@@ -9,12 +9,40 @@
     <meta name="description" content="The HTML5 Herald">
     <meta name="author" content="SitePoint">
 
-    <link rel="stylesheet" href="css/styles.css?v=1.0">
-
+    <link rel="stylesheet" type="text/css" href="style.css">
 </head>
 
 <body>
-    <script src="js/scripts.js"></script>
+    <div id="app">
+        <div id="title">
+            <img alt="profile"
+                src="https://user-images.githubusercontent.com/22552674/72787134-2d7d7380-3be4-11ea-8db5-332632bcf1c4.png">
+        </div>
+        <ul>
+            <template v-for="(link, index) in links">
+                <li>
+                    <div class="landscape" v-bind:style="{backgroundImage: 'url(' + images[index] + ')' }">
+                        <b class="links">{{ link }}</b>
+                    </div>
+                </li>
+                
+            </template>
+        </ul>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script>
+        const app = new Vue({
+            el: '#app',
+            data: {
+                links: [
+                    'https://that.this',
+                    'https://another.one'
+                ],
+                images: [
+                    'https://user-images.githubusercontent.com/22552674/72782374-6d3e5e00-3bd8-11ea-8efa-df1223f4f0ae.png',
+                    'https://user-images.githubusercontent.com/22552674/72783461-59e0c200-3bdb-11ea-8284-5503e3d3ecbb.jpg'
+                ]
+            }
+        })
+    </script>
 </body>
-
-</html>
