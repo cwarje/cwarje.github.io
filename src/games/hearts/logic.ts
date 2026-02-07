@@ -78,6 +78,7 @@ export function createHeartsState(players: Player[]): HeartsState {
     phase: passDir === 'none' ? 'playing' : 'passing',
     passDirection: passDir,
     passSelections: {},
+    passConfirmed: {},
     currentTrick: [],
     currentPlayerIndex: findTwoOfClubs(heartsPlayers),
     leadPlayerIndex: findTwoOfClubs(heartsPlayers),
@@ -149,13 +150,21 @@ export function processHeartsAction(state: unknown, action: unknown, playerId: s
 
     case 'confirm-pass': {
       if (s.phase !== 'passing') return state;
-      // Check all players have selected
-      const allSelected = s.players.every(p => {
-        const sel = s.passSelections[p.id];
-        return sel && sel.length === 3;
-      });
-      if (!allSelected) return state;
+      // Verify this player has selected 3 cards
+      const mySelection = s.passSelections[playerId];
+      if (!mySelection || mySelection.length !== 3) return state;
+      // Already confirmed? No-op
+      if (s.passConfirmed[playerId]) return state;
 
+      const newConfirmed = { ...s.passConfirmed, [playerId]: true };
+
+      // Check if ALL players have confirmed
+      const allConfirmed = s.players.every(p => newConfirmed[p.id]);
+      if (!allConfirmed) {
+        return { ...s, passConfirmed: newConfirmed };
+      }
+
+      // All confirmed — execute the pass
       // Build a map of who passes to whom
       const passMap: Record<number, Card[]> = {};
       const receiveMap: Record<number, Card[]> = {};
@@ -184,6 +193,7 @@ export function processHeartsAction(state: unknown, action: unknown, playerId: s
         players: updatedPlayers,
         phase: 'playing' as const,
         passSelections: {},
+        passConfirmed: {},
         currentPlayerIndex: startIdx,
         leadPlayerIndex: startIdx,
       };
@@ -308,6 +318,7 @@ function endRound(s: HeartsState): HeartsState {
     phase: passDir === 'none' ? 'playing' : 'passing',
     passDirection: passDir,
     passSelections: {},
+    passConfirmed: {},
     currentTrick: [],
     currentPlayerIndex: startIdx,
     leadPlayerIndex: startIdx,
@@ -364,7 +375,16 @@ export function runHeartsBotTurn(state: unknown): unknown {
       changed = true;
     }
 
-    // Don't auto-confirm -- wait for the human player to click "Confirm Pass"
+    // Auto-confirm for all bots that have selected their cards
+    for (const botPlayer of current.players) {
+      if (!botPlayer.isBot) continue;
+      if (current.passConfirmed[botPlayer.id]) continue;
+      if (current.passSelections[botPlayer.id]?.length === 3) {
+        current = processHeartsAction(current, { type: 'confirm-pass' }, botPlayer.id) as HeartsState;
+        changed = true;
+      }
+    }
+
     return changed ? current : state;
   }
 

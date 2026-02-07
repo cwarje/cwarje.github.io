@@ -23,6 +23,7 @@ export interface HeartsState {
   phase: 'passing' | 'playing' | 'round-end';
   passDirection: PassDirection;
   passSelections: Record<string, Card[]>; // playerId -> cards selected to pass
+  passConfirmed: Record<string, boolean>; // playerId -> whether they confirmed their pass
   currentTrick: { playerId: string; card: Card }[];
   currentPlayerIndex: number;
   leadPlayerIndex: number;

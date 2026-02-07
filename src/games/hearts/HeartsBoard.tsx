@@ -71,8 +71,10 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
   const isMyTurn = state.currentPlayerIndex === myIndex;
 
   const selectedPass = state.passSelections[myId] || [];
+  const myPassConfirmed = state.passConfirmed[myId] || false;
 
   const togglePassCard = (card: Card) => {
+    if (myPassConfirmed) return; // Can't change selection after confirming
     const isSelected = selectedPass.some(c => cardEquals(c, card));
     let newSelection: Card[];
     if (isSelected) {
@@ -182,8 +184,8 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
         </div>
       )}
 
-      {/* Pass confirm button */}
-      {state.phase === 'passing' && selectedPass.length === 3 && (
+      {/* Pass confirm button or waiting message */}
+      {state.phase === 'passing' && selectedPass.length === 3 && !myPassConfirmed && (
         <div className="text-center">
           <button
             onClick={confirmPass}
@@ -193,6 +195,18 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
           </button>
         </div>
       )}
+      {state.phase === 'passing' && myPassConfirmed && (() => {
+        const waitingOn = state.players.filter(p => !p.isBot && !state.passConfirmed[p.id]);
+        return waitingOn.length > 0 ? (
+          <div className="text-center text-sm text-gray-400">
+            <p>Waiting on {waitingOn.map(p => p.name).join(', ')} to select cards to pass...</p>
+          </div>
+        ) : (
+          <div className="text-center text-sm text-gray-400">
+            <p>All players confirmed. Starting round...</p>
+          </div>
+        );
+      })()}
 
       {/* My hand */}
       {myPlayer && (
@@ -200,7 +214,7 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
           {myPlayer.hand.map((card, i) => {
             const isSelectedForPass = selectedPass.some(c => cardEquals(c, card));
             const canPlay = state.phase === 'playing' && isMyTurn && isValidPlay(state, myIndex, card);
-            const isPassing = state.phase === 'passing';
+            const isPassing = state.phase === 'passing' && !myPassConfirmed;
 
             return (
               <motion.button
