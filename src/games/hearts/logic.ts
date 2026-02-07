@@ -143,7 +143,7 @@ export function processHeartsAction(state: unknown, action: unknown, playerId: s
   switch (a.type) {
     case 'select-pass': {
       if (s.phase !== 'passing') return state;
-      if (a.cards.length !== 3) return state;
+      if (a.cards.length > 3) return state;
       return { ...s, passSelections: { ...s.passSelections, [playerId]: a.cards } };
     }
 
@@ -328,45 +328,48 @@ export function runHeartsBotTurn(state: unknown): unknown {
   const s = state as HeartsState;
   if (s.gameOver) return state;
 
+  // During passing phase, all players select simultaneously -- iterate all bots
+  if (s.phase === 'passing') {
+    let current = s;
+    let changed = false;
+
+    for (const botPlayer of current.players) {
+      if (!botPlayer.isBot) continue;
+      // Skip if this bot already selected
+      if (current.passSelections[botPlayer.id]?.length === 3) continue;
+
+      // Bot selects 3 cards to pass: highest hearts, queen of spades, then highest cards
+      const hand = [...botPlayer.hand];
+      const selected: Card[] = [];
+
+      // Try to pass queen of spades
+      const qos = hand.find(c => c.suit === 'spades' && c.rank === 12);
+      if (qos) selected.push(qos);
+
+      // Pass high hearts
+      const hearts = hand.filter(c => c.suit === 'hearts').sort((a, b) => b.rank - a.rank);
+      for (const h of hearts) {
+        if (selected.length >= 3) break;
+        if (!selected.some(s => cardEquals(s, h))) selected.push(h);
+      }
+
+      // Fill with highest cards
+      const remaining = hand.sort((a, b) => b.rank - a.rank);
+      for (const c of remaining) {
+        if (selected.length >= 3) break;
+        if (!selected.some(s => cardEquals(s, c))) selected.push(c);
+      }
+
+      current = processHeartsAction(current, { type: 'select-pass', cards: selected.slice(0, 3) }, botPlayer.id) as HeartsState;
+      changed = true;
+    }
+
+    // Don't auto-confirm -- wait for the human player to click "Confirm Pass"
+    return changed ? current : state;
+  }
+
   const currentPlayer = s.players[s.currentPlayerIndex];
   if (!currentPlayer.isBot) return state;
-
-  if (s.phase === 'passing') {
-    // Bot selects 3 cards to pass: highest hearts, queen of spades, then highest cards
-    const hand = [...currentPlayer.hand];
-    const selected: Card[] = [];
-
-    // Try to pass queen of spades
-    const qos = hand.find(c => c.suit === 'spades' && c.rank === 12);
-    if (qos) selected.push(qos);
-
-    // Pass high hearts
-    const hearts = hand.filter(c => c.suit === 'hearts').sort((a, b) => b.rank - a.rank);
-    for (const h of hearts) {
-      if (selected.length >= 3) break;
-      if (!selected.some(s => cardEquals(s, h))) selected.push(h);
-    }
-
-    // Fill with highest cards
-    const remaining = hand.sort((a, b) => b.rank - a.rank);
-    for (const c of remaining) {
-      if (selected.length >= 3) break;
-      if (!selected.some(s => cardEquals(s, c))) selected.push(c);
-    }
-
-    const withSelection = processHeartsAction(s, { type: 'select-pass', cards: selected.slice(0, 3) }, currentPlayer.id) as HeartsState;
-
-    // Check if all bots have selected, then confirm
-    const allSelected = withSelection.players.every(p => {
-      const sel = withSelection.passSelections[p.id];
-      return sel && sel.length === 3;
-    });
-
-    if (allSelected) {
-      return processHeartsAction(withSelection, { type: 'confirm-pass' }, currentPlayer.id);
-    }
-    return withSelection;
-  }
 
   if (s.phase === 'playing') {
     const hand = currentPlayer.hand;
