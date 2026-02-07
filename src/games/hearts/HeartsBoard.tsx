@@ -12,8 +12,8 @@ const SUIT_SYMBOLS: Record<Suit, string> = {
 const SUIT_COLORS: Record<Suit, string> = {
   hearts: 'text-red-400',
   diamonds: 'text-red-400',
-  clubs: 'text-white',
-  spades: 'text-white',
+  clubs: 'text-gray-800',
+  spades: 'text-gray-800',
 };
 
 function rankDisplay(rank: number): string {
