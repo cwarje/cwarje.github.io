@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Copy, Plus, Play, Dice5, Heart, Ship } from 'lucide-react';
@@ -32,12 +32,24 @@ const MAX_PLAYERS: Record<GameType, number> = {
 };
 
 export default function Lobby() {
-  useParams<{ roomCode: string }>();
+  const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
-  const { room, isHost, addBot, removeBot, startGame, error } = useRoomContext();
+  const { room, isHost, addBot, removeBot, removePlayer, startGame, rejoinRoom, connecting, error } = useRoomContext();
+  const rejoinAttempted = useRef(false);
+
+  // Auto-rejoin: if we have a room code in the URL but no room state, try to rejoin
+  useEffect(() => {
+    if (!room && !error && !connecting && roomCode && !rejoinAttempted.current) {
+      rejoinAttempted.current = true;
+      rejoinRoom(roomCode).catch(() => {
+        navigate('/');
+      });
+    }
+  }, [room, error, connecting, roomCode, rejoinRoom, navigate]);
 
   useEffect(() => {
-    if (!room && !error) {
+    // Only redirect home if rejoin was attempted and failed
+    if (!room && error && rejoinAttempted.current) {
       navigate('/');
     }
   }, [room, error, navigate]);
@@ -51,7 +63,7 @@ export default function Lobby() {
   if (!room) {
     return (
       <div className="text-center py-20">
-        <p className="text-gray-400">Connecting to room...</p>
+        <p className="text-gray-400">{connecting ? 'Reconnecting...' : 'Connecting to room...'}</p>
       </div>
     );
   }
@@ -130,6 +142,7 @@ export default function Lobby() {
           hostId={room.hostId}
           isHost={isHost}
           onRemoveBot={removeBot}
+          onRemovePlayer={removePlayer}
         />
       </div>
 

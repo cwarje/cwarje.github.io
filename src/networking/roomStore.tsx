@@ -3,6 +3,7 @@ import Peer from 'peerjs';
 type DataConnection = ReturnType<Peer['connect']>;
 import { createHostPeer, createClientPeer, connectToPeer, destroyPeer } from './peer';
 import { generateRoomCode } from '../utils/roomCode';
+import { getDeviceId } from '../utils/deviceId';
 import type { RoomState, RoomContextValue, GameType, Player, ClientMessage, HostMessage } from './types';
 import { createInitialGameState, processGameAction, checkGameOver } from '../games/gameEngine';
 
@@ -24,9 +25,14 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const [myId, setMyId] = useState<string>('');
 
   const peerRef = useRef<Peer | null>(null);
+  // deviceId -> DataConnection (for host tracking clients)
   const connectionsRef = useRef<Map<string, DataConnection>>(new Map());
+  // conn.peer -> deviceId (reverse lookup for incoming messages)
+  const peerDeviceMapRef = useRef<Map<string, string>>(new Map());
   const roomRef = useRef<RoomState | null>(null);
   const gameStateRef = useRef<unknown>(null);
+
+  const deviceId = getDeviceId();
 
   // Keep refs in sync
   useEffect(() => { roomRef.current = room; }, [room]);
@@ -62,25 +68,52 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
       switch (msg.type) {
         case 'join': {
-          const newPlayer: Player = {
-            id: conn.peer,
-            name: msg.playerName,
-            isBot: false,
-            isHost: false,
-            connected: true,
-          };
-          const updatedRoom = {
-            ...currentRoom,
-            players: [...currentRoom.players, newPlayer],
-          };
-          setRoom(updatedRoom);
-          broadcastRoomState(updatedRoom);
+          const clientDeviceId = msg.deviceId;
+          peerDeviceMapRef.current.set(conn.peer, clientDeviceId);
+
+          const existingPlayer = currentRoom.players.find(p => p.id === clientDeviceId);
+
+          if (existingPlayer) {
+            // Reconnecting player — update connection and mark connected
+            connectionsRef.current.set(clientDeviceId, conn);
+            const updatedRoom = {
+              ...currentRoom,
+              players: currentRoom.players.map(p =>
+                p.id === clientDeviceId ? { ...p, connected: true, name: msg.playerName } : p
+              ),
+            };
+            setRoom(updatedRoom);
+            broadcastRoomState(updatedRoom);
+
+            // If game is in progress, send current game state to this client
+            if (currentRoom.phase !== 'lobby' && gameStateRef.current) {
+              conn.send({ type: 'game-state', state: gameStateRef.current } as HostMessage);
+            }
+          } else {
+            // New player
+            const newPlayer: Player = {
+              id: clientDeviceId,
+              name: msg.playerName,
+              isBot: false,
+              isHost: false,
+              connected: true,
+            };
+            connectionsRef.current.set(clientDeviceId, conn);
+            const updatedRoom = {
+              ...currentRoom,
+              players: [...currentRoom.players, newPlayer],
+            };
+            setRoom(updatedRoom);
+            broadcastRoomState(updatedRoom);
+          }
           break;
         }
         case 'action': {
           if (currentRoom.phase === 'playing') {
+            const senderDeviceId = peerDeviceMapRef.current.get(conn.peer);
+            if (!senderDeviceId) return;
             const currentGs = gameStateRef.current;
-            const newGs = processGameAction(currentRoom.gameType, currentGs, msg.payload, conn.peer);
+            const newGs = processGameAction(currentRoom.gameType, currentGs, msg.payload, senderDeviceId);
             if (newGs !== currentGs) {
               setGameState(newGs);
               broadcastGameState(newGs);
@@ -95,13 +128,16 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           break;
         }
         case 'leave': {
+          const leavingDeviceId = peerDeviceMapRef.current.get(conn.peer);
+          if (!leavingDeviceId) return;
           const updatedRoom2 = {
             ...currentRoom,
-            players: currentRoom.players.filter(p => p.id !== conn.peer),
+            players: currentRoom.players.filter(p => p.id !== leavingDeviceId),
           };
           setRoom(updatedRoom2);
           broadcastRoomState(updatedRoom2);
-          connectionsRef.current.delete(conn.peer);
+          connectionsRef.current.delete(leavingDeviceId);
+          peerDeviceMapRef.current.delete(conn.peer);
           break;
         }
       }
@@ -110,18 +146,21 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     conn.on('close', () => {
       const currentRoom = roomRef.current;
       if (!currentRoom) return;
+      const disconnectedDeviceId = peerDeviceMapRef.current.get(conn.peer);
+      if (!disconnectedDeviceId) return;
       const updatedRoom = {
         ...currentRoom,
         players: currentRoom.players.map(p =>
-          p.id === conn.peer ? { ...p, connected: false } : p
+          p.id === disconnectedDeviceId ? { ...p, connected: false } : p
         ),
       };
       setRoom(updatedRoom);
       broadcastRoomState(updatedRoom);
-      connectionsRef.current.delete(conn.peer);
+      connectionsRef.current.delete(disconnectedDeviceId);
+      peerDeviceMapRef.current.delete(conn.peer);
     });
 
-    connectionsRef.current.set(conn.peer, conn);
+    // Don't add to connectionsRef here — wait for the 'join' message which has the deviceId
   }, [broadcastRoomState, broadcastGameState]);
 
   // Create room as host
@@ -132,10 +171,10 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       const roomCode = generateRoomCode();
       const peer = await createHostPeer(roomCode);
       peerRef.current = peer;
-      setMyId(peer.id);
+      setMyId(deviceId);
 
       const hostPlayer: Player = {
-        id: peer.id,
+        id: deviceId,
         name: playerName,
         isBot: false,
         isHost: true,
@@ -147,7 +186,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         gameType,
         players: [hostPlayer],
         phase: 'lobby',
-        hostId: peer.id,
+        hostId: deviceId,
       };
 
       setRoom(newRoom);
@@ -164,16 +203,25 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setConnecting(false);
     }
-  }, [handleConnection]);
+  }, [handleConnection, deviceId]);
 
-  // Join room as client
-  const joinRoom = useCallback(async (roomCode: string, playerName: string) => {
+  // Shared logic for joining a room (used by joinRoom and rejoinRoom)
+  const joinRoomInternal = useCallback(async (roomCode: string, playerName: string) => {
     setError(null);
     setConnecting(true);
     try {
+      // If already connected, clean up first
+      if (peerRef.current) {
+        connectionsRef.current.forEach(conn => conn.close());
+        connectionsRef.current.clear();
+        peerDeviceMapRef.current.clear();
+        destroyPeer(peerRef.current);
+        peerRef.current = null;
+      }
+
       const peer = await createClientPeer();
       peerRef.current = peer;
-      setMyId(peer.id);
+      setMyId(deviceId);
 
       const conn = await connectToPeer(peer, roomCode);
 
@@ -216,7 +264,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         });
 
         connectionsRef.current.set(conn.peer, conn);
-        conn.send({ type: 'join', playerName } as ClientMessage);
+        conn.send({ type: 'join', playerName, deviceId } as ClientMessage);
       });
     } catch (err) {
       setError((err as Error).message);
@@ -226,7 +274,18 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setConnecting(false);
     }
-  }, []);
+  }, [deviceId]);
+
+  // Join room as client (called from Home page with user-provided name)
+  const joinRoom = useCallback(async (roomCode: string, playerName: string) => {
+    await joinRoomInternal(roomCode, playerName);
+  }, [joinRoomInternal]);
+
+  // Rejoin room (called automatically from Lobby/GamePage with stored name)
+  const rejoinRoom = useCallback(async (roomCode: string) => {
+    const storedName = localStorage.getItem('playerName') || `Player${Math.floor(Math.random() * 9999)}`;
+    await joinRoomInternal(roomCode, storedName);
+  }, [joinRoomInternal]);
 
   // Leave room
   const leaveRoom = useCallback(() => {
@@ -241,6 +300,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       });
     }
     connectionsRef.current.clear();
+    peerDeviceMapRef.current.clear();
     destroyPeer(peerRef.current);
     peerRef.current = null;
     setRoom(null);
@@ -248,6 +308,26 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     setMyId('');
     setError(null);
   }, [isHost, broadcast]);
+
+  // Remove player (host only — works for bots and disconnected humans)
+  const removePlayer = useCallback((playerId: string) => {
+    if (!isHost || !room) return;
+    const updatedRoom = {
+      ...room,
+      players: room.players.filter(p => p.id !== playerId),
+    };
+    setRoom(updatedRoom);
+    broadcastRoomState(updatedRoom);
+    // Clean up connection if it exists
+    connectionsRef.current.delete(playerId);
+    // Clean up reverse map
+    for (const [peerKey, devId] of peerDeviceMapRef.current.entries()) {
+      if (devId === playerId) {
+        peerDeviceMapRef.current.delete(peerKey);
+        break;
+      }
+    }
+  }, [isHost, room, broadcastRoomState]);
 
   // Add bot (host only)
   const addBot = useCallback(() => {
@@ -270,16 +350,10 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     broadcastRoomState(updatedRoom);
   }, [isHost, room, broadcastRoomState]);
 
-  // Remove bot (host only)
+  // Remove bot (host only) — kept for backward compatibility, delegates to removePlayer
   const removeBot = useCallback((botId: string) => {
-    if (!isHost || !room) return;
-    const updatedRoom = {
-      ...room,
-      players: room.players.filter(p => p.id !== botId),
-    };
-    setRoom(updatedRoom);
-    broadcastRoomState(updatedRoom);
-  }, [isHost, room, broadcastRoomState]);
+    removePlayer(botId);
+  }, [removePlayer]);
 
   // Start game (host only)
   const startGame = useCallback(() => {
@@ -331,9 +405,12 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
   // Cleanup on unmount
   useEffect(() => {
+    const connections = connectionsRef.current;
+    const peerDeviceMap = peerDeviceMapRef.current;
     return () => {
-      connectionsRef.current.forEach(conn => conn.close());
-      connectionsRef.current.clear();
+      connections.forEach(conn => conn.close());
+      connections.clear();
+      peerDeviceMap.clear();
       destroyPeer(peerRef.current);
     };
   }, []);
@@ -348,7 +425,9 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         myPlayer,
         createRoom,
         joinRoom,
+        rejoinRoom,
         leaveRoom,
+        removePlayer,
         addBot,
         removeBot,
         startGame,

@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { RotateCcw } from 'lucide-react';
 import { useRoomContext } from '../networking/roomStore';
@@ -12,19 +12,32 @@ import type { HeartsState } from '../games/hearts/types';
 import type { BattleshipState } from '../games/battleship/types';
 
 export default function GamePage() {
+  const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
-  const { room, gameState, myId, isHost, sendAction, playAgain, error } = useRoomContext();
+  const { room, gameState, myId, isHost, sendAction, playAgain, rejoinRoom, connecting, error } = useRoomContext();
+  const rejoinAttempted = useRef(false);
+
+  // Auto-rejoin: if we have a room code in the URL but no room state, try to rejoin
+  useEffect(() => {
+    if (!room && !error && !connecting && roomCode && !rejoinAttempted.current) {
+      rejoinAttempted.current = true;
+      rejoinRoom(roomCode).catch(() => {
+        navigate('/');
+      });
+    }
+  }, [room, error, connecting, roomCode, rejoinRoom, navigate]);
 
   useEffect(() => {
-    if (!room) {
+    // Only redirect home if rejoin was attempted and failed
+    if (!room && error && rejoinAttempted.current) {
       navigate('/');
     }
-  }, [room, navigate]);
+  }, [room, error, navigate]);
 
   if (!room || !gameState) {
     return (
       <div className="text-center py-20">
-        <p className="text-gray-400">Loading game...</p>
+        <p className="text-gray-400">{connecting ? 'Reconnecting...' : 'Loading game...'}</p>
       </div>
     );
   }

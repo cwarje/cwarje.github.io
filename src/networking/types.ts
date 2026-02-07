@@ -10,7 +10,7 @@ export interface Player {
 
 // Messages from client to host
 export type ClientMessage =
-  | { type: 'join'; playerName: string }
+  | { type: 'join'; playerName: string; deviceId: string }
   | { type: 'action'; payload: unknown }
   | { type: 'leave' }
   | { type: 'ready' };
@@ -39,7 +39,9 @@ export interface RoomContextValue {
   myPlayer: Player | null;
   createRoom: (gameType: GameType, playerName: string) => Promise<string>;
   joinRoom: (roomCode: string, playerName: string) => Promise<void>;
+  rejoinRoom: (roomCode: string) => Promise<void>;
   leaveRoom: () => void;
+  removePlayer: (playerId: string) => void;
   addBot: () => void;
   removeBot: (botId: string) => void;
   startGame: () => void;

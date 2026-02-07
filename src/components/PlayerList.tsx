@@ -6,9 +6,10 @@ interface PlayerListProps {
   hostId: string;
   isHost: boolean;
   onRemoveBot?: (botId: string) => void;
+  onRemovePlayer?: (playerId: string) => void;
 }
 
-export default function PlayerList({ players, hostId, isHost, onRemoveBot }: PlayerListProps) {
+export default function PlayerList({ players, hostId, isHost, onRemoveBot, onRemovePlayer }: PlayerListProps) {
   return (
     <div className="space-y-2">
       {players.map((player) => (
@@ -46,6 +47,16 @@ export default function PlayerList({ players, hostId, isHost, onRemoveBot }: Pla
               <button
                 onClick={() => onRemoveBot(player.id)}
                 className="w-6 h-6 rounded-md hover:bg-red-500/20 flex items-center justify-center transition-colors cursor-pointer"
+                title="Remove bot"
+              >
+                <X className="w-3.5 h-3.5 text-red-400" />
+              </button>
+            )}
+            {isHost && !player.isBot && !player.connected && player.id !== hostId && onRemovePlayer && (
+              <button
+                onClick={() => onRemovePlayer(player.id)}
+                className="w-6 h-6 rounded-md hover:bg-red-500/20 flex items-center justify-center transition-colors cursor-pointer"
+                title="Remove disconnected player"
               >
                 <X className="w-3.5 h-3.5 text-red-400" />
               </button>
