@@ -4,9 +4,7 @@ import { peerIdFromRoom } from '../utils/roomCode';
 
 // #region agent log
 const _dbg = (loc: string, msg: string, data?: Record<string, unknown>) => {
-  const entry = { location: loc, message: msg, data, timestamp: Date.now() };
-  console.log('[DEBUG]', JSON.stringify(entry));
-  fetch('http://127.0.0.1:7246/ingest/7c5198fc-b39f-48b8-becd-8710e2391c77',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(entry)}).catch(()=>{});
+  console.log('[DEBUG]', JSON.stringify({ location: loc, message: msg, data, timestamp: Date.now() }));
 };
 // #endregion
 
@@ -81,6 +79,57 @@ export function connectToPeer(peer: Peer, roomCode: string): Promise<DataConnect
     _dbg('peer.ts:connectToPeer', 'Connecting to host peer', { roomCode, hostId, localPeerId: peer.id, hypothesisId: 'A,C' });
     // #endregion
     const conn = peer.connect(hostId, { reliable: true });
+
+    // #region agent log
+    // Monitor ICE connection state on the underlying RTCPeerConnection
+    const pollIce = setInterval(() => {
+      const pc = (conn as unknown as { peerConnection?: RTCPeerConnection }).peerConnection;
+      if (pc) {
+        clearInterval(pollIce);
+        _dbg('peer.ts:connectToPeer', 'RTCPeerConnection found', {
+          iceConnectionState: pc.iceConnectionState,
+          connectionState: pc.connectionState,
+          iceGatheringState: pc.iceGatheringState,
+          signalingState: pc.signalingState,
+          hypothesisId: 'G,H',
+        });
+        pc.addEventListener('iceconnectionstatechange', () => {
+          _dbg('peer.ts:connectToPeer', 'ICE connection state changed', {
+            iceConnectionState: pc.iceConnectionState,
+            elapsed: Date.now() - startTime,
+            hypothesisId: 'G,H',
+          });
+        });
+        pc.addEventListener('connectionstatechange', () => {
+          _dbg('peer.ts:connectToPeer', 'Connection state changed', {
+            connectionState: pc.connectionState,
+            elapsed: Date.now() - startTime,
+            hypothesisId: 'G',
+          });
+        });
+        pc.addEventListener('icegatheringstatechange', () => {
+          _dbg('peer.ts:connectToPeer', 'ICE gathering state changed', {
+            iceGatheringState: pc.iceGatheringState,
+            elapsed: Date.now() - startTime,
+            hypothesisId: 'G',
+          });
+        });
+        let candidateCount = 0;
+        pc.addEventListener('icecandidate', (e) => {
+          candidateCount++;
+          _dbg('peer.ts:connectToPeer', 'ICE candidate', {
+            candidateCount,
+            hasCandidate: !!e.candidate,
+            candidateType: e.candidate?.type,
+            protocol: e.candidate?.protocol,
+            elapsed: Date.now() - startTime,
+            hypothesisId: 'G',
+          });
+        });
+      }
+    }, 50);
+    setTimeout(() => clearInterval(pollIce), 12000);
+    // #endregion
     
     conn.on('open', () => {
       // #region agent log
@@ -96,7 +145,15 @@ export function connectToPeer(peer: Peer, roomCode: string): Promise<DataConnect
     });
     setTimeout(() => {
       // #region agent log
-      _dbg('peer.ts:connectToPeer', 'Connection TIMEOUT', { hostId, elapsed: Date.now() - startTime, hypothesisId: 'A' });
+      const pc = (conn as unknown as { peerConnection?: RTCPeerConnection }).peerConnection;
+      _dbg('peer.ts:connectToPeer', 'Connection TIMEOUT', {
+        hostId,
+        elapsed: Date.now() - startTime,
+        finalIceState: pc?.iceConnectionState,
+        finalConnState: pc?.connectionState,
+        finalGatherState: pc?.iceGatheringState,
+        hypothesisId: 'A,G',
+      });
       // #endregion
       reject(new Error('Connection timeout - room may not exist'));
     }, 10000);

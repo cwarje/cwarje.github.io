@@ -63,9 +63,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const handleConnection = useCallback((conn: DataConnection) => {
     // #region agent log
     const _hdbg = (msg: string, data?: Record<string, unknown>) => {
-      const entry = { location: 'roomStore.tsx:handleConnection', message: msg, data, timestamp: Date.now() };
-      console.log('[DEBUG]', JSON.stringify(entry));
-      fetch('http://127.0.0.1:7246/ingest/7c5198fc-b39f-48b8-becd-8710e2391c77',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(entry)}).catch(()=>{});
+      console.log('[DEBUG]', JSON.stringify({ location: 'roomStore.tsx:handleConnection', message: msg, data, timestamp: Date.now() }));
     };
     _hdbg('Incoming connection from peer', { connPeer: conn.peer, connOpen: conn.open, hypothesisId: 'A,D' });
     // #endregion
@@ -220,9 +218,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const joinRoomInternal = useCallback(async (roomCode: string, playerName: string) => {
     // #region agent log
     const _dbg = (msg: string, data?: Record<string, unknown>) => {
-      const entry = { location: 'roomStore.tsx:joinRoomInternal', message: msg, data, timestamp: Date.now() };
-      console.log('[DEBUG]', JSON.stringify(entry));
-      fetch('http://127.0.0.1:7246/ingest/7c5198fc-b39f-48b8-becd-8710e2391c77',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(entry)}).catch(()=>{});
+      console.log('[DEBUG]', JSON.stringify({ location: 'roomStore.tsx:joinRoomInternal', message: msg, data, timestamp: Date.now() }));
     };
     const joinStart = Date.now();
     _dbg('joinRoomInternal START', { roomCode, playerName, deviceId, hypothesisId: 'C,D' });
