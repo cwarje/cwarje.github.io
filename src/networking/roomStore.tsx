@@ -177,38 +177,47 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
       const conn = await connectToPeer(peer, roomCode);
 
-      conn.on('data', (data) => {
-        const msg = data as HostMessage;
-        switch (msg.type) {
-          case 'room-state':
-            setRoom(msg.state);
-            break;
-          case 'game-state':
-            setGameState(msg.state);
-            break;
-          case 'error':
-            setError(msg.message);
-            break;
-          case 'host-disconnected':
-            setError('Host disconnected');
-            setRoom(null);
-            setGameState(null);
-            destroyPeer(peerRef.current);
-            peerRef.current = null;
-            break;
-        }
+      // Wait for the first room-state from the host before resolving,
+      // so that room is populated before we navigate to the lobby page.
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timeout waiting for room state')), 10000);
+        let resolved = false;
+
+        conn.on('data', (data) => {
+          const msg = data as HostMessage;
+          switch (msg.type) {
+            case 'room-state':
+              setRoom(msg.state);
+              if (!resolved) { resolved = true; clearTimeout(timeout); resolve(); }
+              break;
+            case 'game-state':
+              setGameState(msg.state);
+              break;
+            case 'error':
+              setError(msg.message);
+              if (!resolved) { resolved = true; clearTimeout(timeout); reject(new Error(msg.message)); }
+              break;
+            case 'host-disconnected':
+              setError('Host disconnected');
+              setRoom(null);
+              setGameState(null);
+              destroyPeer(peerRef.current);
+              peerRef.current = null;
+              if (!resolved) { resolved = true; clearTimeout(timeout); reject(new Error('Host disconnected')); }
+              break;
+          }
+        });
+
+        conn.on('close', () => {
+          setError('Disconnected from host');
+          setRoom(null);
+          setGameState(null);
+          if (!resolved) { resolved = true; clearTimeout(timeout); reject(new Error('Disconnected from host')); }
+        });
+
+        connectionsRef.current.set(conn.peer, conn);
+        conn.send({ type: 'join', playerName } as ClientMessage);
       });
-
-      conn.on('close', () => {
-        setError('Disconnected from host');
-        setRoom(null);
-        setGameState(null);
-      });
-
-      connectionsRef.current.set(conn.peer, conn);
-
-      // Send join message
-      conn.send({ type: 'join', playerName } as ClientMessage);
     } catch (err) {
       setError((err as Error).message);
       destroyPeer(peerRef.current);
