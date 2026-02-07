@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Copy, Plus, Play, Dice5, Heart, Ship } from 'lucide-react';
 import { useRoomContext } from '../networking/roomStore';
+import { useToast } from '../components/Toast';
 import PlayerList from '../components/PlayerList';
 import LeaveButton from '../components/LeaveButton';
 import type { GameType } from '../networking/types';
@@ -34,12 +35,18 @@ const MAX_PLAYERS: Record<GameType, number> = {
 export default function Lobby() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
-  const { room, isHost, addBot, removeBot, removePlayer, startGame, rejoinRoom, connecting, error } = useRoomContext();
+  const { room, isHost, addBot, removeBot, removePlayer, startGame, rejoinRoom, connecting, error, clearError } = useRoomContext();
+  const { toast } = useToast();
   const rejoinAttempted = useRef(false);
+  const hasHadRoom = useRef(!!room);
 
-  // Auto-rejoin: if we have a room code in the URL but no room state, try to rejoin
   useEffect(() => {
-    if (!room && !error && !connecting && roomCode && !rejoinAttempted.current) {
+    if (room) hasHadRoom.current = true;
+  }, [room]);
+
+  // Auto-rejoin: only if we NEVER had a room (direct URL navigation)
+  useEffect(() => {
+    if (!room && !error && !connecting && roomCode && !rejoinAttempted.current && !hasHadRoom.current) {
       rejoinAttempted.current = true;
       rejoinRoom(roomCode).catch(() => {
         navigate('/');
@@ -48,11 +55,15 @@ export default function Lobby() {
   }, [room, error, connecting, roomCode, rejoinRoom, navigate]);
 
   useEffect(() => {
-    // Only redirect home if rejoin was attempted and failed
-    if (!room && error && rejoinAttempted.current) {
+    if (!room && error) {
+      const message = error.includes('Host disconnected') || error.includes('Disconnected from host')
+        ? 'Host disconnected. The lobby is closed.'
+        : error;
+      toast(message, 'info');
+      clearError();
       navigate('/');
     }
-  }, [room, error, navigate]);
+  }, [room, error, navigate, toast, clearError]);
 
   useEffect(() => {
     if (room?.phase === 'playing' || room?.phase === 'finished') {

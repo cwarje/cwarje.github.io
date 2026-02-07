@@ -1,13 +1,16 @@
 import { PhoneOff } from 'lucide-react';
 import { useRoomContext } from '../networking/roomStore';
+import { useToast } from './Toast';
 import { useNavigate } from 'react-router-dom';
 
 export default function LeaveButton() {
   const { leaveRoom } = useRoomContext();
+  const { toast } = useToast();
   const navigate = useNavigate();
 
   const handleLeave = () => {
     leaveRoom();
+    toast('Left lobby. The lobby is closed.', 'info');
     navigate('/');
   };
 

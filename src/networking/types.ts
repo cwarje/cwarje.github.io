@@ -48,5 +48,6 @@ export interface RoomContextValue {
   sendAction: (payload: unknown) => void;
   playAgain: () => void;
   error: string | null;
+  clearError: () => void;
   connecting: boolean;
 }

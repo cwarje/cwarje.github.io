@@ -249,6 +249,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
               setError('Host disconnected');
               setRoom(null);
               setGameState(null);
+              connectionsRef.current.clear();
+              peerDeviceMapRef.current.clear();
               destroyPeer(peerRef.current);
               peerRef.current = null;
               if (!resolved) { resolved = true; clearTimeout(timeout); reject(new Error('Host disconnected')); }
@@ -403,6 +405,9 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     broadcastGameState(gs);
   }, [isHost, room, broadcastRoomState, broadcastGameState]);
 
+  // Clear error
+  const clearError = useCallback(() => setError(null), []);
+
   // Cleanup on unmount
   useEffect(() => {
     const connections = connectionsRef.current;
@@ -434,6 +439,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         sendAction,
         playAgain,
         error,
+        clearError,
         connecting,
       }}
     >

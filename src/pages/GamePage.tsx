@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { RotateCcw } from 'lucide-react';
 import { useRoomContext } from '../networking/roomStore';
+import { useToast } from '../components/Toast';
 import LeaveButton from '../components/LeaveButton';
 import YahtzeeBoard from '../games/yahtzee/YahtzeeBoard';
 import HeartsBoard from '../games/hearts/HeartsBoard';
@@ -14,12 +15,18 @@ import type { BattleshipState } from '../games/battleship/types';
 export default function GamePage() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
-  const { room, gameState, myId, isHost, sendAction, playAgain, rejoinRoom, connecting, error } = useRoomContext();
+  const { room, gameState, myId, isHost, sendAction, playAgain, rejoinRoom, connecting, error, clearError } = useRoomContext();
+  const { toast } = useToast();
   const rejoinAttempted = useRef(false);
+  const hasHadRoom = useRef(!!room);
 
-  // Auto-rejoin: if we have a room code in the URL but no room state, try to rejoin
   useEffect(() => {
-    if (!room && !error && !connecting && roomCode && !rejoinAttempted.current) {
+    if (room) hasHadRoom.current = true;
+  }, [room]);
+
+  // Auto-rejoin: only if we NEVER had a room (direct URL navigation)
+  useEffect(() => {
+    if (!room && !error && !connecting && roomCode && !rejoinAttempted.current && !hasHadRoom.current) {
       rejoinAttempted.current = true;
       rejoinRoom(roomCode).catch(() => {
         navigate('/');
@@ -28,11 +35,15 @@ export default function GamePage() {
   }, [room, error, connecting, roomCode, rejoinRoom, navigate]);
 
   useEffect(() => {
-    // Only redirect home if rejoin was attempted and failed
-    if (!room && error && rejoinAttempted.current) {
+    if (!room && error) {
+      const message = error.includes('Host disconnected') || error.includes('Disconnected from host')
+        ? 'Host disconnected. The lobby is closed.'
+        : error;
+      toast(message, 'info');
+      clearError();
       navigate('/');
     }
-  }, [room, error, navigate]);
+  }, [room, error, navigate, toast, clearError]);
 
   if (!room || !gameState) {
     return (
