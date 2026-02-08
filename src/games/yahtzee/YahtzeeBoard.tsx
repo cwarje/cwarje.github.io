@@ -8,8 +8,8 @@ import {
   getUpperTotal,
   getLowerTotal,
   hasUpperBonus,
-  isUpperComplete,
 } from './logic';
+import LeaveButton from '../../components/LeaveButton';
 
 const DICE_ICONS = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6];
 
@@ -36,9 +36,10 @@ interface YahtzeeBoardProps {
   state: YahtzeeState;
   myId: string;
   onAction: (action: unknown) => void;
+  roomCode: string;
 }
 
-export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProps) {
+export default function YahtzeeBoard({ state, myId, onAction, roomCode }: YahtzeeBoardProps) {
   const isMyTurn = state.players[state.currentPlayerIndex]?.id === myId;
   const currentPlayer = state.players[state.currentPlayerIndex];
   const myPlayer = state.players.find(p => p.id === myId);
@@ -159,6 +160,9 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
         animate={{ opacity: 1 }}
         className="max-w-md mx-auto space-y-6 text-center"
       >
+        <div className="flex justify-end">
+          <LeaveButton variant="icon" />
+        </div>
         <Trophy className="w-16 h-16 text-amber-400 mx-auto" />
         <h2 className="text-3xl font-extrabold text-white">Game Over!</h2>
         <div className="space-y-3">
@@ -174,7 +178,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
               <div className="flex items-center gap-3">
                 <span
                   className={`text-lg font-bold ${
-                    i === 0 ? 'text-amber-400' : 'text-gray-400'
+                    i === 0 ? 'text-amber-400' : 'text-white/60'
                   }`}
                 >
                   #{i + 1}
@@ -212,11 +216,11 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
         onClick={() => canScore && handleScore(category)}
         className={`py-1.5 px-2 text-center font-mono text-xs transition-colors ${
           scored !== null
-            ? 'text-gray-400'
+            ? 'bg-green-600/25 text-white'
             : canScore
             ? 'text-primary-400 font-bold cursor-pointer hover:bg-primary-600/20 active:bg-primary-600/30'
-            : 'text-gray-700'
-        } ${isCurrent ? 'bg-white/[0.03]' : ''}`}
+            : 'text-white/30'
+        } ${isCurrent && scored === null ? 'bg-white/[0.03]' : ''}`}
       >
         {scored !== null ? scored : potential !== null ? potential : '-'}
       </td>
@@ -225,9 +229,152 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
 
   return (
     <div className="space-y-5">
+      {/* Score Table (at the top) */}
+      <div className="glass rounded-2xl p-3 overflow-x-auto">
+        <table className="w-full border-collapse text-xs">
+          <thead>
+            <tr className="border-b border-white/10">
+              <th className="text-left py-2 px-2 max-w-[300px]">
+                <div className="text-white font-bold text-sm capitalize">Yahtzee</div>
+                <div className="text-white/50 text-[10px] font-normal">Room: {roomCode}</div>
+              </th>
+              {state.players.map((player) => {
+                const isMe = player.id === myId;
+                const isCurrent = state.players[state.currentPlayerIndex]?.id === player.id;
+                return (
+                  <th
+                    key={player.id}
+                    className={`py-2 px-2 text-center font-medium min-w-[56px] ${
+                      isCurrent
+                        ? 'text-primary-400'
+                        : isMe
+                        ? 'text-primary-300'
+                        : 'text-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span className="truncate max-w-[72px]">
+                        {player.name}
+                        {isMe && (
+                          <span className="text-primary-500 text-[10px] ml-0.5">(You)</span>
+                        )}
+                      </span>
+                      {isMe && <LeaveButton variant="icon" />}
+                    </div>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {/* ── Upper Section ── */}
+            {UPPER_CATEGORIES.map(({ key, label }) => (
+              <tr key={key} className="border-b border-white/5">
+                <td className="py-1.5 px-2 text-white max-w-[300px] truncate">{label}</td>
+                {state.players.map((player) => renderScoreCell(player.id, key))}
+              </tr>
+            ))}
+
+            {/* Upper Subtotal */}
+            <tr className="border-b border-white/10 bg-white/[0.03]">
+              <td className="py-1.5 px-2 text-white font-medium max-w-[300px]">Upper Total</td>
+              {state.players.map((player) => {
+                const upper = getUpperTotal(player.scorecard);
+                return (
+                  <td
+                    key={player.id}
+                    className="py-1.5 px-2 text-center font-mono text-white text-xs"
+                  >
+                    {upper}
+                    <span className="text-white/40">/63</span>
+                  </td>
+                );
+              })}
+            </tr>
+
+            {/* Upper Bonus */}
+            <tr className="border-b border-white/10 bg-white/[0.03]">
+              <td className="py-1.5 px-2 text-white font-medium max-w-[300px]">Bonus</td>
+              {state.players.map((player) => {
+                const earned = hasUpperBonus(player.scorecard);
+                const upperTotal = getUpperTotal(player.scorecard);
+                const remaining = Math.max(0, 63 - upperTotal);
+                return (
+                  <td
+                    key={player.id}
+                    className={`py-1.5 px-2 text-center font-mono font-bold text-xs ${
+                      earned ? 'text-green-400' : 'text-white/50'
+                    }`}
+                  >
+                    {earned ? '35' : `0 (${remaining} left)`}
+                  </td>
+                );
+              })}
+            </tr>
+
+            {/* ── Spacer ── */}
+            <tr>
+              <td colSpan={1 + state.players.length} className="py-1" />
+            </tr>
+
+            {/* ── Lower Section ── */}
+            {LOWER_CATEGORIES.map(({ key, label }) => (
+              <tr key={key} className="border-b border-white/5">
+                <td className="py-1.5 px-2 text-white max-w-[300px] truncate">{label}</td>
+                {state.players.map((player) => renderScoreCell(player.id, key))}
+              </tr>
+            ))}
+
+            {/* Lower Subtotal */}
+            <tr className="border-b border-white/10 bg-white/[0.03]">
+              <td className="py-1.5 px-2 text-white font-medium max-w-[300px]">Lower Total</td>
+              {state.players.map((player) => (
+                <td
+                  key={player.id}
+                  className="py-1.5 px-2 text-center font-mono text-white text-xs"
+                >
+                  {getLowerTotal(player.scorecard)}
+                </td>
+              ))}
+            </tr>
+
+            {/* Yahtzee Bonus */}
+            <tr className="border-b border-white/10 bg-white/[0.03]">
+              <td className="py-1.5 px-2 text-white font-medium max-w-[300px]">Yahtzee Bonus</td>
+              {state.players.map((player) => {
+                const bonusCount = state.yahtzeeBonus[player.id] || 0;
+                return (
+                  <td
+                    key={player.id}
+                    className={`py-1.5 px-2 text-center font-mono font-bold text-xs ${
+                      bonusCount > 0 ? 'text-amber-400' : 'text-white/30'
+                    }`}
+                  >
+                    {bonusCount > 0 ? `+${bonusCount * 100}` : '-'}
+                  </td>
+                );
+              })}
+            </tr>
+
+            {/* ── Grand Total ── */}
+            <tr className="border-t-2 border-white/20">
+              <td className="py-2 px-2 text-white font-bold max-w-[300px]">Total</td>
+              {state.players.map((player) => (
+                <td
+                  key={player.id}
+                  className="py-2 px-2 text-center font-mono font-bold text-white text-sm"
+                >
+                  {player.totalScore}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       {/* Turn indicator */}
       <div className="text-center">
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-white">
           Round {state.round}/13 &middot;{' '}
           <span className={isMyTurn ? 'text-primary-400 font-medium' : 'text-white'}>
             {isMyTurn ? 'Your turn' : `${currentPlayer?.name}'s turn`}
@@ -235,7 +382,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
         </p>
       </div>
 
-      {/* Dice */}
+      {/* Dice + Roll Button (below score table) */}
       <div className="flex flex-col items-center gap-4">
         <div className="flex items-center gap-3">
           {displayDice.map((value, i) => {
@@ -277,12 +424,12 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
                 className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                   state.held[i]
                     ? 'bg-primary-600/30 border-2 border-primary-400 shadow-lg shadow-primary-600/20'
-                    : 'bg-white/10 border border-white/10 hover:bg-white/15'
+                    : 'bg-white border border-white/20 hover:bg-white/90'
                 } ${!isMyTurn || !hasRolled ? 'opacity-60' : ''}`}
               >
                 <DiceIcon
                   className={`w-8 h-8 sm:w-10 sm:h-10 ${
-                    state.held[i] ? 'text-primary-300' : 'text-white'
+                    state.held[i] ? 'text-primary-300' : 'text-slate-900'
                   }`}
                 />
               </motion.button>
@@ -300,144 +447,6 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
             {isRolling ? 'Rolling...' : `Roll ${hasRolled ? `(${state.rollsLeft} left)` : ''}`}
           </button>
         )}
-      </div>
-
-      {/* Score Table */}
-      <div className="glass rounded-2xl p-3 overflow-x-auto">
-        <table className="w-full border-collapse text-xs">
-          <thead>
-            <tr className="border-b border-white/10">
-              <th className="text-left py-2 px-2 text-gray-500 font-medium text-[11px] uppercase tracking-wider">
-                Category
-              </th>
-              {state.players.map((player) => {
-                const isMe = player.id === myId;
-                const isCurrent = state.players[state.currentPlayerIndex]?.id === player.id;
-                return (
-                  <th
-                    key={player.id}
-                    className={`py-2 px-2 text-center font-medium min-w-[56px] ${
-                      isCurrent
-                        ? 'text-primary-400'
-                        : isMe
-                        ? 'text-primary-300'
-                        : 'text-gray-300'
-                    }`}
-                  >
-                    <div className="truncate max-w-[72px]">
-                      {player.name}
-                      {isMe && (
-                        <span className="text-primary-500 text-[10px] ml-0.5">(You)</span>
-                      )}
-                    </div>
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {/* ── Upper Section ── */}
-            {UPPER_CATEGORIES.map(({ key, label }) => (
-              <tr key={key} className="border-b border-white/5">
-                <td className="py-1.5 px-2 text-gray-400">{label}</td>
-                {state.players.map((player) => renderScoreCell(player.id, key))}
-              </tr>
-            ))}
-
-            {/* Upper Subtotal */}
-            <tr className="border-b border-white/10 bg-white/[0.03]">
-              <td className="py-1.5 px-2 text-gray-300 font-medium">Upper Total</td>
-              {state.players.map((player) => {
-                const upper = getUpperTotal(player.scorecard);
-                return (
-                  <td
-                    key={player.id}
-                    className="py-1.5 px-2 text-center font-mono text-gray-400 text-xs"
-                  >
-                    {upper}
-                    <span className="text-gray-600">/63</span>
-                  </td>
-                );
-              })}
-            </tr>
-
-            {/* Upper Bonus */}
-            <tr className="border-b border-white/10 bg-white/[0.03]">
-              <td className="py-1.5 px-2 text-gray-300 font-medium">Bonus</td>
-              {state.players.map((player) => {
-                const earned = hasUpperBonus(player.scorecard);
-                const complete = isUpperComplete(player.scorecard);
-                return (
-                  <td
-                    key={player.id}
-                    className={`py-1.5 px-2 text-center font-mono font-bold text-xs ${
-                      earned ? 'text-green-400' : complete ? 'text-gray-600' : 'text-gray-700'
-                    }`}
-                  >
-                    {earned ? '35' : complete ? '0' : '-'}
-                  </td>
-                );
-              })}
-            </tr>
-
-            {/* ── Spacer ── */}
-            <tr>
-              <td colSpan={1 + state.players.length} className="py-1" />
-            </tr>
-
-            {/* ── Lower Section ── */}
-            {LOWER_CATEGORIES.map(({ key, label }) => (
-              <tr key={key} className="border-b border-white/5">
-                <td className="py-1.5 px-2 text-gray-400">{label}</td>
-                {state.players.map((player) => renderScoreCell(player.id, key))}
-              </tr>
-            ))}
-
-            {/* Lower Subtotal */}
-            <tr className="border-b border-white/10 bg-white/[0.03]">
-              <td className="py-1.5 px-2 text-gray-300 font-medium">Lower Total</td>
-              {state.players.map((player) => (
-                <td
-                  key={player.id}
-                  className="py-1.5 px-2 text-center font-mono text-gray-400 text-xs"
-                >
-                  {getLowerTotal(player.scorecard)}
-                </td>
-              ))}
-            </tr>
-
-            {/* Yahtzee Bonus */}
-            <tr className="border-b border-white/10 bg-white/[0.03]">
-              <td className="py-1.5 px-2 text-gray-300 font-medium">Yahtzee Bonus</td>
-              {state.players.map((player) => {
-                const bonusCount = state.yahtzeeBonus[player.id] || 0;
-                return (
-                  <td
-                    key={player.id}
-                    className={`py-1.5 px-2 text-center font-mono font-bold text-xs ${
-                      bonusCount > 0 ? 'text-amber-400' : 'text-gray-700'
-                    }`}
-                  >
-                    {bonusCount > 0 ? `+${bonusCount * 100}` : '-'}
-                  </td>
-                );
-              })}
-            </tr>
-
-            {/* ── Grand Total ── */}
-            <tr className="border-t-2 border-white/20">
-              <td className="py-2 px-2 text-white font-bold">Total</td>
-              {state.players.map((player) => (
-                <td
-                  key={player.id}
-                  className="py-2 px-2 text-center font-mono font-bold text-white text-sm"
-                >
-                  {player.totalScore}
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
       </div>
     </div>
   );
