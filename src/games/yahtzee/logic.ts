@@ -6,6 +6,13 @@ const ALL_CATEGORIES: ScoreCategory[] = [
   'threeOfAKind', 'fourOfAKind', 'fullHouse', 'smallStraight', 'largeStraight', 'yahtzee', 'chance',
 ];
 
+const UPPER_CATS: ScoreCategory[] = ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes'];
+const LOWER_CATS: ScoreCategory[] = ['threeOfAKind', 'fourOfAKind', 'fullHouse', 'smallStraight', 'largeStraight', 'yahtzee', 'chance'];
+
+const DICE_TO_UPPER: Record<number, ScoreCategory> = {
+  1: 'ones', 2: 'twos', 3: 'threes', 4: 'fours', 5: 'fives', 6: 'sixes',
+};
+
 function emptyScorecard(): Scorecard {
   return {
     ones: null, twos: null, threes: null, fours: null, fives: null, sixes: null,
@@ -54,18 +61,94 @@ export function calculateScore(dice: number[], category: ScoreCategory): number 
   }
 }
 
+/** Check if Yahtzee joker rules apply (rolled a Yahtzee with Yahtzee already scored as 50) */
+export function isJokerActive(dice: number[], scorecard: Scorecard): boolean {
+  const isYahtzee = new Set(dice).size === 1;
+  return isYahtzee && scorecard.yahtzee !== null && scorecard.yahtzee > 0;
+}
+
+/** Calculate score for a category, applying joker rules when active */
+export function calculateScoreWithJoker(dice: number[], category: ScoreCategory, scorecard: Scorecard): number {
+  if (!isJokerActive(dice, scorecard)) {
+    return calculateScore(dice, category);
+  }
+
+  // Joker active: upper section scores normally
+  if ((UPPER_CATS as string[]).includes(category)) {
+    return calculateScore(dice, category);
+  }
+
+  // Lower section with joker: guaranteed values regardless of dice pattern
+  const sum = dice.reduce((a, b) => a + b, 0);
+  switch (category) {
+    case 'threeOfAKind': return sum;
+    case 'fourOfAKind': return sum;
+    case 'fullHouse': return 25;
+    case 'smallStraight': return 30;
+    case 'largeStraight': return 40;
+    case 'yahtzee': return 50;
+    case 'chance': return sum;
+    default: return calculateScore(dice, category);
+  }
+}
+
+/** Get categories available for scoring, enforcing joker rules when active */
+export function getAvailableCategories(dice: number[], scorecard: Scorecard): ScoreCategory[] {
+  if (!isJokerActive(dice, scorecard)) {
+    // Normal: all unfilled categories
+    return ALL_CATEGORIES.filter(c => scorecard[c] === null);
+  }
+
+  const diceValue = dice[0]; // All dice are the same value
+  const correspondingUpper = DICE_TO_UPPER[diceValue];
+
+  // 1. Must use corresponding upper section if it's open
+  if (scorecard[correspondingUpper] === null) {
+    return [correspondingUpper];
+  }
+
+  // 2. Any open lower section category (with joker values)
+  const openLower = LOWER_CATS.filter(c => scorecard[c] === null);
+  if (openLower.length > 0) {
+    return openLower;
+  }
+
+  // 3. Fallback: any open upper section category
+  return UPPER_CATS.filter(c => scorecard[c] === null);
+}
+
+/** Get upper section subtotal (ones through sixes) */
+export function getUpperTotal(scorecard: Scorecard): number {
+  let total = 0;
+  UPPER_CATS.forEach(cat => {
+    if (scorecard[cat] !== null) total += scorecard[cat]!;
+  });
+  return total;
+}
+
+/** Get lower section subtotal */
+export function getLowerTotal(scorecard: Scorecard): number {
+  let total = 0;
+  LOWER_CATS.forEach(cat => {
+    if (scorecard[cat] !== null) total += scorecard[cat]!;
+  });
+  return total;
+}
+
+/** Check if upper bonus is earned (upper total >= 63) */
+export function hasUpperBonus(scorecard: Scorecard): boolean {
+  return getUpperTotal(scorecard) >= 63;
+}
+
+/** Check if all upper categories have been filled */
+export function isUpperComplete(scorecard: Scorecard): boolean {
+  return UPPER_CATS.every(cat => scorecard[cat] !== null);
+}
+
 function calcTotal(sc: Scorecard, bonusCount: number): number {
-  let upper = 0;
-  (['ones', 'twos', 'threes', 'fours', 'fives', 'sixes'] as ScoreCategory[]).forEach(cat => {
-    if (sc[cat] !== null) upper += sc[cat]!;
-  });
+  const upper = getUpperTotal(sc);
   const upperBonus = upper >= 63 ? 35 : 0;
-
-  let lower = 0;
-  (['threeOfAKind', 'fourOfAKind', 'fullHouse', 'smallStraight', 'largeStraight', 'yahtzee', 'chance'] as ScoreCategory[]).forEach(cat => {
-    if (sc[cat] !== null) lower += sc[cat]!;
-  });
-
+  const lower = getLowerTotal(sc);
   return upper + upperBonus + lower + bonusCount * 100;
 }
 
@@ -118,7 +201,11 @@ export function processYahtzeeAction(state: unknown, action: unknown, playerId: 
       if (s.rollsLeft === 3) return state; // Must roll first
       if (currentPlayer.scorecard[a.category] !== null) return state;
 
-      const score = calculateScore(s.dice, a.category);
+      // Enforce joker rules: only allowed categories can be scored
+      const available = getAvailableCategories(s.dice, currentPlayer.scorecard);
+      if (!available.includes(a.category)) return state;
+
+      const score = calculateScoreWithJoker(s.dice, a.category, currentPlayer.scorecard);
       const newScorecard = { ...currentPlayer.scorecard, [a.category]: score };
 
       // Yahtzee bonus
@@ -183,11 +270,11 @@ export function runYahtzeeBotTurn(state: unknown): unknown {
     });
   }
 
-  // Decide whether to keep rolling or score
-  const availableCategories = ALL_CATEGORIES.filter(c => currentPlayer.scorecard[c] === null);
-  const bestCategory = pickBestCategory(s.dice, availableCategories);
+  // Decide whether to keep rolling or score (respects joker rules)
+  const availableCategories = getAvailableCategories(s.dice, currentPlayer.scorecard);
+  const bestCategory = pickBestCategory(s.dice, availableCategories, currentPlayer.scorecard);
 
-  if (s.rollsLeft > 0 && shouldReroll(s.dice, bestCategory)) {
+  if (s.rollsLeft > 0 && shouldReroll(s.dice, bestCategory, currentPlayer.scorecard)) {
     // Decide which to hold
     const newHeld = decideBotHolds(s.dice, bestCategory);
     const newDice = rollDice(s.dice, newHeld);
@@ -205,12 +292,12 @@ export function runYahtzeeBotTurn(state: unknown): unknown {
   return processYahtzeeAction(s, { type: 'score', category: bestCategory }, currentPlayer.id);
 }
 
-function pickBestCategory(dice: number[], available: ScoreCategory[]): ScoreCategory {
+function pickBestCategory(dice: number[], available: ScoreCategory[], scorecard: Scorecard): ScoreCategory {
   let best: ScoreCategory = available[0];
   let bestScore = -1;
 
   for (const cat of available) {
-    const score = calculateScore(dice, cat);
+    const score = calculateScoreWithJoker(dice, cat, scorecard);
     // Weight categories by their value relative to expected
     let weight = score;
     if (cat === 'yahtzee' && score === 50) weight = 100;
@@ -224,7 +311,10 @@ function pickBestCategory(dice: number[], available: ScoreCategory[]): ScoreCate
   return best;
 }
 
-function shouldReroll(dice: number[], bestCategory: ScoreCategory): boolean {
+function shouldReroll(dice: number[], bestCategory: ScoreCategory, scorecard: Scorecard): boolean {
+  // Don't reroll if joker is active (already have a Yahtzee!)
+  if (isJokerActive(dice, scorecard)) return false;
+
   const score = calculateScore(dice, bestCategory);
   if (bestCategory === 'yahtzee' && score === 50) return false;
   if (bestCategory === 'largeStraight' && score === 40) return false;
