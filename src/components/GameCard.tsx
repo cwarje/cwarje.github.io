@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import type { GameType } from '../networking/types';
-import { Dice5, Heart, Ship, Crosshair, Club } from 'lucide-react';
+import { Dice5, Heart, Ship, Crosshair, Club, Info } from 'lucide-react';
 
 const GAME_INFO: Record<GameType, { title: string; description: string; players: string; icon: typeof Dice5; gradient: string }> = {
   yahtzee: {
@@ -59,19 +59,41 @@ const BORDER_COLORS: Record<GameType, string> = {
 interface GameCardProps {
   gameType: GameType;
   onSelect: (gameType: GameType) => void;
+  onInfo?: (gameType: GameType) => void;
 }
 
-export default function GameCard({ gameType, onSelect }: GameCardProps) {
+export default function GameCard({ gameType, onSelect, onInfo }: GameCardProps) {
   const info = GAME_INFO[gameType];
   const Icon = info.icon;
 
   return (
-    <motion.button
+    <motion.div
       whileHover={{ scale: 1.02, y: -4 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onSelect(gameType)}
-      className={`w-full text-left p-6 rounded-2xl glass border border-white/5 ${BORDER_COLORS[gameType]} transition-colors duration-300 group cursor-pointer`}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect(gameType);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      className={`relative w-full text-left p-6 rounded-2xl glass border border-white/5 ${BORDER_COLORS[gameType]} transition-colors duration-300 group cursor-pointer`}
     >
+      {onInfo && (
+        <button
+          type="button"
+          aria-label={`About ${info.title}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onInfo(gameType);
+          }}
+          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 hover:border-white/25 flex items-center justify-center transition-all cursor-pointer z-10"
+        >
+          <Info className="w-4 h-4 text-gray-400 hover:text-white transition-colors" />
+        </button>
+      )}
       <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${info.gradient} flex items-center justify-center mb-4`}>
         <Icon className={`w-7 h-7 ${ICON_COLORS[gameType]}`} />
       </div>
@@ -83,6 +105,6 @@ export default function GameCard({ gameType, onSelect }: GameCardProps) {
           Play &rarr;
         </span>
       </div>
-    </motion.button>
+    </motion.div>
   );
 }

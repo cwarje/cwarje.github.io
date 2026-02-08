@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X } from 'lucide-react';
 import GameCard from '../components/GameCard';
 import RoomCodeInput from '../components/RoomCodeInput';
 import { useRoomContext } from '../networking/roomStore';
 import type { GameType } from '../networking/types';
+import { GAME_CATALOG } from '../games/gameCatalog';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -15,6 +17,18 @@ export default function Home() {
   const [nameInput, setNameInput] = useState(playerName);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ type: 'create'; gameType: GameType } | { type: 'join'; code: string } | null>(null);
+  const [infoGameType, setInfoGameType] = useState<GameType | null>(null);
+
+  const closeInfo = useCallback(() => setInfoGameType(null), []);
+
+  useEffect(() => {
+    if (!infoGameType) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeInfo();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [infoGameType, closeInfo]);
 
   const saveName = (name: string) => {
     localStorage.setItem('playerName', name);
@@ -105,10 +119,72 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 + i * 0.1 }}
           >
-            <GameCard gameType={game} onSelect={handleSelectGame} />
+            <GameCard gameType={game} onSelect={handleSelectGame} onInfo={setInfoGameType} />
           </motion.div>
         ))}
       </motion.div>
+
+      {/* Game Info Modal */}
+      <AnimatePresence>
+        {infoGameType && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={closeInfo}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`About ${GAME_CATALOG[infoGameType].title}`}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-md max-h-[80vh] overflow-y-auto space-y-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">{GAME_CATALOG[infoGameType].title}</h2>
+                <button
+                  onClick={closeInfo}
+                  className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
+
+              {/* Goal */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-primary-400 uppercase tracking-wider">Goal</h3>
+                <p className="text-sm text-gray-300 leading-relaxed">{GAME_CATALOG[infoGameType].info.goal}</p>
+              </div>
+
+              {/* How to Play */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-primary-400 uppercase tracking-wider">How to Play</h3>
+                <ol className="space-y-1.5 list-decimal list-inside">
+                  {GAME_CATALOG[infoGameType].info.howToPlay.map((step, i) => (
+                    <li key={i} className="text-sm text-gray-300 leading-relaxed">{step}</li>
+                  ))}
+                </ol>
+              </div>
+
+              {/* Rules */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-primary-400 uppercase tracking-wider">Rules</h3>
+                <ul className="space-y-1.5 list-disc list-inside">
+                  {GAME_CATALOG[infoGameType].info.rules.map((rule, i) => (
+                    <li key={i} className="text-sm text-gray-300 leading-relaxed">{rule}</li>
+                  ))}
+                </ul>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Name Prompt Modal */}
       {showNamePrompt && (
