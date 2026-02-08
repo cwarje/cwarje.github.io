@@ -200,30 +200,6 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
         </div>
       )}
 
-      {/* Pass confirm button or waiting message */}
-      {state.phase === 'passing' && selectedPass.length === 3 && !myPassConfirmed && (
-        <div className="text-center">
-          <button
-            onClick={confirmPass}
-            className="px-6 py-3 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 transition-colors cursor-pointer"
-          >
-            Confirm Pass
-          </button>
-        </div>
-      )}
-      {state.phase === 'passing' && myPassConfirmed && (() => {
-        const waitingOn = state.players.filter(p => !p.isBot && !state.passConfirmed[p.id]);
-        return waitingOn.length > 0 ? (
-          <div className="text-center text-sm text-gray-400">
-            <p>Waiting on {waitingOn.map(p => p.name).join(', ')} to select cards to pass...</p>
-          </div>
-        ) : (
-          <div className="text-center text-sm text-gray-400">
-            <p>All players confirmed. Starting round...</p>
-          </div>
-        );
-      })()}
-
       {/* My hand */}
       {myPlayer && (
         <div className="flex flex-wrap items-end justify-center gap-1 sm:gap-2 min-h-[140px] pb-4">
@@ -264,6 +240,30 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
           })}
         </div>
       )}
+
+      {/* Pass confirm button or waiting message */}
+      <div className="min-h-[56px] flex items-center justify-center">
+        {state.phase === 'passing' && selectedPass.length === 3 && !myPassConfirmed && (
+          <button
+            onClick={confirmPass}
+            className="px-6 py-3 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 transition-colors cursor-pointer"
+          >
+            Confirm Pass
+          </button>
+        )}
+        {state.phase === 'passing' && myPassConfirmed && (() => {
+          const waitingOn = state.players.filter(p => !p.isBot && !state.passConfirmed[p.id]);
+          return waitingOn.length > 0 ? (
+            <div className="text-center text-sm text-gray-400">
+              <p>Waiting on {waitingOn.map(p => p.name).join(', ')} to select cards to pass...</p>
+            </div>
+          ) : (
+            <div className="text-center text-sm text-gray-400">
+              <p>All players confirmed. Starting round...</p>
+            </div>
+          );
+        })()}
+      </div>
     </div>
   );
 }
