@@ -3,6 +3,7 @@ import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotT
 import { createHeartsState, processHeartsAction, isHeartsOver, runHeartsBotTurn } from './hearts/logic';
 import { createBattleshipState, processBattleshipAction, isBattleshipOver, runBattleshipBotTurn } from './battleship/logic';
 import { createLiarsDiceState, processLiarsDiceAction, isLiarsDiceOver, runLiarsDiceBotTurn } from './liars-dice/logic';
+import { createPokerState, processPokerAction, isPokerOver, runPokerBotTurn } from './poker/logic';
 
 export function createInitialGameState(gameType: GameType, players: Player[]): unknown {
   switch (gameType) {
@@ -10,6 +11,7 @@ export function createInitialGameState(gameType: GameType, players: Player[]): u
     case 'hearts': return createHeartsState(players);
     case 'battleship': return createBattleshipState(players);
     case 'liars-dice': return createLiarsDiceState(players);
+    case 'poker': return createPokerState(players);
   }
 }
 
@@ -20,10 +22,11 @@ export function processGameAction(gameType: GameType, state: unknown, action: un
     case 'hearts': newState = processHeartsAction(state, action, playerId); break;
     case 'battleship': newState = processBattleshipAction(state, action, playerId); break;
     case 'liars-dice': newState = processLiarsDiceAction(state, action, playerId); break;
+    case 'poker': newState = processPokerAction(state, action, playerId); break;
     default: return state;
   }
-  // For Hearts and Liar's Dice, bot turns are scheduled with delays by the host — don't auto-run them
-  if (gameType === 'hearts' || gameType === 'liars-dice') return newState;
+  // For Hearts, Liar's Dice, and Poker, bot turns are scheduled with delays by the host — don't auto-run them
+  if (gameType === 'hearts' || gameType === 'liars-dice' || gameType === 'poker') return newState;
   // For other games, run bot turns synchronously as before
   return runBotTurns(gameType, newState);
 }
@@ -34,6 +37,7 @@ export function checkGameOver(gameType: GameType, state: unknown): boolean {
     case 'hearts': return isHeartsOver(state);
     case 'battleship': return isBattleshipOver(state);
     case 'liars-dice': return isLiarsDiceOver(state);
+    case 'poker': return isPokerOver(state);
     default: return false;
   }
 }
@@ -46,6 +50,7 @@ export function runSingleBotTurn(gameType: GameType, state: unknown): unknown {
     case 'hearts': return runHeartsBotTurn(state);
     case 'battleship': return runBattleshipBotTurn(state);
     case 'liars-dice': return runLiarsDiceBotTurn(state);
+    case 'poker': return runPokerBotTurn(state);
     default: return state;
   }
 }
@@ -63,6 +68,7 @@ function runBotTurns(gameType: GameType, state: unknown): unknown {
       case 'hearts': next = runHeartsBotTurn(current); break;
       case 'battleship': next = runBattleshipBotTurn(current); break;
       case 'liars-dice': next = runLiarsDiceBotTurn(current); break;
+      case 'poker': next = runPokerBotTurn(current); break;
       default: return current;
     }
     if (next === current) break; // No bot action taken

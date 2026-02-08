@@ -1,4 +1,4 @@
-export type GameType = 'yahtzee' | 'hearts' | 'battleship' | 'liars-dice';
+export type GameType = 'yahtzee' | 'hearts' | 'battleship' | 'liars-dice' | 'poker';
 
 export interface Player {
   id: string;

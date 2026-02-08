@@ -8,6 +8,7 @@ import type { RoomState, RoomContextValue, GameType, Player, ClientMessage, Host
 import { createInitialGameState, processGameAction, checkGameOver, runSingleBotTurn } from '../games/gameEngine';
 import type { HeartsState } from '../games/hearts/types';
 import type { LiarsDiceState } from '../games/liars-dice/types';
+import type { PokerState } from '../games/poker/types';
 
 const BOT_NAMES = ['Nova', 'Pixel', 'Byte', 'Chip', 'Blaze', 'Echo', 'Neon', 'Volt'];
 
@@ -410,7 +411,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   // Clear error
   const clearError = useCallback(() => setError(null), []);
 
-  // --- Bot turn scheduling (host only, Hearts & Liar's Dice) ---
+  // --- Bot turn scheduling (host only, Hearts & Liar's Dice & Poker) ---
   const BOT_PLAY_DELAY = 800;   // ms between each bot card play
   const TRICK_DISPLAY_DELAY = 2000; // ms to show completed trick before collecting
   const LIARS_DICE_BOT_DELAY = 1200; // ms between bot actions in Liar's Dice
@@ -576,6 +577,33 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         if (allPulled) {
           runBotStep(LIARS_DICE_NEXT_ROUND_DELAY);
         }
+      }
+    }
+
+    // ── Poker bot scheduling ──
+    if (room.gameType === 'poker') {
+      const ps = gameState as PokerState;
+      if (ps.gameOver || ps.street === 'showdown') return;
+
+      const currentPlayer = ps.players[ps.currentPlayerIndex];
+      if (currentPlayer && currentPlayer.isBot && !currentPlayer.folded && !currentPlayer.allIn) {
+        const POKER_BOT_DELAY = 1000;
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom) return;
+
+          const next = runSingleBotTurn('poker', currentGs);
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('poker', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, POKER_BOT_DELAY);
       }
     }
   }, [gameState, isHost, room, broadcastGameState, broadcastRoomState]);

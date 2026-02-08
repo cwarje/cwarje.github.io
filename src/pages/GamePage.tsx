@@ -9,10 +9,12 @@ import YahtzeeBoard from '../games/yahtzee/YahtzeeBoard';
 import HeartsBoard from '../games/hearts/HeartsBoard';
 import BattleshipBoard from '../games/battleship/BattleshipBoard';
 import LiarsDiceBoard from '../games/liars-dice/LiarsDiceBoard';
+import PokerBoard from '../games/poker/PokerBoard';
 import type { YahtzeeState } from '../games/yahtzee/types';
 import type { HeartsState } from '../games/hearts/types';
 import type { BattleshipState } from '../games/battleship/types';
 import type { LiarsDiceState } from '../games/liars-dice/types';
+import type { PokerState } from '../games/poker/types';
 
 export default function GamePage() {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -103,6 +105,9 @@ export default function GamePage() {
         )}
         {room.gameType === 'liars-dice' && (
           <LiarsDiceBoard state={gameState as LiarsDiceState} myId={myId} onAction={sendAction} />
+        )}
+        {room.gameType === 'poker' && (
+          <PokerBoard state={gameState as PokerState} myId={myId} onAction={sendAction} />
         )}
       </motion.div>
     </div>

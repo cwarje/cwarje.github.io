@@ -98,7 +98,7 @@ export default function Home() {
         transition={{ delay: 0.2 }}
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
       >
-        {(['yahtzee', 'hearts', 'battleship', 'liars-dice'] as GameType[]).map((game, i) => (
+        {(['yahtzee', 'hearts', 'battleship', 'liars-dice', 'poker'] as GameType[]).map((game, i) => (
           <motion.div
             key={game}
             initial={{ opacity: 0, y: 20 }}

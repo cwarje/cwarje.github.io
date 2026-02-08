@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import type { GameType } from '../networking/types';
-import { Dice5, Heart, Ship, Crosshair } from 'lucide-react';
+import { Dice5, Heart, Ship, Crosshair, Club } from 'lucide-react';
 
 const GAME_INFO: Record<GameType, { title: string; description: string; players: string; icon: typeof Dice5; gradient: string }> = {
   yahtzee: {
@@ -31,6 +31,13 @@ const GAME_INFO: Record<GameType, { title: string; description: string; players:
     icon: Crosshair,
     gradient: 'from-emerald-500/20 to-green-600/20',
   },
+  poker: {
+    title: 'Poker',
+    description: 'Texas Hold\'em with blinds, betting rounds, and side pots. Bluff your way to the chips!',
+    players: '2-8 Players',
+    icon: Club,
+    gradient: 'from-violet-500/20 to-purple-600/20',
+  },
 };
 
 const ICON_COLORS: Record<GameType, string> = {
@@ -38,6 +45,7 @@ const ICON_COLORS: Record<GameType, string> = {
   hearts: 'text-rose-400',
   battleship: 'text-cyan-400',
   'liars-dice': 'text-emerald-400',
+  poker: 'text-violet-400',
 };
 
 const BORDER_COLORS: Record<GameType, string> = {
@@ -45,6 +53,7 @@ const BORDER_COLORS: Record<GameType, string> = {
   hearts: 'hover:border-rose-500/30',
   battleship: 'hover:border-cyan-500/30',
   'liars-dice': 'hover:border-emerald-500/30',
+  poker: 'hover:border-violet-500/30',
 };
 
 interface GameCardProps {

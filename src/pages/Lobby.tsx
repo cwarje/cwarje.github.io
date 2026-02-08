@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Copy, Plus, Play, Dice5, Heart, Ship, Crosshair } from 'lucide-react';
+import { Copy, Plus, Play, Dice5, Heart, Ship, Crosshair, Club } from 'lucide-react';
 import { useRoomContext } from '../networking/roomStore';
 import { useToast } from '../components/Toast';
 import PlayerList from '../components/PlayerList';
@@ -13,6 +13,7 @@ const GAME_TITLES: Record<GameType, string> = {
   hearts: 'Hearts',
   battleship: 'Battleship',
   'liars-dice': "Liar's Dice",
+  poker: 'Poker',
 };
 
 const GAME_ICONS: Record<GameType, typeof Dice5> = {
@@ -20,6 +21,7 @@ const GAME_ICONS: Record<GameType, typeof Dice5> = {
   hearts: Heart,
   battleship: Ship,
   'liars-dice': Crosshair,
+  poker: Club,
 };
 
 const MIN_PLAYERS: Record<GameType, number> = {
@@ -27,6 +29,7 @@ const MIN_PLAYERS: Record<GameType, number> = {
   hearts: 4,
   battleship: 2,
   'liars-dice': 2,
+  poker: 2,
 };
 
 const MAX_PLAYERS: Record<GameType, number> = {
@@ -34,6 +37,7 @@ const MAX_PLAYERS: Record<GameType, number> = {
   hearts: 4,
   battleship: 2,
   'liars-dice': 4,
+  poker: 8,
 };
 
 export default function Lobby() {
