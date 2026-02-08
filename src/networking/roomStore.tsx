@@ -5,7 +5,8 @@ import { createHostPeer, createClientPeer, connectToPeer, destroyPeer } from './
 import { generateRoomCode } from '../utils/roomCode';
 import { getDeviceId } from '../utils/deviceId';
 import type { RoomState, RoomContextValue, GameType, Player, ClientMessage, HostMessage } from './types';
-import { createInitialGameState, processGameAction, checkGameOver } from '../games/gameEngine';
+import { createInitialGameState, processGameAction, checkGameOver, runSingleBotTurn } from '../games/gameEngine';
+import type { HeartsState } from '../games/hearts/types';
 
 const BOT_NAMES = ['Nova', 'Pixel', 'Byte', 'Chip', 'Blaze', 'Echo', 'Neon', 'Volt'];
 
@@ -408,11 +409,94 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   // Clear error
   const clearError = useCallback(() => setError(null), []);
 
+  // --- Bot turn scheduling (host only, Hearts) ---
+  const BOT_PLAY_DELAY = 800;   // ms between each bot card play
+  const TRICK_DISPLAY_DELAY = 2000; // ms to show completed trick before collecting
+  const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    // Clear any pending timer when state changes
+    if (botTimerRef.current) {
+      clearTimeout(botTimerRef.current);
+      botTimerRef.current = null;
+    }
+
+    if (!isHost || !room || room.phase !== 'playing' || !gameState) return;
+    if (room.gameType !== 'hearts') return;
+
+    const hs = gameState as HeartsState;
+    if (hs.gameOver) return;
+
+    // If trick is complete (trickWinner set), schedule resolve-trick after delay
+    if (hs.trickWinner) {
+      botTimerRef.current = setTimeout(() => {
+        const currentGs = gameStateRef.current as HeartsState | null;
+        const currentRoom = roomRef.current;
+        if (!currentGs || !currentRoom || !currentGs.trickWinner) return;
+
+        const resolved = processGameAction('hearts', currentGs, { type: 'resolve-trick' }, '');
+        if (resolved !== currentGs) {
+          setGameState(resolved);
+          broadcastGameState(resolved);
+          if (checkGameOver('hearts', resolved)) {
+            const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+            setRoom(finishedRoom);
+            broadcastRoomState(finishedRoom);
+          }
+        }
+      }, TRICK_DISPLAY_DELAY);
+      return;
+    }
+
+    // During passing phase, run bot selections (bots pass simultaneously, no visible delay needed)
+    if (hs.phase === 'passing') {
+      const botsNeedToAct = hs.players.some(p => p.isBot && (!hs.passSelections[p.id] || hs.passSelections[p.id].length < 3 || !hs.passConfirmed[p.id]));
+      if (botsNeedToAct) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom) return;
+
+          const next = runSingleBotTurn('hearts', currentGs);
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+          }
+        }, 100); // Short delay for passing — it's simultaneous and hidden
+      }
+      return;
+    }
+
+    // During playing phase, schedule bot card play if it's a bot's turn
+    if (hs.phase === 'playing') {
+      const currentPlayer = hs.players[hs.currentPlayerIndex];
+      if (currentPlayer && currentPlayer.isBot) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom) return;
+
+          const next = runSingleBotTurn('hearts', currentGs);
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('hearts', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, BOT_PLAY_DELAY);
+      }
+    }
+  }, [gameState, isHost, room, broadcastGameState, broadcastRoomState]);
+
   // Cleanup on unmount
   useEffect(() => {
     const connections = connectionsRef.current;
     const peerDeviceMap = peerDeviceMapRef.current;
     return () => {
+      if (botTimerRef.current) clearTimeout(botTimerRef.current);
       connections.forEach(conn => conn.close());
       connections.clear();
       peerDeviceMap.clear();

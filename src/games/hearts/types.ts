@@ -32,9 +32,11 @@ export interface HeartsState {
   roundNumber: number;
   gameOver: boolean;
   winner: string | null;
+  trickWinner: string | null; // playerId of trick winner, set when trick is complete but not yet resolved
 }
 
 export type HeartsAction =
   | { type: 'select-pass'; cards: Card[] }
   | { type: 'confirm-pass' }
-  | { type: 'play-card'; card: Card };
+  | { type: 'play-card'; card: Card }
+  | { type: 'resolve-trick' };

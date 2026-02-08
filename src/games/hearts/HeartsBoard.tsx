@@ -155,31 +155,47 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
 
       {/* Current trick */}
       {state.phase === 'playing' && (
-        <div className="flex items-center justify-center gap-3 min-h-[120px]">
-          {state.currentTrick.length === 0 ? (
-            <p className="text-gray-600 text-sm">Waiting for lead...</p>
-          ) : (
-            state.currentTrick.map((entry, i) => {
-              const player = state.players.find(p => p.id === entry.playerId);
-              return (
-                <motion.div
-                  key={i}
-                  initial={{ scale: 0.8, opacity: 0, y: 20 }}
-                  animate={{ scale: 1, opacity: 1, y: 0 }}
-                  className="text-center"
-                >
-                  <div className="w-16 h-24 rounded-lg bg-white border border-gray-200 shadow-md flex flex-col items-center justify-center">
-                    <span className={`text-2xl font-bold ${SUIT_COLORS[entry.card.suit]}`}>
-                      {SUIT_SYMBOLS[entry.card.suit]}
-                    </span>
-                    <span className={`text-sm font-bold ${SUIT_COLORS[entry.card.suit]}`}>
-                      {rankDisplay(entry.card.rank)}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-gray-500 mt-1">{player?.name}</p>
-                </motion.div>
-              );
-            })
+        <div className="flex flex-col items-center gap-2 min-h-[120px]">
+          <div className="flex items-center justify-center gap-3">
+            {state.currentTrick.length === 0 ? (
+              <p className="text-gray-600 text-sm">Waiting for lead...</p>
+            ) : (
+              state.currentTrick.map((entry, i) => {
+                const player = state.players.find(p => p.id === entry.playerId);
+                const isWinner = state.trickWinner === entry.playerId;
+                return (
+                  <motion.div
+                    key={`${state.trickNumber}-${i}`}
+                    initial={{ scale: 0.8, opacity: 0, y: 20 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    className="text-center"
+                  >
+                    <div className={`w-16 h-24 rounded-lg bg-white border shadow-md flex flex-col items-center justify-center transition-all ${
+                      isWinner ? 'border-amber-400 ring-2 ring-amber-400/50 shadow-amber-200/50' : 'border-gray-200'
+                    }`}>
+                      <span className={`text-2xl font-bold ${SUIT_COLORS[entry.card.suit]}`}>
+                        {SUIT_SYMBOLS[entry.card.suit]}
+                      </span>
+                      <span className={`text-sm font-bold ${SUIT_COLORS[entry.card.suit]}`}>
+                        {rankDisplay(entry.card.rank)}
+                      </span>
+                    </div>
+                    <p className={`text-[10px] mt-1 ${isWinner ? 'text-amber-400 font-medium' : 'text-gray-500'}`}>
+                      {player?.name}
+                    </p>
+                  </motion.div>
+                );
+              })
+            )}
+          </div>
+          {state.trickWinner && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-xs text-amber-400 font-medium"
+            >
+              {state.players.find(p => p.id === state.trickWinner)?.name} wins the trick
+            </motion.p>
           )}
         </div>
       )}
@@ -213,7 +229,7 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
         <div className="flex flex-wrap items-end justify-center gap-1 sm:gap-2 min-h-[140px] pb-4">
           {myPlayer.hand.map((card, i) => {
             const isSelectedForPass = selectedPass.some(c => cardEquals(c, card));
-            const canPlay = state.phase === 'playing' && isMyTurn && isValidPlay(state, myIndex, card);
+            const canPlay = state.phase === 'playing' && isMyTurn && !state.trickWinner && isValidPlay(state, myIndex, card);
             const isPassing = state.phase === 'passing' && !myPassConfirmed;
 
             return (

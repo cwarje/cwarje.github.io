@@ -87,6 +87,7 @@ export function createHeartsState(players: Player[]): HeartsState {
     roundNumber: 1,
     gameOver: false,
     winner: null,
+    trickWinner: null,
   };
 }
 
@@ -201,6 +202,7 @@ export function processHeartsAction(state: unknown, action: unknown, playerId: s
 
     case 'play-card': {
       if (s.phase !== 'playing') return state;
+      if (s.trickWinner) return state; // Trick awaiting resolution
       const playerIndex = s.players.findIndex(p => p.id === playerId);
       if (playerIndex === -1 || playerIndex !== s.currentPlayerIndex) return state;
 
@@ -212,11 +214,10 @@ export function processHeartsAction(state: unknown, action: unknown, playerId: s
       newPlayers[playerIndex] = { ...player, hand: newHand };
 
       const newTrick = [...s.currentTrick, { playerId, card: a.card }];
-      let heartsBroken = s.heartsBroken || a.card.suit === 'hearts';
+      const heartsBroken = s.heartsBroken || a.card.suit === 'hearts';
 
-      // Trick complete?
+      // Trick complete? Don't resolve yet — set trickWinner so cards stay visible
       if (newTrick.length === s.players.length) {
-        // Determine winner
         const leadSuit = newTrick[0].card.suit;
         let winnerEntry = newTrick[0];
         for (const entry of newTrick.slice(1)) {
@@ -225,31 +226,12 @@ export function processHeartsAction(state: unknown, action: unknown, playerId: s
           }
         }
 
-        const winnerIndex = newPlayers.findIndex(p => p.id === winnerEntry.playerId);
-        const trickCards = newTrick.map(e => e.card);
-        const trickPoints = trickCards.reduce((sum, c) => sum + cardPoints(c), 0);
-
-        newPlayers[winnerIndex] = {
-          ...newPlayers[winnerIndex],
-          tricksTaken: [...newPlayers[winnerIndex].tricksTaken, trickCards],
-          roundScore: newPlayers[winnerIndex].roundScore + trickPoints,
-        };
-
-        const nextTrick = s.trickNumber + 1;
-
-        // Round over?
-        if (nextTrick > 13) {
-          return endRound({ ...s, players: newPlayers, heartsBroken });
-        }
-
         return {
           ...s,
           players: newPlayers,
-          currentTrick: [],
-          currentPlayerIndex: winnerIndex,
-          leadPlayerIndex: winnerIndex,
+          currentTrick: newTrick,
           heartsBroken,
-          trickNumber: nextTrick,
+          trickWinner: winnerEntry.playerId,
         };
       }
 
@@ -262,6 +244,40 @@ export function processHeartsAction(state: unknown, action: unknown, playerId: s
         currentTrick: newTrick,
         currentPlayerIndex: nextPlayerIndex,
         heartsBroken,
+      };
+    }
+
+    case 'resolve-trick': {
+      if (s.phase !== 'playing' || !s.trickWinner) return state;
+
+      const winnerIndex = s.players.findIndex(p => p.id === s.trickWinner);
+      if (winnerIndex === -1) return state;
+
+      const trickCards = s.currentTrick.map(e => e.card);
+      const trickPoints = trickCards.reduce((sum, c) => sum + cardPoints(c), 0);
+
+      const newPlayers = [...s.players];
+      newPlayers[winnerIndex] = {
+        ...newPlayers[winnerIndex],
+        tricksTaken: [...newPlayers[winnerIndex].tricksTaken, trickCards],
+        roundScore: newPlayers[winnerIndex].roundScore + trickPoints,
+      };
+
+      const nextTrick = s.trickNumber + 1;
+
+      // Round over?
+      if (nextTrick > 13) {
+        return endRound({ ...s, players: newPlayers, heartsBroken: s.heartsBroken, trickWinner: null });
+      }
+
+      return {
+        ...s,
+        players: newPlayers,
+        currentTrick: [],
+        currentPlayerIndex: winnerIndex,
+        leadPlayerIndex: winnerIndex,
+        trickNumber: nextTrick,
+        trickWinner: null,
       };
     }
   }
@@ -296,6 +312,7 @@ function endRound(s: HeartsState): HeartsState {
       phase: 'round-end',
       gameOver: true,
       winner: winner.id,
+      trickWinner: null,
     };
   }
 
@@ -327,6 +344,7 @@ function endRound(s: HeartsState): HeartsState {
     roundNumber: nextRound,
     gameOver: false,
     winner: null,
+    trickWinner: null,
   };
 }
 
@@ -390,6 +408,9 @@ export function runHeartsBotTurn(state: unknown): unknown {
 
   const currentPlayer = s.players[s.currentPlayerIndex];
   if (!currentPlayer.isBot) return state;
+
+  // Don't play if trick is awaiting resolution
+  if (s.trickWinner) return state;
 
   if (s.phase === 'playing') {
     const hand = currentPlayer.hand;

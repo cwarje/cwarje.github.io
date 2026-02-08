@@ -19,7 +19,9 @@ export function processGameAction(gameType: GameType, state: unknown, action: un
     case 'battleship': newState = processBattleshipAction(state, action, playerId); break;
     default: return state;
   }
-  // Run bot turns after processing human action
+  // For Hearts, bot turns are scheduled with delays by the host — don't auto-run them
+  if (gameType === 'hearts') return newState;
+  // For other games, run bot turns synchronously as before
   return runBotTurns(gameType, newState);
 }
 
@@ -29,6 +31,17 @@ export function checkGameOver(gameType: GameType, state: unknown): boolean {
     case 'hearts': return isHeartsOver(state);
     case 'battleship': return isBattleshipOver(state);
     default: return false;
+  }
+}
+
+// Run a single bot turn for the given game type (used for delayed scheduling)
+export function runSingleBotTurn(gameType: GameType, state: unknown): unknown {
+  if (checkGameOver(gameType, state)) return state;
+  switch (gameType) {
+    case 'yahtzee': return runYahtzeeBotTurn(state);
+    case 'hearts': return runHeartsBotTurn(state);
+    case 'battleship': return runBattleshipBotTurn(state);
+    default: return state;
   }
 }
 
