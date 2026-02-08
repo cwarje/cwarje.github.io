@@ -61,17 +61,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
   // Host: handle incoming connection
   const handleConnection = useCallback((conn: DataConnection) => {
-    // #region agent log
-    const _hdbg = (msg: string, data?: Record<string, unknown>) => {
-      console.log('[DEBUG]', JSON.stringify({ location: 'roomStore.tsx:handleConnection', message: msg, data, timestamp: Date.now() }));
-    };
-    _hdbg('Incoming connection from peer', { connPeer: conn.peer, connOpen: conn.open, hypothesisId: 'A,D' });
-    // #endregion
     conn.on('data', (data) => {
       const msg = data as ClientMessage;
-      // #region agent log
-      _hdbg('Host received data', { msgType: msg.type, connPeer: conn.peer, hypothesisId: 'D' });
-      // #endregion
       const currentRoom = roomRef.current;
       if (!currentRoom) return;
 
@@ -216,13 +207,6 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
   // Shared logic for joining a room (used by joinRoom and rejoinRoom)
   const joinRoomInternal = useCallback(async (roomCode: string, playerName: string) => {
-    // #region agent log
-    const _dbg = (msg: string, data?: Record<string, unknown>) => {
-      console.log('[DEBUG]', JSON.stringify({ location: 'roomStore.tsx:joinRoomInternal', message: msg, data, timestamp: Date.now() }));
-    };
-    const joinStart = Date.now();
-    _dbg('joinRoomInternal START', { roomCode, playerName, deviceId, hypothesisId: 'C,D' });
-    // #endregion
     setError(null);
     setConnecting(true);
     try {
@@ -236,33 +220,19 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       }
 
       const peer = await createClientPeer();
-      // #region agent log
-      _dbg('Client peer created', { peerId: peer.id, elapsed: Date.now() - joinStart, hypothesisId: 'B' });
-      // #endregion
       peerRef.current = peer;
       setMyId(deviceId);
 
       const conn = await connectToPeer(peer, roomCode);
-      // #region agent log
-      _dbg('connectToPeer resolved', { connPeer: conn.peer, connOpen: conn.open, elapsed: Date.now() - joinStart, hypothesisId: 'A' });
-      // #endregion
 
       // Wait for the first room-state from the host before resolving,
       // so that room is populated before we navigate to the lobby page.
       await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          // #region agent log
-          _dbg('TIMEOUT waiting for room-state', { elapsed: Date.now() - joinStart, hypothesisId: 'D' });
-          // #endregion
-          reject(new Error('Timeout waiting for room state'));
-        }, 10000);
+        const timeout = setTimeout(() => reject(new Error('Timeout waiting for room state')), 10000);
         let resolved = false;
 
         conn.on('data', (data) => {
           const msg = data as HostMessage;
-          // #region agent log
-          _dbg('Received data from host', { msgType: msg.type, elapsed: Date.now() - joinStart, hypothesisId: 'D' });
-          // #endregion
           switch (msg.type) {
             case 'room-state':
               setRoom(msg.state);
@@ -289,9 +259,6 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         });
 
         conn.on('close', () => {
-          // #region agent log
-          _dbg('Connection CLOSED by host', { elapsed: Date.now() - joinStart, hypothesisId: 'D' });
-          // #endregion
           setError('Disconnected from host');
           setRoom(null);
           setGameState(null);
@@ -299,18 +266,9 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         });
 
         connectionsRef.current.set(conn.peer, conn);
-        // #region agent log
-        _dbg('Sending join message', { connPeer: conn.peer, playerName, deviceId, hypothesisId: 'D' });
-        // #endregion
         conn.send({ type: 'join', playerName, deviceId } as ClientMessage);
       });
-      // #region agent log
-      _dbg('joinRoomInternal SUCCESS', { elapsed: Date.now() - joinStart });
-      // #endregion
     } catch (err) {
-      // #region agent log
-      _dbg('joinRoomInternal FAILED', { error: (err as Error).message, elapsed: Date.now() - joinStart });
-      // #endregion
       setError((err as Error).message);
       destroyPeer(peerRef.current);
       peerRef.current = null;
