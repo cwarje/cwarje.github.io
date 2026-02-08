@@ -7,6 +7,7 @@ import { getDeviceId } from '../utils/deviceId';
 import type { RoomState, RoomContextValue, GameType, Player, ClientMessage, HostMessage } from './types';
 import { createInitialGameState, processGameAction, checkGameOver, runSingleBotTurn } from '../games/gameEngine';
 import type { HeartsState } from '../games/hearts/types';
+import type { LiarsDiceState } from '../games/liars-dice/types';
 
 const BOT_NAMES = ['Nova', 'Pixel', 'Byte', 'Chip', 'Blaze', 'Echo', 'Neon', 'Volt'];
 
@@ -409,9 +410,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   // Clear error
   const clearError = useCallback(() => setError(null), []);
 
-  // --- Bot turn scheduling (host only, Hearts) ---
+  // --- Bot turn scheduling (host only, Hearts & Liar's Dice) ---
   const BOT_PLAY_DELAY = 800;   // ms between each bot card play
   const TRICK_DISPLAY_DELAY = 2000; // ms to show completed trick before collecting
+  const LIARS_DICE_BOT_DELAY = 1200; // ms between bot actions in Liar's Dice
+  const LIARS_DICE_REVEAL_DELAY = 2500; // ms to show reveal before revolver
+  const LIARS_DICE_TRIGGER_DELAY = 1500; // ms before bot pulls trigger
+  const LIARS_DICE_NEXT_ROUND_DELAY = 2000; // ms before starting next round
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -422,71 +427,155 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!isHost || !room || room.phase !== 'playing' || !gameState) return;
-    if (room.gameType !== 'hearts') return;
 
-    const hs = gameState as HeartsState;
-    if (hs.gameOver) return;
+    // ── Hearts bot scheduling ──
+    if (room.gameType === 'hearts') {
+      const hs = gameState as HeartsState;
+      if (hs.gameOver) return;
 
-    // If trick is complete (trickWinner set), schedule resolve-trick after delay
-    if (hs.trickWinner) {
-      botTimerRef.current = setTimeout(() => {
-        const currentGs = gameStateRef.current as HeartsState | null;
-        const currentRoom = roomRef.current;
-        if (!currentGs || !currentRoom || !currentGs.trickWinner) return;
-
-        const resolved = processGameAction('hearts', currentGs, { type: 'resolve-trick' }, '');
-        if (resolved !== currentGs) {
-          setGameState(resolved);
-          broadcastGameState(resolved);
-          if (checkGameOver('hearts', resolved)) {
-            const finishedRoom = { ...currentRoom, phase: 'finished' as const };
-            setRoom(finishedRoom);
-            broadcastRoomState(finishedRoom);
-          }
-        }
-      }, TRICK_DISPLAY_DELAY);
-      return;
-    }
-
-    // During passing phase, run bot selections (bots pass simultaneously, no visible delay needed)
-    if (hs.phase === 'passing') {
-      const botsNeedToAct = hs.players.some(p => p.isBot && (!hs.passSelections[p.id] || hs.passSelections[p.id].length < 3 || !hs.passConfirmed[p.id]));
-      if (botsNeedToAct) {
+      // If trick is complete (trickWinner set), schedule resolve-trick after delay
+      if (hs.trickWinner) {
         botTimerRef.current = setTimeout(() => {
-          const currentGs = gameStateRef.current;
+          const currentGs = gameStateRef.current as HeartsState | null;
           const currentRoom = roomRef.current;
-          if (!currentGs || !currentRoom) return;
+          if (!currentGs || !currentRoom || !currentGs.trickWinner) return;
 
-          const next = runSingleBotTurn('hearts', currentGs);
-          if (next !== currentGs) {
-            setGameState(next);
-            broadcastGameState(next);
-          }
-        }, 100); // Short delay for passing — it's simultaneous and hidden
-      }
-      return;
-    }
-
-    // During playing phase, schedule bot card play if it's a bot's turn
-    if (hs.phase === 'playing') {
-      const currentPlayer = hs.players[hs.currentPlayerIndex];
-      if (currentPlayer && currentPlayer.isBot) {
-        botTimerRef.current = setTimeout(() => {
-          const currentGs = gameStateRef.current;
-          const currentRoom = roomRef.current;
-          if (!currentGs || !currentRoom) return;
-
-          const next = runSingleBotTurn('hearts', currentGs);
-          if (next !== currentGs) {
-            setGameState(next);
-            broadcastGameState(next);
-            if (checkGameOver('hearts', next)) {
+          const resolved = processGameAction('hearts', currentGs, { type: 'resolve-trick' }, '');
+          if (resolved !== currentGs) {
+            setGameState(resolved);
+            broadcastGameState(resolved);
+            if (checkGameOver('hearts', resolved)) {
               const finishedRoom = { ...currentRoom, phase: 'finished' as const };
               setRoom(finishedRoom);
               broadcastRoomState(finishedRoom);
             }
           }
-        }, BOT_PLAY_DELAY);
+        }, TRICK_DISPLAY_DELAY);
+        return;
+      }
+
+      // During passing phase, run bot selections (bots pass simultaneously, no visible delay needed)
+      if (hs.phase === 'passing') {
+        const botsNeedToAct = hs.players.some(p => p.isBot && (!hs.passSelections[p.id] || hs.passSelections[p.id].length < 3 || !hs.passConfirmed[p.id]));
+        if (botsNeedToAct) {
+          botTimerRef.current = setTimeout(() => {
+            const currentGs = gameStateRef.current;
+            const currentRoom = roomRef.current;
+            if (!currentGs || !currentRoom) return;
+
+            const next = runSingleBotTurn('hearts', currentGs);
+            if (next !== currentGs) {
+              setGameState(next);
+              broadcastGameState(next);
+            }
+          }, 100); // Short delay for passing — it's simultaneous and hidden
+        }
+        return;
+      }
+
+      // During playing phase, schedule bot card play if it's a bot's turn
+      if (hs.phase === 'playing') {
+        const currentPlayer = hs.players[hs.currentPlayerIndex];
+        if (currentPlayer && currentPlayer.isBot) {
+          botTimerRef.current = setTimeout(() => {
+            const currentGs = gameStateRef.current;
+            const currentRoom = roomRef.current;
+            if (!currentGs || !currentRoom) return;
+
+            const next = runSingleBotTurn('hearts', currentGs);
+            if (next !== currentGs) {
+              setGameState(next);
+              broadcastGameState(next);
+              if (checkGameOver('hearts', next)) {
+                const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+                setRoom(finishedRoom);
+                broadcastRoomState(finishedRoom);
+              }
+            }
+          }, BOT_PLAY_DELAY);
+        }
+      }
+      return;
+    }
+
+    // ── Liar's Dice bot scheduling ──
+    if (room.gameType === 'liars-dice') {
+      const lds = gameState as LiarsDiceState;
+      if (lds.phase === 'gameOver') return;
+
+      const runBotStep = (delay: number) => {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom) return;
+
+          const next = runSingleBotTurn('liars-dice', currentGs);
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('liars-dice', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, delay);
+      };
+
+      // Rolling phase — bot starter auto-rolls
+      if (lds.phase === 'rolling') {
+        const starter = lds.players[lds.roundStarterIndex];
+        if (starter && starter.isBot) {
+          runBotStep(500);
+        }
+        return;
+      }
+
+      // Bidding phase — bot makes bid, calls liar, or spot on
+      if (lds.phase === 'bidding') {
+        const currentPlayer = lds.players[lds.currentPlayerIndex];
+        if (currentPlayer && currentPlayer.isBot && currentPlayer.alive) {
+          runBotStep(LIARS_DICE_BOT_DELAY);
+        }
+        return;
+      }
+
+      // Revealing phase — auto-transition to revolver after delay
+      if (lds.phase === 'revealing') {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as LiarsDiceState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'revealing') return;
+
+          // Transition to revolver phase
+          const next = { ...currentGs, phase: 'revolver' as const };
+          setGameState(next);
+          broadcastGameState(next);
+        }, LIARS_DICE_REVEAL_DELAY);
+        return;
+      }
+
+      // Revolver phase — bots pull trigger, then advance to next round
+      if (lds.phase === 'revolver' && lds.roundResult) {
+        // Check if a bot needs to pull the trigger
+        const botNeedsTrigger = lds.roundResult.triggerPlayerIds.find(pid => {
+          if (lds.roundResult!.pulledTrigger[pid]) return false;
+          const player = lds.players.find(p => p.id === pid);
+          return player && player.isBot;
+        });
+
+        if (botNeedsTrigger) {
+          runBotStep(LIARS_DICE_TRIGGER_DELAY);
+          return;
+        }
+
+        // All triggers pulled — advance to next round
+        const allPulled = lds.roundResult.triggerPlayerIds.every(
+          id => lds.roundResult!.pulledTrigger[id]
+        );
+        if (allPulled) {
+          runBotStep(LIARS_DICE_NEXT_ROUND_DELAY);
+        }
       }
     }
   }, [gameState, isHost, room, broadcastGameState, broadcastRoomState]);

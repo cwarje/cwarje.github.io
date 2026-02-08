@@ -8,9 +8,11 @@ import LeaveButton from '../components/LeaveButton';
 import YahtzeeBoard from '../games/yahtzee/YahtzeeBoard';
 import HeartsBoard from '../games/hearts/HeartsBoard';
 import BattleshipBoard from '../games/battleship/BattleshipBoard';
+import LiarsDiceBoard from '../games/liars-dice/LiarsDiceBoard';
 import type { YahtzeeState } from '../games/yahtzee/types';
 import type { HeartsState } from '../games/hearts/types';
 import type { BattleshipState } from '../games/battleship/types';
+import type { LiarsDiceState } from '../games/liars-dice/types';
 
 export default function GamePage() {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -98,6 +100,9 @@ export default function GamePage() {
         )}
         {room.gameType === 'battleship' && (
           <BattleshipBoard state={gameState as BattleshipState} myId={myId} onAction={sendAction} />
+        )}
+        {room.gameType === 'liars-dice' && (
+          <LiarsDiceBoard state={gameState as LiarsDiceState} myId={myId} onAction={sendAction} />
         )}
       </motion.div>
     </div>

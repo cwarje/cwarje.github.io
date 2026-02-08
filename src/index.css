@@ -80,6 +80,16 @@
   transform: scale(1.1);
 }
 
+/* Revolver pull trigger button pulse */
+.revolver-pull {
+  animation: revolverPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes revolverPulse {
+  0%, 100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.3); }
+  50% { box-shadow: 0 0 30px rgba(239, 68, 68, 0.6); }
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

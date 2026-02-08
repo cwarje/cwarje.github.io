@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import type { GameType } from '../networking/types';
-import { Dice5, Heart, Ship } from 'lucide-react';
+import { Dice5, Heart, Ship, Crosshair } from 'lucide-react';
 
 const GAME_INFO: Record<GameType, { title: string; description: string; players: string; icon: typeof Dice5; gradient: string }> = {
   yahtzee: {
@@ -24,18 +24,27 @@ const GAME_INFO: Record<GameType, { title: string; description: string; players:
     icon: Ship,
     gradient: 'from-cyan-500/20 to-blue-600/20',
   },
+  'liars-dice': {
+    title: "Liar's Dice",
+    description: "Bluff, bid, and call liars. Losers face the revolver. Last player standing wins. Inspired by Liar's Bar.",
+    players: '2-4 Players',
+    icon: Crosshair,
+    gradient: 'from-emerald-500/20 to-green-600/20',
+  },
 };
 
 const ICON_COLORS: Record<GameType, string> = {
   yahtzee: 'text-amber-400',
   hearts: 'text-rose-400',
   battleship: 'text-cyan-400',
+  'liars-dice': 'text-emerald-400',
 };
 
 const BORDER_COLORS: Record<GameType, string> = {
   yahtzee: 'hover:border-amber-500/30',
   hearts: 'hover:border-rose-500/30',
   battleship: 'hover:border-cyan-500/30',
+  'liars-dice': 'hover:border-emerald-500/30',
 };
 
 interface GameCardProps {
