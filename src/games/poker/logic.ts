@@ -249,6 +249,7 @@ export function createPokerState(players: Player[]): PokerState {
     allIn: false,
     betThisStreet: 0,
     totalContrib: 0,
+    leftGame: false,
   }));
 
   const n = pokerPlayers.length;
@@ -297,6 +298,154 @@ export function createPokerState(players: Player[]): PokerState {
     smallBlind: SMALL_BLIND,
     bigBlind: BIG_BLIND,
     showdownReveal: false,
+    handNumber: 1,
+    sessionOver: false,
+  };
+}
+
+// ────────────────────────────────────────────
+// Start next hand (continuous play)
+// ────────────────────────────────────────────
+
+function startNextHand(prevState: PokerState): PokerState {
+  // Filter out players who left or are busted (0 chips)
+  const eligiblePlayers = prevState.players.filter(p => !p.leftGame && p.chips > 0);
+
+  // Not enough players to continue
+  if (eligiblePlayers.length < 2) {
+    return {
+      ...prevState,
+      sessionOver: true,
+    };
+  }
+
+  let deck = shuffleDeck(buildDeck());
+
+  // Reset per-hand fields, preserve chips
+  const pokerPlayers: PokerPlayer[] = eligiblePlayers.map(p => ({
+    id: p.id,
+    name: p.name,
+    isBot: p.isBot,
+    chips: p.chips,
+    holeCards: [],
+    folded: false,
+    allIn: false,
+    betThisStreet: 0,
+    totalContrib: 0,
+    leftGame: false,
+  }));
+
+  const n = pokerPlayers.length;
+
+  // Rotate dealer: find the previous dealer's id and move to next position
+  const prevDealerId = prevState.players[prevState.dealerIndex]?.id;
+  let newDealerIndex = 0;
+  if (prevDealerId) {
+    const prevDealerPos = pokerPlayers.findIndex(p => p.id === prevDealerId);
+    if (prevDealerPos >= 0) {
+      newDealerIndex = (prevDealerPos + 1) % n;
+    }
+  }
+
+  // Post blinds
+  const sbIndex = n === 2 ? newDealerIndex : (newDealerIndex + 1) % n;
+  const bbIndex = n === 2 ? (newDealerIndex + 1) % n : (newDealerIndex + 2) % n;
+
+  const sbAmount = Math.min(SMALL_BLIND, pokerPlayers[sbIndex].chips);
+  pokerPlayers[sbIndex].chips -= sbAmount;
+  pokerPlayers[sbIndex].betThisStreet = sbAmount;
+  pokerPlayers[sbIndex].totalContrib = sbAmount;
+  if (pokerPlayers[sbIndex].chips === 0) pokerPlayers[sbIndex].allIn = true;
+
+  const bbAmount = Math.min(BIG_BLIND, pokerPlayers[bbIndex].chips);
+  pokerPlayers[bbIndex].chips -= bbAmount;
+  pokerPlayers[bbIndex].betThisStreet = bbAmount;
+  pokerPlayers[bbIndex].totalContrib = bbAmount;
+  if (pokerPlayers[bbIndex].chips === 0) pokerPlayers[bbIndex].allIn = true;
+
+  // Deal 2 hole cards to each player
+  for (let i = 0; i < n; i++) {
+    const draw = drawCards(deck, 2);
+    pokerPlayers[i].holeCards = draw.cards;
+    deck = draw.remaining;
+  }
+
+  // First to act preflop: left of big blind
+  const firstToAct = nextActiveIndex(pokerPlayers, bbIndex);
+
+  return {
+    players: pokerPlayers,
+    dealerIndex: newDealerIndex,
+    deck,
+    communityCards: [],
+    street: 'preflop',
+    pots: [],
+    currentBet: BIG_BLIND,
+    minRaise: BIG_BLIND,
+    currentPlayerIndex: firstToAct === -1 ? 0 : firstToAct,
+    lastAggressorIndex: bbIndex,
+    actedThisStreet: {},
+    gameOver: false,
+    winners: [],
+    smallBlind: SMALL_BLIND,
+    bigBlind: BIG_BLIND,
+    showdownReveal: false,
+    handNumber: prevState.handNumber + 1,
+    sessionOver: false,
+  };
+}
+
+// ────────────────────────────────────────────
+// Remove player from poker (leave mid-game)
+// ────────────────────────────────────────────
+
+function removePlayerFromPoker(s: PokerState, playerId: string): PokerState {
+  const playerIndex = s.players.findIndex(p => p.id === playerId);
+  if (playerIndex === -1) return s;
+
+  const newPlayers = s.players.map(p => ({ ...p }));
+  const leavingPlayer = newPlayers[playerIndex];
+
+  // Mark as left and folded
+  leavingPlayer.leftGame = true;
+  leavingPlayer.folded = true;
+
+  // If the game is already over (between hands), just mark and return
+  if (s.gameOver) {
+    return { ...s, players: newPlayers };
+  }
+
+  // Check if only one player left not folded -> resolve hand
+  if (countNotFolded(newPlayers) === 1) {
+    return resolveHand(s, newPlayers);
+  }
+
+  // If it was the leaving player's turn, advance to next player
+  let newCurrentPlayerIndex = s.currentPlayerIndex;
+  let newActed = { ...s.actedThisStreet };
+
+  if (s.currentPlayerIndex === playerIndex) {
+    newActed[leavingPlayer.id] = true;
+    const nextIdx = nextActiveIndex(newPlayers, playerIndex);
+    newCurrentPlayerIndex = nextIdx === -1 ? s.currentPlayerIndex : nextIdx;
+
+    // Check if street is complete after their fold
+    const streetComplete = isStreetComplete(newPlayers, newActed, s.currentBet);
+    if (streetComplete) {
+      return advanceStreet({
+        ...s,
+        players: newPlayers,
+        currentPlayerIndex: newCurrentPlayerIndex,
+        actedThisStreet: newActed,
+      });
+    }
+  }
+
+  return {
+    ...s,
+    players: newPlayers,
+    currentPlayerIndex: newCurrentPlayerIndex,
+    actedThisStreet: newActed,
   };
 }
 
@@ -307,6 +456,16 @@ export function createPokerState(players: Player[]): PokerState {
 export function processPokerAction(state: unknown, action: unknown, playerId: string): unknown {
   const s = state as PokerState;
   const a = action as PokerAction;
+
+  // Handle next-hand action (host triggers between hands)
+  if (a.type === 'next-hand' && s.gameOver && !s.sessionOver) {
+    return startNextHand(s);
+  }
+
+  // Handle leave-table action (player leaves mid-game)
+  if (a.type === 'leave-table') {
+    return removePlayerFromPoker(s, playerId);
+  }
 
   if (s.gameOver || s.street === 'showdown') return state;
 

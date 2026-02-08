@@ -120,8 +120,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             if (newGs !== currentGs) {
               setGameState(newGs);
               broadcastGameState(newGs);
-              // Check for game over
-              if (checkGameOver(currentRoom.gameType, newGs)) {
+              // Check for game over (poker stays in 'playing' phase for continuous play)
+              if (checkGameOver(currentRoom.gameType, newGs) && currentRoom.gameType !== 'poker') {
                 const finishedRoom = { ...roomRef.current!, phase: 'finished' as const };
                 setRoom(finishedRoom);
                 broadcastRoomState(finishedRoom);
@@ -133,6 +133,16 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         case 'leave': {
           const leavingDeviceId = peerDeviceMapRef.current.get(conn.peer);
           if (!leavingDeviceId) return;
+
+          // For poker during play, process leave-table action to fold/remove from game state
+          if (currentRoom.gameType === 'poker' && currentRoom.phase === 'playing' && gameStateRef.current) {
+            const newGs = processGameAction('poker', gameStateRef.current, { type: 'leave-table' }, leavingDeviceId);
+            if (newGs !== gameStateRef.current) {
+              setGameState(newGs);
+              broadcastGameState(newGs);
+            }
+          }
+
           const updatedRoom2 = {
             ...currentRoom,
             players: currentRoom.players.filter(p => p.id !== leavingDeviceId),
@@ -382,7 +392,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       if (newGs !== currentGs) {
         setGameState(newGs);
         broadcastGameState(newGs);
-        if (checkGameOver(currentRoom.gameType, newGs)) {
+        // Poker stays in 'playing' phase for continuous play
+        if (checkGameOver(currentRoom.gameType, newGs) && currentRoom.gameType !== 'poker') {
           const finishedRoom = { ...currentRoom, phase: 'finished' as const };
           setRoom(finishedRoom);
           broadcastRoomState(finishedRoom);
@@ -597,11 +608,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           if (next !== currentGs) {
             setGameState(next);
             broadcastGameState(next);
-            if (checkGameOver('poker', next)) {
-              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
-              setRoom(finishedRoom);
-              broadcastRoomState(finishedRoom);
-            }
+            // Poker stays in 'playing' phase — continuous play handled by PokerBoard
           }
         }, POKER_BOT_DELAY);
       }

@@ -18,6 +18,7 @@ export interface PokerPlayer {
   allIn: boolean;
   betThisStreet: number;
   totalContrib: number; // total chips put in this hand (for side-pot calculation)
+  leftGame: boolean;    // true if player left the session
 }
 
 export interface SidePot {
@@ -48,10 +49,14 @@ export interface PokerState {
   smallBlind: number;
   bigBlind: number;
   showdownReveal: boolean; // true after showdown cards are revealed
+  handNumber: number;      // which hand we're on (1-indexed)
+  sessionOver: boolean;    // true when not enough players to continue
 }
 
 export type PokerAction =
   | { type: 'fold' }
   | { type: 'check' }
   | { type: 'call' }
-  | { type: 'raise'; amount: number };
+  | { type: 'raise'; amount: number }
+  | { type: 'next-hand' }
+  | { type: 'leave-table' };

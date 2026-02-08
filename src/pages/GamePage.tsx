@@ -19,7 +19,7 @@ import type { PokerState } from '../games/poker/types';
 export default function GamePage() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
-  const { room, gameState, myId, isHost, sendAction, playAgain, rejoinRoom, connecting, error, clearError } = useRoomContext();
+  const { room, gameState, myId, isHost, sendAction, playAgain, leaveRoom, rejoinRoom, connecting, error, clearError } = useRoomContext();
   const { toast } = useToast();
   const rejoinAttempted = useRef(false);
   const hasHadRoom = useRef(!!room);
@@ -58,6 +58,13 @@ export default function GamePage() {
   }
 
   const isFinished = room.phase === 'finished';
+  const isPoker = room.gameType === 'poker';
+
+  const handlePokerLeave = () => {
+    leaveRoom();
+    toast('Left the table.', 'info');
+    navigate('/');
+  };
 
   return (
     <div className="space-y-6">
@@ -68,7 +75,7 @@ export default function GamePage() {
           <p className="text-xs text-gray-500">Room: {room.roomCode}</p>
         </div>
         <div className="flex items-center gap-3">
-          {isFinished && isHost && (
+          {isFinished && isHost && !isPoker && (
             <motion.button
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -107,7 +114,7 @@ export default function GamePage() {
           <LiarsDiceBoard state={gameState as LiarsDiceState} myId={myId} onAction={sendAction} />
         )}
         {room.gameType === 'poker' && (
-          <PokerBoard state={gameState as PokerState} myId={myId} onAction={sendAction} />
+          <PokerBoard state={gameState as PokerState} myId={myId} onAction={sendAction} isHost={isHost} onLeave={handlePokerLeave} />
         )}
       </motion.div>
     </div>

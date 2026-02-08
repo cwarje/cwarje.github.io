@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Trophy, ChevronUp, ChevronDown } from 'lucide-react';
+import { Trophy, ChevronUp, ChevronDown, Play, LogOut, Crown } from 'lucide-react';
 import type { PokerState, PokerAction, Card } from './types';
 
 // ────────────────────────────────────────────
@@ -58,9 +58,11 @@ interface PokerBoardProps {
   state: PokerState;
   myId: string;
   onAction: (action: unknown) => void;
+  isHost: boolean;
+  onLeave?: () => void;
 }
 
-export default function PokerBoard({ state, myId, onAction }: PokerBoardProps) {
+export default function PokerBoard({ state, myId, onAction, isHost, onLeave }: PokerBoardProps) {
   const [raiseAmount, setRaiseAmount] = useState<number>(0);
 
   const me = state.players.find(p => p.id === myId);
@@ -96,9 +98,14 @@ export default function PokerBoard({ state, myId, onAction }: PokerBoardProps) {
     <div className="space-y-6">
       {/* Pot display */}
       <div className="text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
-          <span className="text-xs text-gray-400 uppercase tracking-wider">Pot</span>
-          <span className="text-lg font-bold text-white">{totalPot}</span>
+        <div className="inline-flex items-center gap-4 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 uppercase tracking-wider">Pot</span>
+            <span className="text-lg font-bold text-white">{totalPot}</span>
+          </div>
+          {state.handNumber > 0 && (
+            <span className="text-xs text-gray-500">Hand #{state.handNumber}</span>
+          )}
         </div>
         {!state.gameOver && (
           <p className="text-xs text-gray-500 mt-2">
@@ -160,7 +167,9 @@ export default function PokerBoard({ state, myId, onAction }: PokerBoardProps) {
                     {player.name}
                     {isMe && ' (you)'}
                   </span>
-                  {player.folded && <span className="text-xs text-gray-500">folded</span>}
+                  {player.leftGame && <span className="text-xs text-gray-500">left</span>}
+                  {!player.leftGame && player.folded && <span className="text-xs text-gray-500">folded</span>}
+                  {player.chips === 0 && state.gameOver && !player.leftGame && <span className="text-xs text-red-400">busted</span>}
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-gray-400">{player.chips} chips</span>
@@ -209,6 +218,90 @@ export default function PokerBoard({ state, myId, onAction }: PokerBoardProps) {
               </div>
             );
           })}
+        </motion.div>
+      )}
+
+      {/* Session over display */}
+      {state.gameOver && state.sessionOver && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-primary-500/20 bg-primary-500/5 p-4 space-y-3"
+        >
+          <div className="flex items-center gap-2 text-primary-400">
+            <Crown className="w-5 h-5" />
+            <span className="font-bold">Session Over</span>
+          </div>
+          <p className="text-xs text-gray-400">Not enough players to continue. Final standings:</p>
+          <div className="space-y-1">
+            {[...state.players]
+              .filter(p => !p.leftGame)
+              .sort((a, b) => b.chips - a.chips)
+              .map((p, i) => (
+                <div key={p.id} className="flex items-center justify-between text-sm">
+                  <span className="text-white font-medium">
+                    {i === 0 && p.chips > 0 ? '👑 ' : ''}{p.name}
+                  </span>
+                  <span className={`font-bold ${p.chips > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {p.chips} chips
+                  </span>
+                </div>
+              ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Between-hands controls */}
+      {state.gameOver && !state.sessionOver && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col gap-3"
+        >
+          {/* Chip standings */}
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-2">
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Chip Standings</p>
+            {[...state.players]
+              .filter(p => !p.leftGame)
+              .sort((a, b) => b.chips - a.chips)
+              .map(p => (
+                <div key={p.id} className="flex items-center justify-between text-sm">
+                  <span className={`font-medium ${p.id === myId ? 'text-primary-300' : 'text-white'}`}>
+                    {p.name}{p.id === myId ? ' (you)' : ''}
+                  </span>
+                  <span className={`font-bold ${p.chips === 0 ? 'text-red-400' : 'text-gray-300'}`}>
+                    {p.chips === 0 ? 'Busted' : `${p.chips} chips`}
+                  </span>
+                </div>
+              ))}
+          </div>
+
+          {/* Host: Deal Next Hand */}
+          {isHost && (
+            <button
+              onClick={() => sendAction({ type: 'next-hand' })}
+              className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 text-white font-bold text-lg hover:from-primary-500 hover:to-primary-400 transition-all shadow-lg shadow-primary-600/20 cursor-pointer"
+            >
+              <Play className="w-5 h-5" />
+              Deal Next Hand
+            </button>
+          )}
+
+          {/* Non-host: waiting + leave option */}
+          {!isHost && (
+            <div className="space-y-3">
+              <p className="text-center text-sm text-gray-500">Waiting for host to deal next hand...</p>
+              {onLeave && (
+                <button
+                  onClick={onLeave}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors cursor-pointer font-medium"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Leave Table
+                </button>
+              )}
+            </div>
+          )}
         </motion.div>
       )}
 
