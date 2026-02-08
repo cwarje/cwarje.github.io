@@ -25,6 +25,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const [gameState, setGameState] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const [myId, setMyId] = useState<string>('');
 
   const peerRef = useRef<Peer | null>(null);
@@ -34,12 +35,18 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const peerDeviceMapRef = useRef<Map<string, string>>(new Map());
   const roomRef = useRef<RoomState | null>(null);
   const gameStateRef = useRef<unknown>(null);
+  const reconnectingRef = useRef(false);
+  const roomCodeRef = useRef<string>('');
+  // Host: grace period timers for disconnected clients (deviceId -> timer)
+  const disconnectTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const deviceId = getDeviceId();
 
   // Keep refs in sync
   useEffect(() => { roomRef.current = room; }, [room]);
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
+  useEffect(() => { roomCodeRef.current = room?.roomCode ?? ''; }, [room?.roomCode]);
+  useEffect(() => { reconnectingRef.current = reconnecting; }, [reconnecting]);
 
   const isHost = room?.hostId === myId;
 
@@ -77,7 +84,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           const existingPlayer = currentRoom.players.find(p => p.id === clientDeviceId);
 
           if (existingPlayer) {
-            // Reconnecting player — update connection and mark connected
+            // Reconnecting player — cancel any pending grace period disconnect timer
+            const pendingTimer = disconnectTimersRef.current.get(clientDeviceId);
+            if (pendingTimer) {
+              clearTimeout(pendingTimer);
+              disconnectTimersRef.current.delete(clientDeviceId);
+            }
+            // Update connection and mark connected
             connectionsRef.current.set(clientDeviceId, conn);
             const updatedRoom = {
               ...currentRoom,
@@ -161,20 +174,149 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       if (!currentRoom) return;
       const disconnectedDeviceId = peerDeviceMapRef.current.get(conn.peer);
       if (!disconnectedDeviceId) return;
-      const updatedRoom = {
-        ...currentRoom,
-        players: currentRoom.players.map(p =>
-          p.id === disconnectedDeviceId ? { ...p, connected: false } : p
-        ),
-      };
-      setRoom(updatedRoom);
-      broadcastRoomState(updatedRoom);
+
+      // Remove stale connection refs immediately (reconnection will re-add them)
       connectionsRef.current.delete(disconnectedDeviceId);
       peerDeviceMapRef.current.delete(conn.peer);
+
+      // Start grace period — give client time to reconnect before marking disconnected
+      const GRACE_PERIOD_MS = 15_000;
+      const timer = setTimeout(() => {
+        disconnectTimersRef.current.delete(disconnectedDeviceId);
+        const latestRoom = roomRef.current;
+        if (!latestRoom) return;
+        // Only mark disconnected if the player hasn't already reconnected
+        const player = latestRoom.players.find(p => p.id === disconnectedDeviceId);
+        if (player && player.connected) {
+          const updatedRoom = {
+            ...latestRoom,
+            players: latestRoom.players.map(p =>
+              p.id === disconnectedDeviceId ? { ...p, connected: false } : p
+            ),
+          };
+          setRoom(updatedRoom);
+          broadcastRoomState(updatedRoom);
+        }
+      }, GRACE_PERIOD_MS);
+      disconnectTimersRef.current.set(disconnectedDeviceId, timer);
     });
 
     // Don't add to connectionsRef here — wait for the 'join' message which has the deviceId
   }, [broadcastRoomState, broadcastGameState]);
+
+  // Client: auto-reconnect on disconnect with exponential backoff
+  const attemptReconnect = useCallback(async () => {
+    if (reconnectingRef.current) return;
+    const currentRoomCode = roomCodeRef.current;
+    if (!currentRoomCode) return;
+
+    reconnectingRef.current = true;
+    setReconnecting(true);
+
+    const storedName = localStorage.getItem('playerName') || 'Player';
+    const MAX_ATTEMPTS = 3;
+    const BACKOFF_MS = [1000, 2000, 4000];
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      await new Promise(r => setTimeout(r, BACKOFF_MS[attempt]));
+
+      // Abort if user left the room while waiting
+      if (!reconnectingRef.current) return;
+
+      try {
+        // Clean up old peer
+        destroyPeer(peerRef.current);
+        peerRef.current = null;
+        connectionsRef.current.clear();
+        peerDeviceMapRef.current.clear();
+
+        const peer = await createClientPeer();
+        if (!reconnectingRef.current) { destroyPeer(peer); return; }
+        peerRef.current = peer;
+
+        const conn = await connectToPeer(peer, currentRoomCode);
+        if (!reconnectingRef.current) { destroyPeer(peer); return; }
+
+        // Wait for room-state to confirm reconnection succeeded
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Timeout')), 5000);
+          let done = false;
+
+          conn.on('data', (data) => {
+            const msg = data as HostMessage;
+            switch (msg.type) {
+              case 'room-state':
+                setRoom(msg.state);
+                if (!done) { done = true; clearTimeout(timeout); resolve(); }
+                break;
+              case 'game-state':
+                setGameState(msg.state);
+                break;
+              case 'error':
+                if (!done) { done = true; clearTimeout(timeout); reject(new Error(msg.message)); }
+                break;
+              case 'host-disconnected':
+                roomRef.current = null;
+                setError('Host disconnected');
+                setRoom(null);
+                setGameState(null);
+                connectionsRef.current.clear();
+                peerDeviceMapRef.current.clear();
+                destroyPeer(peerRef.current);
+                peerRef.current = null;
+                if (!done) { done = true; clearTimeout(timeout); reject(new Error('Host disconnected')); }
+                break;
+            }
+          });
+
+          conn.on('close', () => {
+            if (!done) {
+              done = true;
+              clearTimeout(timeout);
+              reject(new Error('Connection closed'));
+              return;
+            }
+            // Disconnected again after successful reconnection — retry
+            if (roomRef.current && !reconnectingRef.current) {
+              attemptReconnectRef.current();
+            } else if (!reconnectingRef.current) {
+              setError('Disconnected from host');
+              setRoom(null);
+              setGameState(null);
+            }
+          });
+
+          connectionsRef.current.set(conn.peer, conn);
+          conn.send({ type: 'join', playerName: storedName, deviceId } as ClientMessage);
+        });
+
+        // Reconnection succeeded
+        reconnectingRef.current = false;
+        setReconnecting(false);
+        return;
+      } catch {
+        // If host disconnected, don't retry
+        if (!roomRef.current) {
+          reconnectingRef.current = false;
+          setReconnecting(false);
+          return;
+        }
+        // Otherwise continue to next attempt
+      }
+    }
+
+    // All attempts failed
+    reconnectingRef.current = false;
+    setReconnecting(false);
+    setError('Lost connection to host');
+    setRoom(null);
+    setGameState(null);
+    destroyPeer(peerRef.current);
+    peerRef.current = null;
+  }, [deviceId]);
+
+  const attemptReconnectRef = useRef(attemptReconnect);
+  useEffect(() => { attemptReconnectRef.current = attemptReconnect; }, [attemptReconnect]);
 
   // Create room as host
   const createRoom = useCallback(async (gameType: GameType, playerName: string): Promise<string> => {
@@ -259,6 +401,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
               if (!resolved) { resolved = true; clearTimeout(timeout); reject(new Error(msg.message)); }
               break;
             case 'host-disconnected':
+              roomRef.current = null; // Update ref immediately so close handler won't attempt reconnect
               setError('Host disconnected');
               setRoom(null);
               setGameState(null);
@@ -272,10 +415,20 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         });
 
         conn.on('close', () => {
-          setError('Disconnected from host');
-          setRoom(null);
-          setGameState(null);
-          if (!resolved) { resolved = true; clearTimeout(timeout); reject(new Error('Disconnected from host')); }
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            reject(new Error('Disconnected from host'));
+            return;
+          }
+          // After initial join, attempt auto-reconnection instead of instant disconnect
+          if (roomRef.current && !reconnectingRef.current) {
+            attemptReconnectRef.current();
+          } else if (!reconnectingRef.current) {
+            setError('Disconnected from host');
+            setRoom(null);
+            setGameState(null);
+          }
         });
 
         connectionsRef.current.set(conn.peer, conn);
@@ -304,6 +457,10 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
   // Leave room
   const leaveRoom = useCallback(() => {
+    // Stop any in-progress reconnection
+    reconnectingRef.current = false;
+    setReconnecting(false);
+
     if (isHost) {
       broadcast({ type: 'host-disconnected' });
     } else {
@@ -619,8 +776,12 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const connections = connectionsRef.current;
     const peerDeviceMap = peerDeviceMapRef.current;
+    const disconnectTimers = disconnectTimersRef.current;
     return () => {
       if (botTimerRef.current) clearTimeout(botTimerRef.current);
+      disconnectTimers.forEach(timer => clearTimeout(timer));
+      disconnectTimers.clear();
+      reconnectingRef.current = false;
       connections.forEach(conn => conn.close());
       connections.clear();
       peerDeviceMap.clear();
@@ -649,6 +810,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         error,
         clearError,
         connecting,
+        reconnecting,
       }}
     >
       {children}

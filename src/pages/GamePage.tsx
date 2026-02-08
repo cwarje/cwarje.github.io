@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { RotateCcw } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { RotateCcw, Loader2 } from 'lucide-react';
 import { useRoomContext } from '../networking/roomStore';
 import { useToast } from '../components/Toast';
 import LeaveButton from '../components/LeaveButton';
@@ -19,7 +19,7 @@ import type { PokerState } from '../games/poker/types';
 export default function GamePage() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
-  const { room, gameState, myId, isHost, sendAction, playAgain, leaveRoom, rejoinRoom, connecting, error, clearError } = useRoomContext();
+  const { room, gameState, myId, isHost, sendAction, playAgain, leaveRoom, rejoinRoom, connecting, reconnecting, error, clearError } = useRoomContext();
   const { toast } = useToast();
   const rejoinAttempted = useRef(false);
   const hasHadRoom = useRef(!!room);
@@ -39,7 +39,7 @@ export default function GamePage() {
   }, [room, error, connecting, roomCode, rejoinRoom, navigate]);
 
   useEffect(() => {
-    if (!room && error) {
+    if (!room && error && !reconnecting) {
       const message = error.includes('Host disconnected') || error.includes('Disconnected from host')
         ? 'Host disconnected. The lobby is closed.'
         : error;
@@ -47,7 +47,7 @@ export default function GamePage() {
       clearError();
       navigate('/');
     }
-  }, [room, error, navigate, toast, clearError]);
+  }, [room, error, reconnecting, navigate, toast, clearError]);
 
   if (!room || !gameState) {
     return (
@@ -67,7 +67,24 @@ export default function GamePage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Reconnecting overlay */}
+      <AnimatePresence>
+        {reconnecting && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          >
+            <div className="flex flex-col items-center gap-3 px-6 py-5 rounded-2xl bg-gray-900/90 border border-white/10">
+              <Loader2 className="w-6 h-6 text-primary-400 animate-spin" />
+              <p className="text-sm font-medium text-gray-300">Reconnecting...</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header bar */}
       <div className="flex items-center justify-between">
         <div>

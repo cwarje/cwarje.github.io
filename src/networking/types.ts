@@ -50,4 +50,5 @@ export interface RoomContextValue {
   error: string | null;
   clearError: () => void;
   connecting: boolean;
+  reconnecting: boolean;
 }
