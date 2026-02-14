@@ -334,6 +334,14 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
       const roomCode = generateRoomCode();
       const peer = await createHostPeer(roomCode);
+
+      // If another operation (e.g. joinRoom) started while we were awaiting,
+      // it will have set peerRef.current to its own peer. Abort this lobby creation.
+      if (peerRef.current !== null) {
+        destroyPeer(peer);
+        return roomCodeRef.current || roomCode;
+      }
+
       peerRef.current = peer;
       setMyId(deviceId);
 
@@ -375,9 +383,15 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     setConnecting(true);
     try {
-      // If already hosting a lobby, silently close it first (notify clients)
+      // If already connected, silently close the old connection first
       if (peerRef.current) {
         const currentRoom = roomRef.current;
+
+        // Null out refs immediately so that conn.on('close') handlers from the
+        // old connection won't attempt auto-reconnect to the old room.
+        roomRef.current = null;
+        roomCodeRef.current = '';
+
         if (currentRoom && currentRoom.hostId === deviceId) {
           // We're the host — notify clients that we're shutting down
           connectionsRef.current.forEach((conn) => {
@@ -486,6 +500,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     // Stop any in-progress reconnection
     reconnectingRef.current = false;
     setReconnecting(false);
+
+    // Update refs immediately so that conn.on('close') handlers
+    // (which fire synchronously when we destroy the peer below)
+    // won't mistake this intentional leave for an unintentional disconnect
+    // and attempt to auto-reconnect.
+    roomRef.current = null;
+    roomCodeRef.current = '';
 
     if (isHost) {
       broadcast({ type: 'host-disconnected' });
