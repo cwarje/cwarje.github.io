@@ -7,9 +7,10 @@ interface PlayerListProps {
   isHost: boolean;
   onRemoveBot?: (botId: string) => void;
   onRemovePlayer?: (playerId: string) => void;
+  wins?: Record<string, number>;
 }
 
-export default function PlayerList({ players, hostId, isHost, onRemoveBot, onRemovePlayer }: PlayerListProps) {
+export default function PlayerList({ players, hostId, isHost, onRemoveBot, onRemovePlayer, wins }: PlayerListProps) {
   return (
     <div className="space-y-2">
       {players.map((player) => (
@@ -32,6 +33,11 @@ export default function PlayerList({ players, hostId, isHost, onRemoveBot, onRem
               )}
               {player.isBot && (
                 <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-primary-600/20 text-primary-400 uppercase tracking-wider">Bot</span>
+              )}
+              {wins && wins[player.id] > 0 && (
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-400 tracking-wider">
+                  {wins[player.id]} {wins[player.id] === 1 ? 'win' : 'wins'}
+                </span>
               )}
             </div>
           </div>

@@ -10,6 +10,8 @@ export interface GameCatalogEntry {
   title: string;
   shortDescription: string;
   playersLabel: string;
+  minPlayers: number;
+  maxPlayers: number;
   info: HowToPlay;
 }
 
@@ -18,6 +20,8 @@ export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
     title: 'Yahtzee',
     shortDescription: 'Roll dice, pick categories, and chase that perfect score. Classic dice game for 1-4 players.',
     playersLabel: '1-4 Players',
+    minPlayers: 1,
+    maxPlayers: 4,
     info: {
       goal: 'Score the most points by rolling five dice to make certain combinations over 13 rounds.',
       rules: [
@@ -40,6 +44,8 @@ export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
     title: 'Hearts',
     shortDescription: 'Avoid tricks with hearts and the dreaded Queen of Spades. Or shoot the moon!',
     playersLabel: '4 Players',
+    minPlayers: 4,
+    maxPlayers: 4,
     info: {
       goal: 'Have the fewest points when any player reaches 100. Hearts are worth 1 point each, and the Queen of Spades is worth 13.',
       rules: [
@@ -63,6 +69,8 @@ export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
     title: 'Battleship',
     shortDescription: 'Place your fleet and hunt down the enemy ships. Strategic naval combat for two.',
     playersLabel: '2 Players',
+    minPlayers: 2,
+    maxPlayers: 2,
     info: {
       goal: 'Sink all of your opponent\'s ships before they sink yours.',
       rules: [
@@ -85,6 +93,8 @@ export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
     title: "Liar's Dice",
     shortDescription: "Bluff, bid, and call liars. Losers face the revolver. Last player standing wins. Inspired by Liar's Bar.",
     playersLabel: '2-4 Players',
+    minPlayers: 2,
+    maxPlayers: 4,
     info: {
       goal: 'Be the last player standing. Survive by bluffing well and catching others in their lies.',
       rules: [
@@ -109,6 +119,8 @@ export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
     title: 'Poker',
     shortDescription: 'Texas Hold\'em with blinds, betting rounds, and side pots. Bluff your way to the chips!',
     playersLabel: '2-8 Players',
+    minPlayers: 2,
+    maxPlayers: 8,
     info: {
       goal: 'Win chips by having the best 5-card hand or by making all other players fold.',
       rules: [

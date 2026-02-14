@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RotateCcw, Loader2 } from 'lucide-react';
+import { Home, Loader2 } from 'lucide-react';
 import { useRoomContext } from '../networking/roomStore';
 import { useToast } from '../components/Toast';
 import LeaveButton from '../components/LeaveButton';
@@ -19,7 +19,7 @@ import type { PokerState } from '../games/poker/types';
 export default function GamePage() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
-  const { room, gameState, myId, isHost, sendAction, playAgain, leaveRoom, rejoinRoom, connecting, reconnecting, error, clearError } = useRoomContext();
+  const { room, gameState, myId, isHost, sendAction, returnToLobby, leaveRoom, rejoinRoom, connecting, reconnecting, error, clearError } = useRoomContext();
   const { toast } = useToast();
   const rejoinAttempted = useRef(false);
   const hasHadRoom = useRef(!!room);
@@ -49,6 +49,13 @@ export default function GamePage() {
     }
   }, [room, error, reconnecting, navigate, toast, clearError]);
 
+  // Navigate back to homepage when room returns to lobby phase
+  useEffect(() => {
+    if (room?.phase === 'lobby') {
+      navigate('/');
+    }
+  }, [room?.phase, navigate]);
+
   if (!room || !gameState) {
     return (
       <div className="text-center py-20">
@@ -59,11 +66,22 @@ export default function GamePage() {
 
   const isFinished = room.phase === 'finished';
   const isPoker = room.gameType === 'poker';
+  const pokerState = isPoker ? (gameState as PokerState) : null;
+  const isPokerSessionOver = pokerState?.sessionOver ?? false;
+
+  // Show "Back to Lobby" for host when game is finished (non-poker) or poker session is over
+  const showBackToLobby = isHost && (
+    (isFinished && !isPoker) || (isPoker && isPokerSessionOver)
+  );
 
   const handlePokerLeave = () => {
     leaveRoom();
     toast('Left the table.', 'info');
     navigate('/');
+  };
+
+  const handleReturnToLobby = () => {
+    returnToLobby();
   };
 
   return (
@@ -89,35 +107,35 @@ export default function GamePage() {
       {room.gameType !== 'yahtzee' && (
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold text-white capitalize">{room.gameType}</h1>
+            <h1 className="text-lg font-bold text-white capitalize">{room.gameType === 'liars-dice' ? "Liar's Dice" : room.gameType}</h1>
             <p className="text-xs text-gray-500">Room: {room.roomCode}</p>
           </div>
           <div className="flex items-center gap-3">
-            {isFinished && isHost && !isPoker && (
+            {showBackToLobby && (
               <motion.button
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                onClick={playAgain}
+                onClick={handleReturnToLobby}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-medium hover:bg-primary-500 transition-colors cursor-pointer"
               >
-                <RotateCcw className="w-4 h-4" />
-                Play Again
+                <Home className="w-4 h-4" />
+                Back to Lobby
               </motion.button>
             )}
             <LeaveButton />
           </div>
         </div>
       )}
-      {room.gameType === 'yahtzee' && isFinished && isHost && (
+      {room.gameType === 'yahtzee' && showBackToLobby && (
         <div className="flex items-center justify-end gap-3">
           <motion.button
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            onClick={playAgain}
+            onClick={handleReturnToLobby}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-medium hover:bg-primary-500 transition-colors cursor-pointer"
           >
-            <RotateCcw className="w-4 h-4" />
-            Play Again
+            <Home className="w-4 h-4" />
+            Back to Lobby
           </motion.button>
         </div>
       )}

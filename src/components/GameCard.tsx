@@ -60,26 +60,29 @@ interface GameCardProps {
   gameType: GameType;
   onSelect: (gameType: GameType) => void;
   onInfo?: (gameType: GameType) => void;
+  disabled?: boolean;
+  actionLabel?: string;
 }
 
-export default function GameCard({ gameType, onSelect, onInfo }: GameCardProps) {
+export default function GameCard({ gameType, onSelect, onInfo, disabled, actionLabel = 'Play' }: GameCardProps) {
   const info = GAME_INFO[gameType];
   const Icon = info.icon;
 
   return (
     <motion.div
-      whileHover={{ scale: 1.02, y: -4 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={() => onSelect(gameType)}
+      whileHover={disabled ? {} : { scale: 1.02, y: -4 }}
+      whileTap={disabled ? {} : { scale: 0.98 }}
+      onClick={() => !disabled && onSelect(gameType)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault();
           onSelect(gameType);
         }
       }}
       role="button"
-      tabIndex={0}
-      className={`relative w-full text-left p-6 rounded-2xl glass border border-white/5 ${BORDER_COLORS[gameType]} transition-colors duration-300 group cursor-pointer`}
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled}
+      className={`relative w-full text-left p-6 rounded-2xl glass border border-white/5 ${disabled ? 'opacity-40 cursor-not-allowed' : `${BORDER_COLORS[gameType]} cursor-pointer`} transition-colors duration-300 group`}
     >
       {onInfo && (
         <button
@@ -101,9 +104,11 @@ export default function GameCard({ gameType, onSelect, onInfo }: GameCardProps) 
       <p className="text-sm text-gray-400 mb-4 leading-relaxed">{info.description}</p>
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">{info.players}</span>
-        <span className="text-xs font-medium text-primary-400 opacity-0 group-hover:opacity-100 transition-opacity">
-          Play &rarr;
-        </span>
+        {!disabled && (
+          <span className="text-xs font-medium text-primary-400 opacity-0 group-hover:opacity-100 transition-opacity">
+            {actionLabel} &rarr;
+          </span>
+        )}
       </div>
     </motion.div>
   );

@@ -14,7 +14,7 @@ export default function LeaveButton({ variant = 'default' }: LeaveButtonProps) {
 
   const handleLeave = () => {
     leaveRoom();
-    toast(isHost ? 'Left lobby. The lobby is closed.' : 'Left lobby.', 'info');
+    toast(isHost ? 'Lobby closed.' : 'Left lobby.', 'info');
     navigate('/');
   };
 

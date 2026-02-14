@@ -1,23 +1,26 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, Copy, Plus } from 'lucide-react';
 import GameCard from '../components/GameCard';
 import RoomCodeInput from '../components/RoomCodeInput';
+import PlayerList from '../components/PlayerList';
+import LeaveButton from '../components/LeaveButton';
 import { useRoomContext } from '../networking/roomStore';
 import type { GameType } from '../networking/types';
 import { GAME_CATALOG } from '../games/gameCatalog';
 
 export default function Home() {
   const navigate = useNavigate();
-  const { createRoom, joinRoom, connecting, error } = useRoomContext();
+  const { room, isHost, createLobby, joinRoom, startGame, addBot, removeBot, removePlayer, connecting, error, clearError } = useRoomContext();
   const [playerName] = useState(() => {
-    return localStorage.getItem('playerName') || `Player${Math.floor(Math.random() * 9999)}`;
+    return localStorage.getItem('playerName') || '';
   });
   const [nameInput, setNameInput] = useState(playerName);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
-  const [pendingAction, setPendingAction] = useState<{ type: 'create'; gameType: GameType } | { type: 'join'; code: string } | null>(null);
+  const [pendingJoinCode, setPendingJoinCode] = useState<string | null>(null);
   const [infoGameType, setInfoGameType] = useState<GameType | null>(null);
+  const lobbyCreatingRef = useRef(false);
 
   const closeInfo = useCallback(() => setInfoGameType(null), []);
 
@@ -35,37 +38,88 @@ export default function Home() {
     return name;
   };
 
-  const handleSelectGame = (gameType: GameType) => {
-    setPendingAction({ type: 'create', gameType });
-    setShowNamePrompt(true);
-  };
+  // Clear errors when room is lost (e.g. host disconnected) — auto-create will handle recovery
+  useEffect(() => {
+    if (!room && error) {
+      clearError();
+    }
+  }, [room, error, clearError]);
 
-  const handleJoinRoom = (code: string) => {
-    setPendingAction({ type: 'join', code });
-    setShowNamePrompt(true);
-  };
+  // Auto-create lobby on mount when no room exists and name is available
+  useEffect(() => {
+    if (room || connecting || lobbyCreatingRef.current || error) return;
+    const storedName = localStorage.getItem('playerName');
+    if (storedName) {
+      lobbyCreatingRef.current = true;
+      createLobby(storedName).catch(() => {}).finally(() => {
+        lobbyCreatingRef.current = false;
+      });
+    } else {
+      // No stored name — show prompt
+      setShowNamePrompt(true);
+    }
+  }, [room, connecting, error, createLobby]);
+
+  // Navigate to game when it starts
+  useEffect(() => {
+    if (room?.phase === 'playing' || room?.phase === 'finished') {
+      navigate(`/game/${room.roomCode}`);
+    }
+  }, [room?.phase, room?.roomCode, navigate]);
 
   const handleConfirmName = async () => {
-    const name = saveName(nameInput.trim() || playerName);
+    const name = saveName(nameInput.trim() || `Player${Math.floor(Math.random() * 9999)}`);
     setShowNamePrompt(false);
 
-    if (!pendingAction) return;
-
-    try {
-      if (pendingAction.type === 'create') {
-        const roomCode = await createRoom(pendingAction.gameType, name);
-        navigate(`/lobby/${roomCode}`);
-      } else {
-        await joinRoom(pendingAction.code, name);
-        navigate(`/lobby/${pendingAction.code}`);
+    if (pendingJoinCode) {
+      // Joining another lobby
+      const code = pendingJoinCode;
+      setPendingJoinCode(null);
+      try {
+        await joinRoom(code, name);
+      } catch {
+        // Error is handled by context
       }
-    } catch {
-      // Error is handled by context
+    } else if (!room) {
+      // Creating own lobby
+      try {
+        await createLobby(name);
+      } catch {
+        // Error is handled by context
+      }
     }
   };
 
+  const handleJoinRoom = (code: string) => {
+    const storedName = localStorage.getItem('playerName');
+    if (!storedName) {
+      setPendingJoinCode(code);
+      setShowNamePrompt(true);
+      return;
+    }
+    // Silently close own lobby and join other (joinRoomInternal handles cleanup)
+    joinRoom(code, storedName).catch(() => {});
+  };
+
+  const handleSelectGame = (gameType: GameType) => {
+    if (!isHost || !room) return;
+    const count = room.players.length;
+    const catalog = GAME_CATALOG[gameType];
+    if (count < catalog.minPlayers || count > catalog.maxPlayers) return;
+    startGame(gameType);
+  };
+
+  const copyCode = () => {
+    if (room) navigator.clipboard.writeText(room.roomCode);
+  };
+
+  const playerCount = room?.players.length ?? 0;
+  // Max players across all games (for the "Add Bot" cap)
+  const maxPlayersAcrossGames = Math.max(...Object.values(GAME_CATALOG).map(g => g.maxPlayers));
+  const canAddBot = isHost && playerCount < maxPlayersAcrossGames;
+
   return (
-    <div className="space-y-12">
+    <div className="space-y-10">
       {/* Hero Section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -75,22 +129,83 @@ export default function Home() {
       >
         <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">
           <span className="bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
-            Pick a Game
+            {isHost ? 'Pick a Game' : room ? 'Waiting for Host' : 'Pick a Game'}
           </span>
         </h1>
         <p className="text-gray-400 text-lg max-w-md mx-auto">
-          Play solo against bots or challenge your friends with a room code.
+          {isHost
+            ? 'Add bots or invite friends, then pick a game to start playing.'
+            : room
+              ? 'The host will pick a game to start.'
+              : 'Play solo against bots or challenge your friends with a room code.'}
         </p>
       </motion.div>
+
+      {/* Lobby Panel */}
+      {room && room.phase === 'lobby' && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="max-w-lg mx-auto space-y-5"
+        >
+          {/* Room Code + Leave */}
+          <div className="glass rounded-2xl p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Lobby Code</p>
+              <LeaveButton />
+            </div>
+            <div className="flex items-center justify-center gap-3">
+              <span className="text-3xl font-extrabold tracking-[0.3em] text-white font-mono">
+                {room.roomCode}
+              </span>
+              <button
+                onClick={copyCode}
+                className="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
+                title="Copy lobby code"
+              >
+                <Copy className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 text-center">Share this code with friends to invite them</p>
+          </div>
+
+          {/* Players */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-gray-400">
+                Players ({playerCount})
+              </h2>
+              {canAddBot && (
+                <button
+                  onClick={addBot}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add Bot
+                </button>
+              )}
+            </div>
+            <PlayerList
+              players={room.players}
+              hostId={room.hostId}
+              isHost={isHost}
+              onRemoveBot={removeBot}
+              onRemovePlayer={removePlayer}
+              wins={room.wins}
+            />
+          </div>
+        </motion.div>
+      )}
 
       {/* Join Room Bar */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        transition={{ delay: 0.15 }}
         className="flex flex-col sm:flex-row items-center justify-center gap-3"
       >
-        <span className="text-sm text-gray-500">Have a room code?</span>
+        <span className="text-sm text-gray-500">Have a lobby code?</span>
         <RoomCodeInput onJoin={handleJoinRoom} loading={connecting} />
       </motion.div>
 
@@ -99,7 +214,8 @@ export default function Home() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="text-center text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 max-w-md mx-auto"
+          className="text-center text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 max-w-md mx-auto cursor-pointer"
+          onClick={clearError}
         >
           {error}
         </motion.div>
@@ -110,19 +226,45 @@ export default function Home() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.2 }}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+        className="space-y-4"
       >
-        {(['yahtzee', 'hearts', 'battleship', 'liars-dice', 'poker'] as GameType[]).map((game, i) => (
-          <motion.div
-            key={game}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 + i * 0.1 }}
-          >
-            <GameCard gameType={game} onSelect={handleSelectGame} onInfo={setInfoGameType} />
-          </motion.div>
-        ))}
+        {isHost && room && room.phase === 'lobby' && (
+          <p className="text-center text-sm text-gray-500">
+            Choose a game to start playing with your lobby.
+          </p>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {(['yahtzee', 'hearts', 'battleship', 'liars-dice', 'poker'] as GameType[]).map((game, i) => {
+            const catalog = GAME_CATALOG[game];
+            const canPlay = room ? playerCount >= catalog.minPlayers && playerCount <= catalog.maxPlayers : true;
+            const isDisabled = room ? (!isHost || !canPlay) : false;
+
+            return (
+              <motion.div
+                key={game}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 + i * 0.1 }}
+              >
+                <GameCard
+                  gameType={game}
+                  onSelect={handleSelectGame}
+                  onInfo={setInfoGameType}
+                  disabled={isDisabled}
+                  actionLabel="Start"
+                />
+              </motion.div>
+            );
+          })}
+        </div>
       </motion.div>
+
+      {/* Non-host notice */}
+      {room && !isHost && room.phase === 'lobby' && (
+        <div className="text-center py-2">
+          <p className="text-gray-500 text-sm">Waiting for the host to pick a game...</p>
+        </div>
+      )}
 
       {/* Game Info Modal */}
       <AnimatePresence>
@@ -192,7 +334,6 @@ export default function Home() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setShowNamePrompt(false)}
         >
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
@@ -211,21 +352,13 @@ export default function Home() {
               placeholder="Your name"
               autoFocus
             />
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowNamePrompt(false)}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-white/10 text-gray-400 hover:text-white hover:border-white/20 transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmName}
-                disabled={connecting}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 disabled:opacity-50 transition-colors cursor-pointer"
-              >
-                {connecting ? 'Connecting...' : 'Go'}
-              </button>
-            </div>
+            <button
+              onClick={handleConfirmName}
+              disabled={connecting}
+              className="w-full px-4 py-2.5 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 disabled:opacity-50 transition-colors cursor-pointer"
+            >
+              {connecting ? 'Connecting...' : 'Go'}
+            </button>
           </motion.div>
         </motion.div>
       )}

@@ -5,7 +5,7 @@ import { createHostPeer, createClientPeer, connectToPeer, destroyPeer } from './
 import { generateRoomCode } from '../utils/roomCode';
 import { getDeviceId } from '../utils/deviceId';
 import type { RoomState, RoomContextValue, GameType, Player, ClientMessage, HostMessage } from './types';
-import { createInitialGameState, processGameAction, checkGameOver, runSingleBotTurn } from '../games/gameEngine';
+import { createInitialGameState, processGameAction, checkGameOver, runSingleBotTurn, getGameWinners } from '../games/gameEngine';
 import type { HeartsState } from '../games/hearts/types';
 import type { LiarsDiceState } from '../games/liars-dice/types';
 import type { PokerState } from '../games/poker/types';
@@ -125,7 +125,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           break;
         }
         case 'action': {
-          if (currentRoom.phase === 'playing') {
+          if (currentRoom.phase === 'playing' && currentRoom.gameType) {
             const senderDeviceId = peerDeviceMapRef.current.get(conn.peer);
             if (!senderDeviceId) return;
             const currentGs = gameStateRef.current;
@@ -318,11 +318,20 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const attemptReconnectRef = useRef(attemptReconnect);
   useEffect(() => { attemptReconnectRef.current = attemptReconnect; }, [attemptReconnect]);
 
-  // Create room as host
-  const createRoom = useCallback(async (gameType: GameType, playerName: string): Promise<string> => {
+  // Create lobby as host (no game type — game is chosen when starting)
+  const createLobby = useCallback(async (playerName: string): Promise<string> => {
     setError(null);
     setConnecting(true);
     try {
+      // If already connected, clean up first
+      if (peerRef.current) {
+        connectionsRef.current.forEach(conn => conn.close());
+        connectionsRef.current.clear();
+        peerDeviceMapRef.current.clear();
+        destroyPeer(peerRef.current);
+        peerRef.current = null;
+      }
+
       const roomCode = generateRoomCode();
       const peer = await createHostPeer(roomCode);
       peerRef.current = peer;
@@ -338,10 +347,11 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
       const newRoom: RoomState = {
         roomCode,
-        gameType,
+        gameType: null,
         players: [hostPlayer],
         phase: 'lobby',
         hostId: deviceId,
+        wins: {},
       };
 
       setRoom(newRoom);
@@ -365,8 +375,24 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     setConnecting(true);
     try {
-      // If already connected, clean up first
+      // If already hosting a lobby, silently close it first (notify clients)
       if (peerRef.current) {
+        const currentRoom = roomRef.current;
+        if (currentRoom && currentRoom.hostId === deviceId) {
+          // We're the host — notify clients that we're shutting down
+          connectionsRef.current.forEach((conn) => {
+            if (conn.open) {
+              conn.send({ type: 'host-disconnected' } as HostMessage);
+            }
+          });
+        } else {
+          // We're a client — notify host that we're leaving
+          connectionsRef.current.forEach((conn) => {
+            if (conn.open) {
+              conn.send({ type: 'leave' } as ClientMessage);
+            }
+          });
+        }
         connectionsRef.current.forEach(conn => conn.close());
         connectionsRef.current.clear();
         peerDeviceMapRef.current.clear();
@@ -527,11 +553,11 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     removePlayer(botId);
   }, [removePlayer]);
 
-  // Start game (host only)
-  const startGame = useCallback(() => {
+  // Start game (host only) — gameType is chosen at start time
+  const startGame = useCallback((gameType: GameType) => {
     if (!isHost || !room) return;
-    const gs = createInitialGameState(room.gameType, room.players);
-    const startedRoom = { ...room, phase: 'playing' as const };
+    const gs = createInitialGameState(gameType, room.players);
+    const startedRoom = { ...room, gameType, phase: 'playing' as const };
     setRoom(startedRoom);
     setGameState(gs);
     broadcastRoomState(startedRoom);
@@ -543,7 +569,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     if (isHost) {
       // Host processes directly
       const currentRoom = roomRef.current;
-      if (!currentRoom || currentRoom.phase !== 'playing') return;
+      if (!currentRoom || currentRoom.phase !== 'playing' || !currentRoom.gameType) return;
       const currentGs = gameStateRef.current;
       const newGs = processGameAction(currentRoom.gameType, currentGs, payload, myId);
       if (newGs !== currentGs) {
@@ -565,16 +591,29 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isHost, myId, broadcastGameState, broadcastRoomState]);
 
-  // Play again (host only)
-  const playAgain = useCallback(() => {
+  // Return to lobby (host only) — calculates winners, updates wins, resets to lobby
+  const returnToLobby = useCallback(() => {
     if (!isHost || !room) return;
-    const gs = createInitialGameState(room.gameType, room.players);
-    const resetRoom = { ...room, phase: 'playing' as const };
-    setRoom(resetRoom);
-    setGameState(gs);
-    broadcastRoomState(resetRoom);
-    broadcastGameState(gs);
-  }, [isHost, room, broadcastRoomState, broadcastGameState]);
+
+    // Calculate winners and update wins
+    const updatedWins = { ...room.wins };
+    if (room.gameType && gameStateRef.current) {
+      const winners = getGameWinners(room.gameType, gameStateRef.current);
+      for (const winnerId of winners) {
+        updatedWins[winnerId] = (updatedWins[winnerId] || 0) + 1;
+      }
+    }
+
+    const lobbyRoom: RoomState = {
+      ...room,
+      gameType: null,
+      phase: 'lobby' as const,
+      wins: updatedWins,
+    };
+    setRoom(lobbyRoom);
+    setGameState(null);
+    broadcastRoomState(lobbyRoom);
+  }, [isHost, room, broadcastRoomState]);
 
   // Clear error
   const clearError = useCallback(() => setError(null), []);
@@ -797,7 +836,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         isHost,
         myId,
         myPlayer,
-        createRoom,
+        createLobby,
         joinRoom,
         rejoinRoom,
         leaveRoom,
@@ -806,7 +845,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         removeBot,
         startGame,
         sendAction,
-        playAgain,
+        returnToLobby,
         error,
         clearError,
         connecting,

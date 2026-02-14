@@ -4,6 +4,11 @@ import { createHeartsState, processHeartsAction, isHeartsOver, runHeartsBotTurn 
 import { createBattleshipState, processBattleshipAction, isBattleshipOver, runBattleshipBotTurn } from './battleship/logic';
 import { createLiarsDiceState, processLiarsDiceAction, isLiarsDiceOver, runLiarsDiceBotTurn } from './liars-dice/logic';
 import { createPokerState, processPokerAction, isPokerOver, runPokerBotTurn } from './poker/logic';
+import type { YahtzeeState } from './yahtzee/types';
+import type { HeartsState } from './hearts/types';
+import type { BattleshipState } from './battleship/types';
+import type { LiarsDiceState } from './liars-dice/types';
+import type { PokerState } from './poker/types';
 
 export function createInitialGameState(gameType: GameType, players: Player[]): unknown {
   switch (gameType) {
@@ -52,6 +57,38 @@ export function runSingleBotTurn(gameType: GameType, state: unknown): unknown {
     case 'liars-dice': return runLiarsDiceBotTurn(state);
     case 'poker': return runPokerBotTurn(state);
     default: return state;
+  }
+}
+
+// Determine the winner(s) of a finished game. Returns array of winning player IDs.
+export function getGameWinners(gameType: GameType, gameState: unknown): string[] {
+  switch (gameType) {
+    case 'yahtzee': {
+      const state = gameState as YahtzeeState;
+      const maxScore = Math.max(...state.players.map(p => p.totalScore));
+      return state.players.filter(p => p.totalScore === maxScore).map(p => p.id);
+    }
+    case 'hearts': {
+      const state = gameState as HeartsState;
+      return state.winner ? [state.winner] : [];
+    }
+    case 'battleship': {
+      const state = gameState as BattleshipState;
+      return state.winner ? [state.winner] : [];
+    }
+    case 'liars-dice': {
+      const state = gameState as LiarsDiceState;
+      return state.players.filter(p => p.alive).map(p => p.id);
+    }
+    case 'poker': {
+      const state = gameState as PokerState;
+      const activePlayers = state.players.filter(p => !p.leftGame);
+      if (activePlayers.length === 0) return [];
+      const maxChips = Math.max(...activePlayers.map(p => p.chips));
+      return activePlayers.filter(p => p.chips === maxChips).map(p => p.id);
+    }
+    default:
+      return [];
   }
 }
 

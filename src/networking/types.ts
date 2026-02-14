@@ -25,10 +25,11 @@ export type HostMessage =
 
 export interface RoomState {
   roomCode: string;
-  gameType: GameType;
+  gameType: GameType | null;
   players: Player[];
   phase: 'lobby' | 'playing' | 'finished';
   hostId: string;
+  wins: Record<string, number>;
 }
 
 export interface RoomContextValue {
@@ -37,16 +38,16 @@ export interface RoomContextValue {
   isHost: boolean;
   myId: string;
   myPlayer: Player | null;
-  createRoom: (gameType: GameType, playerName: string) => Promise<string>;
+  createLobby: (playerName: string) => Promise<string>;
   joinRoom: (roomCode: string, playerName: string) => Promise<void>;
   rejoinRoom: (roomCode: string) => Promise<void>;
   leaveRoom: () => void;
   removePlayer: (playerId: string) => void;
   addBot: () => void;
   removeBot: (botId: string) => void;
-  startGame: () => void;
+  startGame: (gameType: GameType) => void;
   sendAction: (payload: unknown) => void;
-  playAgain: () => void;
+  returnToLobby: () => void;
   error: string | null;
   clearError: () => void;
   connecting: boolean;
