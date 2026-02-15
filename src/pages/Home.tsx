@@ -1,18 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Copy, Plus } from 'lucide-react';
+import { X } from 'lucide-react';
 import GameCard from '../components/GameCard';
 import RoomCodeInput from '../components/RoomCodeInput';
-import PlayerList from '../components/PlayerList';
-import LeaveButton from '../components/LeaveButton';
 import { useRoomContext } from '../networking/roomStore';
 import type { GameType } from '../networking/types';
 import { GAME_CATALOG } from '../games/gameCatalog';
 
 export default function Home() {
   const navigate = useNavigate();
-  const { room, isHost, createLobby, joinRoom, startGame, addBot, removeBot, removePlayer, connecting, error, clearError } = useRoomContext();
+  const { room, isHost, createLobby, joinRoom, startGame, connecting, error, clearError } = useRoomContext();
   const [playerName] = useState(() => {
     return localStorage.getItem('playerName') || '';
   });
@@ -109,14 +107,7 @@ export default function Home() {
     startGame(gameType);
   };
 
-  const copyCode = () => {
-    if (room) navigator.clipboard.writeText(room.roomCode);
-  };
-
   const playerCount = room?.players.length ?? 0;
-  // Max players across all games (for the "Add Bot" cap)
-  const maxPlayersAcrossGames = Math.max(...Object.values(GAME_CATALOG).map(g => g.maxPlayers));
-  const canAddBot = isHost && playerCount < maxPlayersAcrossGames;
 
   return (
     <div className="space-y-10">
@@ -134,69 +125,12 @@ export default function Home() {
         </h1>
         <p className="text-gray-400 text-lg max-w-md mx-auto">
           {isHost
-            ? 'Add bots or invite friends, then pick a game to start playing.'
+            ? 'Use the Lobby menu to invite friends or add bots, then pick a game.'
             : room
               ? 'The host will pick a game to start.'
               : 'Play solo against bots or challenge your friends with a room code.'}
         </p>
       </motion.div>
-
-      {/* Lobby Panel */}
-      {room && room.phase === 'lobby' && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="max-w-lg mx-auto space-y-5"
-        >
-          {/* Room Code + Leave */}
-          <div className="glass rounded-2xl p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Lobby Code</p>
-              <LeaveButton />
-            </div>
-            <div className="flex items-center justify-center gap-3">
-              <span className="text-3xl font-extrabold tracking-[0.3em] text-white font-mono">
-                {room.roomCode}
-              </span>
-              <button
-                onClick={copyCode}
-                className="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
-                title="Copy lobby code"
-              >
-                <Copy className="w-4 h-4 text-gray-400" />
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 text-center">Share this code with friends to invite them</p>
-          </div>
-
-          {/* Players */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium text-gray-400">
-                Players ({playerCount})
-              </h2>
-              {canAddBot && (
-                <button
-                  onClick={addBot}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-400 hover:text-white transition-colors cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add Bot
-                </button>
-              )}
-            </div>
-            <PlayerList
-              players={room.players}
-              hostId={room.hostId}
-              isHost={isHost}
-              onRemoveBot={removeBot}
-              onRemovePlayer={removePlayer}
-              wins={room.wins}
-            />
-          </div>
-        </motion.div>
-      )}
 
       {/* Join Room Bar */}
       <motion.div
