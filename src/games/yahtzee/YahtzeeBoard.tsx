@@ -160,9 +160,6 @@ export default function YahtzeeBoard({ state, myId, onAction, roomCode }: Yahtze
         animate={{ opacity: 1 }}
         className="max-w-md mx-auto space-y-6 text-center"
       >
-        <div className="flex justify-end">
-          <LeaveButton variant="icon" />
-        </div>
         <Trophy className="w-16 h-16 text-amber-400 mx-auto" />
         <h2 className="text-3xl font-extrabold text-white">Game Over!</h2>
         <div className="space-y-3">

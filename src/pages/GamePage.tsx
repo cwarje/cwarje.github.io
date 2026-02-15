@@ -74,6 +74,9 @@ export default function GamePage() {
     (isFinished && !isPoker) || (isPoker && isPokerSessionOver)
   );
 
+  // Hide the Leave button on game-over screens
+  const hideLeaveButton = isFinished || (isPoker && isPokerSessionOver);
+
   const handlePokerLeave = () => {
     leaveRoom();
     toast('Left the table.', 'info');
@@ -122,7 +125,7 @@ export default function GamePage() {
                 Back to Lobby
               </motion.button>
             )}
-            <LeaveButton />
+            {!hideLeaveButton && <LeaveButton />}
           </div>
         </div>
       )}
