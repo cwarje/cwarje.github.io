@@ -10,6 +10,8 @@ import type { HeartsState } from '../games/hearts/types';
 import type { LiarsDiceState } from '../games/liars-dice/types';
 import type { PokerState } from '../games/poker/types';
 import type { BattleshipState } from '../games/battleship/types';
+import type { YahtzeeState } from '../games/yahtzee/types';
+import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 
 const BOT_NAMES = ['Nova', 'Pixel', 'Byte', 'Chip', 'Blaze', 'Echo', 'Neon', 'Volt'];
 
@@ -643,6 +645,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   // --- Bot turn scheduling (host only, Hearts & Liar's Dice & Poker) ---
   const BOT_PLAY_DELAY = 800;   // ms between each bot card play (Hearts)
   const BATTLESHIP_BOT_DELAY = 800; // ms before bot fires in Battleship
+  const YAHTZEE_BOT_ROLL_DELAY = 800;  // ms between each bot roll in Yahtzee
+  const YAHTZEE_BOT_SCORE_DELAY = 4000; // ms to show dice before bot scores
   const TRICK_DISPLAY_DELAY = 2000; // ms to show completed trick before collecting
   const LIARS_DICE_BOT_DELAY = 1200; // ms between bot actions in Liar's Dice
   const LIARS_DICE_REVEAL_DELAY = 2500; // ms to show reveal before revolver
@@ -855,6 +859,33 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
           }
         }, BATTLESHIP_BOT_DELAY);
+      }
+    }
+
+    // ── Yahtzee bot scheduling ──
+    if (room.gameType === 'yahtzee') {
+      const ys = gameState as YahtzeeState;
+      if (ys.gameOver) return;
+
+      const currentPlayer = ys.players[ys.currentPlayerIndex];
+      if (currentPlayer && currentPlayer.isBot) {
+        const delay = willYahtzeeBotScore(ys) ? YAHTZEE_BOT_SCORE_DELAY : YAHTZEE_BOT_ROLL_DELAY;
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom) return;
+
+          const next = runSingleBotTurn('yahtzee', currentGs);
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('yahtzee', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, delay);
       }
     }
   }, [gameState, isHost, room, broadcastGameState, broadcastRoomState]);

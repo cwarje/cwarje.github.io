@@ -251,7 +251,22 @@ export function isYahtzeeOver(state: unknown): boolean {
   return (state as YahtzeeState).gameOver;
 }
 
-// Bot AI
+/** Returns true when the bot's next step will be scoring (not rolling).
+ *  Used by the host scheduler to show the dice longer before the score clears them. */
+export function willYahtzeeBotScore(state: unknown): boolean {
+  const s = state as YahtzeeState;
+  if (s.gameOver) return false;
+  const player = s.players[s.currentPlayerIndex];
+  if (!player || !player.isBot) return false;
+  if (s.rollsLeft === 3) return false; // will roll first
+  if (s.rollsLeft === 0) return true;  // must score
+  const available = getAvailableCategories(s.dice, player.scorecard);
+  const best = pickBestCategory(s.dice, available, player.scorecard);
+  return !shouldReroll(s.dice, best, player.scorecard);
+}
+
+// Bot AI — performs exactly ONE step per call (one roll or one score)
+// so the host scheduler can insert delays between each visible action.
 export function runYahtzeeBotTurn(state: unknown): unknown {
   const s = state as YahtzeeState;
   if (s.gameOver) return state;
@@ -259,36 +274,34 @@ export function runYahtzeeBotTurn(state: unknown): unknown {
   const currentPlayer = s.players[s.currentPlayerIndex];
   if (!currentPlayer.isBot) return state;
 
-  // If needs to roll
+  // Step 1: First roll (rollsLeft === 3) — roll all dice
   if (s.rollsLeft === 3) {
     const newDice = rollDice(s.dice, [false, false, false, false, false]);
-    return runYahtzeeBotTurn({
+    return {
       ...s,
       dice: newDice,
       rollsLeft: 2,
       held: [false, false, false, false, false],
-    });
+    };
   }
 
   // Decide whether to keep rolling or score (respects joker rules)
   const availableCategories = getAvailableCategories(s.dice, currentPlayer.scorecard);
   const bestCategory = pickBestCategory(s.dice, availableCategories, currentPlayer.scorecard);
 
+  // Step 2: Reroll (rollsLeft > 0 and should reroll) — hold + roll once
   if (s.rollsLeft > 0 && shouldReroll(s.dice, bestCategory, currentPlayer.scorecard)) {
-    // Decide which to hold
     const newHeld = decideBotHolds(s.dice, bestCategory);
     const newDice = rollDice(s.dice, newHeld);
-    const afterRoll = {
+    return {
       ...s,
       dice: newDice,
       held: newHeld,
       rollsLeft: s.rollsLeft - 1,
     };
-    // Recursively continue bot turn
-    return runYahtzeeBotTurn(afterRoll);
   }
 
-  // Score
+  // Step 3: Score the best category
   return processYahtzeeAction(s, { type: 'score', category: bestCategory }, currentPlayer.id);
 }
 
