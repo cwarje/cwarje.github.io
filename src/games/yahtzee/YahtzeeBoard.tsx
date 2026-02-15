@@ -219,7 +219,12 @@ export default function YahtzeeBoard({ state, myId, onAction, roomCode }: Yahtze
             : 'text-white/30'
         } ${isCurrent && scored === null ? 'bg-white/[0.03]' : ''}`}
       >
-        {scored !== null ? scored : potential !== null ? potential : '-'}
+        {(() => {
+          const yahtzeeBonus = category === 'yahtzee' ? (state.yahtzeeBonus[playerId] || 0) * 100 : 0;
+          if (scored !== null) return scored + yahtzeeBonus;
+          if (potential !== null) return potential;
+          return '-';
+        })()}
       </td>
     );
   };
@@ -272,23 +277,6 @@ export default function YahtzeeBoard({ state, myId, onAction, roomCode }: Yahtze
               </tr>
             ))}
 
-            {/* Upper Subtotal */}
-            <tr className="border-b border-white/10 bg-white/[0.03]">
-              <td className="py-1.5 px-2 text-white font-medium max-w-[300px]">Upper Total</td>
-              {state.players.map((player) => {
-                const upper = getUpperTotal(player.scorecard);
-                return (
-                  <td
-                    key={player.id}
-                    className="py-1.5 px-2 text-center font-mono text-white text-xs"
-                  >
-                    {upper}
-                    <span className="text-white/40">/63</span>
-                  </td>
-                );
-              })}
-            </tr>
-
             {/* Upper Bonus */}
             <tr className="border-b border-white/10 bg-white/[0.03]">
               <td className="py-1.5 px-2 text-white font-medium max-w-[300px]">Bonus</td>
@@ -333,24 +321,6 @@ export default function YahtzeeBoard({ state, myId, onAction, roomCode }: Yahtze
                   {getLowerTotal(player.scorecard)}
                 </td>
               ))}
-            </tr>
-
-            {/* Yahtzee Bonus */}
-            <tr className="border-b border-white/10 bg-white/[0.03]">
-              <td className="py-1.5 px-2 text-white font-medium max-w-[300px]">Yahtzee Bonus</td>
-              {state.players.map((player) => {
-                const bonusCount = state.yahtzeeBonus[player.id] || 0;
-                return (
-                  <td
-                    key={player.id}
-                    className={`py-1.5 px-2 text-center font-mono font-bold text-xs ${
-                      bonusCount > 0 ? 'text-amber-400' : 'text-white/30'
-                    }`}
-                  >
-                    {bonusCount > 0 ? `+${bonusCount * 100}` : '-'}
-                  </td>
-                );
-              })}
             </tr>
 
             {/* ── Grand Total ── */}
