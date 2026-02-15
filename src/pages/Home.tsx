@@ -162,11 +162,6 @@ export default function Home() {
         transition={{ delay: 0.2 }}
         className="space-y-4"
       >
-        {isHost && room && room.phase === 'lobby' && (
-          <p className="text-center text-sm text-gray-500">
-            Choose a game to start playing with your lobby.
-          </p>
-        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {(['yahtzee', 'hearts', 'battleship', 'liars-dice', 'poker'] as GameType[]).map((game, i) => {
             const catalog = GAME_CATALOG[game];
