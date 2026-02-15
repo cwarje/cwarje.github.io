@@ -9,6 +9,7 @@ import { createInitialGameState, processGameAction, checkGameOver, runSingleBotT
 import type { HeartsState } from '../games/hearts/types';
 import type { LiarsDiceState } from '../games/liars-dice/types';
 import type { PokerState } from '../games/poker/types';
+import type { BattleshipState } from '../games/battleship/types';
 
 const BOT_NAMES = ['Nova', 'Pixel', 'Byte', 'Chip', 'Blaze', 'Echo', 'Neon', 'Volt'];
 
@@ -640,7 +641,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const clearError = useCallback(() => setError(null), []);
 
   // --- Bot turn scheduling (host only, Hearts & Liar's Dice & Poker) ---
-  const BOT_PLAY_DELAY = 800;   // ms between each bot card play
+  const BOT_PLAY_DELAY = 800;   // ms between each bot card play (Hearts)
+  const BATTLESHIP_BOT_DELAY = 800; // ms before bot fires in Battleship
   const TRICK_DISPLAY_DELAY = 2000; // ms to show completed trick before collecting
   const LIARS_DICE_BOT_DELAY = 1200; // ms between bot actions in Liar's Dice
   const LIARS_DICE_REVEAL_DELAY = 2500; // ms to show reveal before revolver
@@ -825,9 +827,34 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           if (next !== currentGs) {
             setGameState(next);
             broadcastGameState(next);
-            // Poker stays in 'playing' phase — continuous play handled by PokerBoard
           }
         }, POKER_BOT_DELAY);
+      }
+    }
+
+    // ── Battleship bot scheduling ──
+    if (room.gameType === 'battleship') {
+      const bs = gameState as BattleshipState;
+      if (bs.phase !== 'playing') return;
+
+      const currentPlayer = bs.players[bs.currentPlayerIndex];
+      if (currentPlayer && currentPlayer.isBot) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom) return;
+
+          const next = runSingleBotTurn('battleship', currentGs);
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('battleship', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, BATTLESHIP_BOT_DELAY);
       }
     }
   }, [gameState, isHost, room, broadcastGameState, broadcastRoomState]);

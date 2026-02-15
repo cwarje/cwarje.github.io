@@ -30,8 +30,8 @@ export function processGameAction(gameType: GameType, state: unknown, action: un
     case 'poker': newState = processPokerAction(state, action, playerId); break;
     default: return state;
   }
-  // For Hearts, Liar's Dice, and Poker, bot turns are scheduled with delays by the host — don't auto-run them
-  if (gameType === 'hearts' || gameType === 'liars-dice' || gameType === 'poker') return newState;
+  // For Hearts, Liar's Dice, Poker, and Battleship, bot turns are scheduled with delays by the host — don't auto-run them
+  if (gameType === 'hearts' || gameType === 'liars-dice' || gameType === 'poker' || gameType === 'battleship') return newState;
   // For other games, run bot turns synchronously as before
   return runBotTurns(gameType, newState);
 }
