@@ -128,10 +128,21 @@
   }
 }
 
-.hearts-statusLine {
+.hearts-headsUp {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hearts-headsUpText {
+  width: 100%;
   text-align: center;
   font-size: 0.875rem;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hearts-table {
@@ -273,16 +284,6 @@
 
 .hearts-slotCard--winner .hearts-card {
   box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.4);
-}
-
-.hearts-trickWinner {
-  position: absolute;
-  left: 50%;
-  bottom: -24px;
-  transform: translateX(-50%);
-  font-size: 0.75rem;
-  font-weight: 600;
-  white-space: nowrap;
 }
 
 .hearts-card {

@@ -117,6 +117,24 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
     return getSeatForPlayerIndex(winnerIndex, myIndex, state.players.length);
   }, [state.trickWinner, state.players, myIndex]);
 
+  const trickWinnerName = useMemo(
+    () => state.players.find(p => p.id === state.trickWinner)?.name,
+    [state.players, state.trickWinner],
+  );
+
+  const headsUpMessage = useMemo(() => {
+    if (state.phase === 'passing') {
+      return `Pass 3 cards ${state.passDirection} · Selected ${selectedPass.length}/3`;
+    }
+    if (state.trickWinner && trickWinnerName) {
+      return `${trickWinnerName} wins this trick`;
+    }
+    if (state.phase === 'playing' && isMyTurn) {
+      return 'Your turn';
+    }
+    return '';
+  }, [state.phase, state.passDirection, selectedPass.length, state.trickWinner, trickWinnerName, isMyTurn]);
+
   const handLayout = useMemo(() => {
     const cardCount = myPlayer?.hand.length ?? 0;
     const available = Math.max(handWidth - 8, 220);
@@ -137,13 +155,11 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
   }, [handWidth, myPlayer?.hand.length]);
 
   const renderSeatPill = (seat: Seat) => {
-    const { player, index } = getSeatPlayer(state, myIndex, seat);
+    const { player } = getSeatPlayer(state, myIndex, seat);
     if (!player) return null;
 
     const isCurrentTurn = state.players[state.currentPlayerIndex]?.id === player.id;
     const isMe = player.id === myId;
-    const inCurrentTrick = state.currentTrick.some(entry => entry.playerId === player.id);
-
     return (
       <div
         className={`hearts-seatPill ${isCurrentTurn ? 'hearts-seatPill--active' : ''} ${isMe ? 'hearts-seatPill--me' : ''}`}
@@ -157,7 +173,6 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
         </div>
         <div className="hearts-seatPillBottom">
           <span>Round {player.roundScore}</span>
-          {state.currentPlayerIndex === index ? <span>Turn</span> : inCurrentTrick ? <span>Played</span> : <span>&nbsp;</span>}
         </div>
       </div>
     );
@@ -201,14 +216,6 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
 
   return (
     <div className="hearts-board space-y-4 sm:space-y-5">
-      {state.phase === 'passing' && (
-        <div className="hearts-statusLine">
-          <p>
-            Pass 3 cards {state.passDirection} &middot; Selected {selectedPass.length}/3
-          </p>
-        </div>
-      )}
-
       <div className="hearts-table">
         <div className="hearts-seat hearts-seat--top">{renderSeatPill('top')}</div>
         <div className="hearts-seat hearts-seat--left">{renderSeatPill('left')}</div>
@@ -236,12 +243,13 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
               </div>
             );
           })}
-          {state.trickWinner && (
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hearts-trickWinner">
-              {state.players.find(p => p.id === state.trickWinner)?.name} wins this trick
-            </motion.p>
-          )}
         </div>
+      </div>
+
+      <div className="hearts-headsUp" aria-live="polite">
+        <p className="hearts-headsUpText">
+          {headsUpMessage || '\u00a0'}
+        </p>
       </div>
 
       {myPlayer && (
