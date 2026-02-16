@@ -345,6 +345,20 @@
   font-weight: 700;
 }
 
+@media (max-width: 639px) {
+  .hearts-hand .hearts-card {
+    padding: 6px 8px 6px 0;
+  }
+
+  .hearts-hand .hearts-cardRank {
+    font-size: 1.1rem;
+  }
+
+  .hearts-hand .hearts-cardSuit {
+    font-size: 1.1rem;
+  }
+}
+
 .hearts-hand {
   width: 100%;
   display: flex;
