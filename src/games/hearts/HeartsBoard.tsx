@@ -127,7 +127,7 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
       return `Pass 3 cards ${state.passDirection} · Selected ${selectedPass.length}/3`;
     }
     if (state.trickWinner && trickWinnerName) {
-      return `${trickWinnerName} wins this trick`;
+      return `${trickWinnerName} won the trick`;
     }
     if (state.phase === 'playing' && isMyTurn) {
       return 'Your turn';
@@ -290,7 +290,7 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
                     aria-label={`Play ${rankDisplay(card.rank)} of ${card.suit}`}
                   >
                     <span
-                      className={`hearts-handCardWrap ${canPlay || isPassing ? 'hearts-handCardWrap--active' : ''}`}
+                      className={`hearts-handCardWrap ${canPlay || isPassing ? (isSelectedForPass ? '' : 'hearts-handCardWrap--active') : ''}`}
                       style={{
                         width: `${handLayout.cardWidth}px`,
                         height: `${handLayout.cardHeight}px`,
