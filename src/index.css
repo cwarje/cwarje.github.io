@@ -214,6 +214,8 @@
   grid-column: 2;
   grid-row: 2;
   position: relative;
+  --hearts-center-side-inset: 3%;
+  --hearts-center-vertical-inset: -18px;
   width: min(52vw, 260px);
   height: min(46vw, 220px);
   min-width: 180px;
@@ -235,25 +237,25 @@
 
 .hearts-slot--top {
   left: 50%;
-  top: 0;
+  top: var(--hearts-center-vertical-inset);
   transform: translateX(-50%);
 }
 
 .hearts-slot--left {
-  left: 12%;
+  left: var(--hearts-center-side-inset);
   top: 50%;
   transform: translateY(-50%);
 }
 
 .hearts-slot--right {
-  right: 12%;
+  right: var(--hearts-center-side-inset);
   top: 50%;
   transform: translateY(-50%);
 }
 
 .hearts-slot--bottom {
   left: 50%;
-  bottom: 0;
+  bottom: var(--hearts-center-vertical-inset);
   transform: translateX(-50%);
 }
 
