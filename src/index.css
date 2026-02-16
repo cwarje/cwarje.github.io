@@ -424,13 +424,6 @@
   border-radius: 12px;
   padding: 6px 16px;
   font-weight: 600;
-  margin-top: 12px;
-}
-
-@media (min-width: 640px) {
-  .hearts-actionButton {
-    margin-top: 18px;
-  }
 }
 
 .hearts-actionButton:hover {

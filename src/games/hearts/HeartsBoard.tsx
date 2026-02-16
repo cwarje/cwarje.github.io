@@ -373,7 +373,7 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
             </div>
           </div>
 
-          <div className="min-h-[44px] flex items-center justify-center">
+          <div className="min-h-[56px] sm:min-h-[62px] flex items-start justify-center pt-[12px] sm:pt-[18px]">
             {state.phase === 'passing' && selectedPass.length === 3 && !myPassConfirmed && (
               <button onClick={confirmPass} className="hearts-actionButton">
                 Confirm Pass
