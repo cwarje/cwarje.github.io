@@ -15,9 +15,11 @@ export default function LobbyMenu() {
   const panelRef = useRef<HTMLDivElement>(null);
 
   const playerCount = room?.players.length ?? 0;
+  const hasRoom = !!room;
+  const isLobbyPhase = room?.phase === 'lobby';
   const maxPlayersAcrossGames = Math.max(...Object.values(GAME_CATALOG).map(g => g.maxPlayers));
-  const canAddBot = isHost && playerCount < maxPlayersAcrossGames;
-  const inLobby = room && room.phase === 'lobby';
+  const canManagePlayers = isHost && isLobbyPhase;
+  const canAddBot = canManagePlayers && playerCount < maxPlayersAcrossGames;
 
   useEffect(() => {
     if (!open) return;
@@ -67,7 +69,7 @@ export default function LobbyMenu() {
           <Users className="w-4 h-4" />
         )}
         <span className="hidden sm:inline">Lobby</span>
-        {inLobby && (
+        {hasRoom && (
           <span className="flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-primary-600 text-[11px] font-bold text-white leading-none">
             {playerCount}
           </span>
@@ -84,7 +86,7 @@ export default function LobbyMenu() {
             transition={{ duration: 0.15 }}
             className="absolute right-0 top-full mt-2 w-80 bg-gray-900 border border-white/10 rounded-2xl shadow-2xl shadow-black/40 z-50 overflow-hidden"
           >
-            {!inLobby ? (
+            {!hasRoom ? (
               <div className="px-5 py-8 text-center space-y-2">
                 {connecting ? (
                   <>
@@ -136,8 +138,8 @@ export default function LobbyMenu() {
                       players={room.players}
                       hostId={room.hostId}
                       isHost={isHost}
-                      onRemoveBot={removeBot}
-                      onRemovePlayer={removePlayer}
+                      onRemoveBot={canManagePlayers ? removeBot : undefined}
+                      onRemovePlayer={canManagePlayers ? removePlayer : undefined}
                       wins={room.wins}
                     />
                   </div>

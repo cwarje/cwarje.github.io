@@ -1,11 +1,8 @@
 import { Gamepad2 } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import LobbyMenu from './LobbyMenu';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const location = useLocation();
-  const isHome = location.pathname === '/';
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-primary-950">
       <header className="border-b border-white/5 bg-gray-950/60 backdrop-blur-md sticky top-0 z-50">
@@ -18,7 +15,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               Cam's Games
             </span>
           </Link>
-          {isHome && <LobbyMenu />}
+          <LobbyMenu />
         </div>
       </header>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
