@@ -315,6 +315,232 @@ export function isHeartsOver(state: unknown): boolean {
   return (state as HeartsState).gameOver;
 }
 
+function collectPlayedCards(state: HeartsState): Card[] {
+  const cards: Card[] = [];
+  for (const player of state.players) {
+    for (const trick of player.tricksTaken) {
+      cards.push(...trick);
+    }
+  }
+  cards.push(...state.currentTrick.map(entry => entry.card));
+  return cards;
+}
+
+function countBySuit(cards: Card[]): Record<Suit, number> {
+  const counts: Record<Suit, number> = { clubs: 0, diamonds: 0, spades: 0, hearts: 0 };
+  for (const card of cards) {
+    counts[card.suit]++;
+  }
+  return counts;
+}
+
+function hasCard(cards: Card[], suit: Suit, rank: Rank): boolean {
+  return cards.some(card => card.suit === suit && card.rank === rank);
+}
+
+function cardsOfSuit(cards: Card[], suit: Suit): Card[] {
+  return cards.filter(card => card.suit === suit);
+}
+
+function sortByRankAsc(cards: Card[]): Card[] {
+  return [...cards].sort((a, b) => a.rank - b.rank);
+}
+
+function sortByRankDesc(cards: Card[]): Card[] {
+  return [...cards].sort((a, b) => b.rank - a.rank);
+}
+
+function rankWeight(rank: Rank): number {
+  return (rank - 1) / 13;
+}
+
+function getMoonThreatPlayerId(state: HeartsState, myPlayerId: string): string | null {
+  const byRoundScore = [...state.players].sort((a, b) => b.roundScore - a.roundScore);
+  const leader = byRoundScore[0];
+  const runnerUp = byRoundScore[1];
+  if (!leader || leader.id === myPlayerId) return null;
+  if (leader.roundScore < 10) return null;
+  if (leader.roundScore - (runnerUp?.roundScore ?? 0) < 8) return null;
+  return leader.id;
+}
+
+function getCurrentTrickLeaderId(state: HeartsState): string | null {
+  if (state.currentTrick.length === 0) return null;
+  const leadSuit = state.currentTrick[0].card.suit;
+  let winner = state.currentTrick[0];
+  for (const entry of state.currentTrick.slice(1)) {
+    if (entry.card.suit === leadSuit && entry.card.rank > winner.card.rank) {
+      winner = entry;
+    }
+  }
+  return winner.playerId;
+}
+
+function getCurrentTrickPoints(state: HeartsState): number {
+  return state.currentTrick.reduce((sum, entry) => sum + cardPoints(entry.card), 0);
+}
+
+function getHigherUnseenCount(state: HeartsState, hand: Card[], card: Card): number {
+  const played = collectPlayedCards(state);
+  let count = 0;
+  for (let rank = card.rank + 1; rank <= 14; rank++) {
+    const r = rank as Rank;
+    const inHand = hasCard(hand, card.suit, r);
+    const alreadyPlayed = hasCard(played, card.suit, r);
+    if (!inHand && !alreadyPlayed) count++;
+  }
+  return count;
+}
+
+function getPassCardRisk(state: HeartsState, hand: Card[], card: Card): number {
+  let risk = rankWeight(card.rank) * 18;
+  const suitCounts = countBySuit(hand);
+  const isNearEndgame = state.players.some(p => p.totalScore >= 85);
+
+  if (card.suit === 'spades' && card.rank === 12) risk += 100;
+  if (card.suit === 'spades' && (card.rank === 13 || card.rank === 14) && hasCard(hand, 'spades', 12)) risk += 35;
+  if (card.suit === 'hearts') risk += rankWeight(card.rank) * 28;
+  if (card.rank >= 11 && card.suit !== 'clubs') risk += 8;
+  if (isNearEndgame) risk += cardPoints(card) * 20;
+
+  if (suitCounts[card.suit] <= 2) risk += 6;
+  if (card.suit === 'clubs' && card.rank <= 5) risk -= 8;
+  if (card.suit === 'diamonds' && card.rank <= 5) risk -= 5;
+
+  return risk;
+}
+
+export function chooseHeartsPassCards(state: HeartsState, playerIndex: number): Card[] {
+  const player = state.players[playerIndex];
+  if (!player) return [];
+
+  const selected: Card[] = [];
+  const workingHand = [...player.hand];
+
+  while (selected.length < 3 && workingHand.length > 0) {
+    const suitCounts = countBySuit(workingHand);
+    let bestCard = workingHand[0];
+    let bestScore = Number.NEGATIVE_INFINITY;
+
+    for (const card of workingHand) {
+      let score = getPassCardRisk(state, workingHand, card);
+      const postRemovalSuitCount = suitCounts[card.suit] - 1;
+      if (postRemovalSuitCount === 0 && card.suit !== 'clubs') score += 7;
+      if (postRemovalSuitCount === 0 && card.suit === 'clubs' && state.trickNumber <= 3) score -= 4;
+      if (state.passDirection === 'across') score += rankWeight(card.rank) * 5;
+      if (state.passDirection === 'none') score -= 1000;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestCard = card;
+      }
+    }
+
+    selected.push(bestCard);
+    const nextHand = workingHand.filter(c => !cardEquals(c, bestCard));
+    workingHand.length = 0;
+    workingHand.push(...nextHand);
+  }
+
+  return selected;
+}
+
+function chooseLeadCard(state: HeartsState, hand: Card[], validCards: Card[]): Card {
+  const suitCounts = countBySuit(hand);
+  let bestCard = validCards[0];
+  let bestScore = Number.POSITIVE_INFINITY;
+  const isNearEndgame = state.players[state.currentPlayerIndex].totalScore >= 85;
+
+  for (const card of validCards) {
+    let score = rankWeight(card.rank) * 40;
+    const higherUnseen = getHigherUnseenCount(state, hand, card);
+    score -= higherUnseen * 8;
+    score += (5 - Math.min(suitCounts[card.suit], 5)) * 4;
+
+    if (card.suit === 'hearts') score += 20;
+    if (card.suit === 'spades' && card.rank >= 12) score += 26;
+    if (isNearEndgame) score += cardPoints(card) * 30;
+
+    if (score < bestScore) {
+      bestScore = score;
+      bestCard = card;
+    }
+  }
+
+  return bestCard;
+}
+
+function chooseFollowSuitCard(state: HeartsState, suitCards: Card[], myPlayer: HeartsPlayer): Card {
+  const sortedSuitCards = sortByRankAsc(suitCards);
+  const leadSuit = state.currentTrick[0].card.suit;
+  const highestPlayed = Math.max(...state.currentTrick.filter(entry => entry.card.suit === leadSuit).map(entry => entry.card.rank));
+  const underCards = sortedSuitCards.filter(card => card.rank < highestPlayed);
+  const winningCards = sortedSuitCards.filter(card => card.rank > highestPlayed);
+  const trickPoints = getCurrentTrickPoints(state);
+  const moonThreatPlayerId = getMoonThreatPlayerId(state, myPlayer.id);
+  const currentLeader = getCurrentTrickLeaderId(state);
+  const isNearEndgame = myPlayer.totalScore >= 85;
+
+  if (underCards.length > 0) {
+    if (moonThreatPlayerId && currentLeader === moonThreatPlayerId && trickPoints > 0 && winningCards.length > 0 && !isNearEndgame) {
+      return winningCards[0];
+    }
+    return underCards[underCards.length - 1];
+  }
+
+  return sortedSuitCards[0];
+}
+
+function chooseDiscardCard(state: HeartsState, validCards: Card[], myPlayer: HeartsPlayer): Card {
+  const moonThreatPlayerId = getMoonThreatPlayerId(state, myPlayer.id);
+  const currentLeader = getCurrentTrickLeaderId(state);
+  const shouldAvoidGivingPoints = moonThreatPlayerId !== null && currentLeader === moonThreatPlayerId;
+  const isNearEndgame = myPlayer.totalScore >= 85;
+  const pointCards = validCards.filter(card => cardPoints(card) > 0);
+  const nonPointCards = validCards.filter(card => cardPoints(card) === 0);
+
+  if (shouldAvoidGivingPoints && nonPointCards.length > 0) {
+    return sortByRankDesc(nonPointCards)[0];
+  }
+
+  if (pointCards.length > 0) {
+    const qos = pointCards.find(card => card.suit === 'spades' && card.rank === 12);
+    if (qos) return qos;
+    if (isNearEndgame) return sortByRankDesc(pointCards)[0];
+    const hearts = pointCards.filter(card => card.suit === 'hearts');
+    if (hearts.length > 0) return sortByRankDesc(hearts)[0];
+    return sortByRankDesc(pointCards)[0];
+  }
+
+  const spadeThreats = validCards.filter(card => card.suit === 'spades' && (card.rank === 13 || card.rank === 14));
+  if (spadeThreats.length > 0 && !hasCard(collectPlayedCards(state), 'spades', 12)) {
+    return sortByRankDesc(spadeThreats)[0];
+  }
+
+  return sortByRankDesc(validCards)[0];
+}
+
+export function chooseHeartsPlayCard(state: HeartsState, playerIndex: number): Card | null {
+  const player = state.players[playerIndex];
+  if (!player) return null;
+
+  const hand = player.hand;
+  const validCards = hand.filter(card => isValidHeartsPlay(state, playerIndex, card));
+  if (validCards.length === 0) return null;
+
+  if (state.currentTrick.length === 0) {
+    return chooseLeadCard(state, hand, validCards);
+  }
+
+  const leadSuit = state.currentTrick[0].card.suit;
+  const suitCards = cardsOfSuit(validCards, leadSuit);
+  if (suitCards.length > 0) {
+    return chooseFollowSuitCard(state, suitCards, player);
+  }
+
+  return chooseDiscardCard(state, validCards, player);
+}
+
 // Bot AI
 export function runHeartsBotTurn(state: unknown): unknown {
   const s = state as HeartsState;
@@ -325,33 +551,12 @@ export function runHeartsBotTurn(state: unknown): unknown {
     let current = s;
     let changed = false;
 
-    for (const botPlayer of current.players) {
+    for (let i = 0; i < current.players.length; i++) {
+      const botPlayer = current.players[i];
       if (!botPlayer.isBot) continue;
-      // Skip if this bot already selected
       if (current.passSelections[botPlayer.id]?.length === 3) continue;
 
-      // Bot selects 3 cards to pass: highest hearts, queen of spades, then highest cards
-      const hand = [...botPlayer.hand];
-      const selected: Card[] = [];
-
-      // Try to pass queen of spades
-      const qos = hand.find(c => c.suit === 'spades' && c.rank === 12);
-      if (qos) selected.push(qos);
-
-      // Pass high hearts
-      const hearts = hand.filter(c => c.suit === 'hearts').sort((a, b) => b.rank - a.rank);
-      for (const h of hearts) {
-        if (selected.length >= 3) break;
-        if (!selected.some(s => cardEquals(s, h))) selected.push(h);
-      }
-
-      // Fill with highest cards
-      const remaining = hand.sort((a, b) => b.rank - a.rank);
-      for (const c of remaining) {
-        if (selected.length >= 3) break;
-        if (!selected.some(s => cardEquals(s, c))) selected.push(c);
-      }
-
+      const selected = chooseHeartsPassCards(current, i);
       current = processHeartsAction(current, { type: 'select-pass', cards: selected.slice(0, 3) }, botPlayer.id) as HeartsState;
       changed = true;
     }
@@ -370,53 +575,14 @@ export function runHeartsBotTurn(state: unknown): unknown {
   }
 
   const currentPlayer = s.players[s.currentPlayerIndex];
-  if (!currentPlayer.isBot) return state;
+  if (!currentPlayer?.isBot) return state;
 
   // Don't play if trick is awaiting resolution
   if (s.trickWinner) return state;
+  if (s.phase !== 'playing') return state;
 
-  if (s.phase === 'playing') {
-    const hand = currentPlayer.hand;
-    const validCards = hand.filter(c => isValidHeartsPlay(s, s.currentPlayerIndex, c));
+  const chosen = chooseHeartsPlayCard(s, s.currentPlayerIndex);
+  if (!chosen) return state;
 
-    if (validCards.length === 0) return state;
-
-    // Strategy: play lowest card that follows suit, dump high cards when void
-    let chosen: Card;
-
-    if (s.currentTrick.length === 0) {
-      // Leading: play lowest non-heart card, or lowest heart if only hearts
-      const nonHearts = validCards.filter(c => c.suit !== 'hearts');
-      const options = nonHearts.length > 0 ? nonHearts : validCards;
-      chosen = options.sort((a, b) => a.rank - b.rank)[0];
-    } else {
-      const leadSuit = s.currentTrick[0].card.suit;
-      const hasSuit = validCards.some(c => c.suit === leadSuit);
-
-      if (hasSuit) {
-        // Must follow suit: play highest card that won't win, or lowest
-        const suitCards = validCards.filter(c => c.suit === leadSuit).sort((a, b) => a.rank - b.rank);
-        const highestPlayed = Math.max(...s.currentTrick.filter(e => e.card.suit === leadSuit).map(e => e.card.rank));
-        const underCards = suitCards.filter(c => c.rank < highestPlayed);
-        chosen = underCards.length > 0 ? underCards[underCards.length - 1] : suitCards[0];
-      } else {
-        // Void in suit: dump queen of spades or highest heart
-        const qos = validCards.find(c => c.suit === 'spades' && c.rank === 12);
-        if (qos) {
-          chosen = qos;
-        } else {
-          const hearts = validCards.filter(c => c.suit === 'hearts').sort((a, b) => b.rank - a.rank);
-          if (hearts.length > 0) {
-            chosen = hearts[0];
-          } else {
-            chosen = validCards.sort((a, b) => b.rank - a.rank)[0];
-          }
-        }
-      }
-    }
-
-    return processHeartsAction(s, { type: 'play-card', card: chosen }, currentPlayer.id);
-  }
-
-  return state;
+  return processHeartsAction(s, { type: 'play-card', card: chosen }, currentPlayer.id);
 }
