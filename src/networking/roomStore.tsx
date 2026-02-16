@@ -12,6 +12,7 @@ import type { LiarsDiceState } from '../games/liars-dice/types';
 import type { PokerState } from '../games/poker/types';
 import type { BattleshipState } from '../games/battleship/types';
 import type { YahtzeeState } from '../games/yahtzee/types';
+import type { UpRiverState } from '../games/up-and-down-the-river/types';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 
 const BOT_NAMES = ['Nova', 'Pixel', 'Byte', 'Chip', 'Blaze', 'Echo', 'Neon', 'Volt'];
@@ -658,6 +659,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const LIARS_DICE_REVEAL_DELAY = 2500; // ms to show reveal before revolver
   const LIARS_DICE_TRIGGER_DELAY = 1500; // ms before bot pulls trigger
   const LIARS_DICE_NEXT_ROUND_DELAY = 2000; // ms before starting next round
+  const UP_RIVER_BOT_DELAY = 900; // ms between bot bid/card play
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -735,6 +737,53 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
           }, BOT_PLAY_DELAY);
         }
+      }
+      return;
+    }
+
+    // ── Up and Down the River bot scheduling ──
+    if (room.gameType === 'up-and-down-the-river') {
+      const urs = gameState as UpRiverState;
+      if (urs.gameOver) return;
+
+      if (urs.phase === 'playing' && urs.trickWinner) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as UpRiverState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'playing' || !currentGs.trickWinner) return;
+
+          const resolved = processGameAction('up-and-down-the-river', currentGs, { type: 'resolve-trick' }, '');
+          if (resolved !== currentGs) {
+            setGameState(resolved);
+            broadcastGameState(resolved);
+            if (checkGameOver('up-and-down-the-river', resolved)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, TRICK_DISPLAY_DELAY);
+        return;
+      }
+
+      const currentPlayer = urs.players[urs.currentPlayerIndex];
+      if (currentPlayer && currentPlayer.isBot) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom) return;
+
+          const next = runSingleBotTurn('up-and-down-the-river', currentGs);
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('up-and-down-the-river', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, UP_RIVER_BOT_DELAY);
       }
       return;
     }

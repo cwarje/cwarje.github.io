@@ -197,7 +197,7 @@ export default function Home() {
         className="space-y-4"
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {(['yahtzee', 'hearts', 'battleship', 'liars-dice', 'poker'] as GameType[]).map((game, i) => {
+          {(['yahtzee', 'hearts', 'battleship', 'liars-dice', 'poker', 'up-and-down-the-river'] as GameType[]).map((game, i) => {
             const catalog = GAME_CATALOG[game];
             const canPlay = room ? playerCount >= catalog.minPlayers && playerCount <= catalog.maxPlayers : true;
             const isDisabled = room ? (!isHost || !canPlay) : false;

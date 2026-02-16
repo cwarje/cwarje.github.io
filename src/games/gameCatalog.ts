@@ -140,4 +140,30 @@ export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
       ],
     },
   },
+  'up-and-down-the-river': {
+    title: 'Up and Down the River',
+    shortDescription: 'Bid your exact tricks as rounds climb to 7 cards, then descend. Nail your bids to rack up points.',
+    playersLabel: '4 Players',
+    minPlayers: 4,
+    maxPlayers: 4,
+    info: {
+      goal: 'Score the most points by exactly matching your trick bid each round.',
+      rules: [
+        'Played with a standard 52-card deck among 4 players.',
+        'Rounds follow this sequence: 1, 2, 3, 4, 5, 6, 7, 7, 6, 5, 4, 3, 2, 1 cards per player.',
+        'Each round, one card is turned face up after dealing to set the trump suit.',
+        'Starting left of the dealer, each player bids how many tricks they expect to win.',
+        'You must follow the lead suit if possible. If you cannot, you may play any card, including trump.',
+        'A trump card beats non-trump cards. If no trump is played, highest card of the lead suit wins.',
+        'Exact bid scores 10 plus tricks won. Missing your bid scores 0.',
+      ],
+      howToPlay: [
+        'Review your hand and the trump suit, then place your bid when it is your turn.',
+        'When a trick starts, click a legal card to play.',
+        'Track each player\'s bid and tricks won to gauge risk as the round progresses.',
+        'After each round, scores are added and the dealer rotates.',
+        'After the final 1-card round, highest total score wins.',
+      ],
+    },
+  },
 };

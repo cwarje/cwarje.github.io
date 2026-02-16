@@ -11,11 +11,22 @@ import HeartsBoard from '../games/hearts/HeartsBoard';
 import BattleshipBoard from '../games/battleship/BattleshipBoard';
 import LiarsDiceBoard from '../games/liars-dice/LiarsDiceBoard';
 import PokerBoard from '../games/poker/PokerBoard';
+import UpAndDownTheRiverBoard from '../games/up-and-down-the-river/UpAndDownTheRiverBoard';
 import type { YahtzeeState } from '../games/yahtzee/types';
 import type { HeartsState } from '../games/hearts/types';
 import type { BattleshipState } from '../games/battleship/types';
 import type { LiarsDiceState } from '../games/liars-dice/types';
 import type { PokerState } from '../games/poker/types';
+import type { UpRiverState } from '../games/up-and-down-the-river/types';
+
+function rankDisplay(rank: number | null | undefined): string {
+  if (!rank) return '';
+  if (rank === 11) return 'J';
+  if (rank === 12) return 'Q';
+  if (rank === 13) return 'K';
+  if (rank === 14) return 'A';
+  return String(rank);
+}
 
 export default function GamePage() {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -70,8 +81,18 @@ export default function GamePage() {
   const pokerState = isPoker ? (gameState as PokerState) : null;
   const isPokerSessionOver = pokerState?.sessionOver ?? false;
   const isHearts = room.gameType === 'hearts';
+  const isUpRiver = room.gameType === 'up-and-down-the-river';
   const heartsTargetScore = isHearts ? (gameState as HeartsState).targetScore ?? 100 : null;
+  const upRiverState = isUpRiver ? (gameState as UpRiverState) : null;
+  const fullBoardGame = isHearts || isUpRiver;
   const gameTitle = room.gameType ? GAME_CATALOG[room.gameType].title : 'Game';
+  const upRiverRoundText = upRiverState
+    ? `Round ${upRiverState.roundIndex + 1}/14 · ${upRiverState.currentRoundCardCount} card${upRiverState.currentRoundCardCount === 1 ? '' : 's'}`
+    : null;
+  const suitSymbols = { hearts: '\u2665', diamonds: '\u2666', clubs: '\u2663', spades: '\u2660' } as const;
+  const upRiverTrumpText = upRiverState
+    ? `Trump: ${upRiverState.trumpSuit ? `${rankDisplay(upRiverState.trumpCard?.rank)} ${suitSymbols[upRiverState.trumpSuit]}` : 'None'}`
+    : null;
 
   // Show "Back to Lobby" for host when game is finished (non-poker) or poker session is over
   const showBackToLobby = isHost && (
@@ -114,6 +135,12 @@ export default function GamePage() {
           {isHearts && heartsTargetScore && (
             <p className="text-xs sm:text-sm text-white/80">Game to {heartsTargetScore}</p>
           )}
+          {isUpRiver && upRiverRoundText && (
+            <p className="text-xs sm:text-sm text-white/80">{upRiverRoundText}</p>
+          )}
+          {isUpRiver && upRiverTrumpText && (
+            <p className="text-xs sm:text-sm text-white/80">{upRiverTrumpText}</p>
+          )}
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
           {showBackToLobby && (
@@ -142,7 +169,7 @@ export default function GamePage() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className={isHearts ? 'h-full p-0' : 'p-4 sm:p-6 lg:p-8'}
+          className={fullBoardGame ? 'h-full p-0' : 'p-4 sm:p-6 lg:p-8'}
         >
           {room.gameType === 'yahtzee' && (
             <YahtzeeBoard state={gameState as YahtzeeState} myId={myId} onAction={sendAction} />
@@ -158,6 +185,9 @@ export default function GamePage() {
           )}
           {room.gameType === 'poker' && (
             <PokerBoard state={gameState as PokerState} myId={myId} onAction={sendAction} isHost={isHost} onLeave={handlePokerLeave} />
+          )}
+          {room.gameType === 'up-and-down-the-river' && (
+            <UpAndDownTheRiverBoard state={gameState as UpRiverState} myId={myId} onAction={sendAction} />
           )}
         </motion.div>
       </div>

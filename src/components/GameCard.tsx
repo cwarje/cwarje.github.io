@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import type { GameType } from '../networking/types';
-import { Dice5, Heart, Ship, Crosshair, Club, Info } from 'lucide-react';
+import { Dice5, Heart, Ship, Crosshair, Club, Info, ArrowUpDown } from 'lucide-react';
 
 const GAME_INFO: Record<GameType, { title: string; description: string; players: string; icon: typeof Dice5; gradient: string }> = {
   yahtzee: {
@@ -38,6 +38,13 @@ const GAME_INFO: Record<GameType, { title: string; description: string; players:
     icon: Club,
     gradient: 'from-violet-500/20 to-purple-600/20',
   },
+  'up-and-down-the-river': {
+    title: 'Up and Down the River',
+    description: 'Bid exact tricks as rounds climb up and back down. Precision beats luck.',
+    players: '4 Players',
+    icon: ArrowUpDown,
+    gradient: 'from-teal-500/20 to-sky-600/20',
+  },
 };
 
 const ICON_COLORS: Record<GameType, string> = {
@@ -46,6 +53,7 @@ const ICON_COLORS: Record<GameType, string> = {
   battleship: 'text-cyan-400',
   'liars-dice': 'text-emerald-400',
   poker: 'text-violet-400',
+  'up-and-down-the-river': 'text-teal-300',
 };
 
 const BORDER_COLORS: Record<GameType, string> = {
@@ -54,6 +62,7 @@ const BORDER_COLORS: Record<GameType, string> = {
   battleship: 'hover:border-cyan-500/30',
   'liars-dice': 'hover:border-emerald-500/30',
   poker: 'hover:border-violet-500/30',
+  'up-and-down-the-river': 'hover:border-teal-500/30',
 };
 
 interface GameCardProps {

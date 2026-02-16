@@ -1,4 +1,4 @@
-export type GameType = 'yahtzee' | 'hearts' | 'battleship' | 'liars-dice' | 'poker';
+export type GameType = 'yahtzee' | 'hearts' | 'battleship' | 'liars-dice' | 'poker' | 'up-and-down-the-river';
 export type PlayerColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet' | 'dark-purple';
 export type HeartsTargetScore = 50 | 100;
 export interface GameStartOptions {
