@@ -218,7 +218,8 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
     const { player } = getSeatPlayer(state, myIndex, seat);
     if (!player) return null;
 
-    const isCurrentTurn = state.players[state.currentPlayerIndex]?.id === player.id;
+    const isCurrentTurn =
+      state.phase === 'playing' && !state.trickWinner && state.players[state.currentPlayerIndex]?.id === player.id;
     const isMe = player.id === myId;
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
