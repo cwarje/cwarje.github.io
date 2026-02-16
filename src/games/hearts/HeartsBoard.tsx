@@ -255,7 +255,7 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
       </div>
 
       {myPlayer && (
-        <div className="space-y-3">
+        <div>
           <div ref={handContainerRef} className="hearts-hand">
             <div
               className="hearts-handSpread"
@@ -309,7 +309,7 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
             </div>
           </div>
 
-          <div className="min-h-[56px] flex items-center justify-center">
+          <div className="min-h-[44px] flex items-center justify-center">
             {state.phase === 'passing' && selectedPass.length === 3 && !myPassConfirmed && (
               <button onClick={confirmPass} className="hearts-actionButton">
                 Confirm Pass
