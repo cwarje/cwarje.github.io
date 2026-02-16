@@ -110,7 +110,8 @@
 
 /* Hearts board refresh */
 .hearts-board {
-  background: #fff;
+  --hearts-bg: #3e963e;
+  background: var(--hearts-bg);
   color: #111827;
   border: 0;
   border-radius: 0;
@@ -130,6 +131,7 @@
 
 .hearts-headsUp {
   min-height: 36px;
+  margin-top: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -138,7 +140,8 @@
 .hearts-headsUpText {
   width: 100%;
   text-align: center;
-  font-size: 0.875rem;
+  font-size: 1.2rem;
+  color: #fff;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -274,7 +277,7 @@
   width: 100%;
   height: 100%;
   border-radius: 8px;
-  background: #e5e7eb;
+  background: var(--hearts-bg);
 }
 
 .hearts-slotCard {

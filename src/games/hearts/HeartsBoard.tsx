@@ -166,8 +166,7 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
       >
         <div className="hearts-seatPillTop">
           <span className="hearts-seatPillName">
-            {player.name}
-            {isMe ? ' (You)' : ''}
+            {isMe ? 'You' : player.name}
           </span>
           <span className="hearts-seatPillScore">{player.totalScore}</span>
         </div>
