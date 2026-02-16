@@ -393,8 +393,10 @@
   transition: transform 0.16s ease;
 }
 
-.hearts-handCardWrap--active:hover {
-  transform: translateY(-8px) !important;
+@media (hover: hover) and (pointer: fine) {
+  .hearts-handCardWrap--active:hover {
+    transform: translateY(-8px) !important;
+  }
 }
 
 .hearts-actionButton {
