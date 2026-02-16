@@ -124,24 +124,24 @@ export default function Home() {
           </span>
         </h1>
         <p className="text-gray-400 text-lg max-w-md mx-auto">
-          {isHost
+          {isHost || !room
             ? 'Use the Lobby menu to invite friends or add bots, then pick a game.'
-            : room
-              ? 'The host will pick a game to start.'
-              : 'Play solo against bots or challenge your friends with a room code.'}
+            : 'The host will pick a game to start.'}
         </p>
       </motion.div>
 
-      {/* Join Room Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-        className="flex flex-col sm:flex-row items-center justify-center gap-3"
-      >
-        <span className="text-sm text-gray-500">Have a lobby code?</span>
-        <RoomCodeInput onJoin={handleJoinRoom} loading={connecting} />
-      </motion.div>
+      {/* Join Room Bar — hidden when player has joined someone else's lobby */}
+      {(!room || isHost) && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="flex flex-col sm:flex-row items-center justify-center gap-3"
+        >
+          <span className="text-sm text-gray-500">Have a lobby code?</span>
+          <RoomCodeInput onJoin={handleJoinRoom} loading={connecting} />
+        </motion.div>
+      )}
 
       {/* Error */}
       {error && (
