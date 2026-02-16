@@ -226,7 +226,10 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
             const trickEntry = trickBySeat[seat];
             const isWinningCard = trickWinnerSeat === seat && !!state.trickWinner;
             return (
-              <div key={seat} className={`hearts-slot hearts-slot--${seat}`}>
+              <div
+                key={seat}
+                className={`hearts-slot hearts-slot--${seat} ${trickEntry ? 'hearts-slot--filled' : 'hearts-slot--empty'}`}
+              >
                 {trickEntry ? (
                   <motion.div
                     key={`${state.trickNumber}-${trickEntry.playerId}-${trickEntry.card.suit}-${trickEntry.card.rank}`}

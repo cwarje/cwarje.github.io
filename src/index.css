@@ -249,6 +249,14 @@
   justify-content: center;
 }
 
+.hearts-slot--empty {
+  z-index: 1;
+}
+
+.hearts-slot--filled {
+  z-index: 2;
+}
+
 .hearts-slot--top {
   left: 50%;
   top: var(--hearts-center-vertical-inset);
