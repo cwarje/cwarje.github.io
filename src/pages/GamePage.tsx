@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Loader2 } from 'lucide-react';
 import { useRoomContext } from '../networking/roomStore';
 import { useToast } from '../components/Toast';
+import LobbyMenu from '../components/LobbyMenu';
+import { GAME_CATALOG } from '../games/gameCatalog';
 import YahtzeeBoard from '../games/yahtzee/YahtzeeBoard';
 import HeartsBoard from '../games/hearts/HeartsBoard';
 import BattleshipBoard from '../games/battleship/BattleshipBoard';
@@ -68,6 +70,7 @@ export default function GamePage() {
   const pokerState = isPoker ? (gameState as PokerState) : null;
   const isPokerSessionOver = pokerState?.sessionOver ?? false;
   const isHearts = room.gameType === 'hearts';
+  const gameTitle = room.gameType ? GAME_CATALOG[room.gameType].title : 'Game';
 
   // Show "Back to Lobby" for host when game is finished (non-poker) or poker session is over
   const showBackToLobby = isHost && (
@@ -103,20 +106,24 @@ export default function GamePage() {
         )}
       </AnimatePresence>
 
-      {/* Header actions */}
-      {showBackToLobby && (
-        <div className="absolute top-4 right-4 z-20">
-          <motion.button
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            onClick={handleReturnToLobby}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-medium hover:bg-primary-500 transition-colors cursor-pointer"
-          >
-            <Home className="w-4 h-4" />
-            Back to Lobby
-          </motion.button>
+      {/* Floating game HUD (no layout height) */}
+      <div className="absolute top-0 left-0 right-0 z-20 flex items-start justify-between p-3 sm:p-4 pointer-events-none">
+        <h1 className="pointer-events-none text-xl sm:text-2xl font-bold text-white">{gameTitle}</h1>
+        <div className="pointer-events-auto flex items-center gap-2">
+          {showBackToLobby && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              onClick={handleReturnToLobby}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-medium hover:bg-primary-500 transition-colors cursor-pointer"
+            >
+              <Home className="w-4 h-4" />
+              Back to Lobby
+            </motion.button>
+          )}
+          <LobbyMenu />
         </div>
-      )}
+      </div>
 
       {error && (
         <div className="absolute top-4 left-1/2 z-20 w-[min(90vw,40rem)] -translate-x-1/2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
