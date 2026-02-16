@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Trophy } from 'lucide-react';
 import type { HeartsState, Card, Suit, HeartsPlayer } from './types';
 import { isValidHeartsPlay } from './rules';
@@ -29,6 +29,17 @@ function rankDisplay(rank: number): string {
 type Seat = 'bottom' | 'left' | 'top' | 'right';
 
 const SEATS: Seat[] = ['bottom', 'left', 'top', 'right'];
+const TRICK_EXIT_OFFSETS: Record<Seat, { x: number; y: number }> = {
+  top: { x: 0, y: -72 },
+  left: { x: -72, y: 0 },
+  right: { x: 72, y: 0 },
+  bottom: { x: 0, y: 72 },
+};
+
+function getTrickExitOffset(winnerSeat: Seat | null): { x: number; y: number } {
+  if (!winnerSeat) return { x: 0, y: 20 };
+  return TRICK_EXIT_OFFSETS[winnerSeat];
+}
 
 function cardEquals(a: Card, b: Card): boolean {
   return a.suit === b.suit && a.rank === b.rank;
@@ -121,6 +132,7 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
     () => state.players.find(p => p.id === state.trickWinner)?.name,
     [state.players, state.trickWinner],
   );
+  const trickExitOffset = useMemo(() => getTrickExitOffset(trickWinnerSeat), [trickWinnerSeat]);
 
   const headsUpMessage = useMemo(() => {
     if (state.phase === 'passing') {
@@ -230,18 +242,26 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
                 key={seat}
                 className={`hearts-slot hearts-slot--${seat} ${trickEntry ? 'hearts-slot--filled' : 'hearts-slot--empty'}`}
               >
-                {trickEntry ? (
-                  <motion.div
-                    key={`${state.trickNumber}-${trickEntry.playerId}-${trickEntry.card.suit}-${trickEntry.card.rank}`}
-                    initial={{ scale: 0.8, opacity: 0, y: 12 }}
-                    animate={{ scale: 1, opacity: 1, y: 0 }}
-                    className={`hearts-slotCard ${isWinningCard ? 'hearts-slotCard--winner' : ''}`}
-                  >
-                    {renderCardFace(trickEntry.card, false, false, true)}
-                  </motion.div>
-                ) : (
-                  <div className="hearts-slotPlaceholder" />
-                )}
+                <AnimatePresence mode="wait" initial={false}>
+                  {trickEntry ? (
+                    <motion.div
+                      key={`${state.trickNumber}-${trickEntry.playerId}-${trickEntry.card.suit}-${trickEntry.card.rank}`}
+                      initial={{ scale: 0.8, opacity: 0, y: 12 }}
+                      animate={{ scale: 1, opacity: 1, y: 0 }}
+                      exit={{
+                        x: trickExitOffset.x,
+                        y: trickExitOffset.y,
+                        opacity: 0,
+                      }}
+                      transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
+                      className={`hearts-slotCard ${isWinningCard ? 'hearts-slotCard--winner' : ''}`}
+                    >
+                      {renderCardFace(trickEntry.card, false, false, true)}
+                    </motion.div>
+                  ) : (
+                    <div key={`placeholder-${seat}`} className="hearts-slotPlaceholder" />
+                  )}
+                </AnimatePresence>
               </div>
             );
           })}
