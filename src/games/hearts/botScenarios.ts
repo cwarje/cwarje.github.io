@@ -17,10 +17,10 @@ function sameCard(a: Card | null, b: Card): boolean {
 
 function basePlayers(player0Hand: Card[]): HeartsPlayer[] {
   return [
-    { id: 'p0', name: 'Bot', isBot: true, hand: player0Hand, tricksTaken: [], roundScore: 0, totalScore: 0 },
-    { id: 'p1', name: 'P1', isBot: true, hand: [], tricksTaken: [], roundScore: 0, totalScore: 0 },
-    { id: 'p2', name: 'P2', isBot: true, hand: [], tricksTaken: [], roundScore: 0, totalScore: 0 },
-    { id: 'p3', name: 'P3', isBot: true, hand: [], tricksTaken: [], roundScore: 0, totalScore: 0 },
+    { id: 'p0', name: 'Bot', color: 'blue', isBot: true, hand: player0Hand, tricksTaken: [], roundScore: 0, totalScore: 0 },
+    { id: 'p1', name: 'P1', color: 'red', isBot: true, hand: [], tricksTaken: [], roundScore: 0, totalScore: 0 },
+    { id: 'p2', name: 'P2', color: 'green', isBot: true, hand: [], tricksTaken: [], roundScore: 0, totalScore: 0 },
+    { id: 'p3', name: 'P3', color: 'dark-purple', isBot: true, hand: [], tricksTaken: [], roundScore: 0, totalScore: 0 },
   ];
 }
 

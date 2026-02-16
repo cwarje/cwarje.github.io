@@ -19,10 +19,10 @@ function isQueenOfSpades(card: Card): boolean {
 
 function createBotPlayers(): Player[] {
   return [
-    { id: 'bot-1', name: 'Bot 1', isBot: true, isHost: true, connected: true },
-    { id: 'bot-2', name: 'Bot 2', isBot: true, isHost: false, connected: true },
-    { id: 'bot-3', name: 'Bot 3', isBot: true, isHost: false, connected: true },
-    { id: 'bot-4', name: 'Bot 4', isBot: true, isHost: false, connected: true },
+    { id: 'bot-1', name: 'Bot 1', color: 'red', isBot: true, isHost: true, connected: true },
+    { id: 'bot-2', name: 'Bot 2', color: 'orange', isBot: true, isHost: false, connected: true },
+    { id: 'bot-3', name: 'Bot 3', color: 'green', isBot: true, isHost: false, connected: true },
+    { id: 'bot-4', name: 'Bot 4', color: 'dark-purple', isBot: true, isHost: false, connected: true },
   ];
 }
 

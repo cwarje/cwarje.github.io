@@ -4,7 +4,8 @@ type DataConnection = ReturnType<Peer['connect']>;
 import { createHostPeer, createClientPeer, connectToPeer, destroyPeer } from './peer';
 import { generateRoomCode } from '../utils/roomCode';
 import { getDeviceId } from '../utils/deviceId';
-import type { RoomState, RoomContextValue, GameType, Player, ClientMessage, HostMessage } from './types';
+import type { RoomState, RoomContextValue, GameType, Player, ClientMessage, HostMessage, PlayerColor } from './types';
+import { DEFAULT_PLAYER_COLOR, normalizePlayerColor } from './playerColors';
 import { createInitialGameState, processGameAction, checkGameOver, runSingleBotTurn, getGameWinners } from '../games/gameEngine';
 import type { HeartsState } from '../games/hearts/types';
 import type { LiarsDiceState } from '../games/liars-dice/types';
@@ -98,7 +99,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             const updatedRoom = {
               ...currentRoom,
               players: currentRoom.players.map(p =>
-                p.id === clientDeviceId ? { ...p, connected: true, name: msg.playerName } : p
+                p.id === clientDeviceId ? { ...p, connected: true, name: msg.playerName, color: msg.playerColor } : p
               ),
             };
             setRoom(updatedRoom);
@@ -113,6 +114,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             const newPlayer: Player = {
               id: clientDeviceId,
               name: msg.playerName,
+              color: msg.playerColor,
               isBot: false,
               isHost: false,
               connected: true,
@@ -217,6 +219,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     setReconnecting(true);
 
     const storedName = localStorage.getItem('playerName') || 'Player';
+    const storedColor = normalizePlayerColor(localStorage.getItem('playerColor'));
     const MAX_ATTEMPTS = 3;
     const BACKOFF_MS = [1000, 2000, 4000];
 
@@ -290,7 +293,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           });
 
           connectionsRef.current.set(conn.peer, conn);
-          conn.send({ type: 'join', playerName: storedName, deviceId } as ClientMessage);
+          conn.send({ type: 'join', playerName: storedName, playerColor: storedColor, deviceId } as ClientMessage);
         });
 
         // Reconnection succeeded
@@ -322,7 +325,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { attemptReconnectRef.current = attemptReconnect; }, [attemptReconnect]);
 
   // Create lobby as host (no game type — game is chosen when starting)
-  const createLobby = useCallback(async (playerName: string): Promise<string> => {
+  const createLobby = useCallback(async (playerName: string, playerColor: PlayerColor): Promise<string> => {
     setError(null);
     setConnecting(true);
     try {
@@ -351,6 +354,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       const hostPlayer: Player = {
         id: deviceId,
         name: playerName,
+        color: playerColor,
         isBot: false,
         isHost: true,
         connected: true,
@@ -382,7 +386,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   }, [handleConnection, deviceId]);
 
   // Shared logic for joining a room (used by joinRoom and rejoinRoom)
-  const joinRoomInternal = useCallback(async (roomCode: string, playerName: string) => {
+  const joinRoomInternal = useCallback(async (roomCode: string, playerName: string, playerColor: PlayerColor) => {
     setError(null);
     setConnecting(true);
     try {
@@ -475,7 +479,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         });
 
         connectionsRef.current.set(conn.peer, conn);
-        conn.send({ type: 'join', playerName, deviceId } as ClientMessage);
+        conn.send({ type: 'join', playerName, playerColor, deviceId } as ClientMessage);
       });
     } catch (err) {
       setError((err as Error).message);
@@ -488,14 +492,15 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   }, [deviceId]);
 
   // Join room as client (called from Home page with user-provided name)
-  const joinRoom = useCallback(async (roomCode: string, playerName: string) => {
-    await joinRoomInternal(roomCode, playerName);
+  const joinRoom = useCallback(async (roomCode: string, playerName: string, playerColor: PlayerColor) => {
+    await joinRoomInternal(roomCode, playerName, playerColor);
   }, [joinRoomInternal]);
 
   // Rejoin room (called automatically from Lobby/GamePage with stored name)
   const rejoinRoom = useCallback(async (roomCode: string) => {
     const storedName = localStorage.getItem('playerName') || `Player${Math.floor(Math.random() * 9999)}`;
-    await joinRoomInternal(roomCode, storedName);
+    const storedColor = normalizePlayerColor(localStorage.getItem('playerColor'));
+    await joinRoomInternal(roomCode, storedName, storedColor);
   }, [joinRoomInternal]);
 
   // Leave room
@@ -562,6 +567,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     const bot: Player = {
       id: botId,
       name: botName,
+      color: DEFAULT_PLAYER_COLOR,
       isBot: true,
       isHost: false,
       connected: true,

@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Trophy } from 'lucide-react';
 import type { HeartsState, Card, Suit, HeartsPlayer } from './types';
 import { isValidHeartsPlay } from './rules';
+import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX } from '../../networking/playerColors';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
   hearts: '\u2665',
@@ -42,9 +43,10 @@ function getFittedTextSize(text: string, availableWidth: number, minSize: number
 
 interface AutoFitSeatNameProps {
   name: string;
+  textColor: string;
 }
 
-function AutoFitSeatName({ name }: AutoFitSeatNameProps) {
+function AutoFitSeatName({ name, textColor }: AutoFitSeatNameProps) {
   const nameRef = useRef<HTMLSpanElement>(null);
   const [fontSize, setFontSize] = useState(13);
 
@@ -66,7 +68,7 @@ function AutoFitSeatName({ name }: AutoFitSeatNameProps) {
   }, [name]);
 
   return (
-    <span ref={nameRef} className="hearts-seatPillName" style={{ fontSize: `${fontSize}px` }}>
+    <span ref={nameRef} className="hearts-seatPillName" style={{ fontSize: `${fontSize}px`, color: textColor }}>
       {name}
     </span>
   );
@@ -218,12 +220,14 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
 
     const isCurrentTurn = state.players[state.currentPlayerIndex]?.id === player.id;
     const isMe = player.id === myId;
+    const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+    const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
     return (
       <div
         className={`hearts-seatPill ${isCurrentTurn ? 'hearts-seatPill--active' : ''} ${isMe ? 'hearts-seatPill--me' : ''}`}
       >
-        <div className="hearts-seatPillTop">
-          <AutoFitSeatName name={isMe ? 'You' : player.name} />
+        <div className="hearts-seatPillTop" style={{ backgroundColor: seatColor }}>
+          <AutoFitSeatName name={isMe ? 'You' : player.name} textColor={seatTextColor} />
         </div>
         <div className="hearts-seatPillBottom">
           <span className="hearts-seatPillRound">{player.roundScore}</span>

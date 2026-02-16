@@ -65,6 +65,7 @@ export function createHeartsState(players: Player[]): HeartsState {
   const heartsPlayers: HeartsPlayer[] = gamePlayers.map((p, i) => ({
     id: p.id,
     name: p.name,
+    color: p.color,
     isBot: p.isBot,
     hand: sortHand(deck.slice(i * 13, (i + 1) * 13)),
     tricksTaken: [],

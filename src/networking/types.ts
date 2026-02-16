@@ -1,8 +1,10 @@
 export type GameType = 'yahtzee' | 'hearts' | 'battleship' | 'liars-dice' | 'poker';
+export type PlayerColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet' | 'dark-purple';
 
 export interface Player {
   id: string;
   name: string;
+  color: PlayerColor;
   isBot: boolean;
   isHost: boolean;
   connected: boolean;
@@ -10,7 +12,7 @@ export interface Player {
 
 // Messages from client to host
 export type ClientMessage =
-  | { type: 'join'; playerName: string; deviceId: string }
+  | { type: 'join'; playerName: string; playerColor: PlayerColor; deviceId: string }
   | { type: 'action'; payload: unknown }
   | { type: 'leave' }
   | { type: 'ready' };
@@ -38,8 +40,8 @@ export interface RoomContextValue {
   isHost: boolean;
   myId: string;
   myPlayer: Player | null;
-  createLobby: (playerName: string) => Promise<string>;
-  joinRoom: (roomCode: string, playerName: string) => Promise<void>;
+  createLobby: (playerName: string, playerColor: PlayerColor) => Promise<string>;
+  joinRoom: (roomCode: string, playerName: string, playerColor: PlayerColor) => Promise<void>;
   rejoinRoom: (roomCode: string) => Promise<void>;
   leaveRoom: () => void;
   removePlayer: (playerId: string) => void;

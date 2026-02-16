@@ -5,7 +5,8 @@ import { X } from 'lucide-react';
 import GameCard from '../components/GameCard';
 import RoomCodeInput from '../components/RoomCodeInput';
 import { useRoomContext } from '../networking/roomStore';
-import type { GameType } from '../networking/types';
+import type { GameType, PlayerColor } from '../networking/types';
+import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 import { GAME_CATALOG } from '../games/gameCatalog';
 
 export default function Home() {
@@ -14,7 +15,9 @@ export default function Home() {
   const [playerName] = useState(() => {
     return localStorage.getItem('playerName') || '';
   });
+  const [playerColor] = useState<PlayerColor>(() => normalizePlayerColor(localStorage.getItem('playerColor')));
   const [nameInput, setNameInput] = useState(playerName);
+  const [colorInput, setColorInput] = useState<PlayerColor>(playerColor);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [pendingJoinCode, setPendingJoinCode] = useState<string | null>(null);
   const [infoGameType, setInfoGameType] = useState<GameType | null>(null);
@@ -36,6 +39,11 @@ export default function Home() {
     return name;
   };
 
+  const saveColor = (color: PlayerColor) => {
+    localStorage.setItem('playerColor', color);
+    return color;
+  };
+
   // Clear errors when room is lost (e.g. host disconnected) — auto-create will handle recovery
   useEffect(() => {
     if (!room && error) {
@@ -47,9 +55,10 @@ export default function Home() {
   useEffect(() => {
     if (room || connecting || lobbyCreatingRef.current || error) return;
     const storedName = localStorage.getItem('playerName');
+    const storedColor = normalizePlayerColor(localStorage.getItem('playerColor'));
     if (storedName) {
       lobbyCreatingRef.current = true;
-      createLobby(storedName).catch(() => {}).finally(() => {
+      createLobby(storedName, storedColor).catch(() => {}).finally(() => {
         lobbyCreatingRef.current = false;
       });
     } else {
@@ -67,6 +76,7 @@ export default function Home() {
 
   const handleConfirmName = async () => {
     const name = saveName(nameInput.trim() || `Player${Math.floor(Math.random() * 9999)}`);
+    const color = saveColor(colorInput || DEFAULT_PLAYER_COLOR);
     setShowNamePrompt(false);
 
     if (pendingJoinCode) {
@@ -74,14 +84,14 @@ export default function Home() {
       const code = pendingJoinCode;
       setPendingJoinCode(null);
       try {
-        await joinRoom(code, name);
+        await joinRoom(code, name, color);
       } catch {
         // Error is handled by context
       }
     } else if (!room) {
       // Creating own lobby
       try {
-        await createLobby(name);
+        await createLobby(name, color);
       } catch {
         // Error is handled by context
       }
@@ -90,13 +100,14 @@ export default function Home() {
 
   const handleJoinRoom = (code: string) => {
     const storedName = localStorage.getItem('playerName');
+    const storedColor = normalizePlayerColor(localStorage.getItem('playerColor'));
     if (!storedName) {
       setPendingJoinCode(code);
       setShowNamePrompt(true);
       return;
     }
     // Silently close own lobby and join other (joinRoomInternal handles cleanup)
-    joinRoom(code, storedName).catch(() => {});
+    joinRoom(code, storedName, storedColor).catch(() => {});
   };
 
   const handleSelectGame = (gameType: GameType) => {
@@ -281,6 +292,27 @@ export default function Home() {
               placeholder="Your name"
               autoFocus
             />
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Pick your colour</p>
+              <div className="grid grid-cols-8 gap-1.5">
+                {PLAYER_COLOR_OPTIONS.map((option) => {
+                  const isSelected = colorInput === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setColorInput(option.value)}
+                      className={`w-full aspect-square p-0 rounded-full border-2 transition-all cursor-pointer ${isSelected ? 'border-white ring-2 ring-white/40' : 'border-white/25 hover:border-white/60'}`}
+                      style={{ backgroundColor: PLAYER_COLOR_HEX[option.value] }}
+                      aria-pressed={isSelected}
+                      aria-label={option.label}
+                    >
+                      <span className="sr-only">{option.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <button
               onClick={handleConfirmName}
               disabled={connecting}
