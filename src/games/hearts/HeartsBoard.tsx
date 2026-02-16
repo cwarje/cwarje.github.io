@@ -259,6 +259,7 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
               style={{
                 width: `${handLayout.spreadWidth}px`,
                 height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
+                transition: 'width 0.16s ease',
               }}
             >
               {myPlayer.hand.map((card, i) => {

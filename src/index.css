@@ -357,6 +357,7 @@
   padding: 0;
   cursor: pointer;
   overflow: visible;
+  transition: left 0.16s ease, width 0.16s ease;
 }
 
 .hearts-handHitbox:disabled {
