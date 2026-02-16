@@ -177,10 +177,14 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
   if (state.gameOver) {
     const sorted = [...state.players].sort((a, b) => a.totalScore - b.totalScore);
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hearts-board max-w-2xl mx-auto space-y-6 text-center">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="hearts-board h-full flex flex-col items-center justify-center space-y-6 text-center"
+      >
         <Trophy className="w-14 h-14 text-black mx-auto" />
         <h2 className="text-3xl font-extrabold text-black">Game Over</h2>
-        <div className="space-y-3">
+        <div className="space-y-3 w-full max-w-2xl">
           {sorted.map((p, i) => (
             <div key={p.id} className="hearts-resultRow">
               <div className="flex items-center gap-3">

@@ -67,6 +67,7 @@ export default function GamePage() {
   const isPoker = room.gameType === 'poker';
   const pokerState = isPoker ? (gameState as PokerState) : null;
   const isPokerSessionOver = pokerState?.sessionOver ?? false;
+  const isHearts = room.gameType === 'hearts';
 
   // Show "Back to Lobby" for host when game is finished (non-poker) or poker session is over
   const showBackToLobby = isHost && (
@@ -84,7 +85,7 @@ export default function GamePage() {
   };
 
   return (
-    <div className="space-y-6 relative">
+    <div className="relative h-full flex flex-col">
       {/* Reconnecting overlay */}
       <AnimatePresence>
         {reconnecting && (
@@ -104,7 +105,7 @@ export default function GamePage() {
 
       {/* Header actions */}
       {showBackToLobby && (
-        <div className="flex items-center justify-end">
+        <div className="absolute top-4 right-4 z-20">
           <motion.button
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -118,32 +119,35 @@ export default function GamePage() {
       )}
 
       {error && (
-        <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+        <div className="absolute top-4 left-1/2 z-20 w-[min(90vw,40rem)] -translate-x-1/2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
           {error}
         </div>
       )}
 
-      {/* Game Board */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        {room.gameType === 'yahtzee' && (
-          <YahtzeeBoard state={gameState as YahtzeeState} myId={myId} onAction={sendAction} />
-        )}
-        {room.gameType === 'hearts' && (
-          <HeartsBoard state={gameState as HeartsState} myId={myId} onAction={sendAction} />
-        )}
-        {room.gameType === 'battleship' && (
-          <BattleshipBoard state={gameState as BattleshipState} myId={myId} onAction={sendAction} />
-        )}
-        {room.gameType === 'liars-dice' && (
-          <LiarsDiceBoard state={gameState as LiarsDiceState} myId={myId} onAction={sendAction} />
-        )}
-        {room.gameType === 'poker' && (
-          <PokerBoard state={gameState as PokerState} myId={myId} onAction={sendAction} isHost={isHost} onLeave={handlePokerLeave} />
-        )}
-      </motion.div>
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {/* Game Board */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={isHearts ? 'h-full p-0' : 'p-4 sm:p-6 lg:p-8'}
+        >
+          {room.gameType === 'yahtzee' && (
+            <YahtzeeBoard state={gameState as YahtzeeState} myId={myId} onAction={sendAction} />
+          )}
+          {room.gameType === 'hearts' && (
+            <HeartsBoard state={gameState as HeartsState} myId={myId} onAction={sendAction} />
+          )}
+          {room.gameType === 'battleship' && (
+            <BattleshipBoard state={gameState as BattleshipState} myId={myId} onAction={sendAction} />
+          )}
+          {room.gameType === 'liars-dice' && (
+            <LiarsDiceBoard state={gameState as LiarsDiceState} myId={myId} onAction={sendAction} />
+          )}
+          {room.gameType === 'poker' && (
+            <PokerBoard state={gameState as PokerState} myId={myId} onAction={sendAction} isHost={isHost} onLeave={handlePokerLeave} />
+          )}
+        </motion.div>
+      </div>
     </div>
   );
 }

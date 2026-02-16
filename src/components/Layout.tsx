@@ -7,6 +7,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { room } = useRoomContext();
   const location = useLocation();
   const isGamePage = location.pathname.startsWith('/game/');
+  const mainClassName = isGamePage
+    ? 'h-[calc(100vh-4rem)] max-w-none px-0 py-0 overflow-hidden'
+    : 'max-w-7xl mx-auto px-4 sm:px-6 py-8';
   const gameTitle = (() => {
     if (room?.gameType === 'liars-dice') return "Liar's Dice";
     if (room?.gameType === 'yahtzee') return 'Yahtzee';
@@ -34,7 +37,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <LobbyMenu />
         </div>
       </header>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <main className={mainClassName}>
         {children}
       </main>
     </div>
