@@ -107,3 +107,291 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 116, 139, 0.5);
 }
+
+/* Hearts board refresh */
+.hearts-board {
+  background: #fff;
+  color: #111827;
+  border: 3px solid #111827;
+  border-radius: 20px;
+  padding: 12px;
+}
+
+@media (min-width: 640px) {
+  .hearts-board {
+    padding: 18px;
+  }
+}
+
+.hearts-statusLine {
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.hearts-table {
+  display: grid;
+  grid-template-columns: minmax(72px, 120px) 1fr minmax(72px, 120px);
+  grid-template-rows: auto 1fr auto;
+  gap: 8px;
+  min-height: 280px;
+  align-items: center;
+}
+
+.hearts-seat {
+  display: flex;
+  justify-content: center;
+}
+
+.hearts-seat--top { grid-column: 2; grid-row: 1; }
+.hearts-seat--left { grid-column: 1; grid-row: 2; }
+.hearts-seat--right { grid-column: 3; grid-row: 2; }
+.hearts-seat--bottom { grid-column: 2; grid-row: 3; }
+
+.hearts-seatPill {
+  min-width: 84px;
+  background: #f3f4f6;
+  border: 3px solid #111827;
+  border-radius: 14px;
+  padding: 6px 8px;
+  font-size: 0.7rem;
+  line-height: 1.15;
+}
+
+.hearts-seatPill--active {
+  background: #fde68a;
+}
+
+.hearts-seatPill--me {
+  background: #dbeafe;
+}
+
+.hearts-seatPill--me.hearts-seatPill--active {
+  background: #fde68a;
+}
+
+.hearts-seatPillTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.hearts-seatPillName {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 88px;
+}
+
+.hearts-seatPillScore {
+  background: #111827;
+  color: #fff;
+  border-radius: 10px;
+  font-weight: 700;
+  border: 3px solid #111827;
+  min-width: 24px;
+  text-align: center;
+  padding: 0 6px;
+}
+
+.hearts-seatPillBottom {
+  margin-top: 4px;
+  display: flex;
+  justify-content: space-between;
+  color: #4b5563;
+}
+
+.hearts-center {
+  grid-column: 2;
+  grid-row: 2;
+  position: relative;
+  width: min(52vw, 260px);
+  height: min(46vw, 220px);
+  min-width: 180px;
+  min-height: 158px;
+  margin: 0 auto;
+}
+
+.hearts-slot {
+  position: absolute;
+  width: 72px;
+  height: 104px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hearts-slot--top {
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+}
+
+.hearts-slot--left {
+  left: 12%;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.hearts-slot--right {
+  right: 12%;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.hearts-slot--bottom {
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+}
+
+.hearts-slotPlaceholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  background: #e5e7eb;
+}
+
+.hearts-slotCard {
+  width: 100%;
+  height: 100%;
+}
+
+.hearts-slotCard--winner .hearts-card {
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.4);
+}
+
+.hearts-trickWinner {
+  position: absolute;
+  left: 50%;
+  bottom: -24px;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hearts-card {
+  width: 100%;
+  height: 100%;
+  border: 3px solid #111827;
+  border-radius: 10px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  line-height: 1;
+  padding: 6px 8px;
+  gap: 3px;
+}
+
+.hearts-card--compact {
+  border-radius: 8px;
+  padding: 5px 7px;
+}
+
+.hearts-cardCorner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 1.45em;
+}
+
+.hearts-card--selected {
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.25);
+}
+
+.hearts-card--disabled {
+  background: #e5e7eb;
+}
+
+.hearts-cardRank {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: 1.08rem;
+  font-weight: 700;
+}
+
+.hearts-cardSuit {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: 1.38rem;
+  font-weight: 700;
+}
+
+.hearts-hand {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  min-height: 120px;
+}
+
+.hearts-handSpread {
+  position: relative;
+}
+
+.hearts-handHitbox {
+  position: absolute;
+  top: 0;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  overflow: visible;
+}
+
+.hearts-handHitbox:disabled {
+  cursor: not-allowed;
+}
+
+.hearts-handCardWrap {
+  position: absolute;
+  left: 0;
+  top: 14px;
+  transition: transform 0.16s ease;
+}
+
+.hearts-handCardWrap--active:hover {
+  transform: translateY(-8px) !important;
+}
+
+.hearts-actionButton {
+  border: 3px solid #111827;
+  background: #111827;
+  color: #fff;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-weight: 600;
+}
+
+.hearts-actionButton:hover {
+  background: #000;
+}
+
+.hearts-passStatus {
+  color: #374151;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.hearts-resultRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 3px solid #111827;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: #f9fafb;
+}

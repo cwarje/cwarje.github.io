@@ -1,6 +1,8 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy } from 'lucide-react';
-import type { HeartsState, Card, Suit } from './types';
+import type { HeartsState, Card, Suit, HeartsPlayer } from './types';
+import { isValidHeartsPlay } from './rules';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
   hearts: '\u2665',
@@ -24,39 +26,24 @@ function rankDisplay(rank: number): string {
   return String(rank);
 }
 
+type Seat = 'bottom' | 'left' | 'top' | 'right';
+
+const SEATS: Seat[] = ['bottom', 'left', 'top', 'right'];
+
 function cardEquals(a: Card, b: Card): boolean {
   return a.suit === b.suit && a.rank === b.rank;
 }
 
-function isValidPlay(state: HeartsState, playerIndex: number, card: Card): boolean {
-  const player = state.players[playerIndex];
-  const hand = player.hand;
+function getSeatForPlayerIndex(playerIndex: number, myIndex: number, playerCount: number): Seat {
+  const relative = (playerIndex - myIndex + playerCount) % playerCount;
+  return SEATS[relative] ?? 'bottom';
+}
 
-  if (state.trickNumber === 1 && state.currentTrick.length === 0) {
-    return card.suit === 'clubs' && card.rank === 2;
-  }
-
-  if (state.currentTrick.length > 0) {
-    const leadSuit = state.currentTrick[0].card.suit;
-    const hasSuit = hand.some(c => c.suit === leadSuit);
-    if (hasSuit && card.suit !== leadSuit) return false;
-  }
-
-  if (state.currentTrick.length === 0 && card.suit === 'hearts' && !state.heartsBroken) {
-    const hasNonHearts = hand.some(c => c.suit !== 'hearts');
-    if (hasNonHearts) return false;
-  }
-
-  if (state.trickNumber === 1 && state.currentTrick.length > 0) {
-    const leadSuit = state.currentTrick[0].card.suit;
-    const hasSuit = hand.some(c => c.suit === leadSuit);
-    if (!hasSuit && (card.suit === 'hearts' || (card.suit === 'spades' && card.rank === 12))) {
-      const hasNonPointCards = hand.some(c => !(c.suit === 'hearts' || (c.suit === 'spades' && c.rank === 12)));
-      if (hasNonPointCards) return false;
-    }
-  }
-
-  return true;
+function getSeatPlayer(state: HeartsState, myIndex: number, seat: Seat): { player: HeartsPlayer | null; index: number } {
+  const targetRelative = SEATS.indexOf(seat);
+  if (targetRelative === -1) return { player: null, index: -1 };
+  const index = (myIndex + targetRelative) % state.players.length;
+  return { player: state.players[index] ?? null, index };
 }
 
 interface HeartsBoardProps {
@@ -69,6 +56,8 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
   const myIndex = state.players.findIndex(p => p.id === myId);
   const myPlayer = state.players[myIndex];
   const isMyTurn = state.currentPlayerIndex === myIndex;
+  const handContainerRef = useRef<HTMLDivElement>(null);
+  const [handWidth, setHandWidth] = useState(360);
 
   const selectedPass = state.passSelections[myId] || [];
   const myPassConfirmed = state.passConfirmed[myId] || false;
@@ -94,24 +83,111 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
 
   const playCard = (card: Card) => {
     if (!isMyTurn) return;
-    if (!isValidPlay(state, myIndex, card)) return;
+    if (!isValidHeartsPlay(state, myIndex, card)) return;
     onAction({ type: 'play-card', card });
   };
+
+  useEffect(() => {
+    const element = handContainerRef.current;
+    if (!element) return;
+
+    const updateSize = () => setHandWidth(element.clientWidth);
+    updateSize();
+
+    const resizeObserver = new ResizeObserver(() => updateSize());
+    resizeObserver.observe(element);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const trickBySeat = useMemo(() => {
+    const mapped: Partial<Record<Seat, { playerId: string; card: Card }>> = {};
+    state.currentTrick.forEach((entry) => {
+      const index = state.players.findIndex(p => p.id === entry.playerId);
+      if (index === -1) return;
+      const seat = getSeatForPlayerIndex(index, myIndex, state.players.length);
+      mapped[seat] = entry;
+    });
+    return mapped;
+  }, [state.currentTrick, state.players, myIndex]);
+
+  const trickWinnerSeat = useMemo(() => {
+    if (!state.trickWinner) return null;
+    const winnerIndex = state.players.findIndex(p => p.id === state.trickWinner);
+    if (winnerIndex === -1) return null;
+    return getSeatForPlayerIndex(winnerIndex, myIndex, state.players.length);
+  }, [state.trickWinner, state.players, myIndex]);
+
+  const handLayout = useMemo(() => {
+    const cardCount = myPlayer?.hand.length ?? 0;
+    const available = Math.max(handWidth - 8, 220);
+    const cardWidth = Math.max(58, Math.min(available * 0.2, available < 420 ? 72 : 84));
+    const cardHeight = Math.round(cardWidth * 1.45);
+    const defaultStep = Math.round(cardWidth * 0.58);
+    const fitStep = cardCount > 1 ? (available - cardWidth) / (cardCount - 1) : defaultStep;
+    const step = cardCount > 1 ? Math.max(8, Math.min(defaultStep, fitStep)) : defaultStep;
+    const spreadWidth = cardCount > 1 ? cardWidth + step * (cardCount - 1) : cardWidth;
+
+    return {
+      cardWidth,
+      cardHeight,
+      step,
+      spreadWidth,
+      selectedLift: 14,
+    };
+  }, [handWidth, myPlayer?.hand.length]);
+
+  const renderSeatPill = (seat: Seat) => {
+    const { player, index } = getSeatPlayer(state, myIndex, seat);
+    if (!player) return null;
+
+    const isCurrentTurn = state.players[state.currentPlayerIndex]?.id === player.id;
+    const isMe = player.id === myId;
+    const inCurrentTrick = state.currentTrick.some(entry => entry.playerId === player.id);
+
+    return (
+      <div
+        className={`hearts-seatPill ${isCurrentTurn ? 'hearts-seatPill--active' : ''} ${isMe ? 'hearts-seatPill--me' : ''}`}
+      >
+        <div className="hearts-seatPillTop">
+          <span className="hearts-seatPillName">
+            {player.name}
+            {isMe ? ' (You)' : ''}
+          </span>
+          <span className="hearts-seatPillScore">{player.totalScore}</span>
+        </div>
+        <div className="hearts-seatPillBottom">
+          <span>Round {player.roundScore}</span>
+          {state.currentPlayerIndex === index ? <span>Turn</span> : inCurrentTrick ? <span>Played</span> : <span>&nbsp;</span>}
+        </div>
+      </div>
+    );
+  };
+
+  const renderCardFace = (card: Card, disabled = false, selected = false, compact = false) => (
+    <div
+      className={`hearts-card ${disabled ? 'hearts-card--disabled' : ''} ${selected ? 'hearts-card--selected' : ''} ${compact ? 'hearts-card--compact' : ''}`}
+    >
+      <div className="hearts-cardCorner">
+        <span className={`hearts-cardRank ${SUIT_COLORS[card.suit]}`}>{rankDisplay(card.rank)}</span>
+        <span className={`hearts-cardSuit ${SUIT_COLORS[card.suit]}`}>{SUIT_SYMBOLS[card.suit]}</span>
+      </div>
+    </div>
+  );
 
   if (state.gameOver) {
     const sorted = [...state.players].sort((a, b) => a.totalScore - b.totalScore);
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-md mx-auto space-y-6 text-center">
-        <Trophy className="w-16 h-16 text-amber-400 mx-auto" />
-        <h2 className="text-3xl font-extrabold text-white">Game Over!</h2>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hearts-board max-w-2xl mx-auto space-y-6 text-center">
+        <Trophy className="w-14 h-14 text-black mx-auto" />
+        <h2 className="text-3xl font-extrabold text-black">Game Over</h2>
         <div className="space-y-3">
           {sorted.map((p, i) => (
-            <div key={p.id} className={`flex items-center justify-between px-5 py-3 rounded-xl ${i === 0 ? 'bg-amber-500/10 border border-amber-500/20' : 'glass-light'}`}>
+            <div key={p.id} className="hearts-resultRow">
               <div className="flex items-center gap-3">
-                <span className={`text-lg font-bold ${i === 0 ? 'text-amber-400' : 'text-gray-400'}`}>#{i + 1}</span>
-                <span className="text-white font-medium">{p.name}</span>
+                <span className="text-lg font-bold">#{i + 1}</span>
+                <span className="font-semibold">{p.name}</span>
               </div>
-              <span className="text-xl font-bold text-white">{p.totalScore} pts</span>
+              <span className="text-xl font-bold">{p.totalScore} pts</span>
             </div>
           ))}
         </div>
@@ -120,150 +196,125 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
   }
 
   return (
-    <div className="space-y-6">
-      {/* Scores */}
-      <div className="flex items-center justify-center gap-4 flex-wrap">
-        {state.players.map((p, i) => (
-          <div
-            key={p.id}
-            className={`px-4 py-2 rounded-xl text-center ${
-              i === state.currentPlayerIndex ? 'bg-primary-600/20 ring-1 ring-primary-500/30' : 'glass-light'
-            }`}
-          >
-            <p className={`text-xs font-medium ${p.id === myId ? 'text-primary-400' : 'text-gray-400'}`}>
-              {p.name} {p.id === myId ? '(You)' : ''}
-            </p>
-            <p className="text-lg font-bold text-white">{p.totalScore}</p>
-            <p className="text-[10px] text-gray-500">Round: {p.roundScore}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Phase info */}
-      <div className="text-center text-sm text-gray-400">
-        {state.phase === 'passing' && (
-          <p>Pass 3 cards {state.passDirection} &middot; Selected: {selectedPass.length}/3</p>
-        )}
-        {state.phase === 'playing' && (
+    <div className="hearts-board space-y-4 sm:space-y-5">
+      {state.phase === 'passing' && (
+        <div className="hearts-statusLine">
           <p>
-            Trick {state.trickNumber}/13 &middot;{' '}
-            {isMyTurn ? <span className="text-primary-400 font-medium">Your turn</span> : `${state.players[state.currentPlayerIndex]?.name}'s turn`}
-            {state.heartsBroken && <span className="text-red-400 ml-2">{SUIT_SYMBOLS.hearts} Broken</span>}
+            Pass 3 cards {state.passDirection} &middot; Selected {selectedPass.length}/3
           </p>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Current trick */}
-      {state.phase === 'playing' && (
-        <div className="flex flex-col items-center gap-2 min-h-[120px]">
-          <div className="flex items-center justify-center gap-3">
-            {state.currentTrick.length === 0 ? (
-              <p className="text-gray-600 text-sm">Waiting for lead...</p>
-            ) : (
-              state.currentTrick.map((entry, i) => {
-                const player = state.players.find(p => p.id === entry.playerId);
-                const isWinner = state.trickWinner === entry.playerId;
-                return (
+      <div className="hearts-table">
+        <div className="hearts-seat hearts-seat--top">{renderSeatPill('top')}</div>
+        <div className="hearts-seat hearts-seat--left">{renderSeatPill('left')}</div>
+        <div className="hearts-seat hearts-seat--right">{renderSeatPill('right')}</div>
+        <div className="hearts-seat hearts-seat--bottom">{renderSeatPill('bottom')}</div>
+
+        <div className="hearts-center">
+          {(['top', 'left', 'right', 'bottom'] as Seat[]).map((seat) => {
+            const trickEntry = trickBySeat[seat];
+            const isWinningCard = trickWinnerSeat === seat && !!state.trickWinner;
+            return (
+              <div key={seat} className={`hearts-slot hearts-slot--${seat}`}>
+                {trickEntry ? (
                   <motion.div
-                    key={`${state.trickNumber}-${i}`}
-                    initial={{ scale: 0.8, opacity: 0, y: 20 }}
+                    key={`${state.trickNumber}-${trickEntry.playerId}-${trickEntry.card.suit}-${trickEntry.card.rank}`}
+                    initial={{ scale: 0.8, opacity: 0, y: 12 }}
                     animate={{ scale: 1, opacity: 1, y: 0 }}
-                    className="text-center"
+                    className={`hearts-slotCard ${isWinningCard ? 'hearts-slotCard--winner' : ''}`}
                   >
-                    <div className={`w-16 h-24 rounded-lg bg-white border shadow-md flex flex-col items-center justify-center transition-all ${
-                      isWinner ? 'border-amber-400 ring-2 ring-amber-400/50 shadow-amber-200/50' : 'border-gray-200'
-                    }`}>
-                      <span className={`text-2xl font-bold ${SUIT_COLORS[entry.card.suit]}`}>
-                        {SUIT_SYMBOLS[entry.card.suit]}
-                      </span>
-                      <span className={`text-sm font-bold ${SUIT_COLORS[entry.card.suit]}`}>
-                        {rankDisplay(entry.card.rank)}
-                      </span>
-                    </div>
-                    <p className={`text-[10px] mt-1 ${isWinner ? 'text-amber-400 font-medium' : 'text-gray-500'}`}>
-                      {player?.name}
-                    </p>
+                    {renderCardFace(trickEntry.card, false, false, true)}
                   </motion.div>
-                );
-              })
-            )}
-          </div>
+                ) : (
+                  <div className="hearts-slotPlaceholder" />
+                )}
+              </div>
+            );
+          })}
           {state.trickWinner && (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-xs text-amber-400 font-medium"
-            >
-              {state.players.find(p => p.id === state.trickWinner)?.name} wins the trick
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hearts-trickWinner">
+              {state.players.find(p => p.id === state.trickWinner)?.name} wins this trick
             </motion.p>
           )}
         </div>
-      )}
+      </div>
 
-      {/* My hand */}
       {myPlayer && (
-        <div className="flex flex-wrap items-end justify-center gap-1 sm:gap-2 min-h-[140px] pb-4">
-          {myPlayer.hand.map((card, i) => {
-            const isSelectedForPass = selectedPass.some(c => cardEquals(c, card));
-            const canPlay = state.phase === 'playing' && isMyTurn && !state.trickWinner && isValidPlay(state, myIndex, card);
-            const isPassing = state.phase === 'passing' && !myPassConfirmed;
+        <div className="space-y-3">
+          <div ref={handContainerRef} className="hearts-hand">
+            <div
+              className="hearts-handSpread"
+              style={{
+                width: `${handLayout.spreadWidth}px`,
+                height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
+              }}
+            >
+              {myPlayer.hand.map((card, i) => {
+                const isSelectedForPass = selectedPass.some(c => cardEquals(c, card));
+                const canPlay = state.phase === 'playing' && isMyTurn && !state.trickWinner && isValidHeartsPlay(state, myIndex, card);
+                const isPassing = state.phase === 'passing' && !myPassConfirmed;
+                const isDisabled = !isPassing && !canPlay;
+                const isLast = i === myPlayer.hand.length - 1;
+                const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
 
-            return (
-              <motion.button
-                key={`${card.suit}-${card.rank}`}
-                initial={{ y: 50, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: i * 0.02 }}
-                onClick={() => {
-                  if (isPassing) togglePassCard(card);
-                  else if (canPlay) playCard(card);
-                }}
-                disabled={!isPassing && !canPlay}
-                className={`playing-card w-14 h-20 sm:w-16 sm:h-24 rounded-lg bg-white border flex flex-col items-center justify-center transition-all cursor-pointer ${
-                  isSelectedForPass
-                    ? 'selected border-primary-400 -translate-y-4'
-                    : canPlay
-                    ? 'border-gray-200 hover:border-primary-300 hover:-translate-y-2'
-                    : isPassing
-                    ? 'border-gray-200 hover:border-gray-300'
-                    : 'border-gray-300 opacity-50 cursor-not-allowed'
-                }`}
-              >
-                <span className={`text-lg sm:text-xl font-bold ${SUIT_COLORS[card.suit]}`}>
-                  {SUIT_SYMBOLS[card.suit]}
-                </span>
-                <span className={`text-xs sm:text-sm font-bold ${SUIT_COLORS[card.suit]}`}>
-                  {rankDisplay(card.rank)}
-                </span>
-              </motion.button>
-            );
-          })}
+                return (
+                  <motion.button
+                    key={`${card.suit}-${card.rank}`}
+                    initial={{ y: 50, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: i * 0.02 }}
+                    onClick={() => {
+                      if (isPassing) togglePassCard(card);
+                      else if (canPlay) playCard(card);
+                    }}
+                    disabled={isDisabled}
+                    className="hearts-handHitbox"
+                    style={{
+                      left: `${i * handLayout.step}px`,
+                      width: `${hitboxWidth}px`,
+                      height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
+                      zIndex: i + 1,
+                    }}
+                    aria-label={`Play ${rankDisplay(card.rank)} of ${card.suit}`}
+                  >
+                    <span
+                      className={`hearts-handCardWrap ${canPlay || isPassing ? 'hearts-handCardWrap--active' : ''}`}
+                      style={{
+                        width: `${handLayout.cardWidth}px`,
+                        height: `${handLayout.cardHeight}px`,
+                        transform: isSelectedForPass ? `translateY(-${handLayout.selectedLift}px)` : 'translateY(0px)',
+                      }}
+                    >
+                      {renderCardFace(card, isDisabled, isSelectedForPass)}
+                    </span>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="min-h-[56px] flex items-center justify-center">
+            {state.phase === 'passing' && selectedPass.length === 3 && !myPassConfirmed && (
+              <button onClick={confirmPass} className="hearts-actionButton">
+                Confirm Pass
+              </button>
+            )}
+            {state.phase === 'passing' && myPassConfirmed && (() => {
+              const waitingOn = state.players.filter(p => !p.isBot && !state.passConfirmed[p.id]);
+              return waitingOn.length > 0 ? (
+                <div className="hearts-passStatus">
+                  <p>Waiting on {waitingOn.map(p => p.name).join(', ')}...</p>
+                </div>
+              ) : (
+                <div className="hearts-passStatus">
+                  <p>All players confirmed. Starting round...</p>
+                </div>
+              );
+            })()}
+          </div>
         </div>
       )}
-
-      {/* Pass confirm button or waiting message */}
-      <div className="min-h-[56px] flex items-center justify-center">
-        {state.phase === 'passing' && selectedPass.length === 3 && !myPassConfirmed && (
-          <button
-            onClick={confirmPass}
-            className="px-6 py-3 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 transition-colors cursor-pointer"
-          >
-            Confirm Pass
-          </button>
-        )}
-        {state.phase === 'passing' && myPassConfirmed && (() => {
-          const waitingOn = state.players.filter(p => !p.isBot && !state.passConfirmed[p.id]);
-          return waitingOn.length > 0 ? (
-            <div className="text-center text-sm text-gray-400">
-              <p>Waiting on {waitingOn.map(p => p.name).join(', ')} to select cards to pass...</p>
-            </div>
-          ) : (
-            <div className="text-center text-sm text-gray-400">
-              <p>All players confirmed. Starting round...</p>
-            </div>
-          );
-        })()}
-      </div>
     </div>
   );
 }

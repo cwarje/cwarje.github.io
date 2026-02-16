@@ -1,5 +1,6 @@
 import type { Player } from '../../networking/types';
 import type { HeartsState, HeartsAction, HeartsPlayer, Card, Suit, Rank, PassDirection } from './types';
+import { isValidHeartsPlay } from './rules';
 
 const SUITS: Suit[] = ['clubs', 'diamonds', 'spades', 'hearts'];
 const RANKS: Rank[] = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
@@ -98,44 +99,6 @@ function findTwoOfClubs(players: HeartsPlayer[]): number {
   return 0;
 }
 
-function isValidPlay(state: HeartsState, playerIndex: number, card: Card): boolean {
-  const player = state.players[playerIndex];
-  const hand = player.hand;
-
-  // First trick first card must be 2 of clubs
-  if (state.trickNumber === 1 && state.currentTrick.length === 0) {
-    return card.suit === 'clubs' && card.rank === 2;
-  }
-
-  // Must follow suit if possible
-  if (state.currentTrick.length > 0) {
-    const leadSuit = state.currentTrick[0].card.suit;
-    const hasSuit = hand.some(c => c.suit === leadSuit);
-    if (hasSuit && card.suit !== leadSuit) return false;
-  }
-
-  // Can't lead hearts unless broken (or only hearts left)
-  if (state.currentTrick.length === 0 && card.suit === 'hearts' && !state.heartsBroken) {
-    const hasNonHearts = hand.some(c => c.suit !== 'hearts');
-    if (hasNonHearts) return false;
-  }
-
-  // Can't play points on first trick (unless only points in hand)
-  if (state.trickNumber === 1 && state.currentTrick.length > 0) {
-    const leadSuit = state.currentTrick[0].card.suit;
-    const hasSuit = hand.some(c => c.suit === leadSuit);
-    if (!hasSuit) {
-      const isPointCard = cardPoints(card) > 0;
-      if (isPointCard) {
-        const hasNonPointCards = hand.some(c => cardPoints(c) === 0);
-        if (hasNonPointCards) return false;
-      }
-    }
-  }
-
-  return true;
-}
-
 export function processHeartsAction(state: unknown, action: unknown, playerId: string): unknown {
   const s = state as HeartsState;
   const a = action as HeartsAction;
@@ -206,7 +169,7 @@ export function processHeartsAction(state: unknown, action: unknown, playerId: s
       const playerIndex = s.players.findIndex(p => p.id === playerId);
       if (playerIndex === -1 || playerIndex !== s.currentPlayerIndex) return state;
 
-      if (!isValidPlay(s, playerIndex, a.card)) return state;
+      if (!isValidHeartsPlay(s, playerIndex, a.card)) return state;
 
       const player = s.players[playerIndex];
       const newHand = player.hand.filter(c => !cardEquals(c, a.card));
@@ -414,7 +377,7 @@ export function runHeartsBotTurn(state: unknown): unknown {
 
   if (s.phase === 'playing') {
     const hand = currentPlayer.hand;
-    const validCards = hand.filter(c => isValidPlay(s, s.currentPlayerIndex, c));
+    const validCards = hand.filter(c => isValidHeartsPlay(s, s.currentPlayerIndex, c));
 
     if (validCards.length === 0) return state;
 
