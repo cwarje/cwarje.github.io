@@ -70,6 +70,7 @@ export default function GamePage() {
   const pokerState = isPoker ? (gameState as PokerState) : null;
   const isPokerSessionOver = pokerState?.sessionOver ?? false;
   const isHearts = room.gameType === 'hearts';
+  const heartsTargetScore = isHearts ? (gameState as HeartsState).targetScore ?? 100 : null;
   const gameTitle = room.gameType ? GAME_CATALOG[room.gameType].title : 'Game';
 
   // Show "Back to Lobby" for host when game is finished (non-poker) or poker session is over
@@ -108,7 +109,12 @@ export default function GamePage() {
 
       {/* Floating game HUD (no layout height) */}
       <div className="absolute top-0 left-0 right-0 z-20 flex items-start justify-between p-3 sm:p-4 pointer-events-none">
-        <h1 className="pointer-events-none text-xl sm:text-2xl font-bold text-white">{gameTitle}</h1>
+        <div className="pointer-events-none">
+          <h1 className="text-xl sm:text-2xl font-bold text-white">{gameTitle}</h1>
+          {isHearts && heartsTargetScore && (
+            <p className="text-xs sm:text-sm text-white/80">Game to {heartsTargetScore}</p>
+          )}
+        </div>
         <div className="pointer-events-auto flex items-center gap-2">
           {showBackToLobby && (
             <motion.button

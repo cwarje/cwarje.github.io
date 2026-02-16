@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 import GameCard from '../components/GameCard';
 import RoomCodeInput from '../components/RoomCodeInput';
 import { useRoomContext } from '../networking/roomStore';
-import type { GameType, PlayerColor } from '../networking/types';
+import type { GameType, HeartsTargetScore, PlayerColor } from '../networking/types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 import { GAME_CATALOG } from '../games/gameCatalog';
 
@@ -19,6 +19,7 @@ export default function Home() {
   const [nameInput, setNameInput] = useState(playerName);
   const [colorInput, setColorInput] = useState<PlayerColor>(playerColor);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [showHeartsTargetPrompt, setShowHeartsTargetPrompt] = useState(false);
   const [pendingJoinCode, setPendingJoinCode] = useState<string | null>(null);
   const [infoGameType, setInfoGameType] = useState<GameType | null>(null);
   const lobbyCreatingRef = useRef(false);
@@ -33,6 +34,15 @@ export default function Home() {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [infoGameType, closeInfo]);
+
+  useEffect(() => {
+    if (!showHeartsTargetPrompt) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowHeartsTargetPrompt(false);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [showHeartsTargetPrompt]);
 
   const saveName = (name: string) => {
     localStorage.setItem('playerName', name);
@@ -115,7 +125,20 @@ export default function Home() {
     const count = room.players.length;
     const catalog = GAME_CATALOG[gameType];
     if (count < catalog.minPlayers || count > catalog.maxPlayers) return;
+    if (gameType === 'hearts') {
+      setShowHeartsTargetPrompt(true);
+      return;
+    }
     startGame(gameType);
+  };
+
+  const handleStartHeartsWithTarget = (targetScore: HeartsTargetScore) => {
+    if (!isHost || !room) return;
+    const catalog = GAME_CATALOG.hearts;
+    const count = room.players.length;
+    if (count < catalog.minPlayers || count > catalog.maxPlayers) return;
+    startGame('hearts', { targetScore });
+    setShowHeartsTargetPrompt(false);
   };
 
   const playerCount = room?.players.length ?? 0;
@@ -320,6 +343,44 @@ export default function Home() {
             >
               {connecting ? 'Connecting...' : 'Go'}
             </button>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {showHeartsTargetPrompt && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowHeartsTargetPrompt(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm space-y-4"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Choose Hearts target score"
+          >
+            <h2 className="text-lg font-bold text-white">Start Hearts</h2>
+            <p className="text-sm text-gray-400">Choose the game length:</p>
+            <div className="grid grid-cols-1 gap-3">
+              <button
+                type="button"
+                onClick={() => handleStartHeartsWithTarget(50)}
+                className="w-full px-4 py-2.5 rounded-xl bg-rose-600 text-white font-medium hover:bg-rose-500 transition-colors cursor-pointer"
+              >
+                Game to 50
+              </button>
+              <button
+                type="button"
+                onClick={() => handleStartHeartsWithTarget(100)}
+                className="w-full px-4 py-2.5 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 transition-colors cursor-pointer"
+              >
+                Game to 100
+              </button>
+            </div>
           </motion.div>
         </motion.div>
       )}

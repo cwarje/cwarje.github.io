@@ -27,6 +27,7 @@ function basePlayers(player0Hand: Card[]): HeartsPlayer[] {
 function baseState(player0Hand: Card[]): HeartsState {
   return {
     players: basePlayers(player0Hand),
+    targetScore: 100,
     phase: 'playing',
     passDirection: 'left',
     passSelections: {},

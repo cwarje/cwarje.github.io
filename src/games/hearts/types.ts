@@ -1,4 +1,4 @@
-import type { PlayerColor } from '../../networking/types';
+import type { HeartsTargetScore, PlayerColor } from '../../networking/types';
 
 export type Suit = 'hearts' | 'diamonds' | 'clubs' | 'spades';
 export type Rank = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14; // 11=J, 12=Q, 13=K, 14=A
@@ -23,6 +23,7 @@ export type PassDirection = 'left' | 'right' | 'across' | 'none';
 
 export interface HeartsState {
   players: HeartsPlayer[];
+  targetScore: HeartsTargetScore;
   phase: 'passing' | 'playing' | 'round-end';
   passDirection: PassDirection;
   passSelections: Record<string, Card[]>; // playerId -> cards selected to pass

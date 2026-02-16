@@ -57,7 +57,7 @@ function getPassTargetIndex(fromIndex: number, direction: PassDirection, playerC
   }
 }
 
-export function createHeartsState(players: Player[]): HeartsState {
+export function createHeartsState(players: Player[], options?: { targetScore?: 50 | 100 }): HeartsState {
   // Hearts needs exactly 4 players
   const gamePlayers = players.slice(0, 4);
   const deck = shuffle(createDeck());
@@ -77,6 +77,7 @@ export function createHeartsState(players: Player[]): HeartsState {
 
   return {
     players: heartsPlayers,
+    targetScore: options?.targetScore ?? 100,
     phase: passDir === 'none' ? 'playing' : 'passing',
     passDirection: passDir,
     passSelections: {},
@@ -264,8 +265,8 @@ function endRound(s: HeartsState): HeartsState {
     };
   });
 
-  // Check game over (someone >= 100)
-  const isOver = newPlayers.some(p => p.totalScore >= 100);
+  // Check game over (someone reaches target score)
+  const isOver = newPlayers.some(p => p.totalScore >= s.targetScore);
 
   if (isOver) {
     const minScore = Math.min(...newPlayers.map(p => p.totalScore));

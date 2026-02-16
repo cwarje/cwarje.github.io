@@ -1,5 +1,9 @@
 export type GameType = 'yahtzee' | 'hearts' | 'battleship' | 'liars-dice' | 'poker';
 export type PlayerColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet' | 'dark-purple';
+export type HeartsTargetScore = 50 | 100;
+export interface GameStartOptions {
+  targetScore?: HeartsTargetScore;
+}
 
 export interface Player {
   id: string;
@@ -47,7 +51,7 @@ export interface RoomContextValue {
   removePlayer: (playerId: string) => void;
   addBot: () => void;
   removeBot: (botId: string) => void;
-  startGame: (gameType: GameType) => void;
+  startGame: (gameType: GameType, options?: GameStartOptions) => void;
   sendAction: (payload: unknown) => void;
   returnToLobby: () => void;
   error: string | null;

@@ -4,7 +4,7 @@ type DataConnection = ReturnType<Peer['connect']>;
 import { createHostPeer, createClientPeer, connectToPeer, destroyPeer } from './peer';
 import { generateRoomCode } from '../utils/roomCode';
 import { getDeviceId } from '../utils/deviceId';
-import type { RoomState, RoomContextValue, GameType, Player, ClientMessage, HostMessage, PlayerColor } from './types';
+import type { RoomState, RoomContextValue, GameType, Player, ClientMessage, HostMessage, PlayerColor, GameStartOptions } from './types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor } from './playerColors';
 import { createInitialGameState, processGameAction, checkGameOver, runSingleBotTurn, getGameWinners } from '../games/gameEngine';
 import type { HeartsState } from '../games/hearts/types';
@@ -584,9 +584,9 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   }, [removePlayer]);
 
   // Start game (host only) — gameType is chosen at start time
-  const startGame = useCallback((gameType: GameType) => {
+  const startGame = useCallback((gameType: GameType, options?: GameStartOptions) => {
     if (!isHost || !room) return;
-    const gs = createInitialGameState(gameType, room.players);
+    const gs = createInitialGameState(gameType, room.players, options);
     const startedRoom = { ...room, gameType, phase: 'playing' as const };
     setRoom(startedRoom);
     setGameState(gs);

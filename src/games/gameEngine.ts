@@ -1,4 +1,4 @@
-import type { GameType, Player } from '../networking/types';
+import type { GameType, Player, GameStartOptions } from '../networking/types';
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn } from './yahtzee/logic';
 import { createHeartsState, processHeartsAction, isHeartsOver, runHeartsBotTurn } from './hearts/logic';
 import { createBattleshipState, processBattleshipAction, isBattleshipOver, runBattleshipBotTurn } from './battleship/logic';
@@ -10,10 +10,10 @@ import type { BattleshipState } from './battleship/types';
 import type { LiarsDiceState } from './liars-dice/types';
 import type { PokerState } from './poker/types';
 
-export function createInitialGameState(gameType: GameType, players: Player[]): unknown {
+export function createInitialGameState(gameType: GameType, players: Player[], options?: GameStartOptions): unknown {
   switch (gameType) {
     case 'yahtzee': return createYahtzeeState(players);
-    case 'hearts': return createHeartsState(players);
+    case 'hearts': return createHeartsState(players, { targetScore: options?.targetScore });
     case 'battleship': return createBattleshipState(players);
     case 'liars-dice': return createLiarsDiceState(players);
     case 'poker': return createPokerState(players);
