@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Loader2 } from 'lucide-react';
 import { useRoomContext } from '../networking/roomStore';
 import { useToast } from '../components/Toast';
-import LeaveButton from '../components/LeaveButton';
 import YahtzeeBoard from '../games/yahtzee/YahtzeeBoard';
 import HeartsBoard from '../games/hearts/HeartsBoard';
 import BattleshipBoard from '../games/battleship/BattleshipBoard';
@@ -74,9 +73,6 @@ export default function GamePage() {
     (isFinished && !isPoker) || (isPoker && isPokerSessionOver)
   );
 
-  // Hide the Leave button on game-over screens
-  const hideLeaveButton = isFinished || (isPoker && isPokerSessionOver);
-
   const handlePokerLeave = () => {
     leaveRoom();
     toast('Left the table.', 'info');
@@ -106,31 +102,9 @@ export default function GamePage() {
         )}
       </AnimatePresence>
 
-      {/* Header bar (hidden for Yahtzee — info is in the score table) */}
-      {room.gameType !== 'yahtzee' && (
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-white capitalize">{room.gameType === 'liars-dice' ? "Liar's Dice" : room.gameType}</h1>
-            <p className="text-xs text-gray-500">Room: {room.roomCode}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {showBackToLobby && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                onClick={handleReturnToLobby}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-medium hover:bg-primary-500 transition-colors cursor-pointer"
-              >
-                <Home className="w-4 h-4" />
-                Back to Lobby
-              </motion.button>
-            )}
-            {!hideLeaveButton && <LeaveButton />}
-          </div>
-        </div>
-      )}
-      {room.gameType === 'yahtzee' && showBackToLobby && (
-        <div className="flex items-center justify-end gap-3">
+      {/* Header actions */}
+      {showBackToLobby && (
+        <div className="flex items-center justify-end">
           <motion.button
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -155,7 +129,7 @@ export default function GamePage() {
         animate={{ opacity: 1, y: 0 }}
       >
         {room.gameType === 'yahtzee' && (
-          <YahtzeeBoard state={gameState as YahtzeeState} myId={myId} onAction={sendAction} roomCode={room.roomCode} />
+          <YahtzeeBoard state={gameState as YahtzeeState} myId={myId} onAction={sendAction} />
         )}
         {room.gameType === 'hearts' && (
           <HeartsBoard state={gameState as HeartsState} myId={myId} onAction={sendAction} />

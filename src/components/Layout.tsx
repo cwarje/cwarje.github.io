@@ -1,12 +1,28 @@
 import { Gamepad2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import LobbyMenu from './LobbyMenu';
+import { useRoomContext } from '../networking/roomStore';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
+  const { room } = useRoomContext();
+  const location = useLocation();
+  const isGamePage = location.pathname.startsWith('/game/');
+  const gameTitle = (() => {
+    if (room?.gameType === 'liars-dice') return "Liar's Dice";
+    if (room?.gameType === 'yahtzee') return 'Yahtzee';
+    if (room?.gameType) return room.gameType.charAt(0).toUpperCase() + room.gameType.slice(1);
+    return 'Game';
+  })();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-primary-950">
       <header className="border-b border-white/5 bg-gray-950/60 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between relative">
+          {isGamePage && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <h1 className="text-lg font-bold text-white">{gameTitle}</h1>
+            </div>
+          )}
           <Link to="/" className="flex items-center gap-3 group">
             <div className="w-9 h-9 rounded-lg bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-600/20 group-hover:shadow-primary-600/40 transition-shadow">
               <Gamepad2 className="w-5 h-5 text-white" />

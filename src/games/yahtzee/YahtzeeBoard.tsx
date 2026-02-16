@@ -9,7 +9,6 @@ import {
   getLowerTotal,
   hasUpperBonus,
 } from './logic';
-import LeaveButton from '../../components/LeaveButton';
 
 const DICE_ICONS = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6];
 
@@ -36,10 +35,9 @@ interface YahtzeeBoardProps {
   state: YahtzeeState;
   myId: string;
   onAction: (action: unknown) => void;
-  roomCode: string;
 }
 
-export default function YahtzeeBoard({ state, myId, onAction, roomCode }: YahtzeeBoardProps) {
+export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProps) {
   const isMyTurn = state.players[state.currentPlayerIndex]?.id === myId;
   const currentPlayer = state.players[state.currentPlayerIndex];
   const myPlayer = state.players.find(p => p.id === myId);
@@ -236,10 +234,7 @@ export default function YahtzeeBoard({ state, myId, onAction, roomCode }: Yahtze
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="border-b border-white/10">
-              <th className="text-left py-2 px-2 max-w-[300px]">
-                <div className="text-white font-bold text-sm capitalize">Yahtzee</div>
-                <div className="text-white/50 text-[10px] font-normal">Room: {roomCode}</div>
-              </th>
+              <th className="text-left py-2 px-2 max-w-[300px]" />
               {state.players.map((player) => {
                 const isMe = player.id === myId;
                 const isCurrent = state.players[state.currentPlayerIndex]?.id === player.id;
@@ -261,7 +256,6 @@ export default function YahtzeeBoard({ state, myId, onAction, roomCode }: Yahtze
                           <span className="text-primary-500 text-[10px] ml-0.5">(You)</span>
                         )}
                       </span>
-                      {isMe && <LeaveButton variant="icon" />}
                     </div>
                   </th>
                 );
