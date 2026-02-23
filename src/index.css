@@ -39,23 +39,6 @@
   border: 1px solid rgba(148, 163, 184, 0.1);
 }
 
-/* Dice styling */
-.dice {
-  transition: transform 0.3s ease;
-}
-
-.dice.rolling {
-  animation: diceRoll 0.5s ease-in-out;
-}
-
-@keyframes diceRoll {
-  0% { transform: rotateX(0deg) rotateY(0deg); }
-  25% { transform: rotateX(90deg) rotateY(45deg) scale(1.1); }
-  50% { transform: rotateX(180deg) rotateY(90deg); }
-  75% { transform: rotateX(270deg) rotateY(135deg) scale(1.1); }
-  100% { transform: rotateX(360deg) rotateY(180deg); }
-}
-
 /* Playing card styling */
 .playing-card {
   transition: transform 0.2s ease, box-shadow 0.2s ease;

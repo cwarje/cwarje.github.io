@@ -6,6 +6,7 @@ import {
   Crosshair, Eye, AlertTriangle,
 } from 'lucide-react';
 import type { LiarsDiceState, Bid } from './types';
+import { Dice, faceOrientations, type DiceValue } from '../../components/Dice';
 
 const DICE_ICONS = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6];
 
@@ -201,20 +202,19 @@ export default function LiarsDiceBoard({ state, myId, onAction }: LiarsDiceBoard
         <div className="space-y-2">
           <p className="text-xs text-gray-500 text-center uppercase tracking-wider">Your Dice</p>
           <div className="flex items-center justify-center gap-3">
-            {myPlayer.dice.map((value, i) => {
-              const DiceIcon = DICE_ICONS[value - 1];
-              return (
-                <motion.div
-                  key={i}
-                  initial={{ rotateY: 0, scale: 0.8 }}
-                  animate={{ rotateY: 360, scale: 1 }}
-                  transition={{ duration: 0.5, delay: i * 0.08 }}
-                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center"
-                >
-                  <DiceIcon className="w-8 h-8 sm:w-10 sm:h-10 text-emerald-300" />
-                </motion.div>
-              );
-            })}
+            {myPlayer.dice.map((value, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.08 }}
+              >
+                <Dice
+                  orientation={faceOrientations[value as DiceValue]}
+                  size="3.5rem"
+                />
+              </motion.div>
+            ))}
           </div>
         </div>
       )}
@@ -228,16 +228,17 @@ export default function LiarsDiceBoard({ state, myId, onAction }: LiarsDiceBoard
               <div className="flex items-center gap-1.5">
                 {p.dice.map((value, i) => {
                   if (isRevealing) {
-                    const DiceIcon = DICE_ICONS[value - 1];
                     return (
                       <motion.div
                         key={i}
-                        initial={{ rotateY: 0 }}
-                        animate={{ rotateY: 360 }}
-                        transition={{ duration: 0.5, delay: i * 0.08 }}
-                        className="w-9 h-9 rounded-lg bg-white/10 border border-white/10 flex items-center justify-center"
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.08 }}
                       >
-                        <DiceIcon className="w-5 h-5 text-white" />
+                        <Dice
+                          orientation={faceOrientations[value as DiceValue]}
+                          size="2.25rem"
+                        />
                       </motion.div>
                     );
                   }
@@ -522,11 +523,8 @@ function RevolverDisplay({ chambers, currentChamber }: { chambers: number; curre
 
 function RevealAutoAdvance({ onAction }: { onAction: (action: unknown) => void }) {
   useEffect(() => {
-    // Auto-advance from revealing to revolver after a short delay
     const timer = setTimeout(() => {
-      // The host dispatches a no-op action; actual transition is handled by bot logic
-      // We just need to signal the state to move forward
-      onAction({ type: 'pull-trigger' }); // This will be ignored if player isn't in trigger list
+      onAction({ type: 'pull-trigger' });
     }, 2000);
     return () => clearTimeout(timer);
   }, [onAction]);

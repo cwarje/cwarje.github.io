@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type TransitionEvent } from 'react';
 import { motion } from 'framer-motion';
-import { Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, RotateCcw, Trophy } from 'lucide-react';
+import { RotateCcw, Trophy } from 'lucide-react';
 import type { YahtzeeState, ScoreCategory } from './types';
 import {
   calculateScoreWithJoker,
@@ -9,8 +9,20 @@ import {
   getLowerTotal,
   hasUpperBonus,
 } from './logic';
+import {
+  Dice,
+  faceOrientations,
+  positiveModulo,
+  getForwardRotationDelta,
+  type CubeOrientation,
+  type DiceValue,
+} from '../../components/Dice';
 
-const DICE_ICONS = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6];
+const DICE_COUNT = 5;
+
+function createInitialOrientations(): CubeOrientation[] {
+  return Array.from({ length: DICE_COUNT }, () => ({ x: 0, y: 0 }));
+}
 
 const UPPER_CATEGORIES: { key: ScoreCategory; label: string }[] = [
   { key: 'ones', label: 'Ones' },
@@ -43,89 +55,74 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
   const myPlayer = state.players.find(p => p.id === myId);
   const hasRolled = state.rollsLeft < 3;
 
-  // --- Dice rolling animation state ---
   const [isRolling, setIsRolling] = useState(false);
-  const [displayDice, setDisplayDice] = useState<number[]>(state.dice);
-  const [diceSettled, setDiceSettled] = useState([true, true, true, true, true]);
+  const [orientations, setOrientations] = useState<CubeOrientation[]>(() => createInitialOrientations());
+  const [rollingAnchorIndex, setRollingAnchorIndex] = useState<number | null>(null);
   const prevStateRef = useRef({ playerIndex: state.currentPlayerIndex, rollsLeft: state.rollsLeft });
-  const animTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Detect rolls and trigger rolling animation
   useEffect(() => {
     const prev = prevStateRef.current;
     const rollHappened =
       prev.playerIndex === state.currentPlayerIndex && state.rollsLeft < prev.rollsLeft;
     prevStateRef.current = { playerIndex: state.currentPlayerIndex, rollsLeft: state.rollsLeft };
 
-    // Cleanup previous animation
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    animTimersRef.current.forEach((t) => clearTimeout(t));
-    animTimersRef.current = [];
-
     if (rollHappened) {
       setIsRolling(true);
+
       const heldSnapshot = [...state.held];
-      const finalDice = [...state.dice];
+      const finalDice = state.dice as DiceValue[];
 
-      // Track which dice have settled (mutable, shared with interval closure)
-      const settledSet = new Set<number>();
-      // Mark held dice as already settled
-      heldSnapshot.forEach((h, i) => { if (h) settledSet.add(i); });
-      setDiceSettled(heldSnapshot.map((h) => h));
+      const activeIndices = heldSnapshot
+        .map((h, i) => (h ? -1 : i))
+        .filter((i) => i !== -1);
 
-      // Cycle random dice values every 80ms
-      intervalRef.current = setInterval(() => {
-        setDisplayDice((prev) =>
-          prev.map((_, i) => {
-            if (heldSnapshot[i] || settledSet.has(i)) return finalDice[i];
-            return Math.floor(Math.random() * 6) + 1;
-          })
-        );
-      }, 80);
+      setRollingAnchorIndex(activeIndices[0] ?? null);
 
-      // Stagger settling of each unheld die
-      let settleIndex = 0;
-      for (let i = 0; i < 5; i++) {
-        if (heldSnapshot[i]) continue;
-        const settleTime = 600 + settleIndex * 110;
-        settleIndex++;
-        animTimersRef.current.push(
-          setTimeout(() => {
-            settledSet.add(i);
-            setDiceSettled((prev) => {
-              const next = [...prev];
-              next[i] = true;
-              return next;
-            });
-          }, settleTime)
-        );
-      }
+      setOrientations((prev) =>
+        prev.map((previous, index) => {
+          if (heldSnapshot[index]) return previous;
 
-      // End rolling after all dice settle
-      animTimersRef.current.push(
-        setTimeout(() => {
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          intervalRef.current = null;
-          setDisplayDice(finalDice);
-          setIsRolling(false);
-          setDiceSettled([true, true, true, true, true]);
-        }, 1200)
+          const targetOrientation = faceOrientations[finalDice[index]];
+          const xSpins = (Math.floor(Math.random() * 2) + 2) * 360;
+          const ySpins = (Math.floor(Math.random() * 2) + 3) * 360;
+
+          return {
+            x:
+              previous.x +
+              xSpins +
+              getForwardRotationDelta(
+                positiveModulo(previous.x, 360),
+                positiveModulo(targetOrientation.x, 360),
+              ),
+            y:
+              previous.y +
+              ySpins +
+              getForwardRotationDelta(
+                positiveModulo(previous.y, 360),
+                positiveModulo(targetOrientation.y, 360),
+              ),
+          };
+        }),
       );
     } else {
-      setDisplayDice([...state.dice]);
       setIsRolling(false);
-      setDiceSettled([true, true, true, true, true]);
+      setRollingAnchorIndex(null);
+      setOrientations(
+        state.dice.map((v) => {
+          const fo = faceOrientations[v as DiceValue];
+          return { ...fo };
+        }),
+      );
     }
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      animTimersRef.current.forEach((t) => clearTimeout(t));
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.currentPlayerIndex, state.rollsLeft]);
 
-  // Available categories for scoring (respects joker rules)
+  const handleRollEnd = (event: TransitionEvent<HTMLDivElement>) => {
+    if (event.propertyName !== 'transform' || !isRolling) return;
+    setIsRolling(false);
+    setRollingAnchorIndex(null);
+  };
+
   const myAvailableCategories =
     myPlayer && hasRolled && isMyTurn && !isRolling
       ? getAvailableCategories(state.dice, myPlayer.scorecard)
@@ -263,7 +260,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
             </tr>
           </thead>
           <tbody>
-            {/* ── Upper Section ── */}
+            {/* Upper Section */}
             {UPPER_CATEGORIES.map(({ key, label }) => (
               <tr key={key} className="border-b border-white/5">
                 <td className="py-1.5 px-2 text-white max-w-[300px] truncate">{label}</td>
@@ -291,12 +288,12 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
               })}
             </tr>
 
-            {/* ── Spacer ── */}
+            {/* Spacer */}
             <tr>
               <td colSpan={1 + state.players.length} className="py-1" />
             </tr>
 
-            {/* ── Lower Section ── */}
+            {/* Lower Section */}
             {LOWER_CATEGORIES.map(({ key, label }) => (
               <tr key={key} className="border-b border-white/5">
                 <td className="py-1.5 px-2 text-white max-w-[300px] truncate">{label}</td>
@@ -317,7 +314,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
               ))}
             </tr>
 
-            {/* ── Grand Total ── */}
+            {/* Grand Total */}
             <tr className="border-t-2 border-white/20">
               <td className="py-2 px-2 text-white font-bold max-w-[300px]">Total</td>
               {state.players.map((player) => (
@@ -343,59 +340,28 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
         </p>
       </div>
 
-      {/* Dice + Roll Button (below score table) */}
+      {/* Dice + Roll Button */}
       <div className="flex flex-col items-center gap-4">
-        <div className="flex items-center gap-3">
-          {displayDice.map((value, i) => {
-            const DiceIcon = DICE_ICONS[value - 1];
-            const isDieRolling = isRolling && !state.held[i] && !diceSettled[i];
-
-            return (
-              <motion.button
-                key={i}
-                animate={{
-                  rotate: isDieRolling ? [-10, 10] : 0,
-                  y: isDieRolling ? [-4, 4] : 0,
-                  scale: !isDieRolling && diceSettled[i] ? 1 : 0.95,
-                }}
-                transition={
-                  isDieRolling
-                    ? {
-                        rotate: {
-                          duration: 0.1,
-                          repeat: Infinity,
-                          repeatType: 'reverse' as const,
-                          ease: 'easeInOut',
-                        },
-                        y: {
-                          duration: 0.12,
-                          repeat: Infinity,
-                          repeatType: 'reverse' as const,
-                          ease: 'easeInOut',
-                        },
-                      }
-                    : {
-                        type: 'spring',
-                        stiffness: 400,
-                        damping: 12,
-                      }
-                }
+        <div className="dice-stage">
+          {orientations.map((orientation, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.08 }}
+            >
+              <Dice
+                orientation={orientation}
+                rolling={isRolling && !state.held[i]}
+                held={state.held[i]}
                 onClick={() => handleToggleHold(i)}
+                onTransitionEnd={i === rollingAnchorIndex ? handleRollEnd : undefined}
                 disabled={!isMyTurn || !hasRolled || state.rollsLeft === 0 || isRolling}
-                className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                  state.held[i]
-                    ? 'bg-primary-600/30 border-2 border-primary-400 shadow-lg shadow-primary-600/20'
-                    : 'bg-white border border-white/20 hover:bg-white/90'
-                } ${!isMyTurn || !hasRolled ? 'opacity-60' : ''}`}
-              >
-                <DiceIcon
-                  className={`w-8 h-8 sm:w-10 sm:h-10 ${
-                    state.held[i] ? 'text-primary-300' : 'text-slate-900'
-                  }`}
-                />
-              </motion.button>
-            );
-          })}
+                ariaLabel={`Die ${i + 1}: ${state.held[i] ? 'held' : 'active'}`}
+                className={!isMyTurn || !hasRolled ? 'opacity-60' : ''}
+              />
+            </motion.div>
+          ))}
         </div>
 
         {isMyTurn && (
