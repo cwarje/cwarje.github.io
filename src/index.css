@@ -416,6 +416,28 @@
 }
 
 @media (max-width: 639px) {
+  .hearts-center {
+    --hearts-center-side-inset: 6%;
+    --hearts-center-vertical-inset: -7px;
+  }
+
+  .hearts-slot {
+    width: 58px;
+    height: 84px;
+  }
+
+  .hearts-center .hearts-cardRank {
+    font-size: 1.2rem;
+  }
+
+  .hearts-center .hearts-cardSuit {
+    font-size: 1.2rem;
+  }
+
+  .hearts-center .hearts-card {
+    padding: 4px 0 0 0;
+  }
+
   .hearts-hand .hearts-card {
     padding: 6px 8px 6px 0;
   }
