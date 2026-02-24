@@ -55,6 +55,10 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
   const hasRolled = state.rollsLeft < 3;
 
   const [isRolling, setIsRolling] = useState(false);
+  const spectatorRollsLeftText =
+    !isMyTurn && !isRolling && state.rollsLeft > 0 && state.rollsLeft < 3
+      ? `${state.rollsLeft} roll${state.rollsLeft === 1 ? '' : 's'} left`
+      : '';
   const [orientations, setOrientations] = useState<CubeOrientation[]>(() => createInitialOrientations());
   const [rollingAnchorIndex, setRollingAnchorIndex] = useState<number | null>(null);
   const [hasPendingYahtzeeCelebration, setHasPendingYahtzeeCelebration] = useState(false);
@@ -386,6 +390,11 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
               ? 'YAHZEE'
               : `Roll ${hasRolled ? `(${state.rollsLeft} left)` : ''}`}
           </button>
+        )}
+        {!isMyTurn && spectatorRollsLeftText && (
+          <div className="min-h-12 px-6 py-3 text-white font-medium flex items-center justify-center">
+            {spectatorRollsLeftText}
+          </div>
         )}
       </div>
     </div>
