@@ -4,6 +4,13 @@
   );
 }
 
+@media (max-width: 639px) {
+  .yahtzee-roll-area {
+    --dice-size: 3.25rem;
+    --dice-gap: 1.25rem;
+  }
+}
+
 .dice-stage {
   min-height: calc(var(--dice-size, 3.5rem) + 1.75rem);
   width: min(100%, var(--dice-stage-width));
