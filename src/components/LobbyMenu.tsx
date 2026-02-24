@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Copy, Plus, X, LogOut, Loader2 } from 'lucide-react';
+import { Users, Copy, Plus, X, LogOut, Loader2, Settings } from 'lucide-react';
 import PlayerList from './PlayerList';
 import { useRoomContext } from '../networking/roomStore';
 import { useToast } from './Toast';
 import { useNavigate } from 'react-router-dom';
 import { GAME_CATALOG } from '../games/gameCatalog';
 
-export default function LobbyMenu() {
+type LobbyMenuProps = { variant?: 'default' | 'icon' };
+
+export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
   const { room, isHost, addBot, removeBot, removePlayer, leaveRoom, connecting } = useRoomContext();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -55,24 +57,34 @@ export default function LobbyMenu() {
     navigate('/');
   };
 
+  const isIconVariant = variant === 'icon';
+  const triggerClassName = isIconVariant
+    ? 'flex items-center justify-center w-9 h-9 text-white hover:text-white/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer'
+    : 'flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-sm font-medium text-gray-300 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer';
+
   return (
     <div className="relative" ref={panelRef}>
       {/* Trigger button */}
       <button
         onClick={() => setOpen((v) => !v)}
         disabled={connecting && !room}
-        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-sm font-medium text-gray-300 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+        className={triggerClassName}
+        title={isIconVariant ? 'Lobby' : undefined}
       >
         {connecting && !room ? (
-          <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+          <Loader2 className={`w-4 h-4 animate-spin ${isIconVariant ? 'text-white/70' : 'text-gray-400'}`} />
+        ) : isIconVariant ? (
+          <Settings className="w-6 h-6 text-white" />
         ) : (
-          <Users className="w-4 h-4" />
-        )}
-        <span className="hidden sm:inline">Lobby</span>
-        {hasRoom && (
-          <span className="flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-primary-600 text-[11px] font-bold text-white leading-none">
-            {playerCount}
-          </span>
+          <>
+            <Users className="w-4 h-4" />
+            <span className="hidden sm:inline">Lobby</span>
+            {hasRoom && (
+              <span className="flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-primary-600 text-[11px] font-bold text-white leading-none">
+                {playerCount}
+              </span>
+            )}
+          </>
         )}
       </button>
 

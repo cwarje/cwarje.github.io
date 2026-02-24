@@ -154,7 +154,7 @@ export default function GamePage() {
               Back to Lobby
             </motion.button>
           )}
-          <LobbyMenu />
+          <LobbyMenu variant="icon" />
         </div>
       </div>
 
