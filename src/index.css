@@ -568,16 +568,24 @@
 .river-seat--bottom { grid-column: 2; grid-row: 3; }
 
 .river-seatPill {
-  width: min(100%, 144px);
-  min-width: 96px;
+  width: min(100%, 132px);
+  min-width: 84px;
   background: #f3f4f6;
   border: 3px solid #111827;
   border-radius: 14px;
+  font-size: 0.75rem;
+  line-height: 1;
+  display: grid;
+  grid-template-rows: auto auto auto;
   overflow: hidden;
 }
 
-.river-seatPill--active {
+.river-seatPill--activeSelf {
   animation: riverSeatPillBorderBlink 1.6s linear infinite;
+}
+
+.river-seatPill--activeOther {
+  border-color: #fde68a;
 }
 
 .river-seatPill--me {
@@ -593,7 +601,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 6px;
+  padding: 4px 5px;
 }
 
 .river-seatName {
@@ -604,29 +612,53 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
 }
 
-.river-seatPillStats {
+.river-seatPillLabels,
+.river-seatPillValues {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 1px;
-  background: #111827;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.river-seatPillStats span {
-  background: #ffffff;
-  color: #111827;
-  padding: 2px 6px;
+.river-seatCell {
+  padding: 2px 3px;
   text-align: center;
   font-weight: 600;
-  font-size: 0.72rem;
+  font-size: 0.65rem;
+  white-space: nowrap;
+}
+
+.river-seatPillValues .river-seatCell {
+  font-weight: 700;
+}
+
+.river-seatPillLabels .river-seatCell:not(:last-child),
+.river-seatPillValues .river-seatCell:not(:last-child) {
+  border-right: 1px solid rgba(17, 24, 39, 0.22);
+}
+
+.river-seatCell--bid {
+  background: #ffffff;
+  color: #111827;
+}
+
+.river-seatCell--tricks {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.river-seatCell--total {
+  background: #111827;
+  color: #ffffff;
 }
 
 .river-center {
   grid-column: 2;
   grid-row: 2;
   position: relative;
+  --river-center-side-inset: 3%;
+  --river-center-vertical-inset: -18px;
   width: min(52vw, 260px);
   height: min(46vw, 220px);
   min-width: 180px;
@@ -651,25 +683,25 @@
 
 .river-slot--top {
   left: 50%;
-  top: -16px;
+  top: var(--river-center-vertical-inset);
   transform: translateX(-50%);
 }
 
 .river-slot--left {
-  left: 2%;
+  left: var(--river-center-side-inset);
   top: 50%;
   transform: translateY(-50%);
 }
 
 .river-slot--right {
-  right: 2%;
+  right: var(--river-center-side-inset);
   top: 50%;
   transform: translateY(-50%);
 }
 
 .river-slot--bottom {
   left: 50%;
-  bottom: -16px;
+  bottom: var(--river-center-vertical-inset);
   transform: translateX(-50%);
 }
 
@@ -867,28 +899,76 @@
 .river-hand {
   width: 100%;
   display: flex;
-  flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
+  overflow: hidden;
+  min-height: 120px;
 }
 
-.river-handCard {
-  width: 72px;
-  height: 104px;
+.river-handSpread {
+  position: relative;
+}
+
+.river-handHitbox {
+  position: absolute;
+  top: 0;
   background: transparent;
   border: 0;
   padding: 0;
   cursor: pointer;
-  transition: transform 0.14s ease;
+  overflow: visible;
+  transition: left 0.16s ease, width 0.16s ease;
 }
 
-.river-handCard:disabled {
+.river-handHitbox:disabled {
   cursor: not-allowed;
 }
 
+.river-handCardWrap {
+  position: absolute;
+  left: 0;
+  top: 14px;
+  transition: transform 0.16s ease;
+}
+
+@media (max-width: 639px) {
+  .river-center {
+    --river-center-side-inset: 6%;
+    --river-center-vertical-inset: -7px;
+  }
+
+  .river-slot {
+    width: 58px;
+    height: 84px;
+  }
+
+  .river-center .river-cardRank {
+    font-size: 1.2rem;
+  }
+
+  .river-center .river-cardSuit {
+    font-size: 1.2rem;
+  }
+
+  .river-center .river-card {
+    padding: 4px 0 0 0;
+  }
+
+  .river-hand .river-card {
+    padding: 6px 8px 6px 0;
+  }
+
+  .river-hand .river-cardRank {
+    font-size: 1.1rem;
+  }
+
+  .river-hand .river-cardSuit {
+    font-size: 1.1rem;
+  }
+}
+
 @media (hover: hover) and (pointer: fine) {
-  .river-handCard--active:hover {
-    transform: translateY(-8px);
+  .river-handCardWrap--active:hover {
+    transform: translateY(-8px) !important;
   }
 }
 

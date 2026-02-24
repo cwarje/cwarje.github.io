@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Trophy } from 'lucide-react';
 import type { Card, Suit, UpRiverPlayer, UpRiverState } from './types';
@@ -53,6 +53,8 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
   const myIndex = state.players.findIndex(player => player.id === myId);
   const myPlayer = state.players[myIndex];
   const isMyTurn = state.currentPlayerIndex === myIndex;
+  const handContainerRef = useRef<HTMLDivElement>(null);
+  const [handWidth, setHandWidth] = useState(360);
 
   const trickBySeat = useMemo(() => {
     const mapped: Partial<Record<Seat, { playerId: string; card: Card }>> = {};
@@ -85,6 +87,37 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
     return '';
   }, [state.phase, state.players, state.currentPlayerIndex, state.trickWinner, isMyTurn]);
 
+  useEffect(() => {
+    const element = handContainerRef.current;
+    if (!element) return;
+
+    const updateSize = () => setHandWidth(element.clientWidth);
+    updateSize();
+
+    const resizeObserver = new ResizeObserver(() => updateSize());
+    resizeObserver.observe(element);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const handLayout = useMemo(() => {
+    const cardCount = myPlayer?.hand.length ?? 0;
+    const available = Math.max(handWidth - 8, 220);
+    const cardWidth = Math.max(58, Math.min(available * 0.2, available < 420 ? 72 : 84));
+    const cardHeight = Math.round(cardWidth * 1.45);
+    const defaultStep = Math.round(cardWidth * 0.58);
+    const fitStep = cardCount > 1 ? (available - cardWidth) / (cardCount - 1) : defaultStep;
+    const step = cardCount > 1 ? Math.max(8, Math.min(defaultStep, fitStep)) : defaultStep;
+    const spreadWidth = cardCount > 1 ? cardWidth + step * (cardCount - 1) : cardWidth;
+
+    return {
+      cardWidth,
+      cardHeight,
+      step,
+      spreadWidth,
+      selectedLift: 14,
+    };
+  }, [handWidth, myPlayer?.hand.length]);
+
   const renderCardFace = (card: Card, disabled = false, compact = false) => (
     <div className={`river-card ${disabled ? 'river-card--disabled' : ''} ${compact ? 'river-card--compact' : ''}`}>
       <div className="river-cardCorner">
@@ -100,19 +133,29 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
 
     const isCurrentTurn = state.players[state.currentPlayerIndex]?.id === player.id && !state.trickWinner;
     const isMe = player.id === myId;
+    const activeSeatPillClass = isCurrentTurn
+      ? isMe
+        ? 'river-seatPill--activeSelf'
+        : 'river-seatPill--activeOther'
+      : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
     const bidText = player.bid === null ? '-' : String(player.bid);
 
     return (
-      <div className={`river-seatPill ${isCurrentTurn ? 'river-seatPill--active' : ''} ${isMe ? 'river-seatPill--me' : ''}`}>
+      <div className={`river-seatPill ${activeSeatPillClass} ${isMe ? 'river-seatPill--me' : ''}`}>
         <div className="river-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
           <span className="river-seatName">{isMe ? 'You' : player.name}</span>
         </div>
-        <div className="river-seatPillStats">
-          <span>B: {bidText}</span>
-          <span>T: {player.tricksWon}</span>
-          <span>Total: {player.totalScore}</span>
+        <div className="river-seatPillLabels">
+          <span className="river-seatCell river-seatCell--bid">Bid</span>
+          <span className="river-seatCell river-seatCell--tricks">Tricks</span>
+          <span className="river-seatCell river-seatCell--total">Total</span>
+        </div>
+        <div className="river-seatPillValues">
+          <span className="river-seatCell river-seatCell--bid">{bidText}</span>
+          <span className="river-seatCell river-seatCell--tricks">{player.tricksWon}</span>
+          <span className="river-seatCell river-seatCell--total">{player.totalScore}</span>
         </div>
       </div>
     );
@@ -199,23 +242,52 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
 
       {myPlayer && (
         <div className="space-y-3">
-          <div className="river-hand">
-            {myPlayer.hand.map((card) => {
-              const canPlay = state.phase === 'playing' && isMyTurn && !state.trickWinner && isValidUpRiverPlay(state, myIndex, card);
-              const isDisabled = !canPlay;
-              return (
-                <button
-                  key={`${card.suit}-${card.rank}`}
-                  type="button"
-                  onClick={() => playCard(card)}
-                  disabled={isDisabled}
-                  className={`river-handCard ${canPlay ? 'river-handCard--active' : ''}`}
-                  aria-label={`Play ${rankDisplay(card.rank)} of ${card.suit}`}
-                >
-                  {renderCardFace(card, isDisabled)}
-                </button>
-              );
-            })}
+          <div ref={handContainerRef} className="river-hand">
+            <div
+              className="river-handSpread"
+              style={{
+                width: `${handLayout.spreadWidth}px`,
+                height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
+                transition: 'width 0.16s ease',
+              }}
+            >
+              {myPlayer.hand.map((card, i) => {
+                const canPlay = state.phase === 'playing' && isMyTurn && !state.trickWinner && isValidUpRiverPlay(state, myIndex, card);
+                const isDisabled = !canPlay;
+                const isLast = i === myPlayer.hand.length - 1;
+                const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
+
+                return (
+                  <motion.button
+                    key={`${card.suit}-${card.rank}`}
+                    type="button"
+                    initial={{ y: 50, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: i * 0.02 }}
+                    onClick={() => playCard(card)}
+                    disabled={isDisabled}
+                    className="river-handHitbox"
+                    style={{
+                      left: `${i * handLayout.step}px`,
+                      width: `${hitboxWidth}px`,
+                      height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
+                      zIndex: i + 1,
+                    }}
+                    aria-label={`Play ${rankDisplay(card.rank)} of ${card.suit}`}
+                  >
+                    <span
+                      className={`river-handCardWrap ${canPlay ? 'river-handCardWrap--active' : ''}`}
+                      style={{
+                        width: `${handLayout.cardWidth}px`,
+                        height: `${handLayout.cardHeight}px`,
+                      }}
+                    >
+                      {renderCardFace(card, isDisabled)}
+                    </span>
+                  </motion.button>
+                );
+              })}
+            </div>
           </div>
           <div className="river-actionRow">
             {state.phase === 'bidding' ? (
