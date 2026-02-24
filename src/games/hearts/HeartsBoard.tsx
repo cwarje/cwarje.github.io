@@ -184,6 +184,13 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
 
   const headsUpMessage = useMemo(() => {
     if (state.phase === 'passing') {
+      if (myPassConfirmed) {
+        const waitingOn = state.players.filter(p => !p.isBot && !state.passConfirmed[p.id]);
+        if (waitingOn.length > 0) {
+          return `Waiting on ${waitingOn.map(p => p.name).join(', ')}...`;
+        }
+        return 'All players confirmed. Starting round...';
+      }
       return `Pass 3 cards ${state.passDirection} · Selected ${selectedPass.length}/3`;
     }
     if (state.trickWinner && trickWinnerName) {
@@ -193,7 +200,17 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
       return 'Your turn';
     }
     return '';
-  }, [state.phase, state.passDirection, selectedPass.length, state.trickWinner, trickWinnerName, isMyTurn]);
+  }, [
+    state.phase,
+    state.passDirection,
+    selectedPass.length,
+    myPassConfirmed,
+    state.players,
+    state.passConfirmed,
+    state.trickWinner,
+    trickWinnerName,
+    isMyTurn,
+  ]);
 
   const handLayout = useMemo(() => {
     const cardCount = myPlayer?.hand.length ?? 0;
@@ -392,18 +409,6 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
                 Confirm Pass
               </button>
             )}
-            {state.phase === 'passing' && myPassConfirmed && (() => {
-              const waitingOn = state.players.filter(p => !p.isBot && !state.passConfirmed[p.id]);
-              return waitingOn.length > 0 ? (
-                <div className="hearts-passStatus">
-                  <p>Waiting on {waitingOn.map(p => p.name).join(', ')}...</p>
-                </div>
-              ) : (
-                <div className="hearts-passStatus">
-                  <p>All players confirmed. Starting round...</p>
-                </div>
-              );
-            })()}
           </div>
         </div>
       )}

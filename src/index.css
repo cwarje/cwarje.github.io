@@ -504,13 +504,6 @@
   background: #000;
 }
 
-.hearts-passStatus {
-  color: #374151;
-  text-align: center;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
 .hearts-resultRow {
   display: flex;
   align-items: center;
