@@ -230,7 +230,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
       <td
         key={playerId}
         onClick={() => canScore && handleScore(category)}
-        className={`py-1.5 px-2 text-center text-sm transition-colors ${
+        className={`py-1.5 px-2 text-center text-[13px] sm:text-[15px] transition-colors ${
           scored !== null
             ? 'bg-green-600/25 text-white'
             : canScore
@@ -263,7 +263,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
       )}
       {/* Score Table (at the top) */}
       <div className="p-3 overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-[13px] sm:text-[15px]">
           <thead>
             <tr className="border-b border-white/10">
               <th className="text-left py-2 px-2 max-w-[300px]" />
@@ -317,7 +317,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
                 return (
                   <td
                     key={player.id}
-                    className={`py-1.5 px-2 text-center font-bold text-sm ${
+                    className={`py-1.5 px-2 text-center font-bold text-[13px] sm:text-[15px] ${
                       earned ? 'text-green-400' : 'text-white/50'
                     }`}
                   >
