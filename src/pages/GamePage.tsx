@@ -84,7 +84,7 @@ export default function GamePage() {
   const isUpRiver = room.gameType === 'up-and-down-the-river';
   const heartsTargetScore = isHearts ? (gameState as HeartsState).targetScore ?? 100 : null;
   const upRiverState = isUpRiver ? (gameState as UpRiverState) : null;
-  const fullBoardGame = isHearts || isUpRiver;
+  const fullBoardGame = isHearts || isUpRiver || room.gameType === 'yahtzee';
   const gameTitle = room.gameType ? GAME_CATALOG[room.gameType].title : 'Game';
   const upRiverRoundText = upRiverState
     ? `Round ${upRiverState.roundIndex + 1}/14 · ${upRiverState.currentRoundCardCount} card${upRiverState.currentRoundCardCount === 1 ? '' : 's'}`

@@ -153,7 +153,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="max-w-md mx-auto space-y-6 text-center"
+        className="yahtzee-board h-full flex flex-col items-center justify-center space-y-6 text-center"
       >
         <Trophy className="w-16 h-16 text-amber-400 mx-auto" />
         <h2 className="text-3xl font-extrabold text-white">Game Over!</h2>
@@ -225,9 +225,9 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
   };
 
   return (
-    <div className="space-y-5">
+    <div className="yahtzee-board h-full flex flex-col space-y-4 sm:space-y-5">
       {/* Score Table (at the top) */}
-      <div className="glass rounded-2xl p-3 overflow-x-auto">
+      <div className="p-3 overflow-x-auto">
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="border-b border-white/10">
