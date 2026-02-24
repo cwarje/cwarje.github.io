@@ -157,6 +157,7 @@ export function createYahtzeeState(players: Player[]): YahtzeeState {
     players: players.map(p => ({
       id: p.id,
       name: p.name,
+      color: p.color,
       isBot: p.isBot,
       scorecard: emptyScorecard(),
       totalScore: 0,

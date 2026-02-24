@@ -1,10 +1,22 @@
+.yahtzee-roll-area {
+  --dice-stage-width: calc(
+    (var(--dice-size, 3.5rem) * 5) + (var(--dice-gap, 1.5rem) * 4)
+  );
+}
+
 .dice-stage {
   min-height: calc(var(--dice-size, 3.5rem) + 1.75rem);
+  width: min(100%, var(--dice-stage-width));
   display: flex;
   justify-content: center;
   align-items: center;
   gap: var(--dice-gap, 1.5rem);
   flex-wrap: wrap;
+}
+
+.yahtzee-roll-button {
+  width: min(100%, var(--dice-stage-width));
+  justify-content: center;
 }
 
 .dice-scene {

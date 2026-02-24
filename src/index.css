@@ -131,6 +131,25 @@
   }
 }
 
+.yahtzee-playerHeader {
+  border: 3px solid transparent;
+  border-radius: 10px;
+  background-clip: padding-box;
+}
+
+.yahtzee-playerHeader--active {
+  animation: yahtzeePlayerHeaderBorderBlink 1.6s linear infinite;
+}
+
+@keyframes yahtzeePlayerHeaderBorderBlink {
+  0%, 49.999% {
+    border-color: #fde68a;
+  }
+  50%, 100% {
+    border-color: transparent;
+  }
+}
+
 .hearts-headsUp {
   min-height: 36px;
   margin-top: 10px;

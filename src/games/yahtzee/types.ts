@@ -1,6 +1,9 @@
+import type { PlayerColor } from '../../networking/types';
+
 export interface YahtzeePlayer {
   id: string;
   name: string;
+  color: PlayerColor;
   isBot: boolean;
   scorecard: Scorecard;
   totalScore: number;

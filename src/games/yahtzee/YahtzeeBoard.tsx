@@ -6,7 +6,6 @@ import {
   calculateScoreWithJoker,
   getAvailableCategories,
   getUpperTotal,
-  getLowerTotal,
   hasUpperBonus,
 } from './logic';
 import {
@@ -17,6 +16,7 @@ import {
   type CubeOrientation,
   type DiceValue,
 } from '../../components/Dice';
+import { DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX } from '../../networking/playerColors';
 
 const DICE_COUNT = 5;
 
@@ -51,7 +51,6 @@ interface YahtzeeBoardProps {
 
 export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProps) {
   const isMyTurn = state.players[state.currentPlayerIndex]?.id === myId;
-  const currentPlayer = state.players[state.currentPlayerIndex];
   const myPlayer = state.players.find(p => p.id === myId);
   const hasRolled = state.rollsLeft < 3;
 
@@ -206,7 +205,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
       <td
         key={playerId}
         onClick={() => canScore && handleScore(category)}
-        className={`py-1.5 px-2 text-center text-xs transition-colors ${
+        className={`py-1.5 px-2 text-center text-sm transition-colors ${
           scored !== null
             ? 'bg-green-600/25 text-white'
             : canScore
@@ -218,7 +217,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
           const yahtzeeBonus = category === 'yahtzee' ? (state.yahtzeeBonus[playerId] || 0) * 100 : 0;
           if (scored !== null) return scored + yahtzeeBonus;
           if (potential !== null) return potential;
-          return '-';
+          return '';
         })()}
       </td>
     );
@@ -228,31 +227,31 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
     <div className="yahtzee-board h-full flex flex-col space-y-4 sm:space-y-5">
       {/* Score Table (at the top) */}
       <div className="p-3 overflow-x-auto">
-        <table className="w-full border-collapse text-xs">
+        <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-white/10">
               <th className="text-left py-2 px-2 max-w-[300px]" />
               {state.players.map((player) => {
                 const isMe = player.id === myId;
                 const isCurrent = state.players[state.currentPlayerIndex]?.id === player.id;
+                const displayName = isMe ? 'You' : player.name;
+                const playerNameColor =
+                  PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
                 return (
                   <th
                     key={player.id}
-                    className={`py-2 px-2 text-center font-medium min-w-[56px] ${
-                      isCurrent
-                        ? 'text-primary-400'
-                        : isMe
-                        ? 'text-primary-300'
-                        : 'text-white'
+                    className={`yahtzee-playerHeader py-2 px-2 text-center font-medium min-w-[56px] ${
+                      isCurrent ? 'yahtzee-playerHeader--active font-semibold' : ''
                     }`}
                   >
-                    <div className="flex items-center justify-center gap-1">
-                      <span className="truncate max-w-[72px]">
-                        {player.name}
-                        {isMe && (
-                          <span className="text-primary-500 text-[10px] ml-0.5">(You)</span>
-                        )}
+                    <div className="flex items-center justify-center gap-1 whitespace-nowrap">
+                      <span
+                        className="truncate max-w-[72px]"
+                        style={{ color: playerNameColor }}
+                      >
+                        {displayName}
                       </span>
+                      <span className="text-white">({player.totalScore})</span>
                     </div>
                   </th>
                 );
@@ -278,7 +277,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
                 return (
                   <td
                     key={player.id}
-                    className={`py-1.5 px-2 text-center font-bold text-xs ${
+                    className={`py-1.5 px-2 text-center font-bold text-sm ${
                       earned ? 'text-green-400' : 'text-white/50'
                     }`}
                   >
@@ -301,47 +300,12 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
               </tr>
             ))}
 
-            {/* Lower Subtotal */}
-            <tr className="border-b border-white/10 bg-white/[0.03]">
-              <td className="py-1.5 px-2 text-white font-medium max-w-[300px]">Lower Total</td>
-              {state.players.map((player) => (
-                <td
-                  key={player.id}
-                  className="py-1.5 px-2 text-center text-white text-xs"
-                >
-                  {getLowerTotal(player.scorecard)}
-                </td>
-              ))}
-            </tr>
-
-            {/* Grand Total */}
-            <tr className="border-t-2 border-white/20">
-              <td className="py-2 px-2 text-white font-bold max-w-[300px]">Total</td>
-              {state.players.map((player) => (
-                <td
-                  key={player.id}
-                  className="py-2 px-2 text-center font-bold text-white text-sm"
-                >
-                  {player.totalScore}
-                </td>
-              ))}
-            </tr>
           </tbody>
         </table>
       </div>
 
-      {/* Turn indicator */}
-      <div className="text-center">
-        <p className="text-sm text-white">
-          Round {state.round}/13 &middot;{' '}
-          <span className={isMyTurn ? 'text-primary-400 font-medium' : 'text-white'}>
-            {isMyTurn ? 'Your turn' : `${currentPlayer?.name}'s turn`}
-          </span>
-        </p>
-      </div>
-
       {/* Dice + Roll Button */}
-      <div className="flex flex-col items-center gap-4">
+      <div className="yahtzee-roll-area flex flex-col items-center gap-4">
         <div className="dice-stage">
           {orientations.map((orientation, i) => (
             <motion.div
@@ -368,7 +332,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
           <button
             onClick={handleRoll}
             disabled={state.rollsLeft === 0 || isRolling}
-            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            className="yahtzee-roll-button flex items-center gap-2 px-6 py-3 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             <RotateCcw className={`w-4 h-4 ${isRolling ? 'animate-spin' : ''}`} />
             {isRolling ? 'Rolling...' : `Roll ${hasRolled ? `(${state.rollsLeft} left)` : ''}`}
