@@ -57,7 +57,8 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
   const [isRolling, setIsRolling] = useState(false);
   const [orientations, setOrientations] = useState<CubeOrientation[]>(() => createInitialOrientations());
   const [rollingAnchorIndex, setRollingAnchorIndex] = useState<number | null>(null);
-  const [isYahtzeeHighlighted, setIsYahtzeeHighlighted] = useState(false);
+  const [hasPendingYahtzeeCelebration, setHasPendingYahtzeeCelebration] = useState(false);
+  const [isYahtzeeCelebrationVisible, setIsYahtzeeCelebrationVisible] = useState(false);
   const prevStateRef = useRef({ playerIndex: state.currentPlayerIndex, rollsLeft: state.rollsLeft });
   const prevDiceRef = useRef<number[]>([...state.dice]);
   const showCelebrationTestButton = import.meta.env.DEV;
@@ -75,7 +76,10 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
       const finalDice = state.dice as DiceValue[];
       const diceChanged = finalDice.some((value, index) => value !== prevDiceRef.current[index]);
       const isYahtzeeRoll = diceChanged && new Set(finalDice).size === 1;
-      if (isYahtzeeRoll) setIsYahtzeeHighlighted(true);
+      setHasPendingYahtzeeCelebration(isYahtzeeRoll);
+      if (!isYahtzeeRoll) {
+        setIsYahtzeeCelebrationVisible(false);
+      }
 
       const activeIndices = heldSnapshot
         .map((h, i) => (h ? -1 : i))
@@ -112,6 +116,8 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
     } else {
       setIsRolling(false);
       setRollingAnchorIndex(null);
+      setHasPendingYahtzeeCelebration(false);
+      setIsYahtzeeCelebrationVisible(false);
       setOrientations(
         state.dice.map((v) => {
           const fo = faceOrientations[v as DiceValue];
@@ -125,6 +131,10 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
 
   const handleRollEnd = (event: TransitionEvent<HTMLDivElement>) => {
     if (event.propertyName !== 'transform' || !isRolling) return;
+    if (hasPendingYahtzeeCelebration) {
+      setIsYahtzeeCelebrationVisible(true);
+    }
+    setHasPendingYahtzeeCelebration(false);
     setIsRolling(false);
     setRollingAnchorIndex(null);
   };
@@ -149,13 +159,15 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
 
   const handleScore = (category: ScoreCategory) => {
     if (isMyTurn && hasRolled && !isRolling && myAvailableCategories.includes(category)) {
-      setIsYahtzeeHighlighted(false);
+      setHasPendingYahtzeeCelebration(false);
+      setIsYahtzeeCelebrationVisible(false);
       onAction({ type: 'score', category });
     }
   };
 
   const handleTestCelebration = () => {
-    setIsYahtzeeHighlighted(true);
+    setHasPendingYahtzeeCelebration(false);
+    setIsYahtzeeCelebrationVisible(true);
   };
 
   // --- Game Over Screen ---
@@ -346,7 +358,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
                 orientation={orientation}
                 rolling={isRolling && !state.held[i]}
                 held={state.held[i]}
-                golden={isYahtzeeHighlighted}
+                golden={isYahtzeeCelebrationVisible}
                 onClick={() => handleToggleHold(i)}
                 onTransitionEnd={i === rollingAnchorIndex ? handleRollEnd : undefined}
                 disabled={!isMyTurn || !hasRolled || state.rollsLeft === 0 || isRolling}
@@ -362,7 +374,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
             onClick={handleRoll}
             disabled={state.rollsLeft === 0 || isRolling}
             className={`yahtzee-roll-button flex items-center gap-2 px-6 py-3 rounded-xl text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer ${
-              isYahtzeeHighlighted
+              isYahtzeeCelebrationVisible
                 ? 'yahtzee-roll-button--gold'
                 : 'bg-primary-600 hover:bg-primary-500'
             }`}
@@ -370,7 +382,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
             <RotateCcw className={`w-4 h-4 ${isRolling ? 'animate-spin' : ''}`} />
             {isRolling
               ? 'Rolling...'
-              : isYahtzeeHighlighted
+              : isYahtzeeCelebrationVisible
               ? 'YAHZEE'
               : `Roll ${hasRolled ? `(${state.rollsLeft} left)` : ''}`}
           </button>
