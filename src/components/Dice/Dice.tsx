@@ -51,6 +51,7 @@ interface DiceProps {
   orientation: CubeOrientation;
   rolling?: boolean;
   held?: boolean;
+  golden?: boolean;
   onClick?: () => void;
   onTransitionEnd?: (event: TransitionEvent<HTMLDivElement>) => void;
   size?: string;
@@ -63,6 +64,7 @@ export default function Dice({
   orientation,
   rolling = false,
   held = false,
+  golden = false,
   onClick,
   onTransitionEnd,
   size,
@@ -86,7 +88,7 @@ export default function Dice({
         aria-label={ariaLabel}
       >
         <div
-          className={`dice-cube ${rolling ? 'rolling' : ''} ${held ? 'held' : ''}`.trim()}
+          className={`dice-cube ${rolling ? 'rolling' : ''} ${held ? 'held' : ''} ${golden ? 'golden' : ''}`.trim()}
           style={{ transform: `rotateX(${orientation.x}deg) rotateY(${orientation.y}deg)` }}
         >
           <PipFace value={1} className="cube-face face-front" />

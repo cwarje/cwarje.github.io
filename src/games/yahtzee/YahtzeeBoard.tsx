@@ -57,7 +57,10 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
   const [isRolling, setIsRolling] = useState(false);
   const [orientations, setOrientations] = useState<CubeOrientation[]>(() => createInitialOrientations());
   const [rollingAnchorIndex, setRollingAnchorIndex] = useState<number | null>(null);
+  const [isYahtzeeHighlighted, setIsYahtzeeHighlighted] = useState(false);
   const prevStateRef = useRef({ playerIndex: state.currentPlayerIndex, rollsLeft: state.rollsLeft });
+  const prevDiceRef = useRef<number[]>([...state.dice]);
+  const showCelebrationTestButton = import.meta.env.DEV;
 
   useEffect(() => {
     const prev = prevStateRef.current;
@@ -70,6 +73,9 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
 
       const heldSnapshot = [...state.held];
       const finalDice = state.dice as DiceValue[];
+      const diceChanged = finalDice.some((value, index) => value !== prevDiceRef.current[index]);
+      const isYahtzeeRoll = diceChanged && new Set(finalDice).size === 1;
+      if (isYahtzeeRoll) setIsYahtzeeHighlighted(true);
 
       const activeIndices = heldSnapshot
         .map((h, i) => (h ? -1 : i))
@@ -113,6 +119,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
         }),
       );
     }
+    prevDiceRef.current = [...state.dice];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.currentPlayerIndex, state.rollsLeft]);
 
@@ -129,6 +136,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
 
   const handleRoll = () => {
     if (isMyTurn && state.rollsLeft > 0 && !isRolling) {
+      setIsRolling(true);
       onAction({ type: 'roll' });
     }
   };
@@ -141,8 +149,13 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
 
   const handleScore = (category: ScoreCategory) => {
     if (isMyTurn && hasRolled && !isRolling && myAvailableCategories.includes(category)) {
+      setIsYahtzeeHighlighted(false);
       onAction({ type: 'score', category });
     }
+  };
+
+  const handleTestCelebration = () => {
+    setIsYahtzeeHighlighted(true);
   };
 
   // --- Game Over Screen ---
@@ -226,7 +239,16 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
   const showActivePlayerHeader = state.players.length > 1;
 
   return (
-    <div className="yahtzee-board h-full flex flex-col space-y-4 sm:space-y-5">
+    <div className="yahtzee-board relative h-full flex flex-col space-y-4 sm:space-y-5">
+      {showCelebrationTestButton && (
+        <button
+          type="button"
+          onClick={handleTestCelebration}
+          className="absolute right-3 top-3 z-20 rounded-md border border-amber-300/60 bg-amber-500/20 px-2 py-1 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/30 transition-colors cursor-pointer"
+        >
+          Test Yahtzee FX
+        </button>
+      )}
       {/* Score Table (at the top) */}
       <div className="p-3 overflow-x-auto">
         <table className="w-full border-collapse text-sm">
@@ -324,6 +346,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
                 orientation={orientation}
                 rolling={isRolling && !state.held[i]}
                 held={state.held[i]}
+                golden={isYahtzeeHighlighted}
                 onClick={() => handleToggleHold(i)}
                 onTransitionEnd={i === rollingAnchorIndex ? handleRollEnd : undefined}
                 disabled={!isMyTurn || !hasRolled || state.rollsLeft === 0 || isRolling}
@@ -338,10 +361,18 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
           <button
             onClick={handleRoll}
             disabled={state.rollsLeft === 0 || isRolling}
-            className="yahtzee-roll-button flex items-center gap-2 px-6 py-3 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            className={`yahtzee-roll-button flex items-center gap-2 px-6 py-3 rounded-xl text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer ${
+              isYahtzeeHighlighted
+                ? 'yahtzee-roll-button--gold'
+                : 'bg-primary-600 hover:bg-primary-500'
+            }`}
           >
             <RotateCcw className={`w-4 h-4 ${isRolling ? 'animate-spin' : ''}`} />
-            {isRolling ? 'Rolling...' : `Roll ${hasRolled ? `(${state.rollsLeft} left)` : ''}`}
+            {isRolling
+              ? 'Rolling...'
+              : isYahtzeeHighlighted
+              ? 'YAHZEE'
+              : `Roll ${hasRolled ? `(${state.rollsLeft} left)` : ''}`}
           </button>
         )}
       </div>

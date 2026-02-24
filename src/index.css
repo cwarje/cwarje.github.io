@@ -156,6 +156,27 @@
   }
 }
 
+.yahtzee-roll-button--gold {
+  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #fde68a 100%);
+  color: #3f2206;
+  border: 1px solid rgba(251, 191, 36, 0.75);
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.35);
+  animation: yahtzeeRollButtonGlow 1.2s ease-in-out infinite;
+}
+
+.yahtzee-roll-button--gold:hover {
+  filter: brightness(1.04);
+}
+
+@keyframes yahtzeeRollButtonGlow {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.28);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(245, 158, 11, 0.48);
+  }
+}
+
 .hearts-headsUp {
   min-height: 36px;
   margin-top: 10px;

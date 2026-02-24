@@ -72,6 +72,16 @@
   background: #9ca3af;
 }
 
+.dice-cube.golden .pip-face {
+  background: linear-gradient(135deg, #fef3c7 0%, #fcd34d 55%, #f59e0b 100%);
+  border-color: #92400e;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.32);
+}
+
+.dice-cube.golden.held .pip-face {
+  background: linear-gradient(135deg, #fde68a 0%, #fbbf24 55%, #d97706 100%);
+}
+
 .cube-face {
   position: absolute;
   inset: 0;
@@ -110,4 +120,8 @@
 
 .pip-on {
   background: #0f172a;
+}
+
+.dice-cube.golden .pip-on {
+  background: #451a03;
 }
