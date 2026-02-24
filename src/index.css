@@ -137,16 +137,22 @@
   background-clip: padding-box;
 }
 
-.yahtzee-playerHeader--active {
-  animation: yahtzeePlayerHeaderBorderBlink 1.6s linear infinite;
+.yahtzee-playerHeader--activeSelf {
+  border-color: transparent;
+  animation: yahtzeePlayerHeaderInsetBlink 1.6s linear infinite;
 }
 
-@keyframes yahtzeePlayerHeaderBorderBlink {
+.yahtzee-playerHeader--activeOther {
+  border-color: transparent;
+  box-shadow: inset 0 0 0 3px rgb(253 230 138 / 80%);
+}
+
+@keyframes yahtzeePlayerHeaderInsetBlink {
   0%, 49.999% {
-    border-color: #fde68a;
+    box-shadow: inset 0 0 0 3px rgb(253 230 138 / 80%);
   }
   50%, 100% {
-    border-color: transparent;
+    box-shadow: inset 0 0 0 3px transparent;
   }
 }
 
@@ -203,8 +209,12 @@
   overflow: hidden;
 }
 
-.hearts-seatPill--active {
+.hearts-seatPill--activeSelf {
   animation: heartsSeatPillBorderBlink 1.6s linear infinite;
+}
+
+.hearts-seatPill--activeOther {
+  border-color: #fde68a;
 }
 
 .hearts-seatPill--me {

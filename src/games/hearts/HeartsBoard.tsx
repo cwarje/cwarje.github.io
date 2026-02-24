@@ -214,6 +214,8 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
     };
   }, [handWidth, myPlayer?.hand.length]);
 
+  const showActiveSeatPill = state.players.length > 1;
+
   const renderSeatPill = (seat: Seat) => {
     const { player } = getSeatPlayer(state, myIndex, seat);
     if (!player) return null;
@@ -221,11 +223,17 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
     const isCurrentTurn =
       state.phase === 'playing' && !state.trickWinner && state.players[state.currentPlayerIndex]?.id === player.id;
     const isMe = player.id === myId;
+    const activeSeatPillClass =
+      isCurrentTurn && showActiveSeatPill
+        ? isMe
+          ? 'hearts-seatPill--activeSelf'
+          : 'hearts-seatPill--activeOther'
+        : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
     return (
       <div
-        className={`hearts-seatPill ${isCurrentTurn ? 'hearts-seatPill--active' : ''} ${isMe ? 'hearts-seatPill--me' : ''}`}
+        className={`hearts-seatPill ${activeSeatPillClass} ${isMe ? 'hearts-seatPill--me' : ''}`}
       >
         <div className="hearts-seatPillTop" style={{ backgroundColor: seatColor }}>
           <AutoFitSeatName name={isMe ? 'You' : player.name} textColor={seatTextColor} />

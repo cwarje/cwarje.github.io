@@ -236,17 +236,19 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
               {state.players.map((player) => {
                 const isMe = player.id === myId;
                 const isCurrent = state.players[state.currentPlayerIndex]?.id === player.id;
+                const activeHeaderClass =
+                  isCurrent && showActivePlayerHeader
+                    ? isMe
+                      ? 'yahtzee-playerHeader--activeSelf font-semibold'
+                      : 'yahtzee-playerHeader--activeOther font-semibold'
+                    : '';
                 const displayName = isMe ? 'You' : player.name;
                 const playerNameColor =
                   PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
                 return (
                   <th
                     key={player.id}
-                    className={`yahtzee-playerHeader py-2 px-2 text-center font-medium min-w-[56px] ${
-                      isCurrent && showActivePlayerHeader
-                        ? 'yahtzee-playerHeader--active font-semibold'
-                        : ''
-                    }`}
+                    className={`yahtzee-playerHeader py-2 px-2 text-center font-medium min-w-[56px] ${activeHeaderClass}`}
                   >
                     <div className="flex items-center justify-center gap-1 whitespace-nowrap">
                       <span
