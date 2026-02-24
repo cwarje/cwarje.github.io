@@ -20,6 +20,7 @@ export default function Home() {
   const [colorInput, setColorInput] = useState<PlayerColor>(playerColor);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [showHeartsTargetPrompt, setShowHeartsTargetPrompt] = useState(false);
+  const [pendingBotGame, setPendingBotGame] = useState<GameType | null>(null);
   const [pendingJoinCode, setPendingJoinCode] = useState<string | null>(null);
   const [infoGameType, setInfoGameType] = useState<GameType | null>(null);
   const lobbyCreatingRef = useRef(false);
@@ -43,6 +44,15 @@ export default function Home() {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [showHeartsTargetPrompt]);
+
+  useEffect(() => {
+    if (!pendingBotGame) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPendingBotGame(null);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [pendingBotGame]);
 
   const saveName = (name: string) => {
     localStorage.setItem('playerName', name);
@@ -124,21 +134,34 @@ export default function Home() {
     if (!isHost || !room) return;
     const count = room.players.length;
     const catalog = GAME_CATALOG[gameType];
-    if (count < catalog.minPlayers || count > catalog.maxPlayers) return;
+    if (count > catalog.maxPlayers) return;
+
     if (gameType === 'hearts') {
       setShowHeartsTargetPrompt(true);
       return;
     }
+
+    // Variable-count game with room for bots — show bot selection modal
+    if (catalog.minPlayers !== catalog.maxPlayers && count < catalog.maxPlayers) {
+      setPendingBotGame(gameType);
+      return;
+    }
+
     startGame(gameType);
   };
 
   const handleStartHeartsWithTarget = (targetScore: HeartsTargetScore) => {
     if (!isHost || !room) return;
-    const catalog = GAME_CATALOG.hearts;
     const count = room.players.length;
-    if (count < catalog.minPlayers || count > catalog.maxPlayers) return;
+    if (count > GAME_CATALOG.hearts.maxPlayers) return;
     startGame('hearts', { targetScore });
     setShowHeartsTargetPrompt(false);
+  };
+
+  const handleStartWithBots = (botCount: number) => {
+    if (!isHost || !room || !pendingBotGame) return;
+    startGame(pendingBotGame, { botCount });
+    setPendingBotGame(null);
   };
 
   const playerCount = room?.players.length ?? 0;
@@ -159,7 +182,7 @@ export default function Home() {
         </h1>
         <p className="text-gray-400 text-lg max-w-md mx-auto">
           {isHost || !room
-            ? 'Use the Lobby menu to invite friends or add bots, then pick a game.'
+            ? 'Invite friends from the Lobby menu, then pick a game. Bots are added as needed.'
             : 'The host will pick a game to start.'}
         </p>
       </motion.div>
@@ -199,8 +222,8 @@ export default function Home() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {(['yahtzee', 'hearts', 'battleship', 'liars-dice', 'poker', 'up-and-down-the-river'] as GameType[]).map((game, i) => {
             const catalog = GAME_CATALOG[game];
-            const canPlay = room ? playerCount >= catalog.minPlayers && playerCount <= catalog.maxPlayers : true;
-            const isDisabled = room ? (!isHost || !canPlay) : false;
+            const tooManyPlayers = room ? playerCount > catalog.maxPlayers : false;
+            const isDisabled = room ? (!isHost || tooManyPlayers) : false;
 
             return (
               <motion.div
@@ -384,6 +407,54 @@ export default function Home() {
           </motion.div>
         </motion.div>
       )}
+
+      {pendingBotGame && (() => {
+        const catalog = GAME_CATALOG[pendingBotGame];
+        const minBots = Math.max(0, catalog.minPlayers - playerCount);
+        const maxBots = catalog.maxPlayers - playerCount;
+        return (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setPendingBotGame(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm space-y-4"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Start ${catalog.title}`}
+            >
+              <h2 className="text-lg font-bold text-white">Start {catalog.title}</h2>
+              <p className="text-sm text-gray-400">
+                {playerCount} {playerCount === 1 ? 'player' : 'players'} in lobby.
+                {maxBots > 0 ? ' Add bots to fill seats?' : ''}
+              </p>
+              <div className="grid grid-cols-1 gap-2">
+                {Array.from({ length: maxBots - minBots + 1 }, (_, i) => {
+                  const botCount = minBots + i;
+                  const totalPlayers = playerCount + botCount;
+                  return (
+                    <button
+                      key={botCount}
+                      type="button"
+                      onClick={() => handleStartWithBots(botCount)}
+                      className="w-full px-4 py-2.5 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 transition-colors cursor-pointer"
+                    >
+                      {botCount === 0
+                        ? `Start with ${totalPlayers} ${totalPlayers === 1 ? 'player' : 'players'} (no bots)`
+                        : `Start with ${botCount} ${botCount === 1 ? 'bot' : 'bots'} (${totalPlayers} players total)`}
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </motion.div>
+        );
+      })()}
     </div>
   );
 }

@@ -3,6 +3,7 @@ export type PlayerColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indi
 export type HeartsTargetScore = 50 | 100;
 export interface GameStartOptions {
   targetScore?: HeartsTargetScore;
+  botCount?: number;
 }
 
 export interface Player {

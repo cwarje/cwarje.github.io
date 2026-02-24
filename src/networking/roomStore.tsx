@@ -14,8 +14,27 @@ import type { BattleshipState } from '../games/battleship/types';
 import type { YahtzeeState } from '../games/yahtzee/types';
 import type { UpRiverState } from '../games/up-and-down-the-river/types';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
+import { GAME_CATALOG } from '../games/gameCatalog';
 
 const BOT_NAMES = ['Nova', 'Pixel', 'Byte', 'Chip', 'Blaze', 'Echo', 'Neon', 'Volt'];
+
+function createBots(count: number, existingPlayers: Player[]): Player[] {
+  const usedNames = existingPlayers.map(p => p.name);
+  const bots: Player[] = [];
+  for (let i = 0; i < count; i++) {
+    const available = BOT_NAMES.filter(n => !usedNames.includes(n) && !bots.some(b => b.name === n));
+    const name = available[0] || `Bot ${existingPlayers.length + i}`;
+    bots.push({
+      id: `bot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name,
+      color: DEFAULT_PLAYER_COLOR,
+      isBot: true,
+      isHost: false,
+      connected: true,
+    });
+  }
+  return bots;
+}
 
 const RoomContext = createContext<RoomContextValue | null>(null);
 
@@ -587,8 +606,25 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   // Start game (host only) — gameType is chosen at start time
   const startGame = useCallback((gameType: GameType, options?: GameStartOptions) => {
     if (!isHost || !room) return;
-    const gs = createInitialGameState(gameType, room.players, options);
-    const startedRoom = { ...room, gameType, phase: 'playing' as const };
+    const catalog = GAME_CATALOG[gameType];
+    let players = room.players;
+
+    if (catalog.minPlayers === catalog.maxPlayers) {
+      // Fixed-count game: auto-fill with bots
+      if (players.length > catalog.maxPlayers) return;
+      if (players.length < catalog.maxPlayers) {
+        players = [...players, ...createBots(catalog.maxPlayers - players.length, players)];
+      }
+    } else if (options?.botCount && options.botCount > 0) {
+      const maxBots = catalog.maxPlayers - players.length;
+      const botsToAdd = Math.min(options.botCount, maxBots);
+      if (botsToAdd > 0) {
+        players = [...players, ...createBots(botsToAdd, players)];
+      }
+    }
+
+    const gs = createInitialGameState(gameType, players, options);
+    const startedRoom = { ...room, players, gameType, phase: 'playing' as const };
     setRoom(startedRoom);
     setGameState(gs);
     broadcastRoomState(startedRoom);
@@ -639,6 +675,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       ...room,
       gameType: null,
       phase: 'lobby' as const,
+      players: room.players.filter(p => !p.isBot),
       wins: updatedWins,
     };
     setRoom(lobbyRoom);
