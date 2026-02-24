@@ -223,6 +223,8 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
     );
   };
 
+  const showActivePlayerHeader = state.players.length > 1;
+
   return (
     <div className="yahtzee-board h-full flex flex-col space-y-4 sm:space-y-5">
       {/* Score Table (at the top) */}
@@ -241,7 +243,9 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
                   <th
                     key={player.id}
                     className={`yahtzee-playerHeader py-2 px-2 text-center font-medium min-w-[56px] ${
-                      isCurrent ? 'yahtzee-playerHeader--active font-semibold' : ''
+                      isCurrent && showActivePlayerHeader
+                        ? 'yahtzee-playerHeader--active font-semibold'
+                        : ''
                     }`}
                   >
                     <div className="flex items-center justify-center gap-1 whitespace-nowrap">
