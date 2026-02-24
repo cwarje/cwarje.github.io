@@ -56,7 +56,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
 
   const [isRolling, setIsRolling] = useState(false);
   const spectatorRollsLeftText =
-    !isMyTurn && !isRolling && state.rollsLeft > 0 && state.rollsLeft < 3
+    !isMyTurn && state.rollsLeft > 0 && state.rollsLeft < 3
       ? `${state.rollsLeft} roll${state.rollsLeft === 1 ? '' : 's'} left`
       : '';
   const [orientations, setOrientations] = useState<CubeOrientation[]>(() => createInitialOrientations());
