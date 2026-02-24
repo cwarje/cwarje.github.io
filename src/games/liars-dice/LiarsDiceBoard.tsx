@@ -420,13 +420,13 @@ export default function LiarsDiceBoard({ state, myId, onAction }: LiarsDiceBoard
                     <button
                       key={face}
                       onClick={() => setBidFace(face)}
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center p-0 transition-all cursor-pointer ${
                         bidFace === face
-                          ? 'bg-emerald-600/30 border-2 border-emerald-400 shadow-lg shadow-emerald-600/20'
-                          : 'bg-white/5 border border-white/10 hover:bg-white/10'
+                          ? 'bg-emerald-600/30 shadow-lg shadow-emerald-600/20'
+                          : 'bg-white/5 hover:bg-white/10'
                       }`}
                     >
-                      <DIcon className={`w-6 h-6 ${bidFace === face ? 'text-emerald-300' : 'text-gray-400'}`} />
+                      <DIcon className={`size-full min-w-0 ${bidFace === face ? 'text-emerald-300' : 'text-gray-400'}`} />
                     </button>
                   );
                 })}
