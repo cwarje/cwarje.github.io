@@ -81,8 +81,10 @@ export default function GamePage() {
   const pokerState = isPoker ? (gameState as PokerState) : null;
   const isPokerSessionOver = pokerState?.sessionOver ?? false;
   const isHearts = room.gameType === 'hearts';
+  const heartsState = isHearts ? (gameState as HeartsState) : null;
   const isUpRiver = room.gameType === 'up-and-down-the-river';
-  const heartsTargetScore = isHearts ? (gameState as HeartsState).targetScore ?? 100 : null;
+  const heartsTargetScore = heartsState?.targetScore ?? 100;
+  const heartsBroken = heartsState?.heartsBroken ?? false;
   const upRiverState = isUpRiver ? (gameState as UpRiverState) : null;
   const fullBoardGame = isHearts || isUpRiver || room.gameType === 'yahtzee';
   const gameTitle = room.gameType ? GAME_CATALOG[room.gameType].title : 'Game';
@@ -133,7 +135,14 @@ export default function GamePage() {
         <div className="pointer-events-none">
           <h1 className="text-xl sm:text-2xl font-bold text-white">{gameTitle}</h1>
           {isHearts && heartsTargetScore && (
-            <p className="text-xs sm:text-sm text-white/80">Game to {heartsTargetScore}</p>
+            <>
+              <p className="text-xs sm:text-sm text-white/80">Game to {heartsTargetScore}</p>
+              {heartsBroken && (
+                <p className="text-xs sm:text-sm text-white/80">
+                  <span className="text-red-400">♥</span> broken
+                </p>
+              )}
+            </>
           )}
           {isUpRiver && upRiverRoundText && (
             <p className="text-xs sm:text-sm text-white/80">{upRiverRoundText}</p>
