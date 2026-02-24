@@ -59,7 +59,7 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
 
   const isIconVariant = variant === 'icon';
   const triggerClassName = isIconVariant
-    ? 'flex items-center justify-center w-9 h-9 text-white hover:text-white/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer'
+    ? `flex items-center justify-center w-9 h-9 text-white hover:text-white/80 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer group active:scale-90 ${open ? 'scale-90' : ''}`
     : 'flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-sm font-medium text-gray-300 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer';
 
   return (
@@ -74,7 +74,7 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
         {connecting && !room ? (
           <Loader2 className={`w-4 h-4 animate-spin ${isIconVariant ? 'text-white/70' : 'text-gray-400'}`} />
         ) : isIconVariant ? (
-          <Settings className="w-6 h-6 text-white" />
+          <Settings className="w-6 h-6 stroke-white fill-transparent group-hover:fill-white/50 transition-colors duration-150" />
         ) : (
           <>
             <Users className="w-4 h-4" />
