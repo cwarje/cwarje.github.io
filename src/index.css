@@ -210,6 +210,8 @@
 .hearts-seat {
   display: flex;
   justify-content: center;
+  position: relative;
+  z-index: 3;
 }
 
 .hearts-seat--top { grid-column: 2; grid-row: 1; }
@@ -298,6 +300,7 @@
   grid-column: 2;
   grid-row: 2;
   position: relative;
+  z-index: 1;
   --hearts-center-side-inset: 3%;
   --hearts-center-vertical-inset: -18px;
   width: min(52vw, 260px);
@@ -665,6 +668,20 @@
   color: #ffffff;
 }
 
+@media (min-width: 640px) {
+  .river-seatName {
+    font-size: 0.75rem;
+  }
+
+  .river-seatPillLabels .river-seatCell {
+    font-size: 0.75rem;
+  }
+
+  .river-seatPillValues .river-seatCell {
+    font-size: 1rem;
+  }
+}
+
 .river-center {
   position: absolute;
   inset: 0;
@@ -704,7 +721,7 @@
   width: 100%;
   height: 100%;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--river-bg);
 }
 
 .river-slotCard {
@@ -743,6 +760,24 @@
 
 .river-card--disabled {
   background: #c8c8c8;
+}
+
+.river-hudTrumpCard {
+  width: 44px;
+  height: 62px;
+}
+
+.river-hudTrumpCard .river-cardRank {
+  font-size: 1.2rem;
+}
+
+.river-hudTrumpCard .river-cardSuit {
+  font-size: 1.14rem;
+}
+
+.river-hudTrumpCard .river-card {
+  padding: 0;
+  padding-top: 3px;
 }
 
 .river-cardCorner {

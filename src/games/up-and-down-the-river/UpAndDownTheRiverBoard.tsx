@@ -40,6 +40,13 @@ interface TrickSlotPlacement {
   dy: string;
 }
 
+interface ElementSize {
+  width: number;
+  height: number;
+}
+
+const RIVER_SEAT_EDGE_GAP_PX = 8;
+
 function rankDisplay(rank: number): string {
   if (rank === 11) return 'J';
   if (rank === 12) return 'Q';
@@ -110,13 +117,33 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const myPlayer = myIndex >= 0 ? state.players[myIndex] : null;
   const isMyTurn = myIndex >= 0 && state.currentPlayerIndex === myIndex;
+  const tableRef = useRef<HTMLDivElement>(null);
   const handContainerRef = useRef<HTMLDivElement>(null);
   const [handWidth, setHandWidth] = useState(360);
+  const [tableSize, setTableSize] = useState<ElementSize>({ width: 0, height: 0 });
+  const [seatPillElement, setSeatPillElement] = useState<HTMLDivElement | null>(null);
+  const [seatPillSize, setSeatPillSize] = useState<ElementSize>({ width: 0, height: 0 });
 
   const seatLayouts = useMemo<RiverSeatLayout[]>(() => {
     const playerCount = state.players.length;
     if (playerCount === 0) return [];
-    const radii = getLayoutRadii(playerCount);
+    const fallbackRadii = getLayoutRadii(playerCount);
+    const canUseMeasuredRadii =
+      tableSize.width > 0 &&
+      tableSize.height > 0 &&
+      seatPillSize.width > 0 &&
+      seatPillSize.height > 0;
+    const radii = canUseMeasuredRadii
+      ? (() => {
+          const usableHalfWidth = tableSize.width / 2 - seatPillSize.width / 2 - RIVER_SEAT_EDGE_GAP_PX;
+          const usableHalfHeight = tableSize.height / 2 - seatPillSize.height / 2 - RIVER_SEAT_EDGE_GAP_PX;
+          return {
+            seatRadiusX: Math.max(0, Math.min(50, (usableHalfWidth / tableSize.width) * 100)),
+            seatRadiusY: Math.max(0, Math.min(50, (usableHalfHeight / tableSize.height) * 100)),
+          };
+        })()
+      : fallbackRadii;
+
     return Array.from({ length: playerCount }, (_, relativeIndex) => {
       const playerIndex = (anchorIndex + relativeIndex) % playerCount;
       const player = state.players[playerIndex];
@@ -130,7 +157,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
         seatTop: 50 + radii.seatRadiusY * Math.sin(angleInRadians),
       };
     }).filter(layout => !!layout.player);
-  }, [state.players, anchorIndex]);
+  }, [state.players, anchorIndex, tableSize.width, tableSize.height, seatPillSize.width, seatPillSize.height]);
 
   const trickByRelativeSeat = useMemo(() => {
     const mapped: Partial<Record<number, { playerId: string; card: Card }>> = {};
@@ -163,6 +190,31 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
     if (state.phase === 'playing' && isMyTurn) return 'Your turn';
     return '';
   }, [state.phase, state.players, state.currentPlayerIndex, state.trickWinner, isMyTurn]);
+
+  useEffect(() => {
+    const element = tableRef.current;
+    if (!element) return;
+
+    const updateSize = () => setTableSize({ width: element.clientWidth, height: element.clientHeight });
+    updateSize();
+
+    const resizeObserver = new ResizeObserver(() => updateSize());
+    resizeObserver.observe(element);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!seatPillElement) return;
+
+    const updateSize = () => {
+      setSeatPillSize({ width: seatPillElement.clientWidth, height: seatPillElement.clientHeight });
+    };
+    updateSize();
+
+    const resizeObserver = new ResizeObserver(() => updateSize());
+    resizeObserver.observe(seatPillElement);
+    return () => resizeObserver.disconnect();
+  }, [seatPillElement]);
 
   useEffect(() => {
     const element = handContainerRef.current;
@@ -204,7 +256,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
     </div>
   );
 
-  const renderSeatPill = (seatLayout: RiverSeatLayout) => {
+  const renderSeatPill = (seatLayout: RiverSeatLayout, shouldMeasure = false) => {
     const player = seatLayout.player;
     const isCurrentTurn = state.players[state.currentPlayerIndex]?.id === player.id && !state.trickWinner;
     const isMe = player.id === myId;
@@ -218,14 +270,17 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
     const bidText = player.bid === null ? '-' : String(player.bid);
 
     return (
-      <div className={`river-seatPill ${activeSeatPillClass} ${isMe ? 'river-seatPill--me' : ''}`}>
+      <div
+        ref={shouldMeasure ? setSeatPillElement : undefined}
+        className={`river-seatPill ${activeSeatPillClass} ${isMe ? 'river-seatPill--me' : ''}`}
+      >
         <div className="river-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
           <span className="river-seatName">{isMe ? 'You' : player.name}</span>
         </div>
         <div className="river-seatPillLabels">
           <span className="river-seatCell river-seatCell--bid">Bid</span>
-          <span className="river-seatCell river-seatCell--tricks">Tricks</span>
-          <span className="river-seatCell river-seatCell--total">Total</span>
+          <span className="river-seatCell river-seatCell--tricks">Trx</span>
+          <span className="river-seatCell river-seatCell--total">Tot</span>
         </div>
         <div className="river-seatPillValues">
           <span className="river-seatCell river-seatCell--bid">{bidText}</span>
@@ -274,7 +329,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
 
   return (
     <div className={`river-board river-board--players-${state.players.length} space-y-3 sm:space-y-4`}>
-      <div className={`river-table river-table--players-${state.players.length}`}>
+      <div ref={tableRef} className={`river-table river-table--players-${state.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
             key={`seat-${layout.player.id}`}
@@ -284,7 +339,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
               top: `${layout.seatTop}%`,
             }}
           >
-            {renderSeatPill(layout)}
+            {renderSeatPill(layout, layout.relativeIndex === 0)}
           </div>
         ))}
 

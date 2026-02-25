@@ -92,9 +92,7 @@ export default function GamePage() {
     ? `Round ${upRiverState.roundIndex + 1}/14 · ${upRiverState.currentRoundCardCount} card${upRiverState.currentRoundCardCount === 1 ? '' : 's'}`
     : null;
   const suitSymbols = { hearts: '\u2665', diamonds: '\u2666', clubs: '\u2663', spades: '\u2660' } as const;
-  const upRiverTrumpText = upRiverState
-    ? `Trump: ${upRiverState.trumpSuit ? `${rankDisplay(upRiverState.trumpCard?.rank)} ${suitSymbols[upRiverState.trumpSuit]}` : 'None'}`
-    : null;
+  const suitColors = { hearts: 'text-red-400', diamonds: 'text-red-400', clubs: 'text-gray-800', spades: 'text-gray-800' } as const;
 
   // Show "Back to Lobby" for host when game is finished (non-poker) or poker session is over
   const showBackToLobby = isHost && (
@@ -133,7 +131,17 @@ export default function GamePage() {
       {/* Floating game HUD (no layout height) */}
       <div className="absolute top-0 left-0 right-0 z-20 flex items-start justify-between p-3 sm:p-4 pointer-events-none">
         <div className="pointer-events-none">
-          <h1 className="text-xl sm:text-2xl font-bold text-white">{gameTitle}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">
+            {room.gameType === 'up-and-down-the-river' ? (
+              <>
+                Up and Down
+                <br />
+                the River
+              </>
+            ) : (
+              gameTitle
+            )}
+          </h1>
           {isHearts && heartsTargetScore && (
             <>
               <p className="text-xs sm:text-sm text-white/80">Game to {heartsTargetScore}</p>
@@ -147,8 +155,22 @@ export default function GamePage() {
           {isUpRiver && upRiverRoundText && (
             <p className="text-xs sm:text-sm text-white/80">{upRiverRoundText}</p>
           )}
-          {isUpRiver && upRiverTrumpText && (
-            <p className="text-xs sm:text-sm text-white/80">{upRiverTrumpText}</p>
+          {isUpRiver && (
+            <div className="mt-1">
+              <p className="text-xs sm:text-sm text-white/80">Trump:</p>
+              {upRiverState?.trumpCard ? (
+                <div className="river-hudTrumpCard mt-1">
+                  <div className="river-card river-card--compact">
+                    <div className="river-cardCorner">
+                      <span className={`river-cardRank ${suitColors[upRiverState.trumpCard.suit]}`}>{rankDisplay(upRiverState.trumpCard.rank)}</span>
+                      <span className={`river-cardSuit ${suitColors[upRiverState.trumpCard.suit]}`}>{suitSymbols[upRiverState.trumpCard.suit]}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs sm:text-sm text-white/80 mt-1">None</p>
+              )}
+            </div>
           )}
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
