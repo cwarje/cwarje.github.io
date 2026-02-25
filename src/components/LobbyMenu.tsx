@@ -6,14 +6,18 @@ import { useRoomContext } from '../networking/roomStore';
 import { useToast } from './Toast';
 import { useNavigate } from 'react-router-dom';
 import { GAME_CATALOG } from '../games/gameCatalog';
+import type { PlayerColor } from '../networking/types';
+import { normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 
 type LobbyMenuProps = { variant?: 'default' | 'icon' };
 
 export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
-  const { room, isHost, addBot, removeBot, removePlayer, leaveRoom, connecting } = useRoomContext();
+  const { room, myPlayer, isHost, addBot, removeBot, removePlayer, leaveRoom, updateProfile, connecting } = useRoomContext();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [nameInput, setNameInput] = useState(() => localStorage.getItem('playerName') || '');
+  const [colorInput, setColorInput] = useState<PlayerColor>(() => normalizePlayerColor(localStorage.getItem('playerColor')));
   const panelRef = useRef<HTMLDivElement>(null);
 
   const playerCount = room?.players.length ?? 0;
@@ -31,6 +35,14 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const profileName = myPlayer?.name ?? localStorage.getItem('playerName') ?? '';
+    const profileColor = myPlayer?.color ?? normalizePlayerColor(localStorage.getItem('playerColor'));
+    setNameInput(profileName);
+    setColorInput(profileColor);
+  }, [open, myPlayer?.name, myPlayer?.color]);
 
   useEffect(() => {
     if (!open) return;
@@ -55,6 +67,27 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
     leaveRoom();
     toast(isHost ? 'Lobby closed.' : 'Left lobby.', 'info');
     navigate('/');
+  };
+
+  const handleSaveProfile = () => {
+    const trimmedName = nameInput.trim();
+    if (!trimmedName) {
+      toast('Please enter a name.', 'error');
+      return;
+    }
+    updateProfile(trimmedName, colorInput);
+    toast('Profile updated.', 'success');
+  };
+
+  const handleSelectColor = (nextColor: PlayerColor) => {
+    setColorInput(nextColor);
+    const fallbackName = myPlayer?.name ?? localStorage.getItem('playerName') ?? '';
+    const nameToSave = nameInput.trim() || fallbackName.trim();
+    if (!nameToSave) {
+      toast('Please enter a name before changing color.', 'error');
+      return;
+    }
+    updateProfile(nameToSave, nextColor);
   };
 
   const isIconVariant = variant === 'icon';
@@ -98,77 +131,112 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
             transition={{ duration: 0.15 }}
             className="absolute right-0 top-full mt-2 w-80 bg-gray-900 border border-white/10 rounded-2xl shadow-2xl shadow-black/40 z-50 overflow-hidden"
           >
-            {!hasRoom ? (
-              <div className="px-5 py-8 text-center space-y-2">
-                {connecting ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin text-gray-400 mx-auto" />
-                    <p className="text-sm text-gray-400">Creating lobby...</p>
-                  </>
-                ) : (
-                  <p className="text-sm text-gray-500">No active lobby</p>
-                )}
-              </div>
-            ) : (
-              <div className="divide-y divide-white/5">
-                {/* Lobby code section */}
-                <div className="px-5 py-4 space-y-2">
-                  <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Lobby Code</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl font-extrabold tracking-[0.3em] text-white font-mono">
-                      {room.roomCode}
-                    </span>
-                    <button
-                      onClick={copyCode}
-                      className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
-                      title="Copy lobby code"
-                    >
-                      <Copy className="w-4 h-4 text-gray-400" />
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-gray-500">Share this code with friends to invite them</p>
-                </div>
-
-                {/* Players section */}
-                <div className="px-5 py-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-medium text-gray-400">
-                      Players ({playerCount})
-                    </h3>
-                    {canAddBot && (
-                      <button
-                        onClick={addBot}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-medium text-gray-400 hover:text-white transition-colors cursor-pointer"
-                      >
-                        <Plus className="w-3 h-3" />
-                        Add Bot
-                      </button>
-                    )}
-                  </div>
-                  <div className="max-h-48 overflow-y-auto -mx-1 px-1">
-                    <PlayerList
-                      players={room.players}
-                      hostId={room.hostId}
-                      isHost={isHost}
-                      onRemoveBot={canManagePlayers ? removeBot : undefined}
-                      onRemovePlayer={canManagePlayers ? removePlayer : undefined}
-                      wins={room.wins}
-                    />
-                  </div>
-                </div>
-
-                {/* Leave button */}
-                <div className="px-5 py-3">
+            <div className="divide-y divide-white/5">
+              {/* Profile section */}
+              <div className="px-5 py-4 space-y-3">
+                <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Profile</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    maxLength={24}
+                    className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary-500"
+                    placeholder="Your name"
+                  />
                   <button
-                    onClick={handleLeave}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/30 transition-all duration-200 cursor-pointer"
+                    onClick={handleSaveProfile}
+                    className="px-3 py-2 rounded-lg bg-primary-600 hover:bg-primary-500 text-sm font-medium text-white transition-colors cursor-pointer whitespace-nowrap"
                   >
-                    {isHost ? <X className="w-4 h-4" /> : <LogOut className="w-4 h-4" />}
-                    <span className="text-sm font-medium">{isHost ? 'Close Lobby' : 'Leave Lobby'}</span>
+                    Save
                   </button>
                 </div>
+                <div className="grid grid-cols-8 gap-2">
+                  {PLAYER_COLOR_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleSelectColor(option.value)}
+                      className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${colorInput === option.value ? 'border-white scale-105' : 'border-transparent hover:border-white/50'}`}
+                      style={{ backgroundColor: PLAYER_COLOR_HEX[option.value] }}
+                      title={option.label}
+                      aria-label={`Set color to ${option.label}`}
+                    />
+                  ))}
+                </div>
               </div>
-            )}
+
+              {!hasRoom ? (
+                <div className="px-5 py-8 text-center space-y-2">
+                  {connecting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin text-gray-400 mx-auto" />
+                      <p className="text-sm text-gray-400">Creating lobby...</p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-500">No active lobby</p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Lobby code section */}
+                  <div className="px-5 py-4 space-y-2">
+                    <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Lobby Code</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xl font-extrabold tracking-[0.3em] text-white font-mono">
+                        {room.roomCode}
+                      </span>
+                      <button
+                        onClick={copyCode}
+                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
+                        title="Copy lobby code"
+                      >
+                        <Copy className="w-4 h-4 text-gray-400" />
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-gray-500">Share this code with friends to invite them</p>
+                  </div>
+
+                  {/* Players section */}
+                  <div className="px-5 py-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-medium text-gray-400">
+                        Players ({playerCount})
+                      </h3>
+                      {canAddBot && (
+                        <button
+                          onClick={addBot}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-medium text-gray-400 hover:text-white transition-colors cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Add Bot
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-48 overflow-y-auto -mx-1 px-1">
+                      <PlayerList
+                        players={room.players}
+                        hostId={room.hostId}
+                        isHost={isHost}
+                        onRemoveBot={canManagePlayers ? removeBot : undefined}
+                        onRemovePlayer={canManagePlayers ? removePlayer : undefined}
+                        wins={room.wins}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Leave button */}
+                  <div className="px-5 py-3">
+                    <button
+                      onClick={handleLeave}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/30 transition-all duration-200 cursor-pointer"
+                    >
+                      {isHost ? <X className="w-4 h-4" /> : <LogOut className="w-4 h-4" />}
+                      <span className="text-sm font-medium">{isHost ? 'Close Lobby' : 'Leave Lobby'}</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

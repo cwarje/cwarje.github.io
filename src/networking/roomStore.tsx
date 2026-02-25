@@ -36,6 +36,87 @@ function createBots(count: number, existingPlayers: Player[]): Player[] {
   return bots;
 }
 
+function applyProfileToGameState(
+  gameType: GameType,
+  state: unknown,
+  playerId: string,
+  playerName: string,
+  playerColor: PlayerColor
+): unknown {
+  if (!state) return state;
+
+  switch (gameType) {
+    case 'yahtzee': {
+      const current = state as YahtzeeState;
+      let changed = false;
+      const players = current.players.map((player) => {
+        if (player.id !== playerId) return player;
+        if (player.name === playerName && player.color === playerColor) return player;
+        changed = true;
+        return { ...player, name: playerName, color: playerColor };
+      });
+      return changed ? { ...current, players } : current;
+    }
+    case 'hearts': {
+      const current = state as HeartsState;
+      let changed = false;
+      const players = current.players.map((player) => {
+        if (player.id !== playerId) return player;
+        if (player.name === playerName && player.color === playerColor) return player;
+        changed = true;
+        return { ...player, name: playerName, color: playerColor };
+      });
+      return changed ? { ...current, players } : current;
+    }
+    case 'up-and-down-the-river': {
+      const current = state as UpRiverState;
+      let changed = false;
+      const players = current.players.map((player) => {
+        if (player.id !== playerId) return player;
+        if (player.name === playerName && player.color === playerColor) return player;
+        changed = true;
+        return { ...player, name: playerName, color: playerColor };
+      });
+      return changed ? { ...current, players } : current;
+    }
+    case 'battleship': {
+      const current = state as BattleshipState;
+      let changed = false;
+      const players = current.players.map((player) => {
+        if (player.id !== playerId) return player;
+        if (player.name === playerName) return player;
+        changed = true;
+        return { ...player, name: playerName };
+      });
+      return changed ? { ...current, players } : current;
+    }
+    case 'liars-dice': {
+      const current = state as LiarsDiceState;
+      let changed = false;
+      const players = current.players.map((player) => {
+        if (player.id !== playerId) return player;
+        if (player.name === playerName) return player;
+        changed = true;
+        return { ...player, name: playerName };
+      });
+      return changed ? { ...current, players } : current;
+    }
+    case 'poker': {
+      const current = state as PokerState;
+      let changed = false;
+      const players = current.players.map((player) => {
+        if (player.id !== playerId) return player;
+        if (player.name === playerName) return player;
+        changed = true;
+        return { ...player, name: playerName };
+      });
+      return changed ? { ...current, players } : current;
+    }
+    default:
+      return state;
+  }
+}
+
 const RoomContext = createContext<RoomContextValue | null>(null);
 
 export function useRoomContext(): RoomContextValue {
@@ -125,9 +206,19 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             setRoom(updatedRoom);
             broadcastRoomState(updatedRoom);
 
+            const currentGs = gameStateRef.current;
+            const updatedGs =
+              currentRoom.phase !== 'lobby' && currentRoom.gameType && currentGs
+                ? applyProfileToGameState(currentRoom.gameType, currentGs, clientDeviceId, msg.playerName, msg.playerColor)
+                : currentGs;
+            if (updatedGs && updatedGs !== currentGs) {
+              setGameState(updatedGs);
+              broadcastGameState(updatedGs);
+            }
+
             // If game is in progress, send current game state to this client
-            if (currentRoom.phase !== 'lobby' && gameStateRef.current) {
-              conn.send({ type: 'game-state', state: gameStateRef.current } as HostMessage);
+            if (currentRoom.phase !== 'lobby' && updatedGs) {
+              conn.send({ type: 'game-state', state: updatedGs } as HostMessage);
             }
           } else {
             // New player
@@ -146,6 +237,30 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             };
             setRoom(updatedRoom);
             broadcastRoomState(updatedRoom);
+          }
+          break;
+        }
+        case 'update-profile': {
+          const senderDeviceId = peerDeviceMapRef.current.get(conn.peer);
+          if (!senderDeviceId || senderDeviceId !== msg.deviceId) return;
+
+          const updatedRoom = {
+            ...currentRoom,
+            players: currentRoom.players.map((player) =>
+              player.id === senderDeviceId ? { ...player, name: msg.playerName, color: msg.playerColor } : player
+            ),
+          };
+          setRoom(updatedRoom);
+          broadcastRoomState(updatedRoom);
+
+          const currentGs = gameStateRef.current;
+          const updatedGs =
+            currentRoom.phase !== 'lobby' && currentRoom.gameType && currentGs
+              ? applyProfileToGameState(currentRoom.gameType, currentGs, senderDeviceId, msg.playerName, msg.playerColor)
+              : currentGs;
+          if (updatedGs && updatedGs !== currentGs) {
+            setGameState(updatedGs);
+            broadcastGameState(updatedGs);
           }
           break;
         }
@@ -522,6 +637,51 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     const storedColor = normalizePlayerColor(localStorage.getItem('playerColor'));
     await joinRoomInternal(roomCode, storedName, storedColor);
   }, [joinRoomInternal]);
+
+  const updateProfile = useCallback((playerName: string, playerColor: PlayerColor) => {
+    const name = playerName.trim() || `Player${Math.floor(Math.random() * 9999)}`;
+    const color = normalizePlayerColor(playerColor);
+    localStorage.setItem('playerName', name);
+    localStorage.setItem('playerColor', color);
+
+    const currentRoom = roomRef.current;
+    if (!currentRoom || !myId) return;
+
+    const player = currentRoom.players.find((p) => p.id === myId);
+    if (!player || player.isBot) return;
+    if (player.name === name && player.color === color) return;
+
+    const updatedRoom = {
+      ...currentRoom,
+      players: currentRoom.players.map((p) =>
+        p.id === myId ? { ...p, name, color } : p
+      ),
+    };
+    setRoom(updatedRoom);
+
+    const currentGs = gameStateRef.current;
+    const updatedGs =
+      currentRoom.phase !== 'lobby' && currentRoom.gameType && currentGs
+        ? applyProfileToGameState(currentRoom.gameType, currentGs, myId, name, color)
+        : currentGs;
+    if (updatedGs && updatedGs !== currentGs) {
+      setGameState(updatedGs);
+      if (isHost) {
+        broadcastGameState(updatedGs);
+      }
+    }
+
+    if (isHost) {
+      broadcastRoomState(updatedRoom);
+      return;
+    }
+
+    connectionsRef.current.forEach((conn) => {
+      if (conn.open) {
+        conn.send({ type: 'update-profile', playerName: name, playerColor: color, deviceId: myId } as ClientMessage);
+      }
+    });
+  }, [myId, isHost, broadcastGameState, broadcastRoomState]);
 
   // Leave room
   const leaveRoom = useCallback(() => {
@@ -1009,6 +1169,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         myPlayer,
         createLobby,
         joinRoom,
+        updateProfile,
         rejoinRoom,
         leaveRoom,
         removePlayer,
