@@ -229,6 +229,9 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
       ? calculateScoreWithJoker(state.dice, category, player.scorecard)
       : null;
     const isCurrent = state.players[state.currentPlayerIndex]?.id === playerId;
+    const yahtzeeBonus = category === 'yahtzee' ? (state.yahtzeeBonus[playerId] || 0) * 100 : 0;
+    const displayValue = scored !== null ? scored + yahtzeeBonus : potential;
+    const displayText = displayValue === null ? '\u00A0' : String(displayValue);
 
     return (
       <td
@@ -238,16 +241,13 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
           scored !== null
             ? 'bg-green-600/25 text-white'
             : canScore
-            ? 'text-primary-400 font-bold cursor-pointer hover:bg-primary-600/20 active:bg-primary-600/30'
+            ? 'text-primary-400 cursor-pointer hover:bg-primary-600/20 active:bg-primary-600/30'
             : 'text-white/30'
         } ${isCurrent && scored === null ? 'bg-white/[0.03]' : ''}`}
       >
-        {(() => {
-          const yahtzeeBonus = category === 'yahtzee' ? (state.yahtzeeBonus[playerId] || 0) * 100 : 0;
-          if (scored !== null) return scored + yahtzeeBonus;
-          if (potential !== null) return potential;
-          return '';
-        })()}
+        <span className="inline-block w-[3ch] text-center" aria-hidden={displayValue === null}>
+          {displayText}
+        </span>
       </td>
     );
   };
