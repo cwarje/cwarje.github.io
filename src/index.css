@@ -615,7 +615,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 0.72rem;
+  font-size: 13px;
 }
 
 .river-seatPillLabels,
@@ -658,7 +658,7 @@
 
 @media (min-width: 640px) {
   .river-seatName {
-    font-size: 0.75rem;
+    font-size: 13px;
   }
 
   .river-seatPillLabels .river-seatCell {

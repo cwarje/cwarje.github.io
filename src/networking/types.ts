@@ -1,8 +1,10 @@
 export type GameType = 'yahtzee' | 'hearts' | 'battleship' | 'liars-dice' | 'poker' | 'up-and-down-the-river';
 export type PlayerColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet' | 'dark-purple';
 export type HeartsTargetScore = 50 | 100;
+export type UpRiverStartMode = 'up-down' | 'down-up';
 export interface GameStartOptions {
   targetScore?: HeartsTargetScore;
+  upRiverStartMode?: UpRiverStartMode;
   botCount?: number;
 }
 

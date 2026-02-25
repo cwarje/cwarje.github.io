@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 import GameCard from '../components/GameCard';
 import RoomCodeInput from '../components/RoomCodeInput';
 import { useRoomContext } from '../networking/roomStore';
-import type { GameType, HeartsTargetScore, PlayerColor } from '../networking/types';
+import type { GameStartOptions, GameType, HeartsTargetScore, PlayerColor, UpRiverStartMode } from '../networking/types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 import { GAME_CATALOG } from '../games/gameCatalog';
 
@@ -20,7 +20,9 @@ export default function Home() {
   const [colorInput, setColorInput] = useState<PlayerColor>(playerColor);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [showHeartsTargetPrompt, setShowHeartsTargetPrompt] = useState(false);
+  const [showUpRiverStartPrompt, setShowUpRiverStartPrompt] = useState(false);
   const [pendingBotGame, setPendingBotGame] = useState<GameType | null>(null);
+  const [pendingUpRiverStartMode, setPendingUpRiverStartMode] = useState<UpRiverStartMode | null>(null);
   const [pendingJoinCode, setPendingJoinCode] = useState<string | null>(null);
   const [infoGameType, setInfoGameType] = useState<GameType | null>(null);
   const lobbyCreatingRef = useRef(false);
@@ -46,9 +48,21 @@ export default function Home() {
   }, [showHeartsTargetPrompt]);
 
   useEffect(() => {
+    if (!showUpRiverStartPrompt) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowUpRiverStartPrompt(false);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [showUpRiverStartPrompt]);
+
+  useEffect(() => {
     if (!pendingBotGame) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPendingBotGame(null);
+      if (e.key === 'Escape') {
+        setPendingBotGame(null);
+        setPendingUpRiverStartMode(null);
+      }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
@@ -141,8 +155,14 @@ export default function Home() {
       return;
     }
 
+    if (gameType === 'up-and-down-the-river') {
+      setShowUpRiverStartPrompt(true);
+      return;
+    }
+
     // Variable-count game with room for bots — show bot selection modal
     if (catalog.minPlayers !== catalog.maxPlayers && count < catalog.maxPlayers) {
+      setPendingUpRiverStartMode(null);
       setPendingBotGame(gameType);
       return;
     }
@@ -158,10 +178,32 @@ export default function Home() {
     setShowHeartsTargetPrompt(false);
   };
 
+  const handleStartUpRiverWithMode = (upRiverStartMode: UpRiverStartMode) => {
+    if (!isHost || !room) return;
+    const count = room.players.length;
+    const catalog = GAME_CATALOG['up-and-down-the-river'];
+    if (count > catalog.maxPlayers) return;
+
+    if (count < catalog.maxPlayers) {
+      setPendingUpRiverStartMode(upRiverStartMode);
+      setPendingBotGame('up-and-down-the-river');
+      setShowUpRiverStartPrompt(false);
+      return;
+    }
+
+    startGame('up-and-down-the-river', { upRiverStartMode });
+    setShowUpRiverStartPrompt(false);
+  };
+
   const handleStartWithBots = (botCount: number) => {
     if (!isHost || !room || !pendingBotGame) return;
-    startGame(pendingBotGame, { botCount });
+    const options: GameStartOptions = { botCount };
+    if (pendingBotGame === 'up-and-down-the-river' && pendingUpRiverStartMode) {
+      options.upRiverStartMode = pendingUpRiverStartMode;
+    }
+    startGame(pendingBotGame, options);
     setPendingBotGame(null);
+    setPendingUpRiverStartMode(null);
   };
 
   const playerCount = room?.players.length ?? 0;
@@ -408,6 +450,44 @@ export default function Home() {
         </motion.div>
       )}
 
+      {showUpRiverStartPrompt && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowUpRiverStartPrompt(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm space-y-4"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Choose Up and Down the River start mode"
+          >
+            <h2 className="text-lg font-bold text-white">Start Up and Down the River</h2>
+            <p className="text-sm text-gray-400">Choose how round sizes progress:</p>
+            <div className="grid grid-cols-1 gap-3">
+              <button
+                type="button"
+                onClick={() => handleStartUpRiverWithMode('up-down')}
+                className="w-full px-4 py-2.5 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 transition-colors cursor-pointer"
+              >
+                Up and Down the River (1-7-1)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleStartUpRiverWithMode('down-up')}
+                className="w-full px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-500 transition-colors cursor-pointer"
+              >
+                Down and Up the River (7-1-7)
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
       {pendingBotGame && (() => {
         const catalog = GAME_CATALOG[pendingBotGame];
         const minBots = Math.max(0, catalog.minPlayers - playerCount);
@@ -417,7 +497,10 @@ export default function Home() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setPendingBotGame(null)}
+            onClick={() => {
+              setPendingBotGame(null);
+              setPendingUpRiverStartMode(null);
+            }}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}

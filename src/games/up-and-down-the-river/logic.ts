@@ -1,10 +1,15 @@
-import type { Player } from '../../networking/types';
+import type { Player, UpRiverStartMode } from '../../networking/types';
 import type { Card, Rank, Suit, UpRiverAction, UpRiverPlayer, UpRiverState } from './types';
 import { cardEquals, getTrickWinnerPlayerId, isValidUpRiverPlay } from './rules';
 
 const SUITS: Suit[] = ['clubs', 'diamonds', 'spades', 'hearts'];
 const RANKS: Rank[] = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
-export const ROUND_SEQUENCE: number[] = [1, 2, 3, 4, 5, 6, 7, 7, 6, 5, 4, 3, 2, 1];
+export const ROUND_SEQUENCE_UP_DOWN: number[] = [1, 2, 3, 4, 5, 6, 7, 7, 6, 5, 4, 3, 2, 1];
+export const ROUND_SEQUENCE_DOWN_UP: number[] = [7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7];
+
+function getRoundSequence(upRiverStartMode: UpRiverStartMode): number[] {
+  return upRiverStartMode === 'down-up' ? ROUND_SEQUENCE_DOWN_UP : ROUND_SEQUENCE_UP_DOWN;
+}
 
 function createDeck(): Card[] {
   const deck: Card[] = [];
@@ -33,8 +38,14 @@ function sortHand(hand: Card[]): Card[] {
   });
 }
 
-function startRound(players: UpRiverPlayer[], roundIndex: number, dealerIndex: number): UpRiverState {
-  const cardCount = ROUND_SEQUENCE[roundIndex];
+function startRound(
+  players: UpRiverPlayer[],
+  roundIndex: number,
+  dealerIndex: number,
+  roundSequence: number[],
+  upRiverStartMode: UpRiverStartMode,
+): UpRiverState {
+  const cardCount = roundSequence[roundIndex];
   const playerCount = players.length;
   const deck = shuffle(createDeck());
   const biddingStartIndex = (dealerIndex + 1) % playerCount;
@@ -56,6 +67,8 @@ function startRound(players: UpRiverPlayer[], roundIndex: number, dealerIndex: n
   return {
     players: dealtPlayers,
     phase: 'bidding',
+    upRiverStartMode,
+    roundSequence,
     roundIndex,
     currentRoundCardCount: cardCount,
     dealerIndex,
@@ -71,8 +84,10 @@ function startRound(players: UpRiverPlayer[], roundIndex: number, dealerIndex: n
   };
 }
 
-export function createUpRiverState(players: Player[]): UpRiverState {
+export function createUpRiverState(players: Player[], options?: { upRiverStartMode?: UpRiverStartMode }): UpRiverState {
   const gamePlayers = players.slice(0, 6);
+  const upRiverStartMode = options?.upRiverStartMode ?? 'up-down';
+  const roundSequence = getRoundSequence(upRiverStartMode);
   const initialPlayers: UpRiverPlayer[] = gamePlayers.map((player) => ({
     id: player.id,
     name: player.name,
@@ -84,7 +99,7 @@ export function createUpRiverState(players: Player[]): UpRiverState {
     roundScore: 0,
     totalScore: 0,
   }));
-  return startRound(initialPlayers, 0, 0);
+  return startRound(initialPlayers, 0, 0, roundSequence, upRiverStartMode);
 }
 
 function applyRoundScoring(players: UpRiverPlayer[]): UpRiverPlayer[] {
@@ -101,7 +116,7 @@ function applyRoundScoring(players: UpRiverPlayer[]): UpRiverPlayer[] {
 
 function endRound(state: UpRiverState): UpRiverState {
   const scoredPlayers = applyRoundScoring(state.players);
-  const isLastRound = state.roundIndex >= ROUND_SEQUENCE.length - 1;
+  const isLastRound = state.roundIndex >= state.roundSequence.length - 1;
 
   if (isLastRound) {
     const maxScore = Math.max(...scoredPlayers.map(p => p.totalScore));
@@ -118,7 +133,13 @@ function endRound(state: UpRiverState): UpRiverState {
   }
 
   const nextDealer = (state.dealerIndex + 1) % scoredPlayers.length;
-  return startRound(scoredPlayers, state.roundIndex + 1, nextDealer);
+  return startRound(
+    scoredPlayers,
+    state.roundIndex + 1,
+    nextDealer,
+    state.roundSequence,
+    state.upRiverStartMode,
+  );
 }
 
 export function processUpRiverAction(state: unknown, action: unknown, playerId: string): unknown {

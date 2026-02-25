@@ -19,7 +19,7 @@ export function createInitialGameState(gameType: GameType, players: Player[], op
     case 'battleship': return createBattleshipState(players);
     case 'liars-dice': return createLiarsDiceState(players);
     case 'poker': return createPokerState(players);
-    case 'up-and-down-the-river': return createUpRiverState(players);
+    case 'up-and-down-the-river': return createUpRiverState(players, { upRiverStartMode: options?.upRiverStartMode });
   }
 }
 

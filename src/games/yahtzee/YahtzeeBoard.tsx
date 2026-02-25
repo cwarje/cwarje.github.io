@@ -387,7 +387,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
             {isRolling
               ? 'Rolling...'
               : isYahtzeeCelebrationVisible
-              ? 'YAHZEE'
+              ? 'YAHTZEE!!!'
               : `Roll ${hasRolled ? `(${state.rollsLeft} left)` : ''}`}
           </button>
         )}
