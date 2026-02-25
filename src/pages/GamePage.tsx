@@ -88,9 +88,6 @@ export default function GamePage() {
   const upRiverState = isUpRiver ? (gameState as UpRiverState) : null;
   const fullBoardGame = isHearts || isUpRiver || room.gameType === 'yahtzee';
   const gameTitle = room.gameType ? GAME_CATALOG[room.gameType].title : 'Game';
-  const upRiverRoundText = upRiverState
-    ? `Round ${upRiverState.roundIndex + 1}/14 · ${upRiverState.currentRoundCardCount} card${upRiverState.currentRoundCardCount === 1 ? '' : 's'}`
-    : null;
   const suitSymbols = { hearts: '\u2665', diamonds: '\u2666', clubs: '\u2663', spades: '\u2660' } as const;
   const suitColors = { hearts: 'text-red-400', diamonds: 'text-red-400', clubs: 'text-gray-800', spades: 'text-gray-800' } as const;
 
@@ -152,28 +149,18 @@ export default function GamePage() {
               )}
             </>
           )}
-          {isUpRiver && upRiverRoundText && (
-            <p className="text-xs sm:text-sm text-white/80">{upRiverRoundText}</p>
-          )}
-          {isUpRiver && (
-            <div className="mt-1">
-              <p className="text-xs sm:text-sm text-white/80">Trump:</p>
-              {upRiverState?.trumpCard ? (
-                <div className="river-hudTrumpCard mt-1">
-                  <div className="river-card river-card--compact">
-                    <div className="river-cardCorner">
-                      <span className={`river-cardRank ${suitColors[upRiverState.trumpCard.suit]}`}>{rankDisplay(upRiverState.trumpCard.rank)}</span>
-                      <span className={`river-cardSuit ${suitColors[upRiverState.trumpCard.suit]}`}>{suitSymbols[upRiverState.trumpCard.suit]}</span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-xs sm:text-sm text-white/80 mt-1">None</p>
-              )}
-            </div>
-          )}
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
+          {isUpRiver && upRiverState?.trumpCard && (
+            <div className="river-hudTrumpCard">
+              <div className="river-card river-card--compact">
+                <div className="river-cardCorner">
+                  <span className={`river-cardRank ${suitColors[upRiverState.trumpCard.suit]}`}>{rankDisplay(upRiverState.trumpCard.rank)}</span>
+                  <span className={`river-cardSuit ${suitColors[upRiverState.trumpCard.suit]}`}>{suitSymbols[upRiverState.trumpCard.suit]}</span>
+                </div>
+              </div>
+            </div>
+          )}
           {showBackToLobby && (
             <motion.button
               initial={{ opacity: 0, scale: 0.9 }}

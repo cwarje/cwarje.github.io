@@ -75,6 +75,12 @@ function AutoFitSeatName({ name, textColor }: AutoFitSeatNameProps) {
 }
 
 type Seat = 'bottom' | 'left' | 'top' | 'right';
+interface TrickSlotPlacement {
+  row: number;
+  col: number;
+  dx: string;
+  dy: string;
+}
 
 const SEATS: Seat[] = ['bottom', 'left', 'top', 'right'];
 const TRICK_EXIT_OFFSETS: Record<Seat, { x: number; y: number }> = {
@@ -82,6 +88,12 @@ const TRICK_EXIT_OFFSETS: Record<Seat, { x: number; y: number }> = {
   left: { x: -72, y: 0 },
   right: { x: 72, y: 0 },
   bottom: { x: 0, y: 72 },
+};
+const TRICK_SLOT_PLACEMENTS: Record<Seat, TrickSlotPlacement> = {
+  bottom: { row: 2, col: 2, dx: '0px', dy: '0px' },
+  left: { row: 2, col: 1, dx: '0px', dy: 'calc(var(--hearts-slot-h) * -0.5)' },
+  top: { row: 1, col: 2, dx: '0px', dy: '0px' },
+  right: { row: 2, col: 3, dx: '0px', dy: 'calc(var(--hearts-slot-h) * -0.5)' },
 };
 
 function getTrickExitOffset(winnerSeat: Seat | null): { x: number; y: number } {
@@ -308,37 +320,47 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
         <div className="hearts-seat hearts-seat--bottom">{renderSeatPill('bottom')}</div>
 
         <div className="hearts-center">
-          {(['top', 'left', 'right', 'bottom'] as Seat[]).map((seat) => {
-            const trickEntry = trickBySeat[seat];
-            const isWinningCard = trickWinnerSeat === seat && !!state.trickWinner;
-            return (
-              <div
-                key={seat}
-                className={`hearts-slot hearts-slot--${seat} ${trickEntry ? 'hearts-slot--filled' : 'hearts-slot--empty'}`}
-              >
-                <AnimatePresence mode="wait" initial={false}>
-                  {trickEntry ? (
-                    <motion.div
-                      key={`${state.trickNumber}-${trickEntry.playerId}-${trickEntry.card.suit}-${trickEntry.card.rank}`}
-                      initial={{ scale: 0.8, opacity: 0, y: 12 }}
-                      animate={{ scale: 1, opacity: 1, y: 0 }}
-                      exit={{
-                        x: trickExitOffset.x,
-                        y: trickExitOffset.y,
-                        opacity: 0,
-                      }}
-                      transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
-                      className={`hearts-slotCard ${isWinningCard ? 'hearts-slotCard--winner' : ''}`}
-                    >
-                      {renderCardFace(trickEntry.card, false, false, true)}
-                    </motion.div>
-                  ) : (
-                    <div key={`placeholder-${seat}`} className="hearts-slotPlaceholder" />
-                  )}
-                </AnimatePresence>
-              </div>
-            );
-          })}
+          <div className="hearts-centerGrid">
+            {(['top', 'left', 'right', 'bottom'] as Seat[]).map((seat) => {
+              const trickEntry = trickBySeat[seat];
+              const isWinningCard = trickWinnerSeat === seat && !!state.trickWinner;
+              const placement = TRICK_SLOT_PLACEMENTS[seat];
+              return (
+                <div
+                  key={seat}
+                  className={`hearts-slot ${trickEntry ? 'hearts-slot--filled' : 'hearts-slot--empty'}`}
+                  style={{
+                    gridColumn: placement.col,
+                    gridRow: placement.row,
+                    transform: `translate(${placement.dx}, ${placement.dy})`,
+                  }}
+                >
+                  <AnimatePresence mode="wait" initial={false}>
+                    {trickEntry ? (
+                      <motion.div
+                        key={`${state.trickNumber}-${trickEntry.playerId}-${trickEntry.card.suit}-${trickEntry.card.rank}`}
+                        initial={{ scale: 0.8, opacity: 0, y: 12 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{
+                          x: trickExitOffset.x,
+                          y: trickExitOffset.y,
+                          opacity: 0,
+                        }}
+                        transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
+                        className={`hearts-slotCard ${isWinningCard ? 'hearts-slotCard--winner' : ''}`}
+                      >
+                        <div className="hearts-slotCardInner">
+                          {renderCardFace(trickEntry.card, false, false, true)}
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <div key={`placeholder-${seat}`} className="hearts-slotPlaceholder" />
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 

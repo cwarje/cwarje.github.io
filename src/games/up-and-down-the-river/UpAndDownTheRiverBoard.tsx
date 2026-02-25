@@ -46,6 +46,7 @@ interface ElementSize {
 }
 
 const RIVER_SEAT_EDGE_GAP_PX = 8;
+const TRICK_EXIT_DISTANCE_PX = 72;
 
 function rankDisplay(rank: number): string {
   if (rank === 11) return 'J';
@@ -177,6 +178,23 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
     if (winnerIndex === -1) return null;
     return (winnerIndex - anchorIndex + state.players.length) % state.players.length;
   }, [state.players, state.trickWinner, anchorIndex]);
+
+  const trickExitOffset = useMemo(() => {
+    if (trickWinnerRelativeSeat === null) return { x: 0, y: 20 };
+    const winnerLayout = seatLayouts.find(layout => layout.relativeIndex === trickWinnerRelativeSeat);
+    if (!winnerLayout) return { x: 0, y: 20 };
+
+    const deltaX = winnerLayout.seatLeft - 50;
+    const deltaY = winnerLayout.seatTop - 50;
+    const distance = Math.hypot(deltaX, deltaY);
+
+    if (distance < 0.001) return { x: 0, y: 20 };
+
+    return {
+      x: (deltaX / distance) * TRICK_EXIT_DISTANCE_PX,
+      y: (deltaY / distance) * TRICK_EXIT_DISTANCE_PX,
+    };
+  }, [trickWinnerRelativeSeat, seatLayouts]);
 
   const headsUpMessage = useMemo(() => {
     if (state.phase === 'bidding') {
@@ -365,7 +383,11 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
                         key={`${state.trickNumber}-${trickEntry.playerId}-${trickEntry.card.suit}-${trickEntry.card.rank}`}
                         initial={{ scale: 0.8, opacity: 0, y: 12 }}
                         animate={{ scale: 1, opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
+                        exit={{
+                          x: trickExitOffset.x,
+                          y: trickExitOffset.y,
+                          opacity: 0,
+                        }}
                         transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
                         className={`river-slotCard ${isWinningCard ? 'river-slotCard--winner' : ''}`}
                       >
