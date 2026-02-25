@@ -142,14 +142,14 @@ export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
   },
   'up-and-down-the-river': {
     title: 'Up and Down the River',
-    shortDescription: 'Bid your exact tricks as rounds climb to 7 cards, then descend. Nail your bids to rack up points.',
-    playersLabel: '4 Players',
+    shortDescription: 'Bid your exact tricks as rounds climb to 7 cards, then descend. Nail your bids to rack up points in 4-6 player tables.',
+    playersLabel: '4-6 Players',
     minPlayers: 4,
-    maxPlayers: 4,
+    maxPlayers: 6,
     info: {
       goal: 'Score the most points by exactly matching your trick bid each round.',
       rules: [
-        'Played with a standard 52-card deck among 4 players.',
+        'Played with a standard 52-card deck among 4-6 players.',
         'Rounds follow this sequence: 1, 2, 3, 4, 5, 6, 7, 7, 6, 5, 4, 3, 2, 1 cards per player.',
         'Each round, one card is turned face up after dealing to set the trump suit.',
         'Starting left of the dealer, each player bids how many tricks they expect to win.',

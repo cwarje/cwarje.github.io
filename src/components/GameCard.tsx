@@ -41,7 +41,7 @@ const GAME_INFO: Record<GameType, { title: string; description: string; players:
   'up-and-down-the-river': {
     title: 'Up and Down the River',
     description: 'Bid exact tricks as rounds climb up and back down. Precision beats luck.',
-    players: '4 Players',
+    players: '4-6 Players',
     icon: ArrowUpDown,
     gradient: 'from-teal-500/20 to-sky-600/20',
   },

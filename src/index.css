@@ -547,25 +547,25 @@
 }
 
 .river-table {
-  display: grid;
-  grid-template-columns: minmax(72px, 140px) 1fr minmax(72px, 140px);
-  grid-template-rows: auto 1fr auto;
-  gap: 8px;
-  min-height: 280px;
-  align-items: center;
+  position: relative;
+  width: 100%;
+  min-height: 320px;
+  isolation: isolate;
   flex: 1;
   min-height: 0;
 }
 
 .river-seat {
+  position: absolute;
   display: flex;
   justify-content: center;
+  transform: translate(-50%, -50%);
+  z-index: 3;
 }
 
-.river-seat--top { grid-column: 2; grid-row: 1; }
-.river-seat--left { grid-column: 1; grid-row: 2; }
-.river-seat--right { grid-column: 3; grid-row: 2; }
-.river-seat--bottom { grid-column: 2; grid-row: 3; }
+.river-seat--self {
+  z-index: 4;
+}
 
 .river-seatPill {
   width: min(100%, 132px);
@@ -578,6 +578,18 @@
   display: grid;
   grid-template-rows: auto auto auto;
   overflow: hidden;
+}
+
+.river-table--players-5 .river-seatPill {
+  width: min(100%, 120px);
+}
+
+.river-table--players-6 .river-seatPill {
+  width: min(100%, 110px);
+}
+
+.river-table--players-6 .river-seatCell {
+  font-size: 0.62rem;
 }
 
 .river-seatPill--activeSelf {
@@ -654,22 +666,29 @@
 }
 
 .river-center {
-  grid-column: 2;
-  grid-row: 2;
-  position: relative;
-  --river-center-side-inset: 3%;
-  --river-center-vertical-inset: -18px;
-  width: min(52vw, 260px);
-  height: min(46vw, 220px);
-  min-width: 180px;
-  min-height: 158px;
-  margin: 0 auto;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  --river-slot-w: 72px;
+  --river-slot-h: 104px;
+  --river-slot-gap: 6px;
+}
+
+.river-centerGrid {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-columns: repeat(3, var(--river-slot-w));
+  grid-template-rows: repeat(2, var(--river-slot-h));
+  gap: var(--river-slot-gap);
+  place-items: center;
 }
 
 .river-slot {
-  position: absolute;
-  width: 72px;
-  height: 104px;
+  width: var(--river-slot-w);
+  height: var(--river-slot-h);
   border: 0;
   border-radius: 10px;
   background: transparent;
@@ -681,30 +700,6 @@
 .river-slot--empty { z-index: 1; }
 .river-slot--filled { z-index: 2; }
 
-.river-slot--top {
-  left: 50%;
-  top: var(--river-center-vertical-inset);
-  transform: translateX(-50%);
-}
-
-.river-slot--left {
-  left: var(--river-center-side-inset);
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.river-slot--right {
-  right: var(--river-center-side-inset);
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.river-slot--bottom {
-  left: 50%;
-  bottom: var(--river-center-vertical-inset);
-  transform: translateX(-50%);
-}
-
 .river-slotPlaceholder {
   width: 100%;
   height: 100%;
@@ -713,6 +708,11 @@
 }
 
 .river-slotCard {
+  width: 100%;
+  height: 100%;
+}
+
+.river-slotCardInner {
   width: 100%;
   height: 100%;
 }
@@ -931,14 +931,22 @@
 }
 
 @media (max-width: 639px) {
-  .river-center {
-    --river-center-side-inset: 6%;
-    --river-center-vertical-inset: -7px;
+  .river-table {
+    min-height: 300px;
   }
 
-  .river-slot {
-    width: 58px;
-    height: 84px;
+  .river-center {
+    --river-slot-w: 58px;
+    --river-slot-h: 84px;
+    --river-slot-gap: 4px;
+  }
+
+  .river-table--players-5 .river-seatPill {
+    width: min(100%, 106px);
+  }
+
+  .river-table--players-6 .river-seatPill {
+    width: min(100%, 96px);
   }
 
   .river-center .river-cardRank {

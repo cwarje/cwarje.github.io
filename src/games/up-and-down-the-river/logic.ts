@@ -72,7 +72,7 @@ function startRound(players: UpRiverPlayer[], roundIndex: number, dealerIndex: n
 }
 
 export function createUpRiverState(players: Player[]): UpRiverState {
-  const gamePlayers = players.slice(0, 4);
+  const gamePlayers = players.slice(0, 6);
   const initialPlayers: UpRiverPlayer[] = gamePlayers.map((player) => ({
     id: player.id,
     name: player.name,

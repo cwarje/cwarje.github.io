@@ -19,14 +19,25 @@ const SUIT_COLORS: Record<Suit, string> = {
   spades: 'text-gray-800',
 };
 
-type Seat = 'bottom' | 'left' | 'top' | 'right';
-
-const SEATS: Seat[] = ['bottom', 'left', 'top', 'right'];
-
 interface UpRiverBoardProps {
   state: UpRiverState;
   myId: string;
   onAction: (action: unknown) => void;
+}
+
+interface RiverSeatLayout {
+  relativeIndex: number;
+  playerIndex: number;
+  player: UpRiverPlayer;
+  seatLeft: number;
+  seatTop: number;
+}
+
+interface TrickSlotPlacement {
+  row: 1 | 2;
+  col: 1 | 2 | 3;
+  dx: string;
+  dy: string;
 }
 
 function rankDisplay(rank: number): string {
@@ -37,42 +48,108 @@ function rankDisplay(rank: number): string {
   return String(rank);
 }
 
-function getSeatForPlayerIndex(playerIndex: number, myIndex: number, playerCount: number): Seat {
-  const relative = (playerIndex - myIndex + playerCount) % playerCount;
-  return SEATS[relative] ?? 'bottom';
+function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
+  if (playerCount >= 6) {
+    return {
+      seatRadiusX: 40,
+      seatRadiusY: 34,
+    };
+  }
+
+  if (playerCount === 5) {
+    return {
+      seatRadiusX: 37,
+      seatRadiusY: 32,
+    };
+  }
+
+  return {
+    seatRadiusX: 35,
+    seatRadiusY: 30,
+  };
 }
 
-function getSeatPlayer(state: UpRiverState, myIndex: number, seat: Seat): { player: UpRiverPlayer | null; index: number } {
-  const targetRelative = SEATS.indexOf(seat);
-  if (targetRelative === -1) return { player: null, index: -1 };
-  const index = (myIndex + targetRelative) % state.players.length;
-  return { player: state.players[index] ?? null, index };
+const TRICK_SLOT_PLACEMENTS: Record<number, TrickSlotPlacement[]> = {
+  4: [
+    { row: 2, col: 2, dx: '0px', dy: '0px' },
+    { row: 2, col: 1, dx: '0px', dy: 'calc(var(--river-slot-h) * -0.5)' },
+    { row: 1, col: 2, dx: '0px', dy: '0px' },
+    { row: 2, col: 3, dx: '0px', dy: 'calc(var(--river-slot-h) * -0.5)' },
+  ],
+  5: [
+    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--river-slot-h) * 0.25)' },
+    { row: 2, col: 1, dx: '0px', dy: '0px' },
+    { row: 1, col: 1, dx: 'calc(var(--river-slot-w) * 0.5)', dy: '0px' },
+    { row: 1, col: 3, dx: 'calc(var(--river-slot-w) * -0.5)', dy: '0px' },
+    { row: 2, col: 3, dx: '0px', dy: '0px' },
+  ],
+  6: [
+    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--river-slot-h) * 0.25)' },
+    { row: 2, col: 1, dx: '0px', dy: '0px' },
+    { row: 1, col: 1, dx: '0px', dy: '0px' },
+    { row: 1, col: 2, dx: '0px', dy: 'calc(var(--river-slot-h) * -0.25)' },
+    { row: 1, col: 3, dx: '0px', dy: '0px' },
+    { row: 2, col: 3, dx: '0px', dy: '0px' },
+  ],
+};
+
+function getTrickSlotPlacement(playerCount: number, relativeIndex: number): TrickSlotPlacement {
+  const layout = TRICK_SLOT_PLACEMENTS[playerCount]?.[relativeIndex];
+  if (layout) return layout;
+
+  return {
+    row: 2,
+    col: 2,
+    dx: '0px',
+    dy: '0px',
+  };
 }
 
 export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRiverBoardProps) {
   const myIndex = state.players.findIndex(player => player.id === myId);
-  const myPlayer = state.players[myIndex];
-  const isMyTurn = state.currentPlayerIndex === myIndex;
+  const anchorIndex = myIndex >= 0 ? myIndex : 0;
+  const myPlayer = myIndex >= 0 ? state.players[myIndex] : null;
+  const isMyTurn = myIndex >= 0 && state.currentPlayerIndex === myIndex;
   const handContainerRef = useRef<HTMLDivElement>(null);
   const [handWidth, setHandWidth] = useState(360);
 
-  const trickBySeat = useMemo(() => {
-    const mapped: Partial<Record<Seat, { playerId: string; card: Card }>> = {};
+  const seatLayouts = useMemo<RiverSeatLayout[]>(() => {
+    const playerCount = state.players.length;
+    if (playerCount === 0) return [];
+    const radii = getLayoutRadii(playerCount);
+    return Array.from({ length: playerCount }, (_, relativeIndex) => {
+      const playerIndex = (anchorIndex + relativeIndex) % playerCount;
+      const player = state.players[playerIndex];
+      const angle = 90 + (360 * relativeIndex) / playerCount;
+      const angleInRadians = (angle * Math.PI) / 180;
+      return {
+        relativeIndex,
+        playerIndex,
+        player,
+        seatLeft: 50 + radii.seatRadiusX * Math.cos(angleInRadians),
+        seatTop: 50 + radii.seatRadiusY * Math.sin(angleInRadians),
+      };
+    }).filter(layout => !!layout.player);
+  }, [state.players, anchorIndex]);
+
+  const trickByRelativeSeat = useMemo(() => {
+    const mapped: Partial<Record<number, { playerId: string; card: Card }>> = {};
+    const playerCount = state.players.length;
     state.currentTrick.forEach((entry) => {
       const index = state.players.findIndex(p => p.id === entry.playerId);
       if (index === -1) return;
-      const seat = getSeatForPlayerIndex(index, myIndex, state.players.length);
-      mapped[seat] = entry;
+      const relative = (index - anchorIndex + playerCount) % playerCount;
+      mapped[relative] = entry;
     });
     return mapped;
-  }, [state.currentTrick, state.players, myIndex]);
+  }, [state.currentTrick, state.players, anchorIndex]);
 
-  const trickWinnerSeat = useMemo(() => {
+  const trickWinnerRelativeSeat = useMemo(() => {
     if (!state.trickWinner) return null;
     const winnerIndex = state.players.findIndex(player => player.id === state.trickWinner);
     if (winnerIndex === -1) return null;
-    return getSeatForPlayerIndex(winnerIndex, myIndex, state.players.length);
-  }, [state.players, state.trickWinner, myIndex]);
+    return (winnerIndex - anchorIndex + state.players.length) % state.players.length;
+  }, [state.players, state.trickWinner, anchorIndex]);
 
   const headsUpMessage = useMemo(() => {
     if (state.phase === 'bidding') {
@@ -127,10 +204,8 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
     </div>
   );
 
-  const renderSeatPill = (seat: Seat) => {
-    const { player } = getSeatPlayer(state, myIndex, seat);
-    if (!player) return null;
-
+  const renderSeatPill = (seatLayout: RiverSeatLayout) => {
+    const player = seatLayout.player;
     const isCurrentTurn = state.players[state.currentPlayerIndex]?.id === player.id && !state.trickWinner;
     const isMe = player.id === myId;
     const activeSeatPillClass = isCurrentTurn
@@ -162,7 +237,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
   };
 
   const playCard = (card: Card) => {
-    if (state.phase !== 'playing' || !isMyTurn || state.trickWinner) return;
+    if (state.phase !== 'playing' || !isMyTurn || state.trickWinner || myIndex < 0) return;
     if (!isValidUpRiverPlay(state, myIndex, card)) return;
     onAction({ type: 'play-card', card });
   };
@@ -198,41 +273,59 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
   }
 
   return (
-    <div className="river-board space-y-3 sm:space-y-4">
-      <div className="river-table">
-        <div className="river-seat river-seat--top">{renderSeatPill('top')}</div>
-        <div className="river-seat river-seat--left">{renderSeatPill('left')}</div>
-        <div className="river-seat river-seat--right">{renderSeatPill('right')}</div>
-        <div className="river-seat river-seat--bottom">{renderSeatPill('bottom')}</div>
+    <div className={`river-board river-board--players-${state.players.length} space-y-3 sm:space-y-4`}>
+      <div className={`river-table river-table--players-${state.players.length}`}>
+        {seatLayouts.map((layout) => (
+          <div
+            key={`seat-${layout.player.id}`}
+            className={`river-seat ${layout.relativeIndex === 0 ? 'river-seat--self' : ''}`}
+            style={{
+              left: `${layout.seatLeft}%`,
+              top: `${layout.seatTop}%`,
+            }}
+          >
+            {renderSeatPill(layout)}
+          </div>
+        ))}
 
         <div className="river-center">
-          {(['top', 'left', 'right', 'bottom'] as Seat[]).map((seat) => {
-            const trickEntry = trickBySeat[seat];
-            const isWinningCard = trickWinnerSeat === seat && !!state.trickWinner;
-            return (
-              <div
-                key={seat}
-                className={`river-slot river-slot--${seat} ${trickEntry ? 'river-slot--filled' : 'river-slot--empty'}`}
-              >
-                <AnimatePresence mode="wait" initial={false}>
-                  {trickEntry ? (
-                    <motion.div
-                      key={`${state.trickNumber}-${trickEntry.playerId}-${trickEntry.card.suit}-${trickEntry.card.rank}`}
-                      initial={{ scale: 0.8, opacity: 0, y: 12 }}
-                      animate={{ scale: 1, opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-                      className={`river-slotCard ${isWinningCard ? 'river-slotCard--winner' : ''}`}
-                    >
-                      {renderCardFace(trickEntry.card, false, true)}
-                    </motion.div>
-                  ) : (
-                    <div key={`placeholder-${seat}`} className="river-slotPlaceholder" />
-                  )}
-                </AnimatePresence>
-              </div>
-            );
-          })}
+          <div className="river-centerGrid">
+            {seatLayouts.map((layout) => {
+              const trickEntry = trickByRelativeSeat[layout.relativeIndex];
+              const isWinningCard = trickWinnerRelativeSeat === layout.relativeIndex && !!state.trickWinner;
+              const placement = getTrickSlotPlacement(state.players.length, layout.relativeIndex);
+              return (
+                <div
+                  key={`slot-${layout.player.id}`}
+                  className={`river-slot ${trickEntry ? 'river-slot--filled' : 'river-slot--empty'}`}
+                  style={{
+                    gridColumn: placement.col,
+                    gridRow: placement.row,
+                    transform: `translate(${placement.dx}, ${placement.dy})`,
+                  }}
+                >
+                  <AnimatePresence mode="wait" initial={false}>
+                    {trickEntry ? (
+                      <motion.div
+                        key={`${state.trickNumber}-${trickEntry.playerId}-${trickEntry.card.suit}-${trickEntry.card.rank}`}
+                        initial={{ scale: 0.8, opacity: 0, y: 12 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                        className={`river-slotCard ${isWinningCard ? 'river-slotCard--winner' : ''}`}
+                      >
+                        <div className="river-slotCardInner">
+                          {renderCardFace(trickEntry.card, false, true)}
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <div key={`placeholder-${layout.relativeIndex}`} className="river-slotPlaceholder" />
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
