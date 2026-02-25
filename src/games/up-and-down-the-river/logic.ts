@@ -4,8 +4,8 @@ import { cardEquals, getTrickWinnerPlayerId, isValidUpRiverPlay } from './rules'
 
 const SUITS: Suit[] = ['clubs', 'diamonds', 'spades', 'hearts'];
 const RANKS: Rank[] = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
-export const ROUND_SEQUENCE_UP_DOWN: number[] = [1, 2, 3, 4, 5, 6, 7, 7, 6, 5, 4, 3, 2, 1];
-export const ROUND_SEQUENCE_DOWN_UP: number[] = [7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7];
+export const ROUND_SEQUENCE_UP_DOWN: number[] = [1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1];
+export const ROUND_SEQUENCE_DOWN_UP: number[] = [7, 6, 5, 4, 3, 2, 1, 2, 3, 4, 5, 6, 7];
 
 function getRoundSequence(upRiverStartMode: UpRiverStartMode): number[] {
   return upRiverStartMode === 'down-up' ? ROUND_SEQUENCE_DOWN_UP : ROUND_SEQUENCE_UP_DOWN;
@@ -61,7 +61,8 @@ function startRound(
     };
   });
 
-  const trumpCard = deck[playerCount * cardCount] ?? null;
+  const isLastRound = roundIndex >= roundSequence.length - 1;
+  const trumpCard = isLastRound ? null : (deck[playerCount * cardCount] ?? null);
   const trumpSuit = trumpCard?.suit ?? null;
 
   return {

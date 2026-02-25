@@ -262,7 +262,7 @@ export default function Home() {
         className="space-y-4"
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {(['yahtzee', 'hearts', 'battleship', 'liars-dice', 'poker', 'up-and-down-the-river'] as GameType[]).map((game, i) => {
+          {(['yahtzee', 'hearts', 'up-and-down-the-river', 'battleship', 'liars-dice', 'poker'] as GameType[]).map((game, i) => {
             const catalog = GAME_CATALOG[game];
             const tooManyPlayers = room ? playerCount > catalog.maxPlayers : false;
             const isDisabled = room ? (!isHost || tooManyPlayers) : false;
