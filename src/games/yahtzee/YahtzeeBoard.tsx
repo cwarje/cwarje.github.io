@@ -267,10 +267,16 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
       )}
       {/* Score Table (at the top) */}
       <div className="p-3 overflow-x-auto">
-        <table className="w-full border-collapse text-[13px] sm:text-[15px]">
+        <table className="w-full table-fixed border-collapse text-[13px] sm:text-[15px]">
+          <colgroup>
+            <col className="w-[132px] sm:w-[200px]" />
+            {state.players.map((player) => (
+              <col key={player.id} />
+            ))}
+          </colgroup>
           <thead>
             <tr className="border-b border-white/10">
-              <th className="text-left py-2 px-2 max-w-[300px]" />
+              <th className="text-left py-2 px-2" />
               {state.players.map((player) => {
                 const isMe = player.id === myId;
                 const isCurrent = state.players[state.currentPlayerIndex]?.id === player.id;
@@ -286,11 +292,11 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
                 return (
                   <th
                     key={player.id}
-                    className={`yahtzee-playerHeader py-2 px-2 text-center font-medium min-w-[56px] ${activeHeaderClass}`}
+                    className={`yahtzee-playerHeader py-2 px-2 text-center font-medium ${activeHeaderClass}`}
                   >
-                    <div className="flex items-center justify-center gap-1 whitespace-nowrap">
+                    <div className="flex min-w-0 items-center justify-center gap-1 whitespace-nowrap">
                       <span
-                        className="truncate max-w-[72px]"
+                        className="truncate max-w-full"
                         style={{ color: playerNameColor }}
                       >
                         {displayName}
