@@ -7,7 +7,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isGamePage = location.pathname.startsWith('/game/');
   const showHeader = !isGamePage;
   const mainClassName = isGamePage
-    ? 'h-screen max-w-none px-0 py-0 overflow-hidden'
+    ? 'game-viewport-height max-w-none px-0 py-0 overflow-hidden'
     : 'max-w-7xl mx-auto px-4 sm:px-6 py-8';
 
   return (
