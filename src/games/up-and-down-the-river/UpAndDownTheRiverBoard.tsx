@@ -453,7 +453,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
                         height: `${handLayout.cardHeight}px`,
                       }}
                     >
-                      {renderCardFace(card, isDisabled)}
+                      {renderCardFace(card, state.phase === 'playing' && isDisabled)}
                     </span>
                   </motion.button>
                 );
