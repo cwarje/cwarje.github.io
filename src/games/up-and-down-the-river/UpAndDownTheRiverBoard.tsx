@@ -23,6 +23,7 @@ interface UpRiverBoardProps {
   state: UpRiverState;
   myId: string;
   onAction: (action: unknown) => void;
+  isHandZoomed?: boolean;
 }
 
 interface RiverSeatLayout {
@@ -113,7 +114,7 @@ function getTrickSlotPlacement(playerCount: number, relativeIndex: number): Tric
   };
 }
 
-export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRiverBoardProps) {
+export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZoomed = false }: UpRiverBoardProps) {
   const myIndex = state.players.findIndex(player => player.id === myId);
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const myPlayer = myIndex >= 0 ? state.players[myIndex] : null;
@@ -361,7 +362,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
           </div>
         ))}
 
-        <div className="river-center">
+        <div className={`river-center ${isHandZoomed ? 'river-center--zoom' : ''}`}>
           <div className="river-centerGrid">
             {seatLayouts.map((layout) => {
               const trickEntry = trickByRelativeSeat[layout.relativeIndex];
@@ -412,7 +413,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction }: UpRive
 
       {myPlayer && (
         <div className="space-y-3">
-          <div ref={handContainerRef} className="river-hand">
+          <div ref={handContainerRef} className={`river-hand ${isHandZoomed ? 'river-hand--zoom' : ''}`}>
             <div
               className="river-handSpread"
               style={{

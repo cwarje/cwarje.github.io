@@ -121,9 +121,10 @@ interface HeartsBoardProps {
   state: HeartsState;
   myId: string;
   onAction: (action: unknown) => void;
+  isHandZoomed?: boolean;
 }
 
-export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps) {
+export default function HeartsBoard({ state, myId, onAction, isHandZoomed = false }: HeartsBoardProps) {
   const myIndex = state.players.findIndex(p => p.id === myId);
   const myPlayer = state.players[myIndex];
   const isMyTurn = state.currentPlayerIndex === myIndex;
@@ -319,7 +320,7 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
         <div className="hearts-seat hearts-seat--right">{renderSeatPill('right')}</div>
         <div className="hearts-seat hearts-seat--bottom">{renderSeatPill('bottom')}</div>
 
-        <div className="hearts-center">
+        <div className={`hearts-center ${isHandZoomed ? 'hearts-center--zoom' : ''}`}>
           <div className="hearts-centerGrid">
             {(['top', 'left', 'right', 'bottom'] as Seat[]).map((seat) => {
               const trickEntry = trickBySeat[seat];
@@ -372,7 +373,7 @@ export default function HeartsBoard({ state, myId, onAction }: HeartsBoardProps)
 
       {myPlayer && (
         <div>
-          <div ref={handContainerRef} className="hearts-hand">
+          <div ref={handContainerRef} className={`hearts-hand ${isHandZoomed ? 'hearts-hand--zoom' : ''}`}>
             <div
               className="hearts-handSpread"
               style={{

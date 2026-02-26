@@ -446,6 +446,34 @@
   .hearts-hand .hearts-cardSuit {
     font-size: 1.1rem;
   }
+
+  .hearts-hand.hearts-hand--zoom .hearts-cardRank {
+    font-size: 1.6rem;
+    line-height: 1;
+  }
+
+  .hearts-hand.hearts-hand--zoom .hearts-cardSuit {
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+
+  .hearts-hand.hearts-hand--zoom .hearts-cardCorner {
+    width: 1.75em;
+  }
+
+  .hearts-center.hearts-center--zoom .hearts-cardRank {
+    font-size: 1.6rem;
+    line-height: 1;
+  }
+
+  .hearts-center.hearts-center--zoom .hearts-cardSuit {
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+
+  .hearts-center.hearts-center--zoom .hearts-cardCorner {
+    width: 1.75em;
+  }
 }
 
 .hearts-hand {
@@ -454,6 +482,36 @@
   justify-content: center;
   overflow: hidden;
   min-height: 120px;
+}
+
+@media (min-width: 640px) {
+  .hearts-hand.hearts-hand--zoom .hearts-cardRank {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .hearts-hand.hearts-hand--zoom .hearts-cardSuit {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .hearts-hand.hearts-hand--zoom .hearts-cardCorner {
+    width: 1.8em;
+  }
+
+  .hearts-center.hearts-center--zoom .hearts-cardRank {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .hearts-center.hearts-center--zoom .hearts-cardSuit {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .hearts-center.hearts-center--zoom .hearts-cardCorner {
+    width: 1.8em;
+  }
 }
 
 .hearts-handSpread {
@@ -762,11 +820,11 @@
 }
 
 .river-hudTrumpCard .river-cardRank {
-  font-size: 1.2rem;
+  font-size: 1.3rem;
 }
 
 .river-hudTrumpCard .river-cardSuit {
-  font-size: 1.14rem;
+  font-size: 1.3rem;
 }
 
 .river-hudTrumpCard .river-card {
@@ -933,6 +991,36 @@
   min-height: 120px;
 }
 
+@media (min-width: 640px) {
+  .river-hand.river-hand--zoom .river-cardRank {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .river-hand.river-hand--zoom .river-cardSuit {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .river-hand.river-hand--zoom .river-cardCorner {
+    width: 1.8em;
+  }
+
+  .river-center.river-center--zoom .river-cardRank {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .river-center.river-center--zoom .river-cardSuit {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .river-center.river-center--zoom .river-cardCorner {
+    width: 1.8em;
+  }
+}
+
 .river-handSpread {
   position: relative;
 }
@@ -1000,6 +1088,34 @@
 
   .river-hand .river-cardSuit {
     font-size: 1.1rem;
+  }
+
+  .river-hand.river-hand--zoom .river-cardRank {
+    font-size: 1.6rem;
+    line-height: 1;
+  }
+
+  .river-hand.river-hand--zoom .river-cardSuit {
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+
+  .river-hand.river-hand--zoom .river-cardCorner {
+    width: 1.75em;
+  }
+
+  .river-center.river-center--zoom .river-cardRank {
+    font-size: 1.6rem;
+    line-height: 1;
+  }
+
+  .river-center.river-center--zoom .river-cardSuit {
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+
+  .river-center.river-center--zoom .river-cardCorner {
+    width: 1.75em;
   }
 }
 

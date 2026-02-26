@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Loader2 } from 'lucide-react';
+import { Home, Loader2, Search } from 'lucide-react';
 import { useRoomContext } from '../networking/roomStore';
 import { useToast } from '../components/Toast';
 import LobbyMenu from '../components/LobbyMenu';
@@ -35,6 +35,7 @@ export default function GamePage() {
   const { toast } = useToast();
   const rejoinAttempted = useRef(false);
   const hasHadRoom = useRef(!!room);
+  const [isHandZoomed, setIsHandZoomed] = useState(false);
 
   useEffect(() => {
     if (room) hasHadRoom.current = true;
@@ -87,6 +88,7 @@ export default function GamePage() {
   const heartsBroken = heartsState?.heartsBroken ?? false;
   const upRiverState = isUpRiver ? (gameState as UpRiverState) : null;
   const fullBoardGame = isHearts || isUpRiver || room.gameType === 'yahtzee';
+  const showHandZoomToggle = isHearts || isUpRiver;
   const gameTitle = room.gameType ? GAME_CATALOG[room.gameType].title : 'Game';
   const suitSymbols = { hearts: '\u2665', diamonds: '\u2666', clubs: '\u2663', spades: '\u2660' } as const;
   const suitColors = { hearts: 'text-red-400', diamonds: 'text-red-400', clubs: 'text-gray-800', spades: 'text-gray-800' } as const;
@@ -176,6 +178,23 @@ export default function GamePage() {
         </div>
       </div>
 
+      {showHandZoomToggle && (
+        <div className="absolute bottom-0 left-0 right-0 z-20 p-3 sm:p-4 pointer-events-none">
+          <div className="pointer-events-auto ml-auto w-fit">
+            <button
+              type="button"
+              onClick={() => setIsHandZoomed(v => !v)}
+              className={`flex items-center justify-center w-9 h-9 text-white hover:text-white/80 transition-all duration-150 cursor-pointer group active:scale-90 ${isHandZoomed ? 'scale-90' : ''}`}
+              title={isHandZoomed ? 'Shrink hand text' : 'Zoom hand text'}
+              aria-label={isHandZoomed ? 'Shrink hand text' : 'Zoom hand text'}
+              aria-pressed={isHandZoomed}
+            >
+              <Search className="w-6 h-6 stroke-white" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="absolute top-4 left-1/2 z-20 w-[min(90vw,40rem)] -translate-x-1/2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
           {error}
@@ -193,7 +212,7 @@ export default function GamePage() {
             <YahtzeeBoard state={gameState as YahtzeeState} myId={myId} onAction={sendAction} />
           )}
           {room.gameType === 'hearts' && (
-            <HeartsBoard state={gameState as HeartsState} myId={myId} onAction={sendAction} />
+            <HeartsBoard state={gameState as HeartsState} myId={myId} onAction={sendAction} isHandZoomed={isHandZoomed} />
           )}
           {room.gameType === 'battleship' && (
             <BattleshipBoard state={gameState as BattleshipState} myId={myId} onAction={sendAction} />
@@ -205,7 +224,7 @@ export default function GamePage() {
             <PokerBoard state={gameState as PokerState} myId={myId} onAction={sendAction} isHost={isHost} onLeave={handlePokerLeave} />
           )}
           {room.gameType === 'up-and-down-the-river' && (
-            <UpAndDownTheRiverBoard state={gameState as UpRiverState} myId={myId} onAction={sendAction} />
+            <UpAndDownTheRiverBoard state={gameState as UpRiverState} myId={myId} onAction={sendAction} isHandZoomed={isHandZoomed} />
           )}
         </motion.div>
       </div>
