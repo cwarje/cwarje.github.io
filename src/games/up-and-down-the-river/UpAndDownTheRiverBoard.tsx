@@ -198,6 +198,18 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
   }, [trickWinnerRelativeSeat, seatLayouts]);
 
   const headsUpMessage = useMemo(() => {
+    if (state.phase === 'round-end') {
+      const madeBidNames = state.players
+        .filter(player => player.bid !== null && player.bid === player.tricksWon)
+        .map(player => (player.id === myId ? 'You' : player.name));
+      const missedBidNames = state.players
+        .filter(player => player.bid === null || player.bid !== player.tricksWon)
+        .map(player => (player.id === myId ? 'You' : player.name));
+      const madeBidText = madeBidNames.length > 0 ? madeBidNames.join(', ') : 'None';
+      const missedBidText = missedBidNames.length > 0 ? missedBidNames.join(', ') : 'None';
+      return `Made bid: ${madeBidText} · Missed bid: ${missedBidText}`;
+    }
+
     if (state.phase === 'bidding') {
       if (isMyTurn) return 'Your turn to bid';
       return `Waiting for ${state.players[state.currentPlayerIndex]?.name ?? 'player'} to bid`;
@@ -279,11 +291,16 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
     const player = seatLayout.player;
     const isCurrentTurn = state.players[state.currentPlayerIndex]?.id === player.id && !state.trickWinner;
     const isMe = player.id === myId;
-    const activeSeatPillClass = isCurrentTurn
-      ? isMe
-        ? 'river-seatPill--activeSelf'
-        : 'river-seatPill--activeOther'
-      : '';
+    const bidMatched = player.bid !== null && player.bid === player.tricksWon;
+    const seatPillStateClass = state.phase === 'round-end'
+      ? bidMatched
+        ? 'river-seatPill--roundSuccess'
+        : 'river-seatPill--roundFail'
+      : isCurrentTurn
+        ? isMe
+          ? 'river-seatPill--activeSelf'
+          : 'river-seatPill--activeOther'
+        : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
     const bidText = player.bid === null ? '-' : String(player.bid);
@@ -291,7 +308,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
     return (
       <div
         ref={shouldMeasure ? setSeatPillElement : undefined}
-        className={`river-seatPill ${activeSeatPillClass} ${isMe ? 'river-seatPill--me' : ''}`}
+        className={`river-seatPill ${seatPillStateClass} ${isMe ? 'river-seatPill--me' : ''}`}
       >
         <div className="river-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
           <span className="river-seatName">{isMe ? 'You' : player.name}</span>
@@ -408,7 +425,9 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
       </div>
 
       <div className="river-headsUp" aria-live="polite">
-        <p className="river-headsUpText">{headsUpMessage || '\u00a0'}</p>
+        <p className={`river-headsUpText ${state.phase === 'round-end' ? 'river-headsUpText--roundEnd' : ''}`}>
+          {headsUpMessage || '\u00a0'}
+        </p>
       </div>
 
       {myPlayer && (

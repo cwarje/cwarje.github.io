@@ -857,6 +857,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const LIARS_DICE_TRIGGER_DELAY = 1500; // ms before bot pulls trigger
   const LIARS_DICE_NEXT_ROUND_DELAY = 2000; // ms before starting next round
   const UP_RIVER_BOT_DELAY = 900; // ms between bot bid/card play
+  const UP_RIVER_ROUND_END_DELAY = 5000; // ms to show bid result borders before next round
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -960,6 +961,21 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
           }
         }, TRICK_DISPLAY_DELAY);
+        return;
+      }
+
+      if (urs.phase === 'round-end') {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as UpRiverState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'round-end' || currentGs.gameOver) return;
+
+          const next = processGameAction('up-and-down-the-river', currentGs, { type: 'start-next-round' }, '');
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+          }
+        }, UP_RIVER_ROUND_END_DELAY);
         return;
       }
 

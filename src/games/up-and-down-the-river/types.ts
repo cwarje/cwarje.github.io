@@ -44,4 +44,5 @@ export interface UpRiverState {
 export type UpRiverAction =
   | { type: 'place-bid'; bid: number }
   | { type: 'play-card'; card: Card }
-  | { type: 'resolve-trick' };
+  | { type: 'resolve-trick' }
+  | { type: 'start-next-round' };

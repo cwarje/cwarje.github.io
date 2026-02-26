@@ -655,6 +655,14 @@
   border-color: #fde68a;
 }
 
+.river-seatPill--roundSuccess {
+  border-color: #16a34a;
+}
+
+.river-seatPill--roundFail {
+  border-color: #dc2626;
+}
+
 .river-seatPill--me {
   background: #dbeafe;
 }
@@ -873,6 +881,13 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.river-headsUpText--roundEnd {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.35;
 }
 
 .river-bidPanel {

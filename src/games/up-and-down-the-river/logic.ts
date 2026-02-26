@@ -133,14 +133,15 @@ function endRound(state: UpRiverState): UpRiverState {
     };
   }
 
-  const nextDealer = (state.dealerIndex + 1) % scoredPlayers.length;
-  return startRound(
-    scoredPlayers,
-    state.roundIndex + 1,
-    nextDealer,
-    state.roundSequence,
-    state.upRiverStartMode,
-  );
+  return {
+    ...state,
+    players: scoredPlayers,
+    phase: 'round-end',
+    gameOver: false,
+    winner: null,
+    trickWinner: null,
+    currentTrick: [],
+  };
 }
 
 export function processUpRiverAction(state: unknown, action: unknown, playerId: string): unknown {
@@ -238,6 +239,18 @@ export function processUpRiverAction(state: unknown, action: unknown, playerId: 
         leaderIndex: winnerIndex,
         currentPlayerIndex: winnerIndex,
       };
+    }
+
+    case 'start-next-round': {
+      if (s.phase !== 'round-end' || s.gameOver) return state;
+      const nextDealer = (s.dealerIndex + 1) % s.players.length;
+      return startRound(
+        s.players,
+        s.roundIndex + 1,
+        nextDealer,
+        s.roundSequence,
+        s.upRiverStartMode,
+      );
     }
   }
 
