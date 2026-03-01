@@ -1150,3 +1150,246 @@
   padding: 10px 14px;
   background: #f9fafb;
 }
+
+/* Poker board */
+.poker-board {
+  --poker-bg: #0d5c2e;
+  background: var(--poker-bg);
+  color: #111827;
+  border: 0;
+  border-radius: 0;
+  padding: 12px;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 640px) {
+  .poker-board {
+    padding: 18px;
+  }
+}
+
+.poker-table {
+  position: relative;
+  width: 100%;
+  min-height: 280px;
+  isolation: isolate;
+  flex: 1;
+  min-height: 0;
+}
+
+.poker-seat {
+  position: absolute;
+  display: flex;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+
+.poker-seat--self {
+  z-index: 4;
+}
+
+.poker-seatPill {
+  width: min(100%, 128px);
+  min-width: 80px;
+  background: #f3f4f6;
+  border: 3px solid #111827;
+  border-radius: 14px;
+  font-size: 0.75rem;
+  line-height: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.poker-seatPill--activeSelf {
+  animation: pokerSeatPillBorderBlink 1.6s linear infinite;
+}
+
+.poker-seatPill--activeOther {
+  border-color: #fde68a;
+}
+
+.poker-seatPill--me {
+  background: #dbeafe;
+}
+
+.poker-seatPill--folded {
+  opacity: 0.55;
+}
+
+@keyframes pokerSeatPillBorderBlink {
+  0%, 49.999% { border-color: #111827; }
+  50%, 100% { border-color: #fde68a; }
+}
+
+.poker-seatPillColor {
+  height: 4px;
+  flex-shrink: 0;
+}
+
+.poker-seatPillBody {
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.poker-seatPillName {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+}
+
+.poker-seatPillChips {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.poker-headsUp {
+  min-height: 36px;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.poker-headsUpText {
+  width: 100%;
+  text-align: center;
+  font-size: 1.1rem;
+  color: #fff;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.poker-center {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.poker-center > * {
+  pointer-events: auto;
+}
+
+.poker-pot {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 2px solid rgba(253, 230, 138, 0.5);
+  color: #fef3c7;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.poker-communityCards {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.poker-hand {
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 0;
+  min-height: 80px;
+}
+
+.poker-hand.poker-hand--zoom .poker-cardRank {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.poker-hand.poker-hand--zoom .poker-cardSuit {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.poker-actionRow {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+}
+
+.poker-actionButton {
+  min-width: 88px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: 3px solid #111827;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.poker-actionButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.poker-card {
+  width: 52px;
+  height: 72px;
+  border: 2px solid #111827;
+  border-radius: 8px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  gap: 2px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.poker-cardRank {
+  font-size: 1rem;
+}
+
+.poker-cardSuit {
+  font-size: 0.9rem;
+}
+
+@media (min-width: 640px) {
+  .poker-seatPillName {
+    font-size: 13px;
+  }
+
+  .poker-hand.poker-hand--zoom .poker-cardRank {
+    font-size: 1.6rem;
+  }
+
+  .poker-hand.poker-hand--zoom .poker-cardSuit {
+    font-size: 1.5rem;
+  }
+}

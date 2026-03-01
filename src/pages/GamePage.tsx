@@ -87,8 +87,8 @@ export default function GamePage() {
   const heartsTargetScore = heartsState?.targetScore ?? 100;
   const heartsBroken = heartsState?.heartsBroken ?? false;
   const upRiverState = isUpRiver ? (gameState as UpRiverState) : null;
-  const fullBoardGame = isHearts || isUpRiver || room.gameType === 'yahtzee';
-  const showHandZoomToggle = isHearts || isUpRiver;
+  const fullBoardGame = isHearts || isUpRiver || room.gameType === 'yahtzee' || isPoker;
+  const showHandZoomToggle = isHearts || isUpRiver || isPoker;
   const gameTitle = room.gameType ? GAME_CATALOG[room.gameType].title : 'Game';
   const suitSymbols = { hearts: '\u2665', diamonds: '\u2666', clubs: '\u2663', spades: '\u2660' } as const;
   const suitColors = { hearts: 'text-red-400', diamonds: 'text-red-400', clubs: 'text-gray-800', spades: 'text-gray-800' } as const;
@@ -221,7 +221,7 @@ export default function GamePage() {
             <LiarsDiceBoard state={gameState as LiarsDiceState} myId={myId} onAction={sendAction} />
           )}
           {room.gameType === 'poker' && (
-            <PokerBoard state={gameState as PokerState} myId={myId} onAction={sendAction} isHost={isHost} onLeave={handlePokerLeave} />
+            <PokerBoard state={gameState as PokerState} myId={myId} onAction={sendAction} isHost={isHost} onLeave={handlePokerLeave} isHandZoomed={isHandZoomed} />
           )}
           {room.gameType === 'up-and-down-the-river' && (
             <UpAndDownTheRiverBoard state={gameState as UpRiverState} myId={myId} onAction={sendAction} isHandZoomed={isHandZoomed} />

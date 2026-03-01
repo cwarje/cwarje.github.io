@@ -242,6 +242,7 @@ export function createPokerState(players: Player[]): PokerState {
   const pokerPlayers: PokerPlayer[] = players.map(p => ({
     id: p.id,
     name: p.name,
+    color: p.color,
     isBot: p.isBot,
     chips: STARTING_CHIPS,
     holeCards: [],
@@ -321,10 +322,11 @@ function startNextHand(prevState: PokerState): PokerState {
 
   let deck = shuffleDeck(buildDeck());
 
-  // Reset per-hand fields, preserve chips
+  // Reset per-hand fields, preserve chips and color
   const pokerPlayers: PokerPlayer[] = eligiblePlayers.map(p => ({
     id: p.id,
     name: p.name,
+    color: p.color,
     isBot: p.isBot,
     chips: p.chips,
     holeCards: [],

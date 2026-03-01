@@ -106,9 +106,9 @@ function applyProfileToGameState(
       let changed = false;
       const players = current.players.map((player) => {
         if (player.id !== playerId) return player;
-        if (player.name === playerName) return player;
+        if (player.name === playerName && player.color === playerColor) return player;
         changed = true;
-        return { ...player, name: playerName };
+        return { ...player, name: playerName, color: playerColor };
       });
       return changed ? { ...current, players } : current;
     }

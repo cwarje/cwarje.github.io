@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, ChevronUp, ChevronDown, Play, LogOut, Crown } from 'lucide-react';
-import type { PokerState, PokerAction, Card } from './types';
+import { DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, normalizePlayerColor } from '../../networking/playerColors';
+import type { PokerState, PokerAction, Card, PokerPlayer } from './types';
 
 // ────────────────────────────────────────────
 // Card display helpers
@@ -29,25 +30,41 @@ function rankLabel(rank: number): string {
   return String(rank);
 }
 
-function CardDisplay({ card, faceDown = false, size = 'md' }: { card?: Card; faceDown?: boolean; size?: 'sm' | 'md' }) {
-  const sizeClasses = size === 'sm'
-    ? 'w-10 h-14 text-xs'
-    : 'w-14 h-20 text-sm';
-
+function PokerCardDisplay({ card, faceDown = false, size = 'md' }: { card?: Card; faceDown?: boolean; size?: 'sm' | 'md' }) {
   if (faceDown || !card) {
     return (
-      <div className={`${sizeClasses} rounded-lg bg-gradient-to-br from-blue-800 to-blue-950 border border-blue-700/50 flex items-center justify-center shadow-md`}>
+      <div className={`poker-card ${size === 'sm' ? '!w-10 !h-14' : ''} bg-gradient-to-br from-blue-800 to-blue-950 border-2 border-blue-700/50 flex items-center justify-center shadow-md`}>
         <div className="w-3/4 h-3/4 rounded border border-blue-600/30 bg-blue-900/50" />
       </div>
     );
   }
 
   return (
-    <div className={`${sizeClasses} rounded-lg bg-gray-800 border border-white/10 flex flex-col items-center justify-center shadow-md font-bold ${SUIT_COLORS[card.suit]}`}>
-      <span>{rankLabel(card.rank)}</span>
-      <span className="text-xs leading-none">{SUIT_SYMBOLS[card.suit]}</span>
+    <div className={`poker-card ${size === 'sm' ? '!w-10 !h-14' : ''}`}>
+      <span className={`poker-cardRank ${SUIT_COLORS[card.suit]}`}>{rankLabel(card.rank)}</span>
+      <span className={`poker-cardSuit text-xs leading-none ${SUIT_COLORS[card.suit]}`}>{SUIT_SYMBOLS[card.suit]}</span>
     </div>
   );
+}
+
+// ────────────────────────────────────────────
+// Layout: ellipse radii per player count (percent)
+// ────────────────────────────────────────────
+
+function getPokerLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
+  if (playerCount >= 6) return { seatRadiusX: 42, seatRadiusY: 36 };
+  if (playerCount === 5) return { seatRadiusX: 38, seatRadiusY: 32 };
+  if (playerCount === 4) return { seatRadiusX: 36, seatRadiusY: 30 };
+  if (playerCount === 3) return { seatRadiusX: 32, seatRadiusY: 28 };
+  return { seatRadiusX: 28, seatRadiusY: 24 }; // 2
+}
+
+interface PokerSeatLayout {
+  relativeIndex: number;
+  playerIndex: number;
+  player: PokerPlayer;
+  seatLeft: number;
+  seatTop: number;
 }
 
 // ────────────────────────────────────────────
@@ -60,12 +77,16 @@ interface PokerBoardProps {
   onAction: (action: unknown) => void;
   isHost: boolean;
   onLeave?: () => void;
+  isHandZoomed?: boolean;
 }
 
-export default function PokerBoard({ state, myId, onAction, isHost, onLeave }: PokerBoardProps) {
+export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isHandZoomed = false }: PokerBoardProps) {
   const [raiseAmount, setRaiseAmount] = useState<number>(0);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const me = state.players.find(p => p.id === myId);
+  const myIndex = state.players.findIndex(p => p.id === myId);
+  const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const isMyTurn = state.players[state.currentPlayerIndex]?.id === myId && !state.gameOver;
   const currentPlayer = state.players[state.currentPlayerIndex];
 
@@ -73,8 +94,6 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave }: P
   const canCheck = toCall === 0;
   const minRaiseTotal = state.currentBet + state.minRaise;
   const maxRaiseTotal = me ? me.betThisStreet + me.chips : 0;
-
-  // Set initial raise amount when it's my turn
   const effectiveMinRaise = Math.min(minRaiseTotal, maxRaiseTotal);
 
   const totalPot = state.players.reduce((sum, p) => sum + p.totalContrib, 0);
@@ -88,265 +107,212 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave }: P
     sendAction({ type: 'raise', amount });
   };
 
-  // Sort players so "me" is at the bottom
-  const myIndex = state.players.findIndex(p => p.id === myId);
-  const orderedPlayers = myIndex >= 0
-    ? [...state.players.slice(myIndex), ...state.players.slice(0, myIndex)]
-    : state.players;
+  const seatLayouts = useMemo<PokerSeatLayout[]>(() => {
+    const playerCount = state.players.length;
+    if (playerCount === 0) return [];
+    const radii = getPokerLayoutRadii(playerCount);
+    return Array.from({ length: playerCount }, (_, relativeIndex) => {
+      const playerIndex = (anchorIndex + relativeIndex) % playerCount;
+      const player = state.players[playerIndex];
+      const angle = 90 + (360 * relativeIndex) / playerCount;
+      const angleInRadians = (angle * Math.PI) / 180;
+      return {
+        relativeIndex,
+        playerIndex,
+        player,
+        seatLeft: 50 + radii.seatRadiusX * Math.cos(angleInRadians),
+        seatTop: 50 + radii.seatRadiusY * Math.sin(angleInRadians),
+      };
+    });
+  }, [state.players, anchorIndex]);
 
-  return (
-    <div className="space-y-6">
-      {/* Pot display */}
-      <div className="text-center">
-        <div className="inline-flex items-center gap-4 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400 uppercase tracking-wider">Pot</span>
-            <span className="text-lg font-bold text-white">{totalPot}</span>
+  const headsUpMessage = useMemo(() => {
+    if (state.gameOver && state.winners.length > 0) {
+      const names = state.winners.map(w => {
+        const p = state.players.find(x => x.id === w.playerId);
+        return p?.id === myId ? 'You' : (p?.name ?? w.playerId);
+      });
+      return names.length === 1 ? `${names[0]} wins the hand` : `${names.join(' and ')} win the hand`;
+    }
+    if (state.gameOver && state.sessionOver) return 'Session over';
+    if (state.gameOver && !state.sessionOver) return 'Hand over — waiting for host to deal next hand';
+    if (!state.gameOver && currentPlayer) {
+      const name = currentPlayer.id === myId ? 'Your' : `${currentPlayer.name}'s`;
+      return `${state.street.charAt(0).toUpperCase() + state.street.slice(1)} · ${name} turn`;
+    }
+    return '\u00a0';
+  }, [state.gameOver, state.sessionOver, state.winners, state.players, state.street, currentPlayer, myId]);
+
+  const renderSeatPill = (layout: PokerSeatLayout) => {
+    const { player } = layout;
+    const isCurrentTurn = !state.gameOver && state.players[state.currentPlayerIndex]?.id === player.id;
+    const isMe = player.id === myId;
+    const isDealer = state.players[state.dealerIndex]?.id === player.id;
+    const color = normalizePlayerColor((player as { color?: string }).color ?? null);
+    const seatColor = PLAYER_COLOR_HEX[color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+    const activeClass = isCurrentTurn ? (isMe ? 'poker-seatPill--activeSelf' : 'poker-seatPill--activeOther') : '';
+    const foldedClass = player.folded ? 'poker-seatPill--folded' : '';
+
+    return (
+      <div
+        className={`poker-seatPill ${activeClass} ${isMe ? 'poker-seatPill--me' : ''} ${foldedClass}`}
+      >
+        <div className="poker-seatPillColor" style={{ backgroundColor: seatColor }} />
+        <div className="poker-seatPillBody">
+          <span className="poker-seatPillName">{isMe ? 'You' : player.name}</span>
+          <div className="flex items-center gap-1.5 flex-wrap justify-center">
+            {isDealer && <span className="text-[10px] font-bold bg-amber-500/30 text-amber-300 rounded px-1">D</span>}
+            {player.allIn && <span className="text-[10px] font-bold bg-red-500/30 text-red-300 rounded px-1">AI</span>}
+            {player.leftGame && <span className="text-[10px] text-gray-500">left</span>}
           </div>
-          {state.handNumber > 0 && (
-            <span className="text-xs text-gray-500">Hand #{state.handNumber}</span>
-          )}
+          <span className="poker-seatPillChips">{player.chips} chips</span>
+          {player.betThisStreet > 0 && <span className="text-[10px] text-amber-400">bet {player.betThisStreet}</span>}
         </div>
-        {!state.gameOver && (
-          <p className="text-xs text-gray-500 mt-2">
-            {state.street.charAt(0).toUpperCase() + state.street.slice(1)}
-            {' \u2022 '}
-            <span className="text-primary-400">{currentPlayer?.name}</span>&apos;s turn
-          </p>
-        )}
       </div>
+    );
+  };
 
-      {/* Community cards */}
-      <div className="flex justify-center gap-2">
-        {[0, 1, 2, 3, 4].map(i => {
-          const card = state.communityCards[i];
-          if (!card && state.street === 'preflop') {
-            return <CardDisplay key={i} faceDown size="md" />;
-          }
-          return card
-            ? <CardDisplay key={i} card={card} size="md" />
-            : <div key={i} className="w-14 h-20 rounded-lg border border-white/5 bg-white/[0.02]" />;
-        })}
-      </div>
+  // Between-hands / session-over / winners (full-screen overlays when game over)
+  if (state.gameOver && state.sessionOver) {
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="poker-board h-full flex flex-col items-center justify-center space-y-6 text-center p-6">
+        <Crown className="w-14 h-14 text-amber-400 mx-auto" />
+        <h2 className="text-2xl font-bold text-white">Session Over</h2>
+        <p className="text-sm text-white/80">Final standings</p>
+        <div className="space-y-2 w-full max-w-xs">
+          {[...state.players].filter(p => !p.leftGame).sort((a, b) => b.chips - a.chips).map((p, i) => (
+            <div key={p.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-2">
+              <span className="font-medium text-white">{i === 0 && p.chips > 0 ? '👑 ' : ''}{p.id === myId ? 'You' : p.name}</span>
+              <span className={`font-bold ${p.chips > 0 ? 'text-green-400' : 'text-red-400'}`}>{p.chips} chips</span>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    );
+  }
 
-      {/* Players ring */}
-      <div className="space-y-2">
-        {orderedPlayers.map((player) => {
-          const isMe = player.id === myId;
-          const isCurrent = state.players[state.currentPlayerIndex]?.id === player.id && !state.gameOver;
-          const isDealer = state.players[state.dealerIndex]?.id === player.id;
-          const showCards = isMe || (state.showdownReveal && !player.folded);
-
-          return (
-            <motion.div
-              key={player.id}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
-                isCurrent
-                  ? 'border-primary-500/40 bg-primary-500/10'
-                  : player.folded
-                    ? 'border-white/5 bg-white/[0.02] opacity-50'
-                    : 'border-white/10 bg-white/5'
-              }`}
+  if (state.gameOver && state.winners.length > 0 && !state.sessionOver) {
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="poker-board space-y-4">
+        <div ref={tableRef} className={`poker-table poker-table--players-${state.players.length}`}>
+          {seatLayouts.map((layout) => (
+            <div
+              key={layout.player.id}
+              className={`poker-seat ${layout.relativeIndex === 0 ? 'poker-seat--self' : ''}`}
+              style={{ left: `${layout.seatLeft}%`, top: `${layout.seatTop}%` }}
             >
-              {/* Badges */}
-              <div className="flex flex-col items-center gap-1 w-8">
-                {isDealer && (
-                  <span className="text-[10px] font-bold bg-yellow-500/20 text-yellow-400 rounded-full px-1.5 py-0.5">D</span>
-                )}
-                {player.allIn && (
-                  <span className="text-[10px] font-bold bg-red-500/20 text-red-400 rounded-full px-1.5 py-0.5">AI</span>
-                )}
-              </div>
-
-              {/* Name & chips */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm font-medium truncate ${isMe ? 'text-primary-300' : 'text-white'}`}>
-                    {player.name}
-                    {isMe && ' (you)'}
-                  </span>
-                  {player.leftGame && <span className="text-xs text-gray-500">left</span>}
-                  {!player.leftGame && player.folded && <span className="text-xs text-gray-500">folded</span>}
-                  {player.chips === 0 && state.gameOver && !player.leftGame && <span className="text-xs text-red-400">busted</span>}
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-400">{player.chips} chips</span>
-                  {player.betThisStreet > 0 && (
-                    <span className="text-xs text-amber-400">bet: {player.betThisStreet}</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Hole cards */}
-              <div className="flex gap-1">
-                {player.holeCards.length > 0 ? (
-                  showCards ? (
-                    player.holeCards.map((c, i) => <CardDisplay key={i} card={c} size="sm" />)
-                  ) : (
-                    [0, 1].map(i => <CardDisplay key={i} faceDown size="sm" />)
-                  )
-                ) : null}
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
-
-      {/* Winners display */}
-      {state.gameOver && state.winners.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-4 space-y-2"
-        >
-          <div className="flex items-center gap-2 text-yellow-400">
+              {renderSeatPill(layout)}
+            </div>
+          ))}
+          <div className="poker-center">
+            <div className="poker-pot">Pot {totalPot}</div>
+            <div className="poker-communityCards">
+              {state.communityCards.map((card, i) => <PokerCardDisplay key={i} card={card} size="md" />)}
+            </div>
+          </div>
+        </div>
+        <div className="poker-headsUp" aria-live="polite">
+          <p className="poker-headsUpText">{headsUpMessage || '\u00a0'}</p>
+        </div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 space-y-2">
+          <div className="flex items-center gap-2 text-amber-400 font-bold">
             <Trophy className="w-5 h-5" />
-            <span className="font-bold">
-              {state.winners.length === 1 ? 'Winner' : 'Winners'}
-            </span>
+            {state.winners.length === 1 ? 'Winner' : 'Winners'}
           </div>
           {state.winners.map((w) => {
             const player = state.players.find(p => p.id === w.playerId);
             return (
-              <div key={w.playerId} className="flex items-center justify-between text-sm">
-                <span className="text-white font-medium">{player?.name ?? w.playerId}</span>
-                <span className="text-gray-400">
-                  {w.handName} &mdash; <span className="text-yellow-400 font-bold">+{w.amount}</span>
-                </span>
+              <div key={w.playerId} className="flex justify-between text-sm">
+                <span className="text-white font-medium">{player?.id === myId ? 'You' : player?.name ?? w.playerId}</span>
+                <span className="text-amber-300 font-bold">+{w.amount} · {w.handName}</span>
               </div>
             );
           })}
         </motion.div>
-      )}
-
-      {/* Session over display */}
-      {state.gameOver && state.sessionOver && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-xl border border-primary-500/20 bg-primary-500/5 p-4 space-y-3"
-        >
-          <div className="flex items-center gap-2 text-primary-400">
-            <Crown className="w-5 h-5" />
-            <span className="font-bold">Session Over</span>
-          </div>
-          <p className="text-xs text-gray-400">Not enough players to continue. Final standings:</p>
-          <div className="space-y-1">
-            {[...state.players]
-              .filter(p => !p.leftGame)
-              .sort((a, b) => b.chips - a.chips)
-              .map((p, i) => (
-                <div key={p.id} className="flex items-center justify-between text-sm">
-                  <span className="text-white font-medium">
-                    {i === 0 && p.chips > 0 ? '👑 ' : ''}{p.name}
-                  </span>
-                  <span className={`font-bold ${p.chips > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {p.chips} chips
-                  </span>
-                </div>
-              ))}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Between-hands controls */}
-      {state.gameOver && !state.sessionOver && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col gap-3"
-        >
-          {/* Chip standings */}
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-2">
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Chip Standings</p>
-            {[...state.players]
-              .filter(p => !p.leftGame)
-              .sort((a, b) => b.chips - a.chips)
-              .map(p => (
-                <div key={p.id} className="flex items-center justify-between text-sm">
-                  <span className={`font-medium ${p.id === myId ? 'text-primary-300' : 'text-white'}`}>
-                    {p.name}{p.id === myId ? ' (you)' : ''}
-                  </span>
-                  <span className={`font-bold ${p.chips === 0 ? 'text-red-400' : 'text-gray-300'}`}>
-                    {p.chips === 0 ? 'Busted' : `${p.chips} chips`}
-                  </span>
-                </div>
-              ))}
-          </div>
-
-          {/* Host: Deal Next Hand */}
-          {isHost && (
-            <button
-              onClick={() => sendAction({ type: 'next-hand' })}
-              className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 text-white font-bold text-lg hover:from-primary-500 hover:to-primary-400 transition-all shadow-lg shadow-primary-600/20 cursor-pointer"
-            >
-              <Play className="w-5 h-5" />
-              Deal Next Hand
-            </button>
-          )}
-
-          {/* Non-host: waiting + leave option */}
-          {!isHost && (
-            <div className="space-y-3">
-              <p className="text-center text-sm text-gray-500">Waiting for host to deal next hand...</p>
-              {onLeave && (
-                <button
-                  onClick={onLeave}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors cursor-pointer font-medium"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Leave Table
-                </button>
-              )}
-            </div>
-          )}
-        </motion.div>
-      )}
-
-      {/* Action buttons */}
-      {isMyTurn && me && !me.folded && !me.allIn && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/5 p-4"
-        >
-          {/* Top row: fold, check/call */}
-          <div className="flex gap-3">
-            <button
-              onClick={() => sendAction({ type: 'fold' })}
-              className="flex-1 px-4 py-3 rounded-xl border border-white/10 text-gray-400 hover:text-white hover:border-white/20 transition-colors cursor-pointer font-medium"
-            >
-              Fold
-            </button>
-            {canCheck ? (
-              <button
-                onClick={() => sendAction({ type: 'check' })}
-                className="flex-1 px-4 py-3 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 transition-colors cursor-pointer"
-              >
-                Check
-              </button>
-            ) : (
-              <button
-                onClick={() => sendAction({ type: 'call' })}
-                className="flex-1 px-4 py-3 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 transition-colors cursor-pointer"
-              >
-                Call {Math.min(toCall, me.chips)}
+        {isHost && (
+          <button
+            onClick={() => sendAction({ type: 'next-hand' })}
+            className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-primary-600 text-white font-bold text-lg hover:bg-primary-500 cursor-pointer"
+          >
+            <Play className="w-5 h-5" />
+            Deal Next Hand
+          </button>
+        )}
+        {!isHost && (
+          <div className="space-y-3">
+            <p className="text-center text-sm text-white/70">Waiting for host to deal next hand...</p>
+            {onLeave && (
+              <button onClick={onLeave} className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 cursor-pointer font-medium">
+                <LogOut className="w-4 h-4" />
+                Leave Table
               </button>
             )}
           </div>
+        )}
+      </motion.div>
+    );
+  }
 
-          {/* Raise row */}
+  // Main playing view: table + heads-up + hand + action row
+  return (
+    <div className="poker-board space-y-3 sm:space-y-4">
+      <div ref={tableRef} className={`poker-table poker-table--players-${state.players.length}`}>
+        {seatLayouts.map((layout) => (
+          <div
+            key={layout.player.id}
+            className={`poker-seat ${layout.relativeIndex === 0 ? 'poker-seat--self' : ''}`}
+            style={{ left: `${layout.seatLeft}%`, top: `${layout.seatTop}%` }}
+          >
+            {renderSeatPill(layout)}
+          </div>
+        ))}
+
+        <div className="poker-center">
+          <div className="poker-pot">Pot {totalPot}{state.handNumber > 0 ? ` · Hand #${state.handNumber}` : ''}</div>
+          <div className="poker-communityCards">
+            {[0, 1, 2, 3, 4].map((i) => {
+              const card = state.communityCards[i];
+              if (!card && state.street === 'preflop') return <PokerCardDisplay key={i} faceDown size="md" />;
+              return card ? <PokerCardDisplay key={i} card={card} size="md" /> : <div key={i} className="w-14 h-20 rounded-lg border-2 border-white/10 bg-white/5" />;
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="poker-headsUp" aria-live="polite">
+        <p className="poker-headsUpText">{headsUpMessage || '\u00a0'}</p>
+      </div>
+
+      {me && (
+        <div className={`poker-hand ${isHandZoomed ? 'poker-hand--zoom' : ''}`}>
+          {me.holeCards.length > 0 ? (
+            me.holeCards.map((c, i) => <PokerCardDisplay key={i} card={c} size="sm" />)
+          ) : (
+            [0, 1].map((i) => <PokerCardDisplay key={i} faceDown size="sm" />)
+          )}
+        </div>
+      )}
+
+      {isMyTurn && me && !me.folded && !me.allIn && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="poker-actionRow">
+          <button type="button" onClick={() => sendAction({ type: 'fold' })} className="poker-actionButton border-white/20 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white">
+            Fold
+          </button>
+          {canCheck ? (
+            <button type="button" onClick={() => sendAction({ type: 'check' })} className="poker-actionButton bg-primary-600 border-primary-700 text-white hover:bg-primary-500">
+              Check
+            </button>
+          ) : (
+            <button type="button" onClick={() => sendAction({ type: 'call' })} className="poker-actionButton bg-primary-600 border-primary-700 text-white hover:bg-primary-500">
+              Call {Math.min(toCall, me.chips)}
+            </button>
+          )}
           {me.chips > toCall && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setRaiseAmount(prev => Math.max(effectiveMinRaise, prev - state.bigBlind))}
-                className="w-10 h-10 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <ChevronDown className="w-4 h-4 text-gray-400" />
+            <>
+              <button type="button" onClick={() => setRaiseAmount(prev => Math.max(effectiveMinRaise, prev - state.bigBlind))} className="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer">
+                <ChevronDown className="w-4 h-4 text-white" />
               </button>
-              <div className="flex-1 relative">
+              <div className="flex flex-col items-center min-w-[80px]">
                 <input
                   type="range"
                   min={effectiveMinRaise}
@@ -354,33 +320,20 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave }: P
                   step={state.bigBlind}
                   value={raiseAmount || effectiveMinRaise}
                   onChange={e => setRaiseAmount(Number(e.target.value))}
-                  className="w-full accent-primary-500"
+                  className="w-full accent-amber-500"
                 />
-                <div className="text-center text-xs text-gray-400 mt-1">
-                  {raiseAmount || effectiveMinRaise}
-                </div>
+                <span className="text-xs text-white/80">{raiseAmount || effectiveMinRaise}</span>
               </div>
-              <button
-                onClick={() => setRaiseAmount(prev => Math.min(maxRaiseTotal, (prev || effectiveMinRaise) + state.bigBlind))}
-                className="w-10 h-10 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <ChevronUp className="w-4 h-4 text-gray-400" />
+              <button type="button" onClick={() => setRaiseAmount(prev => Math.min(maxRaiseTotal, (prev || effectiveMinRaise) + state.bigBlind))} className="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer">
+                <ChevronUp className="w-4 h-4 text-white" />
               </button>
-              <button
-                onClick={handleRaise}
-                className="px-6 py-2.5 rounded-xl bg-amber-600 text-white font-medium hover:bg-amber-500 transition-colors cursor-pointer"
-              >
+              <button type="button" onClick={handleRaise} className="poker-actionButton bg-amber-600 border-amber-700 text-white hover:bg-amber-500">
                 Raise
               </button>
-            </div>
+            </>
           )}
-
-          {/* All-in shortcut */}
           {me.chips > 0 && (
-            <button
-              onClick={() => sendAction({ type: 'raise', amount: me.betThisStreet + me.chips })}
-              className="w-full px-4 py-2 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer text-sm font-medium"
-            >
+            <button type="button" onClick={() => sendAction({ type: 'raise', amount: me.betThisStreet + me.chips })} className="poker-actionButton border-red-500/30 text-red-300 hover:bg-red-500/20">
               All In ({me.chips})
             </button>
           )}
