@@ -16,7 +16,7 @@ import type { UpRiverState } from '../games/up-and-down-the-river/types';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 import { GAME_CATALOG } from '../games/gameCatalog';
 
-const BOT_NAMES = ['Nova', 'Pixel', 'Byte', 'Chip', 'Blaze', 'Echo', 'Neon', 'Volt'];
+export const BOT_NAMES = ['Nova', 'Pixel', 'Byte', 'Chip', 'Blaze', 'Echo', 'Neon', 'Volt'];
 
 function createBots(count: number, existingPlayers: Player[]): Player[] {
   const usedNames = existingPlayers.map(p => p.name);

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Minus, Plus, X } from 'lucide-react';
 import GameCard from '../components/GameCard';
 import RoomCodeInput from '../components/RoomCodeInput';
-import { useRoomContext } from '../networking/roomStore';
+import { useRoomContext, BOT_NAMES } from '../networking/roomStore';
 import type { GameStartOptions, GameType, HeartsTargetScore, PlayerColor, UpRiverStartMode } from '../networking/types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 import { GAME_CATALOG } from '../games/gameCatalog';
@@ -15,7 +15,7 @@ const gameTypesToShow = import.meta.env.DEV ? allGameTypes.filter(g => !GAMES_HI
 
 export default function Home() {
   const navigate = useNavigate();
-  const { room, isHost, createLobby, joinRoom, startGame, connecting, error, clearError } = useRoomContext();
+  const { room, isHost, myId, createLobby, joinRoom, startGame, connecting, error, clearError } = useRoomContext();
   const [playerName] = useState(() => {
     return localStorage.getItem('playerName') || '';
   });
@@ -501,10 +501,23 @@ export default function Home() {
         </motion.div>
       )}
 
-      {pendingBotGame && (() => {
+      {pendingBotGame && room && (() => {
         const catalog = GAME_CATALOG[pendingBotGame];
         const minBots = Math.max(0, catalog.minPlayers - playerCount);
         const maxBots = catalog.maxPlayers - playerCount;
+        const totalPlayers = playerCount + selectedBotCount;
+        const usedNames = room.players.map((p) => p.name);
+        const previewBotNames = BOT_NAMES.filter((n) => !usedNames.includes(n)).slice(0, selectedBotCount);
+        const displayList: { name: string; color: string }[] = [
+          ...room.players.map((p) => ({
+            name: p.id === myId ? 'You' : p.name,
+            color: PLAYER_COLOR_HEX[p.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR],
+          })),
+          ...previewBotNames.map((name) => ({
+            name,
+            color: PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR],
+          })),
+        ];
         return (
           <motion.div
             initial={{ opacity: 0 }}
@@ -524,10 +537,28 @@ export default function Home() {
               aria-modal="true"
               aria-label={`Start ${catalog.title}`}
             >
-              <h2 className="text-lg font-bold text-white">Start {catalog.title}</h2>
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="text-lg font-bold text-white">Start {catalog.title}</h2>
+                <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-gray-300">
+                  {totalPlayers} {totalPlayers === 1 ? 'player' : 'players'}
+                </span>
+              </div>
               <p className="text-sm text-gray-400">
-                {playerCount} {playerCount === 1 ? 'player' : 'players'} in lobby.
-                {maxBots > 0 ? ' Add bots to fill seats?' : ''}
+                {playerCount === 1 ? (
+                  'Play alone'
+                ) : (
+                  <>
+                    Play with{' '}
+                    {displayList.map((item, i) => (
+                      <span key={i}>
+                        {i > 0 && (i === displayList.length - 1 ? ' and ' : ', ')}
+                        <span className="font-medium" style={{ color: item.color }}>
+                          {item.name}
+                        </span>
+                      </span>
+                    ))}
+                  </>
+                )}
               </p>
               <div
                 className="flex items-center justify-center gap-4 py-2"
