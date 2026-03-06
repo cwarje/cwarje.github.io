@@ -10,9 +10,9 @@ import type { GameStartOptions, GameType, PlayerColor } from '../networking/type
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 import { GAME_CATALOG } from '../games/gameCatalog';
 
-const GAMES_HIDDEN_IN_DEV: GameType[] = ['battleship', 'liars-dice', 'poker'];
+const PRODUCTION_GAME_TYPES: GameType[] = ['yahtzee', 'hearts', 'up-and-down-the-river'];
 const allGameTypes: GameType[] = ['yahtzee', 'hearts', 'up-and-down-the-river', 'battleship', 'liars-dice', 'poker'];
-const gameTypesToShow = import.meta.env.DEV ? allGameTypes.filter(g => !GAMES_HIDDEN_IN_DEV.includes(g)) : allGameTypes;
+const gameTypesToShow = import.meta.env.DEV ? allGameTypes : PRODUCTION_GAME_TYPES;
 
 export default function Home() {
   const navigate = useNavigate();
