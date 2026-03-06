@@ -4,7 +4,7 @@ import { Users, Copy, Plus, X, LogOut, Loader2, Settings } from 'lucide-react';
 import PlayerList from './PlayerList';
 import { useRoomContext } from '../networking/roomStore';
 import { useToast } from './Toast';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { GAME_CATALOG } from '../games/gameCatalog';
 import type { PlayerColor } from '../networking/types';
 import { normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
@@ -15,8 +15,6 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
   const { room, myPlayer, isHost, addBot, removeBot, removePlayer, leaveRoom, updateProfile, connecting } = useRoomContext();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const location = useLocation();
-  const isHomePage = location.pathname === '/';
   const [open, setOpen] = useState(false);
   const [nameInput, setNameInput] = useState(() => localStorage.getItem('playerName') || '');
   const [colorInput, setColorInput] = useState<PlayerColor>(() => normalizePlayerColor(localStorage.getItem('playerColor')));
@@ -180,54 +178,51 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                 </div>
               ) : (
                 <>
-                  {/* Lobby code and players only when not on homepage (shown in homepage cards there) */}
-                  {!isHomePage && (
-                    <>
-                      <div className="px-5 py-4 space-y-2">
-                        <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Lobby Code</p>
-                        <div className="flex items-center justify-between">
-                          <span className="text-2xl font-extrabold tracking-[0.3em] text-white font-mono">
-                            {room.roomCode}
-                          </span>
-                          <button
-                            onClick={copyCode}
-                            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
-                            title="Copy lobby code"
-                          >
-                            <Copy className="w-4 h-4 text-gray-400" />
-                          </button>
-                        </div>
-                        <p className="text-[11px] text-gray-500">Share this code with friends to invite them</p>
-                      </div>
+                  {/* Lobby code section */}
+                  <div className="px-5 py-4 space-y-2">
+                    <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Lobby Code</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xl font-extrabold tracking-[0.3em] text-white font-mono">
+                        {room.roomCode}
+                      </span>
+                      <button
+                        onClick={copyCode}
+                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
+                        title="Copy lobby code"
+                      >
+                        <Copy className="w-4 h-4 text-gray-400" />
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-gray-500">Share this code with friends to invite them</p>
+                  </div>
 
-                      <div className="px-5 py-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-xs font-medium text-gray-400">
-                            Players ({playerCount})
-                          </h3>
-                          {canAddBot && (
-                            <button
-                              onClick={addBot}
-                              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-medium text-gray-400 hover:text-white transition-colors cursor-pointer"
-                            >
-                              <Plus className="w-3 h-3" />
-                              Add Bot
-                            </button>
-                          )}
-                        </div>
-                        <div className="max-h-48 overflow-y-auto -mx-1 px-1">
-                          <PlayerList
-                            players={room.players}
-                            hostId={room.hostId}
-                            isHost={isHost}
-                            onRemoveBot={canManagePlayers ? removeBot : undefined}
-                            onRemovePlayer={canManagePlayers ? removePlayer : undefined}
-                            wins={room.wins}
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
+                  {/* Players section */}
+                  <div className="px-5 py-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-medium text-gray-400">
+                        Players ({playerCount})
+                      </h3>
+                      {canAddBot && (
+                        <button
+                          onClick={addBot}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-medium text-gray-400 hover:text-white transition-colors cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Add Bot
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-48 overflow-y-auto -mx-1 px-1">
+                      <PlayerList
+                        players={room.players}
+                        hostId={room.hostId}
+                        isHost={isHost}
+                        onRemoveBot={canManagePlayers ? removeBot : undefined}
+                        onRemovePlayer={canManagePlayers ? removePlayer : undefined}
+                        wins={room.wins}
+                      />
+                    </div>
+                  </div>
 
                   {/* Leave button */}
                   <div className="px-5 py-3">

@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Copy } from 'lucide-react';
+import { X } from 'lucide-react';
 import GameCard from '../components/GameCard';
 import RoomCodeInput from '../components/RoomCodeInput';
-import PlayerList from '../components/PlayerList';
-import { useToast } from '../components/Toast';
 import { useRoomContext } from '../networking/roomStore';
 import type { GameStartOptions, GameType, HeartsTargetScore, PlayerColor, UpRiverStartMode } from '../networking/types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
@@ -17,8 +15,7 @@ const gameTypesToShow = import.meta.env.DEV ? allGameTypes.filter(g => !GAMES_HI
 
 export default function Home() {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const { room, isHost, createLobby, joinRoom, startGame, removeBot, removePlayer, connecting, error, clearError } = useRoomContext();
+  const { room, isHost, createLobby, joinRoom, startGame, connecting, error, clearError } = useRoomContext();
   const [playerName] = useState(() => {
     return localStorage.getItem('playerName') || '';
   });
@@ -214,85 +211,40 @@ export default function Home() {
   };
 
   const playerCount = room?.players.length ?? 0;
-  const isLobbyPhase = room?.phase === 'lobby';
-  const canManagePlayers = isHost && isLobbyPhase;
-
-  const copyLobbyCode = () => {
-    if (room) {
-      navigator.clipboard.writeText(room.roomCode);
-      toast('Lobby code copied!', 'info');
-    }
-  };
 
   return (
     <div className="space-y-10">
-      {/* Two-card lobby section: join (left/top) + share code (right/bottom) */}
+      {/* Hero Section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+        className="text-center space-y-4"
       >
-        {/* Card 1: Enter friend's code + player list (first on mobile, left on desktop) */}
-        <div className="rounded-2xl glass border border-white/10 p-6 sm:p-7 flex flex-col min-h-[240px] order-1 lg:order-1">
-          {(!room || isHost) && (
-            <div className="mb-5 w-full">
-              <RoomCodeInput onJoin={handleJoinRoom} loading={connecting} variant="large" />
-            </div>
-          )}
-          {room ? (
-            <div className="flex-1 flex flex-col min-h-0">
-              <div className="mb-2">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Players in lobby ({playerCount})</span>
-              </div>
-              <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
-                <PlayerList
-                  players={room.players}
-                  hostId={room.hostId}
-                  isHost={isHost}
-                  onRemoveBot={canManagePlayers ? removeBot : undefined}
-                  onRemovePlayer={canManagePlayers ? removePlayer : undefined}
-                  wins={room.wins}
-                />
-              </div>
-            </div>
-          ) : (
-            <p className="mt-1 text-sm text-gray-500">Join a lobby above or create one to see players here.</p>
-          )}
-        </div>
-
-        {/* Card 2: Host + share code (second on mobile, right on desktop) */}
-        <div className="rounded-2xl glass border border-white/10 p-6 sm:p-7 flex min-h-[240px] flex-col items-center justify-center text-center order-2 lg:order-2">
-          {room ? (
-            <div className="flex flex-col items-center gap-3">
-              <h2 className="text-2xl font-semibold text-white">Host</h2>
-              <p className="max-w-xs text-sm text-gray-400">Share this code with friends to invite them</p>
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-4xl font-extrabold tracking-[0.3em] text-white font-mono sm:text-5xl">
-                  {room.roomCode}
-                </span>
-                <button
-                  type="button"
-                  onClick={copyLobbyCode}
-                  className="shrink-0 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 transition-colors cursor-pointer hover:bg-white/10"
-                  title="Copy lobby code"
-                >
-                  <Copy className="w-5 h-5 text-gray-400" />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-3">
-              <h2 className="text-2xl font-semibold text-white">Host</h2>
-              {connecting ? (
-                <p className="text-sm text-gray-400">Creating your lobby...</p>
-              ) : (
-                <p className="max-w-xs text-sm text-gray-500">Your lobby code will appear here once a lobby is created.</p>
-              )}
-            </div>
-          )}
-        </div>
+        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">
+          <span className="bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
+            {isHost ? 'Pick a Game' : room ? 'Waiting for Host' : 'Pick a Game'}
+          </span>
+        </h1>
+        <p className="text-gray-400 text-lg max-w-md mx-auto">
+          {isHost || !room
+            ? 'Invite friends from the Lobby menu, then pick a game. Bots are added as needed.'
+            : 'The host will pick a game to start.'}
+        </p>
       </motion.div>
+
+      {/* Join Room Bar — hidden when player has joined someone else's lobby */}
+      {(!room || isHost) && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="flex flex-col sm:flex-row items-center justify-center gap-3"
+        >
+          <span className="text-sm text-gray-500">Have a lobby code?</span>
+          <RoomCodeInput onJoin={handleJoinRoom} loading={connecting} />
+        </motion.div>
+      )}
 
       {/* Error */}
       {error && (
@@ -306,23 +258,13 @@ export default function Home() {
         </motion.div>
       )}
 
-      {/* Games section */}
+      {/* Game Cards */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.2 }}
-        className="space-y-6"
+        className="space-y-4"
       >
-        <div className="text-center sm:text-left">
-          <h2 className="text-2xl font-bold text-white tracking-tight">
-            {isHost ? 'Pick a game' : room ? 'Waiting for host' : 'Pick a game'}
-          </h2>
-          <p className="text-gray-400 text-sm mt-1">
-            {isHost || !room
-              ? 'Choose a game below. Add bots from the lobby card if needed.'
-              : 'The host will start a game when ready.'}
-          </p>
-        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {gameTypesToShow.map((game, i) => {
             const catalog = GAME_CATALOG[game];
