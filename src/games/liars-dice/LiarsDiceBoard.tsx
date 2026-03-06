@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dice1, Dice2, Dice3, Dice4, Dice5, Dice6,
-  Trophy, Skull, Shield, CircleDot, ChevronUp, ChevronDown,
+  Skull, Shield, CircleDot, ChevronUp, ChevronDown,
   Crosshair, Eye, AlertTriangle,
 } from 'lucide-react';
 import type { LiarsDiceState, Bid } from './types';
@@ -57,7 +57,7 @@ export default function LiarsDiceBoard({ state, myId, onAction }: LiarsDiceBoard
     const eliminated = state.players.filter(p => !p.alive);
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-md mx-auto space-y-6 text-center">
-        <Trophy className="w-16 h-16 text-amber-400 mx-auto" />
+        <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
         <h2 className="text-3xl font-extrabold text-white">Game Over!</h2>
         <div className="space-y-3">
           {winner && (

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Trophy } from 'lucide-react';
 import type { HeartsState, Card, Suit, HeartsPlayer } from './types';
 import { isValidHeartsPlay } from './rules';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX } from '../../networking/playerColors';
@@ -295,8 +294,8 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
         animate={{ opacity: 1 }}
         className="hearts-board h-full flex flex-col items-center justify-center space-y-6 text-center"
       >
-        <Trophy className="w-14 h-14 text-black mx-auto" />
-        <h2 className="text-3xl font-extrabold text-black">Game Over</h2>
+        <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
+        <h2 className="text-3xl font-extrabold text-white">Game Over</h2>
         <div className="space-y-3 w-full max-w-2xl">
           {sorted.map((p, i) => (
             <div key={p.id} className="hearts-resultRow">

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type TransitionEvent } from 'react';
 import { motion } from 'framer-motion';
-import { RotateCcw, Trophy } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import type { YahtzeeState, ScoreCategory } from './types';
 import {
   calculateScoreWithJoker,
@@ -183,7 +183,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
         animate={{ opacity: 1 }}
         className="yahtzee-board h-full flex flex-col items-center justify-center space-y-6 text-center"
       >
-        <Trophy className="w-16 h-16 text-amber-400 mx-auto" />
+        <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
         <h2 className="text-3xl font-extrabold text-white">Game Over!</h2>
         <div className="space-y-3">
           {sorted.map((p, i) => (

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { RotateCw, Check, Trophy, Crosshair } from 'lucide-react';
+import { RotateCw, Check, Crosshair } from 'lucide-react';
 import type { BattleshipState, Ship, CellState } from './types';
 import { SHIPS } from './types';
 
@@ -269,7 +269,7 @@ export default function BattleshipBoard({ state, myId, onAction }: BattleshipBoa
     const isWinner = state.winner === myId;
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-md mx-auto space-y-6 text-center">
-        <Trophy className={`w-16 h-16 mx-auto ${isWinner ? 'text-amber-400' : 'text-gray-500'}`} />
+        <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
         <h2 className="text-3xl font-extrabold text-white">{isWinner ? 'Victory!' : 'Defeat'}</h2>
         <p className="text-gray-400">
           {isWinner ? 'You sank all enemy ships!' : `${state.players.find(p => p.id === state.winner)?.name} sank your fleet.`}

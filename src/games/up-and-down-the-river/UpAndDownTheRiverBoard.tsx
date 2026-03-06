@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Trophy } from 'lucide-react';
 import type { Card, Suit, UpRiverPlayer, UpRiverState } from './types';
 import { isValidUpRiverPlay } from './rules';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX } from '../../networking/playerColors';
@@ -346,8 +345,8 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
         animate={{ opacity: 1 }}
         className="river-board h-full flex flex-col items-center justify-center space-y-6 text-center"
       >
-        <Trophy className="w-14 h-14 text-black mx-auto" />
-        <h2 className="text-3xl font-extrabold text-black">Game Over</h2>
+        <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
+        <h2 className="text-3xl font-extrabold text-white">Game Over</h2>
         <div className="space-y-3 w-full max-w-2xl">
           {rankedPlayers.map((player, i) => (
             <div key={player.id} className="river-resultRow">

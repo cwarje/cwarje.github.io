@@ -9,6 +9,10 @@ import type { GameStartOptions, GameType, HeartsTargetScore, PlayerColor, UpRive
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 import { GAME_CATALOG } from '../games/gameCatalog';
 
+const GAMES_HIDDEN_IN_DEV: GameType[] = ['battleship', 'liars-dice', 'poker'];
+const allGameTypes: GameType[] = ['yahtzee', 'hearts', 'up-and-down-the-river', 'battleship', 'liars-dice', 'poker'];
+const gameTypesToShow = import.meta.env.DEV ? allGameTypes.filter(g => !GAMES_HIDDEN_IN_DEV.includes(g)) : allGameTypes;
+
 export default function Home() {
   const navigate = useNavigate();
   const { room, isHost, createLobby, joinRoom, startGame, connecting, error, clearError } = useRoomContext();
@@ -262,7 +266,7 @@ export default function Home() {
         className="space-y-4"
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {(['yahtzee', 'hearts', 'up-and-down-the-river', 'battleship', 'liars-dice', 'poker'] as GameType[]).map((game, i) => {
+          {gameTypesToShow.map((game, i) => {
             const catalog = GAME_CATALOG[game];
             const tooManyPlayers = room ? playerCount > catalog.maxPlayers : false;
             const isDisabled = room ? (!isHost || tooManyPlayers) : false;

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Trophy, ChevronUp, ChevronDown, Play, LogOut, Crown } from 'lucide-react';
+import { Trophy, ChevronUp, ChevronDown, Play, LogOut } from 'lucide-react';
 import { DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, normalizePlayerColor } from '../../networking/playerColors';
 import type { PokerState, PokerAction, Card, PokerPlayer } from './types';
 
@@ -176,7 +176,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
   if (state.gameOver && state.sessionOver) {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="poker-board h-full flex flex-col items-center justify-center space-y-6 text-center p-6">
-        <Crown className="w-14 h-14 text-amber-400 mx-auto" />
+        <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
         <h2 className="text-2xl font-bold text-white">Session Over</h2>
         <p className="text-sm text-white/80">Final standings</p>
         <div className="space-y-2 w-full max-w-xs">
