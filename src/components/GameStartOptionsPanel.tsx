@@ -38,9 +38,9 @@ export default function GameStartOptionsPanel({
   }, [showBots, minBots, maxBots]);
 
   const canStart =
-    playerCount >= catalog.minPlayers &&
+    playerCount >= 1 &&
     playerCount <= catalog.maxPlayers &&
-    (!showBots || playerCount + botCount >= catalog.minPlayers);
+    (catalog.minPlayers === catalog.maxPlayers || playerCount + botCount >= catalog.minPlayers);
 
   const handlePlay = () => {
     if (!canStart || !isHost) return;
