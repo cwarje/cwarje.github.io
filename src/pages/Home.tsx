@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Minus, Plus, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import GameCard from '../components/GameCard';
+import GameStartOptionsPanel from '../components/GameStartOptionsPanel';
 import RoomCodeInput from '../components/RoomCodeInput';
-import { useRoomContext, BOT_NAMES } from '../networking/roomStore';
-import type { GameStartOptions, GameType, HeartsTargetScore, PlayerColor, UpRiverStartMode } from '../networking/types';
+import { useRoomContext } from '../networking/roomStore';
+import type { GameStartOptions, GameType, PlayerColor } from '../networking/types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 import { GAME_CATALOG } from '../games/gameCatalog';
 
@@ -15,7 +16,7 @@ const gameTypesToShow = import.meta.env.DEV ? allGameTypes.filter(g => !GAMES_HI
 
 export default function Home() {
   const navigate = useNavigate();
-  const { room, isHost, myId, createLobby, joinRoom, startGame, connecting, error, clearError } = useRoomContext();
+  const { room, isHost, createLobby, joinRoom, startGame, connecting, error, clearError } = useRoomContext();
   const [playerName] = useState(() => {
     return localStorage.getItem('playerName') || '';
   });
@@ -23,11 +24,7 @@ export default function Home() {
   const [nameInput, setNameInput] = useState(playerName);
   const [colorInput, setColorInput] = useState<PlayerColor>(playerColor);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
-  const [showHeartsTargetPrompt, setShowHeartsTargetPrompt] = useState(false);
-  const [showUpRiverStartPrompt, setShowUpRiverStartPrompt] = useState(false);
-  const [pendingBotGame, setPendingBotGame] = useState<GameType | null>(null);
-  const [pendingUpRiverStartMode, setPendingUpRiverStartMode] = useState<UpRiverStartMode | null>(null);
-  const [selectedBotCount, setSelectedBotCount] = useState(0);
+  const [expandedGameType, setExpandedGameType] = useState<GameType | null>(null);
   const [pendingJoinCode, setPendingJoinCode] = useState<string | null>(null);
   const [infoGameType, setInfoGameType] = useState<GameType | null>(null);
   const lobbyCreatingRef = useRef(false);
@@ -42,43 +39,6 @@ export default function Home() {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [infoGameType, closeInfo]);
-
-  useEffect(() => {
-    if (!showHeartsTargetPrompt) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setShowHeartsTargetPrompt(false);
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [showHeartsTargetPrompt]);
-
-  useEffect(() => {
-    if (!showUpRiverStartPrompt) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setShowUpRiverStartPrompt(false);
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [showUpRiverStartPrompt]);
-
-  useEffect(() => {
-    if (!pendingBotGame) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setPendingBotGame(null);
-        setPendingUpRiverStartMode(null);
-      }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [pendingBotGame]);
-
-  useEffect(() => {
-    if (!pendingBotGame || !room) return;
-    const catalog = GAME_CATALOG[pendingBotGame];
-    const minBots = Math.max(0, catalog.minPlayers - room.players.length);
-    setSelectedBotCount(minBots);
-  }, [pendingBotGame, room?.players.length]);
 
   const saveName = (name: string) => {
     localStorage.setItem('playerName', name);
@@ -161,61 +121,13 @@ export default function Home() {
     const count = room.players.length;
     const catalog = GAME_CATALOG[gameType];
     if (count > catalog.maxPlayers) return;
-
-    if (gameType === 'hearts') {
-      setShowHeartsTargetPrompt(true);
-      return;
-    }
-
-    if (gameType === 'up-and-down-the-river') {
-      setShowUpRiverStartPrompt(true);
-      return;
-    }
-
-    // Variable-count game with room for bots — show bot selection modal
-    if (catalog.minPlayers !== catalog.maxPlayers && count < catalog.maxPlayers) {
-      setPendingUpRiverStartMode(null);
-      setPendingBotGame(gameType);
-      return;
-    }
-
-    startGame(gameType);
+    setExpandedGameType((current) => (current === gameType ? null : gameType));
   };
 
-  const handleStartHeartsWithTarget = (targetScore: HeartsTargetScore) => {
+  const handleStartGame = (gameType: GameType, options?: GameStartOptions) => {
     if (!isHost || !room) return;
-    const count = room.players.length;
-    if (count > GAME_CATALOG.hearts.maxPlayers) return;
-    startGame('hearts', { targetScore });
-    setShowHeartsTargetPrompt(false);
-  };
-
-  const handleStartUpRiverWithMode = (upRiverStartMode: UpRiverStartMode) => {
-    if (!isHost || !room) return;
-    const count = room.players.length;
-    const catalog = GAME_CATALOG['up-and-down-the-river'];
-    if (count > catalog.maxPlayers) return;
-
-    if (count < catalog.maxPlayers) {
-      setPendingUpRiverStartMode(upRiverStartMode);
-      setPendingBotGame('up-and-down-the-river');
-      setShowUpRiverStartPrompt(false);
-      return;
-    }
-
-    startGame('up-and-down-the-river', { upRiverStartMode });
-    setShowUpRiverStartPrompt(false);
-  };
-
-  const handleStartWithBots = (botCount: number) => {
-    if (!isHost || !room || !pendingBotGame) return;
-    const options: GameStartOptions = { botCount };
-    if (pendingBotGame === 'up-and-down-the-river' && pendingUpRiverStartMode) {
-      options.upRiverStartMode = pendingUpRiverStartMode;
-    }
-    startGame(pendingBotGame, options);
-    setPendingBotGame(null);
-    setPendingUpRiverStartMode(null);
+    startGame(gameType, options);
+    setExpandedGameType(null);
   };
 
   const playerCount = room?.players.length ?? 0;
@@ -279,6 +191,7 @@ export default function Home() {
             const catalog = GAME_CATALOG[game];
             const tooManyPlayers = room ? playerCount > catalog.maxPlayers : false;
             const isDisabled = room ? (!isHost || tooManyPlayers) : false;
+            const isExpanded = expandedGameType === game;
 
             return (
               <motion.div
@@ -286,13 +199,26 @@ export default function Home() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 + i * 0.1 }}
+                className="flex flex-col min-w-0 w-full"
               >
                 <GameCard
                   gameType={game}
                   onSelect={handleSelectGame}
                   onInfo={setInfoGameType}
                   disabled={isDisabled}
+                  isExpanded={isExpanded}
                 />
+                <AnimatePresence>
+                  {isExpanded && isHost && room && (
+                    <GameStartOptionsPanel
+                      key={game}
+                      gameType={game}
+                      playerCount={playerCount}
+                      isHost={isHost}
+                      onStart={(options) => handleStartGame(game, options)}
+                    />
+                  )}
+                </AnimatePresence>
               </motion.div>
             );
           })}
@@ -424,184 +350,6 @@ export default function Home() {
         </motion.div>
       )}
 
-      {showHeartsTargetPrompt && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setShowHeartsTargetPrompt(false)}
-        >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm space-y-4"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Choose Hearts target score"
-          >
-            <h2 className="text-lg font-bold text-white">Start Hearts</h2>
-            <p className="text-sm text-gray-400">Choose the game length:</p>
-            <div className="grid grid-cols-1 gap-3">
-              <button
-                type="button"
-                onClick={() => handleStartHeartsWithTarget(50)}
-                className="w-full px-4 py-2.5 rounded-xl bg-rose-600 text-white font-medium hover:bg-rose-500 transition-colors cursor-pointer"
-              >
-                Game to 50
-              </button>
-              <button
-                type="button"
-                onClick={() => handleStartHeartsWithTarget(100)}
-                className="w-full px-4 py-2.5 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 transition-colors cursor-pointer"
-              >
-                Game to 100
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-
-      {showUpRiverStartPrompt && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setShowUpRiverStartPrompt(false)}
-        >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm space-y-4"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Choose Up and Down the River start mode"
-          >
-            <h2 className="text-lg font-bold text-white">Start Up and Down the River</h2>
-            <p className="text-sm text-gray-400">Choose how round sizes progress:</p>
-            <div className="grid grid-cols-1 gap-3">
-              <button
-                type="button"
-                onClick={() => handleStartUpRiverWithMode('up-down')}
-                className="w-full px-4 py-2.5 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 transition-colors cursor-pointer"
-              >
-                Up and Down the River (1-7-1)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleStartUpRiverWithMode('down-up')}
-                className="w-full px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-500 transition-colors cursor-pointer"
-              >
-                Down and Up the River (7-1-7)
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-
-      {pendingBotGame && room && (() => {
-        const catalog = GAME_CATALOG[pendingBotGame];
-        const minBots = Math.max(0, catalog.minPlayers - playerCount);
-        const maxBots = catalog.maxPlayers - playerCount;
-        const totalPlayers = playerCount + selectedBotCount;
-        const usedNames = room.players.map((p) => p.name);
-        const previewBotNames = BOT_NAMES.filter((n) => !usedNames.includes(n)).slice(0, selectedBotCount);
-        const displayList: { name: string; color: string }[] = [
-          ...room.players.map((p) => ({
-            name: p.id === myId ? 'You' : p.name,
-            color: PLAYER_COLOR_HEX[p.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR],
-          })),
-          ...previewBotNames.map((name) => ({
-            name,
-            color: PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR],
-          })),
-        ];
-        return (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => {
-              setPendingBotGame(null);
-              setPendingUpRiverStartMode(null);
-            }}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm space-y-4"
-              onClick={(e) => e.stopPropagation()}
-              role="dialog"
-              aria-modal="true"
-              aria-label={`Start ${catalog.title}`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <h2 className="text-lg font-bold text-white">Start {catalog.title}</h2>
-                <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-gray-300">
-                  {totalPlayers} {totalPlayers === 1 ? 'player' : 'players'}
-                </span>
-              </div>
-              <p className="text-sm text-gray-400">
-                {playerCount === 1 ? (
-                  'Play alone'
-                ) : (
-                  <>
-                    Play with{' '}
-                    {displayList.map((item, i) => (
-                      <span key={i}>
-                        {i > 0 && (i === displayList.length - 1 ? ' and ' : ', ')}
-                        <span className="font-medium" style={{ color: item.color }}>
-                          {item.name}
-                        </span>
-                      </span>
-                    ))}
-                  </>
-                )}
-              </p>
-              <div
-                className="flex items-center justify-center gap-4 py-2"
-                role="group"
-                aria-label="Number of bots"
-              >
-                <button
-                  type="button"
-                  aria-label="Fewer bots"
-                  disabled={selectedBotCount <= minBots}
-                  onClick={() => setSelectedBotCount((c) => Math.max(minBots, c - 1))}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
-                >
-                  <Minus className="h-5 w-5" />
-                </button>
-                <span
-                  className="min-w-[3rem] text-center text-lg font-medium text-white"
-                  aria-valuenow={selectedBotCount}
-                  aria-valuemin={minBots}
-                  aria-valuemax={maxBots}
-                >
-                  {selectedBotCount === 0 ? 'No bots' : `${selectedBotCount} ${selectedBotCount === 1 ? 'bot' : 'bots'}`}
-                </span>
-                <button
-                  type="button"
-                  aria-label="More bots"
-                  disabled={selectedBotCount >= maxBots}
-                  onClick={() => setSelectedBotCount((c) => Math.min(maxBots, c + 1))}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
-                >
-                  <Plus className="h-5 w-5" />
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleStartWithBots(Math.max(minBots, Math.min(maxBots, selectedBotCount)))}
-                className="w-full px-4 py-2.5 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 transition-colors cursor-pointer"
-              >
-                Start game
-              </button>
-            </motion.div>
-          </motion.div>
-        );
-      })()}
     </div>
   );
 }
