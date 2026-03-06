@@ -6,12 +6,12 @@ import { useRoomContext } from '../networking/roomStore';
 import { useToast } from './Toast';
 import { useNavigate } from 'react-router-dom';
 import type { PlayerColor } from '../networking/types';
-import { normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
+import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 
 type LobbyMenuProps = { variant?: 'default' | 'icon' };
 
 export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
-  const { room, myPlayer, isHost, removeBot, removePlayer, leaveRoom, updateProfile, connecting } = useRoomContext();
+  const { room, myId, myPlayer, isHost, removeBot, removePlayer, leaveRoom, updateProfile, connecting } = useRoomContext();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -88,9 +88,10 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
   };
 
   const isIconVariant = variant === 'icon';
+  const otherPlayers = hasRoom ? room.players.filter((p) => p.id !== myId) : [];
   const triggerClassName = isIconVariant
     ? `flex items-center justify-center w-9 h-9 text-white hover:text-white/80 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer group active:scale-90 ${open ? 'scale-90' : ''}`
-    : 'flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-sm font-medium text-gray-300 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer';
+    : 'flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-sm font-medium text-gray-300 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer';
 
   return (
     <div className="relative" ref={panelRef}>
@@ -99,7 +100,8 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
         onClick={() => setOpen((v) => !v)}
         disabled={connecting && !room}
         className={triggerClassName}
-        title={isIconVariant ? 'Lobby' : undefined}
+        title={isIconVariant ? 'Lobby' : 'Open lobby'}
+        aria-label={isIconVariant ? 'Lobby' : 'Open lobby'}
       >
         {connecting && !room ? (
           <Loader2 className={`w-4 h-4 animate-spin ${isIconVariant ? 'text-white/70' : 'text-gray-400'}`} />
@@ -107,13 +109,16 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
           <Settings className="w-6 h-6 stroke-white fill-transparent group-hover:fill-white/50 transition-colors duration-150" />
         ) : (
           <>
-            <Users className="w-4 h-4" />
-            <span className="hidden sm:inline">Lobby</span>
-            {hasRoom && (
-              <span className="flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-primary-600 text-[11px] font-bold text-white leading-none">
-                {playerCount}
-              </span>
-            )}
+            {otherPlayers.map((p) => {
+              const letter = (p.name && p.name[0]) ? p.name[0].toUpperCase() : '?';
+              const color = PLAYER_COLOR_HEX[p.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+              return (
+                <span key={p.id} className="flex-shrink-0 text-sm font-semibold leading-none" style={{ color }}>
+                  {letter}
+                </span>
+              );
+            })}
+            <Users className="w-4 h-4 flex-shrink-0" />
           </>
         )}
       </button>
