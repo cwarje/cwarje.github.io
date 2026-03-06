@@ -13,7 +13,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-black">
       {showHeader && (
-        <header className="border-b border-white/5 bg-gray-950/60 backdrop-blur-md sticky top-0 z-50">
+        <header className="border-b border-white/5 bg-black sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between relative">
             <Link to="/" className="flex items-center gap-3 group">
               <div className="flex items-center justify-center">

@@ -292,7 +292,6 @@ export default function Home() {
                   onSelect={handleSelectGame}
                   onInfo={setInfoGameType}
                   disabled={isDisabled}
-                  actionLabel="Start"
                 />
               </motion.div>
             );
