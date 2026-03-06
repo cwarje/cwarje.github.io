@@ -181,9 +181,9 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
         <p className="text-sm text-white/80">Final standings</p>
         <div className="space-y-2 w-full max-w-xs">
           {[...state.players].filter(p => !p.leftGame).sort((a, b) => b.chips - a.chips).map((p, i) => (
-            <div key={p.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-2">
-              <span className="font-medium text-white">{i === 0 && p.chips > 0 ? '👑 ' : ''}{p.id === myId ? 'You' : p.name}</span>
-              <span className={`font-bold ${p.chips > 0 ? 'text-green-400' : 'text-red-400'}`}>{p.chips} chips</span>
+            <div key={p.id} className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/5 px-4 py-2">
+              <span className="font-medium text-white text-left">{i === 0 && p.chips > 0 ? '👑 ' : ''}{p.id === myId ? 'You' : p.name}</span>
+              <span className={`font-bold text-right ${p.chips > 0 ? 'text-green-400' : 'text-red-400'}`}>{p.chips} chips</span>
             </div>
           ))}
         </div>
@@ -222,9 +222,9 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
           {state.winners.map((w) => {
             const player = state.players.find(p => p.id === w.playerId);
             return (
-              <div key={w.playerId} className="flex justify-between text-sm">
-                <span className="text-white font-medium">{player?.id === myId ? 'You' : player?.name ?? w.playerId}</span>
-                <span className="text-amber-300 font-bold">+{w.amount} · {w.handName}</span>
+              <div key={w.playerId} className="flex justify-between gap-4 text-sm">
+                <span className="text-white font-medium text-left">{player?.id === myId ? 'You' : player?.name ?? w.playerId}</span>
+                <span className="text-amber-300 font-bold text-right">+{w.amount} · {w.handName}</span>
               </div>
             );
           })}

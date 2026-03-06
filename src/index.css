@@ -563,11 +563,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 1.25rem;
   border: 3px solid #111827;
   border-radius: 12px;
   padding: 10px 14px;
   background: #f9fafb;
+}
+.hearts-resultRow > div {
+  text-align: left;
+}
+.hearts-resultRow > span {
+  text-align: right;
 }
 
 /* Up and Down the River board */
@@ -1144,11 +1150,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 1.25rem;
   border: 3px solid #111827;
   border-radius: 12px;
   padding: 10px 14px;
   background: #f9fafb;
+}
+.river-resultRow > div {
+  text-align: left;
+}
+.river-resultRow > span {
+  text-align: right;
 }
 
 /* Poker board */

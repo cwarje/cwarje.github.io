@@ -189,13 +189,13 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
           {sorted.map((p, i) => (
             <div
               key={p.id}
-              className={`flex items-center justify-between px-5 py-3 rounded-xl ${
+              className={`flex items-center justify-between gap-4 px-5 py-3 rounded-xl ${
                 i === 0
                   ? 'bg-amber-500/10 border border-amber-500/20'
                   : 'glass-light'
               }`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 text-left">
                 <span
                   className={`text-lg font-bold ${
                     i === 0 ? 'text-amber-400' : 'text-white/60'
@@ -205,7 +205,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
                 </span>
                 <span className="text-white font-medium">{p.name}</span>
               </div>
-              <span className="text-xl font-bold text-white">{p.totalScore}</span>
+              <span className="text-xl font-bold text-white text-right">{p.totalScore}</span>
             </div>
           ))}
         </div>
