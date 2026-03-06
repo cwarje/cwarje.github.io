@@ -2,45 +2,39 @@ import { motion } from 'framer-motion';
 import type { GameType } from '../networking/types';
 import { Dice5, Heart, Ship, Crosshair, Club, Info, ArrowUpDown } from 'lucide-react';
 
-const GAME_INFO: Record<GameType, { title: string; description: string; players: string; icon: typeof Dice5; gradient: string }> = {
+const GAME_INFO: Record<GameType, { title: string; players: string; icon: typeof Dice5; gradient: string }> = {
   yahtzee: {
     title: 'Yahtzee',
-    description: 'Roll dice, pick categories, and chase that perfect score. Classic dice game for 1-4 players.',
     players: '1-4 Players',
     icon: Dice5,
     gradient: 'from-amber-500/20 to-orange-600/20',
   },
   hearts: {
     title: 'Hearts',
-    description: 'Avoid tricks with hearts and the dreaded Queen of Spades. Or shoot the moon!',
     players: '4 Players',
     icon: Heart,
     gradient: 'from-rose-500/20 to-pink-600/20',
   },
   battleship: {
     title: 'Battleship',
-    description: 'Place your fleet and hunt down the enemy ships. Strategic naval combat for two.',
     players: '2 Players',
     icon: Ship,
     gradient: 'from-cyan-500/20 to-blue-600/20',
   },
   'liars-dice': {
     title: "Liar's Dice",
-    description: "Bluff, bid, and call liars. Losers face the revolver. Last player standing wins. Inspired by Liar's Bar.",
     players: '2-4 Players',
     icon: Crosshair,
     gradient: 'from-emerald-500/20 to-green-600/20',
   },
   poker: {
     title: 'Poker',
-    description: 'Texas Hold\'em with blinds, betting rounds, and side pots. Bluff your way to the chips!',
     players: '2-8 Players',
     icon: Club,
     gradient: 'from-violet-500/20 to-purple-600/20',
   },
   'up-and-down-the-river': {
     title: 'Up and Down the River',
-    description: 'Bid exact tricks as rounds climb up and back down. Precision beats luck.',
     players: '4-6 Players',
     icon: ArrowUpDown,
     gradient: 'from-teal-500/20 to-sky-600/20',
@@ -109,8 +103,7 @@ export default function GameCard({ gameType, onSelect, onInfo, disabled, actionL
       <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${info.gradient} flex items-center justify-center mb-4`}>
         <Icon className={`w-7 h-7 ${ICON_COLORS[gameType]}`} />
       </div>
-      <h3 className="text-xl font-bold text-white mb-2">{info.title}</h3>
-      <p className="text-sm text-gray-400 mb-4 leading-relaxed">{info.description}</p>
+      <h3 className="text-xl font-bold text-white mb-4">{info.title}</h3>
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">{info.players}</span>
         {!disabled && (

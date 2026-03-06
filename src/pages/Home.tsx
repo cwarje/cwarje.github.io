@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { Minus, Plus, X } from 'lucide-react';
 import GameCard from '../components/GameCard';
 import RoomCodeInput from '../components/RoomCodeInput';
 import { useRoomContext } from '../networking/roomStore';
@@ -27,6 +27,7 @@ export default function Home() {
   const [showUpRiverStartPrompt, setShowUpRiverStartPrompt] = useState(false);
   const [pendingBotGame, setPendingBotGame] = useState<GameType | null>(null);
   const [pendingUpRiverStartMode, setPendingUpRiverStartMode] = useState<UpRiverStartMode | null>(null);
+  const [selectedBotCount, setSelectedBotCount] = useState(0);
   const [pendingJoinCode, setPendingJoinCode] = useState<string | null>(null);
   const [infoGameType, setInfoGameType] = useState<GameType | null>(null);
   const lobbyCreatingRef = useRef(false);
@@ -71,6 +72,13 @@ export default function Home() {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [pendingBotGame]);
+
+  useEffect(() => {
+    if (!pendingBotGame || !room) return;
+    const catalog = GAME_CATALOG[pendingBotGame];
+    const minBots = Math.max(0, catalog.minPlayers - room.players.length);
+    setSelectedBotCount(minBots);
+  }, [pendingBotGame, room?.players.length]);
 
   const saveName = (name: string) => {
     localStorage.setItem('playerName', name);
@@ -221,16 +229,18 @@ export default function Home() {
         transition={{ duration: 0.5 }}
         className="text-center space-y-4"
       >
-        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">
-          <span className="bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
-            {isHost ? 'Pick a Game' : room ? 'Waiting for Host' : 'Pick a Game'}
-          </span>
-        </h1>
-        <p className="text-gray-400 text-lg max-w-md mx-auto">
-          {isHost || !room
-            ? 'Invite friends from the Lobby menu, then pick a game. Bots are added as needed.'
-            : 'The host will pick a game to start.'}
-        </p>
+        {room && !isHost && (
+          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">
+            <span className="bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
+              Waiting for Host
+            </span>
+          </h1>
+        )}
+        {room && !isHost && (
+          <p className="text-gray-400 text-lg max-w-md mx-auto">
+            The host will pick a game to start.
+          </p>
+        )}
       </motion.div>
 
       {/* Join Room Bar — hidden when player has joined someone else's lobby */}
@@ -241,7 +251,6 @@ export default function Home() {
           transition={{ delay: 0.15 }}
           className="flex flex-col sm:flex-row items-center justify-center gap-3"
         >
-          <span className="text-sm text-gray-500">Have a lobby code?</span>
           <RoomCodeInput onJoin={handleJoinRoom} loading={connecting} />
         </motion.div>
       )}
@@ -520,24 +529,45 @@ export default function Home() {
                 {playerCount} {playerCount === 1 ? 'player' : 'players'} in lobby.
                 {maxBots > 0 ? ' Add bots to fill seats?' : ''}
               </p>
-              <div className="grid grid-cols-1 gap-2">
-                {Array.from({ length: maxBots - minBots + 1 }, (_, i) => {
-                  const botCount = minBots + i;
-                  const totalPlayers = playerCount + botCount;
-                  return (
-                    <button
-                      key={botCount}
-                      type="button"
-                      onClick={() => handleStartWithBots(botCount)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 transition-colors cursor-pointer"
-                    >
-                      {botCount === 0
-                        ? `Start with ${totalPlayers} ${totalPlayers === 1 ? 'player' : 'players'} (no bots)`
-                        : `Start with ${botCount} ${botCount === 1 ? 'bot' : 'bots'} (${totalPlayers} players total)`}
-                    </button>
-                  );
-                })}
+              <div
+                className="flex items-center justify-center gap-4 py-2"
+                role="group"
+                aria-label="Number of bots"
+              >
+                <button
+                  type="button"
+                  aria-label="Fewer bots"
+                  disabled={selectedBotCount <= minBots}
+                  onClick={() => setSelectedBotCount((c) => Math.max(minBots, c - 1))}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+                >
+                  <Minus className="h-5 w-5" />
+                </button>
+                <span
+                  className="min-w-[3rem] text-center text-lg font-medium text-white"
+                  aria-valuenow={selectedBotCount}
+                  aria-valuemin={minBots}
+                  aria-valuemax={maxBots}
+                >
+                  {selectedBotCount === 0 ? 'No bots' : `${selectedBotCount} ${selectedBotCount === 1 ? 'bot' : 'bots'}`}
+                </span>
+                <button
+                  type="button"
+                  aria-label="More bots"
+                  disabled={selectedBotCount >= maxBots}
+                  onClick={() => setSelectedBotCount((c) => Math.min(maxBots, c + 1))}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
               </div>
+              <button
+                type="button"
+                onClick={() => handleStartWithBots(Math.max(minBots, Math.min(maxBots, selectedBotCount)))}
+                className="w-full px-4 py-2.5 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-500 transition-colors cursor-pointer"
+              >
+                Start game
+              </button>
             </motion.div>
           </motion.div>
         );
