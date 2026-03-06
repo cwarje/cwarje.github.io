@@ -1,5 +1,6 @@
 import { Bot, User, Crown, X, Wifi, WifiOff } from 'lucide-react';
 import type { Player } from '../networking/types';
+import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX } from '../networking/playerColors';
 
 interface PlayerListProps {
   players: Player[];
@@ -12,17 +13,19 @@ interface PlayerListProps {
 
 export default function PlayerList({ players, hostId, isHost, onRemoveBot, onRemovePlayer, wins }: PlayerListProps) {
   return (
-    <div className="space-y-2">
-      {players.map((player) => (
+    <div className="space-y-1">
+      {players.map((player) => {
+        const iconColor = PLAYER_COLOR_HEX[normalizePlayerColor(player.color)] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+        return (
         <div
           key={player.id}
-          className="flex items-center gap-3 px-4 py-3 rounded-xl glass-light"
+          className="flex items-center gap-2 px-3 py-2 rounded-xl glass-light"
         >
-          <div className="w-8 h-8 rounded-lg bg-primary-600/20 flex items-center justify-center">
+          <div className="w-7 h-7 flex items-center justify-center flex-shrink-0">
             {player.isBot ? (
-              <Bot className="w-4 h-4 text-primary-400" />
+              <Bot className="w-3.5 h-3.5" style={{ color: iconColor }} />
             ) : (
-              <User className="w-4 h-4 text-primary-400" />
+              <User className="w-3.5 h-3.5" style={{ color: iconColor }} />
             )}
           </div>
           <div className="flex-1 min-w-0">
@@ -31,9 +34,6 @@ export default function PlayerList({ players, hostId, isHost, onRemoveBot, onRem
               {player.id === hostId && (
                 <Crown className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
               )}
-              {player.isBot && (
-                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-primary-600/20 text-primary-400 uppercase tracking-wider">Bot</span>
-              )}
               {wins && wins[player.id] > 0 && (
                 <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-400 tracking-wider">
                   {wins[player.id]} {wins[player.id] === 1 ? 'win' : 'wins'}
@@ -41,13 +41,15 @@ export default function PlayerList({ players, hostId, isHost, onRemoveBot, onRem
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-6 flex-shrink-0 justify-end">
             {!player.isBot && (
-              player.connected ? (
-                <Wifi className="w-3.5 h-3.5 text-emerald-400" />
-              ) : (
-                <WifiOff className="w-3.5 h-3.5 text-red-400" />
-              )
+              <div className="w-6 h-6 flex items-center justify-center">
+                {player.connected ? (
+                  <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <WifiOff className="w-3.5 h-3.5 text-red-400" />
+                )}
+              </div>
             )}
             {isHost && player.isBot && onRemoveBot && (
               <button
@@ -69,7 +71,8 @@ export default function PlayerList({ players, hostId, isHost, onRemoveBot, onRem
             )}
           </div>
         </div>
-      ))}
+      );
+      })}
     </div>
   );
 }

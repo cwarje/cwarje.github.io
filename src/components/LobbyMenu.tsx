@@ -1,18 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Copy, Plus, X, LogOut, Loader2, Settings } from 'lucide-react';
+import { Users, Copy, X, LogOut, Loader2, Settings } from 'lucide-react';
 import PlayerList from './PlayerList';
 import { useRoomContext } from '../networking/roomStore';
 import { useToast } from './Toast';
 import { useNavigate } from 'react-router-dom';
-import { GAME_CATALOG } from '../games/gameCatalog';
 import type { PlayerColor } from '../networking/types';
 import { normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 
 type LobbyMenuProps = { variant?: 'default' | 'icon' };
 
 export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
-  const { room, myPlayer, isHost, addBot, removeBot, removePlayer, leaveRoom, updateProfile, connecting } = useRoomContext();
+  const { room, myPlayer, isHost, removeBot, removePlayer, leaveRoom, updateProfile, connecting } = useRoomContext();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -23,9 +22,7 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
   const playerCount = room?.players.length ?? 0;
   const hasRoom = !!room;
   const isLobbyPhase = room?.phase === 'lobby';
-  const maxPlayersAcrossGames = Math.max(...Object.values(GAME_CATALOG).map(g => g.maxPlayers));
   const canManagePlayers = isHost && isLobbyPhase;
-  const canAddBot = canManagePlayers && playerCount < maxPlayersAcrossGames;
 
   useEffect(() => {
     if (!open) return;
@@ -135,13 +132,13 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
               {/* Profile section */}
               <div className="px-5 py-4 space-y-3">
                 <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Profile</p>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <input
                     type="text"
                     value={nameInput}
                     onChange={(e) => setNameInput(e.target.value)}
                     maxLength={24}
-                    className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary-500"
+                    className="min-w-0 flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary-500"
                     placeholder="Your name"
                   />
                   <button
@@ -202,15 +199,6 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                       <h3 className="text-xs font-medium text-gray-400">
                         Players ({playerCount})
                       </h3>
-                      {canAddBot && (
-                        <button
-                          onClick={addBot}
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-medium text-gray-400 hover:text-white transition-colors cursor-pointer"
-                        >
-                          <Plus className="w-3 h-3" />
-                          Add Bot
-                        </button>
-                      )}
                     </div>
                     <div className="max-h-48 overflow-y-auto -mx-1 px-1">
                       <PlayerList
