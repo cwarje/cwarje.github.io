@@ -265,7 +265,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
             {[0, 1, 2, 3, 4].map((i) => {
               const card = state.communityCards[i];
               if (!card && state.street === 'preflop') return <PokerCardDisplay key={i} faceDown size="md" />;
-              return card ? <PokerCardDisplay key={`community-${i}-${card.suit}-${card.rank}`} card={card} size="md" skipFlip={showHandWinners} /> : <div key={i} className="w-14 h-20 rounded-lg border-2 border-white/10 bg-white/5" />;
+              return card ? <PokerCardDisplay key={`community-${i}-${card.suit}-${card.rank}`} card={card} size="md" skipFlip={showHandWinners} /> : <div key={i} className="poker-communityPlaceholder" />;
             })}
           </div>
         </div>
@@ -400,7 +400,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
                       <button type="button" onClick={() => setRaiseAmount(prev => Math.max(effectiveMinRaise, prev - state.bigBlind))} className="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer">
                         <ChevronDown className="w-4 h-4 text-white" />
                       </button>
-                      <div className="flex flex-col items-center min-w-[80px]">
+                      <div className="poker-raiseSliderContainer">
                         <div className="poker-raiseSliderTrack">
                           <input
                             type="range"

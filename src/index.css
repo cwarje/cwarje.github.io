@@ -1354,6 +1354,14 @@
   justify-content: center;
 }
 
+.poker-communityPlaceholder {
+  width: 56px;
+  height: 80px;
+  border-radius: 0.5rem;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .poker-hand {
   margin-top: 8px;
   width: 100%;
@@ -1419,6 +1427,13 @@
   display: flex;
   align-items: center;
   width: 100%;
+}
+
+.poker-raiseSliderContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 80px;
 }
 
 .poker-card {
@@ -1527,6 +1542,48 @@
 }
 
 @media (max-width: 639px) {
+  .poker-communityCards {
+    gap: 2px;
+  }
+
+  .poker-center .poker-card,
+  .poker-center .poker-cardBack,
+  .poker-center .poker-cardFlip,
+  .poker-center .poker-cardFlipFront {
+    width: 39px;
+    height: 70px;
+  }
+
+  .poker-center .poker-communityPlaceholder {
+    width: 39px;
+    height: 70px;
+  }
+
+  .poker-actionRow {
+    margin-top: 8px;
+    min-height: 86px;
+    gap: 8px;
+  }
+
+  .poker-actionButton {
+    min-width: 80px;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+  }
+
+  .poker-raiseButton {
+    min-width: 104px;
+  }
+
+  .poker-raiseSliderContainer {
+    min-width: 68px;
+    width: 68px;
+  }
+
+  .poker-raiseSliderTrack {
+    height: 34px;
+  }
+
   .poker-center .poker-cardRank,
   .poker-hand .poker-cardRank {
     font-size: 1.1rem;
@@ -1569,6 +1626,19 @@
 }
 
 @media (min-width: 640px) {
+  .poker-center .poker-card,
+  .poker-center .poker-cardBack,
+  .poker-center .poker-cardFlip,
+  .poker-center .poker-cardFlipFront {
+    width: 70px;
+    height: 100px;
+  }
+
+  .poker-center .poker-communityPlaceholder {
+    width: 70px;
+    height: 100px;
+  }
+
   .poker-seatPillName {
     font-size: 13px;
   }
