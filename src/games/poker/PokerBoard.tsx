@@ -260,7 +260,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
         ))}
 
         <div className={`poker-center ${isHandZoomed ? 'poker-center--zoom' : ''}`}>
-          <div className="poker-pot">Pot {totalPot}{state.handNumber > 0 && !showHandWinners ? ` · Hand #${state.handNumber}` : ''}</div>
+          <div className="poker-pot">Pot {totalPot}</div>
           <div className="poker-communityCards">
             {[0, 1, 2, 3, 4].map((i) => {
               const card = state.communityCards[i];
@@ -285,23 +285,23 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
             {state.winners.map((w) => {
               const player = state.players.find(p => p.id === w.playerId);
               return (
-                <div key={w.playerId} className="flex items-start justify-between gap-4 text-sm">
+                <div key={w.playerId} className="flex items-center justify-between gap-4 text-sm">
                   <div className="min-w-0">
                     <span className="text-white font-medium text-left block">{player?.id === myId ? 'You' : player?.name ?? w.playerId}</span>
-                    {w.winningCards && w.winningCards.length > 0 && (
-                      <div className="poker-winnerCards mt-1 flex flex-wrap gap-1">
-                        {w.winningCards.map((card, idx) => (
-                          <PokerCardDisplay
-                            key={`${w.playerId}-winner-card-${idx}-${card.suit}-${card.rank}`}
-                            card={card}
-                            size="sm"
-                            skipFlip
-                          />
-                        ))}
-                      </div>
-                    )}
+                    <span className="text-amber-300 font-bold text-left block mt-0.5">+{w.amount} · {w.handName}</span>
                   </div>
-                  <span className="text-amber-300 font-bold text-right whitespace-nowrap">+{w.amount} · {w.handName}</span>
+                  {w.winningCards && w.winningCards.length > 0 && (
+                    <div className="poker-winnerCards flex flex-wrap justify-end gap-1 flex-shrink-0">
+                      {w.winningCards.map((card, idx) => (
+                        <PokerCardDisplay
+                          key={`${w.playerId}-winner-card-${idx}-${card.suit}-${card.rank}`}
+                          card={card}
+                          size="sm"
+                          skipFlip
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

@@ -151,6 +151,9 @@ export default function GamePage() {
               )}
             </>
           )}
+          {isPoker && pokerState?.handNumber != null && pokerState.handNumber > 0 && (
+            <p className="text-xs sm:text-sm text-white/80">Hand #{pokerState.handNumber}</p>
+          )}
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
           {isUpRiver && upRiverState?.trumpCard && (
