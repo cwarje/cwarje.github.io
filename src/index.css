@@ -1326,25 +1326,35 @@
 
 .poker-hand {
   margin-top: 8px;
+  width: 100%;
   display: flex;
   justify-content: center;
-  gap: 8px;
+  overflow: hidden;
   padding: 8px 0;
-  min-height: 80px;
+  min-height: 120px;
 }
 
-.poker-hand.poker-hand--zoom .poker-cardRank {
-  font-size: 1.4rem;
-  line-height: 1;
+.poker-handSpread {
+  position: relative;
 }
 
-.poker-hand.poker-hand--zoom .poker-cardSuit {
-  font-size: 1.3rem;
-  line-height: 1;
+.poker-handHitbox {
+  position: absolute;
+  top: 0;
+  background: transparent;
+  overflow: visible;
+  transition: left 0.16s ease, width 0.16s ease;
+}
+
+.poker-handCardWrap {
+  position: absolute;
+  left: 0;
+  transition: transform 0.16s ease;
 }
 
 .poker-actionRow {
   margin-top: 10px;
+  min-height: 96px;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -1369,9 +1379,9 @@
 }
 
 .poker-card {
-  width: 52px;
-  height: 72px;
-  border: 2px solid #111827;
+  width: 56px;
+  height: 80px;
+  border: 3px solid #111827;
   border-radius: 8px;
   background: #fff;
   display: flex;
@@ -1385,16 +1395,16 @@
 }
 
 .poker-cardBack {
-  width: 52px;
-  height: 72px;
-  border: 2px solid #111827;
+  width: 56px;
+  height: 80px;
+  border: 3px solid #111827;
   border-radius: 8px;
   background: #800000;
 }
 
 .poker-cardFlip {
-  width: 52px;
-  height: 72px;
+  width: 56px;
+  height: 80px;
   perspective: 600px;
 }
 
@@ -1420,30 +1430,86 @@
 
 .poker-cardFlipBack {
   background: #800000;
-  border: 2px solid #111827;
+  border: 3px solid #111827;
 }
 
 .poker-cardFlipFront {
   transform: rotateY(180deg);
-  border: 2px solid #111827;
+  border: 3px solid #111827;
   border-radius: 8px;
   background: #fff;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  gap: 2px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 5px 7px 5px 2px;
   line-height: 1;
   font-weight: 700;
 }
 
+.poker-cardCorner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 1.45em;
+  gap: 2px;
+}
+
 .poker-cardRank {
-  font-size: 1rem;
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: 1.45rem;
 }
 
 .poker-cardSuit {
-  font-size: 0.9rem;
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: 1.38rem;
+}
+
+@media (max-width: 639px) {
+  .poker-center .poker-cardRank,
+  .poker-hand .poker-cardRank {
+    font-size: 1.1rem;
+  }
+
+  .poker-center .poker-cardSuit,
+  .poker-hand .poker-cardSuit {
+    font-size: 1.1rem;
+  }
+
+  .poker-hand.poker-hand--zoom .poker-cardRank,
+  .poker-center.poker-center--zoom .poker-cardRank {
+    font-size: 1.6rem;
+    line-height: 1;
+  }
+
+  .poker-hand.poker-hand--zoom .poker-cardSuit,
+  .poker-center.poker-center--zoom .poker-cardSuit {
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+
+  .poker-hand.poker-hand--zoom .poker-cardCorner,
+  .poker-center.poker-center--zoom .poker-cardCorner {
+    width: 1.75em;
+  }
+}
+
+.poker-hand .poker-cardFlip,
+.poker-hand .poker-cardBack,
+.poker-hand .poker-cardFlipFront {
+  width: 100%;
+  height: 100%;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .poker-handCardWrap--active:hover {
+    transform: translateY(-8px);
+  }
 }
 
 @media (min-width: 640px) {
@@ -1451,11 +1517,20 @@
     font-size: 13px;
   }
 
-  .poker-hand.poker-hand--zoom .poker-cardRank {
-    font-size: 1.6rem;
+  .poker-hand.poker-hand--zoom .poker-cardRank,
+  .poker-center.poker-center--zoom .poker-cardRank {
+    font-size: 1.8rem;
+    line-height: 1;
   }
 
-  .poker-hand.poker-hand--zoom .poker-cardSuit {
-    font-size: 1.5rem;
+  .poker-hand.poker-hand--zoom .poker-cardSuit,
+  .poker-center.poker-center--zoom .poker-cardSuit {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .poker-hand.poker-hand--zoom .poker-cardCorner,
+  .poker-center.poker-center--zoom .poker-cardCorner {
+    width: 1.8em;
   }
 }

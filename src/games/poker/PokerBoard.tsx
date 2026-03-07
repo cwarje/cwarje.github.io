@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, ChevronUp, ChevronDown, Play, LogOut } from 'lucide-react';
 import { DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, normalizePlayerColor } from '../../networking/playerColors';
@@ -48,8 +48,10 @@ function PokerCardDisplay({ card, faceDown = false, size = 'md' }: { card?: Card
       >
         <div className="poker-cardFlipBack" aria-hidden="true" />
         <div className="poker-cardFlipFront">
-          <span className={`poker-cardRank ${SUIT_COLORS[card.suit]}`}>{rankLabel(card.rank)}</span>
-          <span className={`poker-cardSuit text-xs leading-none ${SUIT_COLORS[card.suit]}`}>{SUIT_SYMBOLS[card.suit]}</span>
+          <div className="poker-cardCorner">
+            <span className={`poker-cardRank ${SUIT_COLORS[card.suit]}`}>{rankLabel(card.rank)}</span>
+            <span className={`poker-cardSuit ${SUIT_COLORS[card.suit]}`}>{SUIT_SYMBOLS[card.suit]}</span>
+          </div>
         </div>
       </motion.div>
     </div>
@@ -92,6 +94,8 @@ interface PokerBoardProps {
 export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isHandZoomed = false }: PokerBoardProps) {
   const [raiseAmount, setRaiseAmount] = useState<number>(0);
   const tableRef = useRef<HTMLDivElement>(null);
+  const handContainerRef = useRef<HTMLDivElement>(null);
+  const [handWidth, setHandWidth] = useState(180);
 
   const me = state.players.find(p => p.id === myId);
   const myIndex = state.players.findIndex(p => p.id === myId);
@@ -115,6 +119,18 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
     const amount = Math.max(effectiveMinRaise, Math.min(raiseAmount, maxRaiseTotal));
     sendAction({ type: 'raise', amount });
   };
+
+  useEffect(() => {
+    const element = handContainerRef.current;
+    if (!element) return;
+
+    const updateSize = () => setHandWidth(element.clientWidth);
+    updateSize();
+
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(element);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   const seatLayouts = useMemo<PokerSeatLayout[]>(() => {
     const playerCount = state.players.length;
@@ -151,6 +167,27 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
     }
     return '\u00a0';
   }, [state.gameOver, state.sessionOver, state.winners, state.players, state.street, currentPlayer, myId]);
+
+  const visibleHandCards = me?.holeCards.length ? me.holeCards : [undefined, undefined];
+  const handLayout = useMemo(() => {
+    const cardCount = visibleHandCards.length;
+    const available = Math.max(handWidth - 8, 150);
+    const maxCardWidth = 80;
+    const cardWidth = Math.max(52, Math.min(available * 0.42, maxCardWidth));
+    const cardHeight = Math.round(cardWidth * 1.4);
+    const defaultStep = Math.round(cardWidth * 0.72);
+    const fitStep = cardCount > 1 ? (available - cardWidth) / (cardCount - 1) : defaultStep;
+    const step = cardCount > 1 ? Math.max(22, Math.min(defaultStep, fitStep)) : defaultStep;
+    const spreadWidth = cardCount > 1 ? cardWidth + step * (cardCount - 1) : cardWidth;
+
+    return {
+      cardWidth,
+      cardHeight,
+      step,
+      spreadWidth,
+      hoverLift: 14,
+    };
+  }, [handWidth, visibleHandCards.length]);
 
   const renderSeatPill = (layout: PokerSeatLayout) => {
     const { player } = layout;
@@ -213,7 +250,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
               {renderSeatPill(layout)}
             </div>
           ))}
-          <div className="poker-center">
+          <div className={`poker-center ${isHandZoomed ? 'poker-center--zoom' : ''}`}>
             <div className="poker-pot">Pot {totalPot}</div>
             <div className="poker-communityCards">
               {state.communityCards.map((card, i) => <PokerCardDisplay key={i} card={card} size="md" />)}
@@ -276,7 +313,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
           </div>
         ))}
 
-        <div className="poker-center">
+        <div className={`poker-center ${isHandZoomed ? 'poker-center--zoom' : ''}`}>
           <div className="poker-pot">Pot {totalPot}{state.handNumber > 0 ? ` · Hand #${state.handNumber}` : ''}</div>
           <div className="poker-communityCards">
             {[0, 1, 2, 3, 4].map((i) => {
@@ -293,60 +330,96 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
       </div>
 
       {me && (
-        <div className={`poker-hand ${isHandZoomed ? 'poker-hand--zoom' : ''}`}>
-          {me.holeCards.length > 0 ? (
-            me.holeCards.map((c, i) => <PokerCardDisplay key={`hole-${i}-${c.suit}-${c.rank}`} card={c} size="sm" />)
-          ) : (
-            [0, 1].map((i) => <PokerCardDisplay key={i} faceDown size="sm" />)
-          )}
+        <div ref={handContainerRef} className={`poker-hand ${isHandZoomed ? 'poker-hand--zoom' : ''}`}>
+          <div
+            className="poker-handSpread"
+            style={{
+              width: `${handLayout.spreadWidth}px`,
+              height: `${handLayout.cardHeight + handLayout.hoverLift}px`,
+              transition: 'width 0.16s ease',
+            }}
+          >
+            {visibleHandCards.map((card, i) => {
+              const isLast = i === visibleHandCards.length - 1;
+              const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
+
+              return (
+                <div
+                  key={card ? `hole-${i}-${card.suit}-${card.rank}` : `hole-back-${i}`}
+                  className="poker-handHitbox"
+                  style={{
+                    left: `${i * handLayout.step}px`,
+                    width: `${hitboxWidth}px`,
+                    height: `${handLayout.cardHeight + handLayout.hoverLift}px`,
+                    zIndex: i + 1,
+                  }}
+                >
+                  <div
+                    className="poker-handCardWrap poker-handCardWrap--active"
+                    style={{
+                      top: `${handLayout.hoverLift}px`,
+                      width: `${handLayout.cardWidth}px`,
+                      height: `${handLayout.cardHeight}px`,
+                    }}
+                  >
+                    <PokerCardDisplay card={card} faceDown={!card} size="sm" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {isMyTurn && me && !me.folded && !me.allIn && (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="poker-actionRow">
-          <button type="button" onClick={() => sendAction({ type: 'fold' })} className="poker-actionButton border-white/20 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white">
-            Fold
-          </button>
-          {canCheck ? (
-            <button type="button" onClick={() => sendAction({ type: 'check' })} className="poker-actionButton bg-primary-600 border-primary-700 text-white hover:bg-primary-500">
-              Check
-            </button>
-          ) : (
-            <button type="button" onClick={() => sendAction({ type: 'call' })} className="poker-actionButton bg-primary-600 border-primary-700 text-white hover:bg-primary-500">
-              Call {Math.min(toCall, me.chips)}
-            </button>
-          )}
-          {me.chips > toCall && (
-            <>
-              <button type="button" onClick={() => setRaiseAmount(prev => Math.max(effectiveMinRaise, prev - state.bigBlind))} className="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer">
-                <ChevronDown className="w-4 h-4 text-white" />
+      {me && (
+        <div className="poker-actionRow">
+          {isMyTurn && !me.folded && !me.allIn && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'contents' }}>
+              <button type="button" onClick={() => sendAction({ type: 'fold' })} className="poker-actionButton border-white/20 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white">
+                Fold
               </button>
-              <div className="flex flex-col items-center min-w-[80px]">
-                <input
-                  type="range"
-                  min={effectiveMinRaise}
-                  max={maxRaiseTotal}
-                  step={state.bigBlind}
-                  value={raiseAmount || effectiveMinRaise}
-                  onChange={e => setRaiseAmount(Number(e.target.value))}
-                  className="w-full accent-amber-500"
-                />
-                <span className="text-xs text-white/80">{raiseAmount || effectiveMinRaise}</span>
-              </div>
-              <button type="button" onClick={() => setRaiseAmount(prev => Math.min(maxRaiseTotal, (prev || effectiveMinRaise) + state.bigBlind))} className="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer">
-                <ChevronUp className="w-4 h-4 text-white" />
-              </button>
-              <button type="button" onClick={handleRaise} className="poker-actionButton bg-amber-600 border-amber-700 text-white hover:bg-amber-500">
-                Raise
-              </button>
-            </>
+              {canCheck ? (
+                <button type="button" onClick={() => sendAction({ type: 'check' })} className="poker-actionButton bg-primary-600 border-primary-700 text-white hover:bg-primary-500">
+                  Check
+                </button>
+              ) : (
+                <button type="button" onClick={() => sendAction({ type: 'call' })} className="poker-actionButton bg-primary-600 border-primary-700 text-white hover:bg-primary-500">
+                  Call {Math.min(toCall, me.chips)}
+                </button>
+              )}
+              {me.chips > toCall && (
+                <>
+                  <button type="button" onClick={() => setRaiseAmount(prev => Math.max(effectiveMinRaise, prev - state.bigBlind))} className="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer">
+                    <ChevronDown className="w-4 h-4 text-white" />
+                  </button>
+                  <div className="flex flex-col items-center min-w-[80px]">
+                    <input
+                      type="range"
+                      min={effectiveMinRaise}
+                      max={maxRaiseTotal}
+                      step={state.bigBlind}
+                      value={raiseAmount || effectiveMinRaise}
+                      onChange={e => setRaiseAmount(Number(e.target.value))}
+                      className="w-full accent-amber-500"
+                    />
+                    <span className="text-xs text-white/80">{raiseAmount || effectiveMinRaise}</span>
+                  </div>
+                  <button type="button" onClick={() => setRaiseAmount(prev => Math.min(maxRaiseTotal, (prev || effectiveMinRaise) + state.bigBlind))} className="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer">
+                    <ChevronUp className="w-4 h-4 text-white" />
+                  </button>
+                  <button type="button" onClick={handleRaise} className="poker-actionButton bg-amber-600 border-amber-700 text-white hover:bg-amber-500">
+                    Raise
+                  </button>
+                </>
+              )}
+              {me.chips > 0 && (
+                <button type="button" onClick={() => sendAction({ type: 'raise', amount: me.betThisStreet + me.chips })} className="poker-actionButton border-red-500/30 text-red-300 hover:bg-red-500/20">
+                  All In ({me.chips})
+                </button>
+              )}
+            </motion.div>
           )}
-          {me.chips > 0 && (
-            <button type="button" onClick={() => sendAction({ type: 'raise', amount: me.betThisStreet + me.chips })} className="poker-actionButton border-red-500/30 text-red-300 hover:bg-red-500/20">
-              All In ({me.chips})
-            </button>
-          )}
-        </motion.div>
+        </div>
       )}
     </div>
   );
