@@ -18,8 +18,8 @@ const SUIT_SYMBOLS: Record<string, string> = {
 const SUIT_COLORS: Record<string, string> = {
   hearts: 'text-red-500',
   diamonds: 'text-red-500',
-  clubs: 'text-white',
-  spades: 'text-white',
+  clubs: 'text-gray-800',
+  spades: 'text-gray-800',
 };
 
 function rankLabel(rank: number): string {
@@ -205,11 +205,10 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
         className={`poker-seatPill ${activeClass} ${isMe ? 'poker-seatPill--me' : ''} ${foldedClass}`}
       >
         <div className="poker-seatPillTop" style={{ backgroundColor: seatColor }}>
-          <span className="poker-seatPillName" style={{ color: seatTextColor }}>{isMe ? 'You' : player.name}</span>
+          <span className="poker-seatPillName" style={{ color: seatTextColor }}>{isMe ? 'You' : player.name}{isDealer ? ' (Dealer)' : ''}</span>
         </div>
         <div className="poker-seatPillBody">
           <div className="flex items-center gap-1.5 flex-wrap justify-center">
-            {isDealer && <span className="text-[10px] font-bold bg-amber-500/30 text-amber-300 rounded px-1">D</span>}
             {player.allIn && <span className="text-[10px] font-bold bg-red-500/30 text-red-300 rounded px-1">AI</span>}
             {player.leftGame && <span className="text-[10px] text-gray-500">left</span>}
           </div>
@@ -395,22 +394,23 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
                     <ChevronDown className="w-4 h-4 text-white" />
                   </button>
                   <div className="flex flex-col items-center min-w-[80px]">
-                    <input
-                      type="range"
-                      min={effectiveMinRaise}
-                      max={maxRaiseTotal}
-                      step={state.bigBlind}
-                      value={raiseAmount || effectiveMinRaise}
-                      onChange={e => setRaiseAmount(Number(e.target.value))}
-                      className="w-full accent-amber-500"
-                    />
-                    <span className="text-xs text-white/80">{raiseAmount || effectiveMinRaise}</span>
+                    <div className="poker-raiseSliderTrack">
+                      <input
+                        type="range"
+                        min={effectiveMinRaise}
+                        max={maxRaiseTotal}
+                        step={state.bigBlind}
+                        value={raiseAmount || effectiveMinRaise}
+                        onChange={e => setRaiseAmount(Number(e.target.value))}
+                        className="w-full accent-amber-500"
+                      />
+                    </div>
                   </div>
                   <button type="button" onClick={() => setRaiseAmount(prev => Math.min(maxRaiseTotal, (prev || effectiveMinRaise) + state.bigBlind))} className="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer">
                     <ChevronUp className="w-4 h-4 text-white" />
                   </button>
                   <button type="button" onClick={handleRaise} className="poker-actionButton bg-amber-600 border-amber-700 text-white hover:bg-amber-500">
-                    Raise
+                    Raise {raiseAmount || effectiveMinRaise}
                   </button>
                 </>
               )}
