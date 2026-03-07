@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, ChevronUp, ChevronDown, Play, LogOut } from 'lucide-react';
-import { DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, normalizePlayerColor } from '../../networking/playerColors';
+import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, normalizePlayerColor } from '../../networking/playerColors';
 import type { PokerState, PokerAction, Card, PokerPlayer } from './types';
 
 // ────────────────────────────────────────────
@@ -196,6 +196,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
     const isDealer = state.players[state.dealerIndex]?.id === player.id;
     const color = normalizePlayerColor((player as { color?: string }).color ?? null);
     const seatColor = PLAYER_COLOR_HEX[color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+    const seatTextColor = DARK_PLAYER_COLORS.has(color) ? '#ffffff' : '#111827';
     const activeClass = isCurrentTurn ? (isMe ? 'poker-seatPill--activeSelf' : 'poker-seatPill--activeOther') : '';
     const foldedClass = player.folded ? 'poker-seatPill--folded' : '';
 
@@ -203,9 +204,10 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
       <div
         className={`poker-seatPill ${activeClass} ${isMe ? 'poker-seatPill--me' : ''} ${foldedClass}`}
       >
-        <div className="poker-seatPillColor" style={{ backgroundColor: seatColor }} />
+        <div className="poker-seatPillTop" style={{ backgroundColor: seatColor }}>
+          <span className="poker-seatPillName" style={{ color: seatTextColor }}>{isMe ? 'You' : player.name}</span>
+        </div>
         <div className="poker-seatPillBody">
-          <span className="poker-seatPillName">{isMe ? 'You' : player.name}</span>
           <div className="flex items-center gap-1.5 flex-wrap justify-center">
             {isDealer && <span className="text-[10px] font-bold bg-amber-500/30 text-amber-300 rounded px-1">D</span>}
             {player.allIn && <span className="text-[10px] font-bold bg-red-500/30 text-red-300 rounded px-1">AI</span>}

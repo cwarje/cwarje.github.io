@@ -1239,9 +1239,11 @@
   50%, 100% { border-color: #fde68a; }
 }
 
-.poker-seatPillColor {
-  height: 4px;
-  flex-shrink: 0;
+.poker-seatPillTop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
 }
 
 .poker-seatPillBody {
