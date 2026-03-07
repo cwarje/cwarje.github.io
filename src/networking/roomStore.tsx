@@ -36,6 +36,12 @@ function createBots(count: number, existingPlayers: Player[]): Player[] {
   return bots;
 }
 
+function isPokerHostControlAction(payload: unknown): payload is { type: 'next-hand' | 'end-session' } {
+  if (typeof payload !== 'object' || payload === null) return false;
+  const actionType = (payload as { type?: unknown }).type;
+  return actionType === 'next-hand' || actionType === 'end-session';
+}
+
 function applyProfileToGameState(
   gameType: GameType,
   state: unknown,
@@ -268,6 +274,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           if (currentRoom.phase === 'playing' && currentRoom.gameType) {
             const senderDeviceId = peerDeviceMapRef.current.get(conn.peer);
             if (!senderDeviceId) return;
+            if (
+              currentRoom.gameType === 'poker'
+              && isPokerHostControlAction(msg.payload)
+              && senderDeviceId !== currentRoom.hostId
+            ) {
+              return;
+            }
             const currentGs = gameStateRef.current;
             const newGs = processGameAction(currentRoom.gameType, currentGs, msg.payload, senderDeviceId);
             if (newGs !== currentGs) {
@@ -797,6 +810,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       // Host processes directly
       const currentRoom = roomRef.current;
       if (!currentRoom || currentRoom.phase !== 'playing' || !currentRoom.gameType) return;
+      if (
+        currentRoom.gameType === 'poker'
+        && isPokerHostControlAction(payload)
+        && myId !== currentRoom.hostId
+      ) {
+        return;
+      }
       const currentGs = gameStateRef.current;
       const newGs = processGameAction(currentRoom.gameType, currentGs, payload, myId);
       if (newGs !== currentGs) {

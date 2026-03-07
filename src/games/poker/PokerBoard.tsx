@@ -30,10 +30,11 @@ function rankLabel(rank: number): string {
   return String(rank);
 }
 
-function PokerCardDisplay({ card, faceDown = false, size = 'md' }: { card?: Card; faceDown?: boolean; size?: 'sm' | 'md' }) {
+function PokerCardDisplay({ card, faceDown = false, size = 'md', skipFlip = false }: { card?: Card; faceDown?: boolean; size?: 'sm' | 'md'; skipFlip?: boolean }) {
   if (faceDown || !card) {
+    const backSizeClass = size === 'sm' ? '!w-10 !h-14' : '';
     return (
-      <div className={`poker-card poker-cardBack ${size === 'sm' ? '!w-10 !h-14' : ''}`} />
+      <div className={`poker-card poker-cardBack ${backSizeClass}`} />
     );
   }
 
@@ -42,9 +43,9 @@ function PokerCardDisplay({ card, faceDown = false, size = 'md' }: { card?: Card
     <div className={`poker-cardFlip ${sizeClass}`}>
       <motion.div
         className="poker-cardFlipInner"
-        initial={{ rotateY: 0 }}
+        initial={skipFlip ? false : { rotateY: 0 }}
         animate={{ rotateY: 180 }}
-        transition={{ duration: 0.45, ease: 'easeInOut' }}
+        transition={skipFlip ? undefined : { duration: 0.45, ease: 'easeInOut' }}
       >
         <div className="poker-cardFlipBack" aria-hidden="true" />
         <div className="poker-cardFlipFront">
@@ -157,7 +158,9 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
         const p = state.players.find(x => x.id === w.playerId);
         return p?.id === myId ? 'You' : (p?.name ?? w.playerId);
       });
-      return names.length === 1 ? `${names[0]} wins the hand` : `${names.join(' and ')} win the hand`;
+      return names.length === 1
+        ? (names[0] === 'You' ? 'You win the hand' : `${names[0]} wins the hand`)
+        : `${names.join(' and ')} win the hand`;
     }
     if (state.gameOver && state.sessionOver) return 'Session over';
     if (state.gameOver && !state.sessionOver) return 'Hand over — waiting for host to deal next hand';
@@ -206,14 +209,16 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
       >
         <div className="poker-seatPillTop" style={{ backgroundColor: seatColor }}>
           <span className="poker-seatPillName" style={{ color: seatTextColor }}>{isMe ? 'You' : player.name}{isDealer ? ' (Dealer)' : ''}</span>
-        </div>
-        <div className="poker-seatPillBody">
-          <div className="flex items-center gap-1.5 flex-wrap justify-center">
+          <div className="poker-seatPillBadges">
             {player.allIn && <span className="text-[10px] font-bold bg-red-500/30 text-red-300 rounded px-1">AI</span>}
             {player.leftGame && <span className="text-[10px] text-gray-500">left</span>}
           </div>
-          <span className="poker-seatPillChips">{player.chips} chips</span>
-          {player.betThisStreet > 0 && <span className="text-[10px] text-amber-400">bet {player.betThisStreet}</span>}
+        </div>
+        <div className="poker-seatPillBody">
+          <span className="poker-seatCell poker-seatCell--label">chips</span>
+          <span className="poker-seatCell poker-seatCell--chips">{player.chips}</span>
+          <span className="poker-seatCell poker-seatCell--label">bet</span>
+          <span className="poker-seatCell poker-seatCell--bet">{player.betThisStreet}</span>
         </div>
       </div>
     );
@@ -238,69 +243,9 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
     );
   }
 
-  if (state.gameOver && state.winners.length > 0 && !state.sessionOver) {
-    return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="poker-board space-y-4">
-        <div ref={tableRef} className={`poker-table poker-table--players-${state.players.length}`}>
-          {seatLayouts.map((layout) => (
-            <div
-              key={layout.player.id}
-              className={`poker-seat ${layout.relativeIndex === 0 ? 'poker-seat--self' : ''}`}
-              style={{ left: `${layout.seatLeft}%`, top: `${layout.seatTop}%` }}
-            >
-              {renderSeatPill(layout)}
-            </div>
-          ))}
-          <div className={`poker-center ${isHandZoomed ? 'poker-center--zoom' : ''}`}>
-            <div className="poker-pot">Pot {totalPot}</div>
-            <div className="poker-communityCards">
-              {state.communityCards.map((card, i) => <PokerCardDisplay key={i} card={card} size="md" />)}
-            </div>
-          </div>
-        </div>
-        <div className="poker-headsUp" aria-live="polite">
-          <p className="poker-headsUpText">{headsUpMessage || '\u00a0'}</p>
-        </div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 space-y-2">
-          <div className="flex items-center gap-2 text-amber-400 font-bold">
-            <Trophy className="w-5 h-5" />
-            {state.winners.length === 1 ? 'Winner' : 'Winners'}
-          </div>
-          {state.winners.map((w) => {
-            const player = state.players.find(p => p.id === w.playerId);
-            return (
-              <div key={w.playerId} className="flex justify-between gap-4 text-sm">
-                <span className="text-white font-medium text-left">{player?.id === myId ? 'You' : player?.name ?? w.playerId}</span>
-                <span className="text-amber-300 font-bold text-right">+{w.amount} · {w.handName}</span>
-              </div>
-            );
-          })}
-        </motion.div>
-        {isHost && (
-          <button
-            onClick={() => sendAction({ type: 'next-hand' })}
-            className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-primary-600 text-white font-bold text-lg hover:bg-primary-500 cursor-pointer"
-          >
-            <Play className="w-5 h-5" />
-            Deal Next Hand
-          </button>
-        )}
-        {!isHost && (
-          <div className="space-y-3">
-            <p className="text-center text-sm text-white/70">Waiting for host to deal next hand...</p>
-            {onLeave && (
-              <button onClick={onLeave} className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 cursor-pointer font-medium">
-                <LogOut className="w-4 h-4" />
-                Leave Table
-              </button>
-            )}
-          </div>
-        )}
-      </motion.div>
-    );
-  }
+  const showHandWinners = state.gameOver && state.winners.length > 0 && !state.sessionOver;
 
-  // Main playing view: table + heads-up + hand + action row
+  // Main playing view: table + heads-up + contextual bottom section
   return (
     <div className="poker-board space-y-3 sm:space-y-4">
       <div ref={tableRef} className={`poker-table poker-table--players-${state.players.length}`}>
@@ -315,12 +260,12 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
         ))}
 
         <div className={`poker-center ${isHandZoomed ? 'poker-center--zoom' : ''}`}>
-          <div className="poker-pot">Pot {totalPot}{state.handNumber > 0 ? ` · Hand #${state.handNumber}` : ''}</div>
+          <div className="poker-pot">Pot {totalPot}{state.handNumber > 0 && !showHandWinners ? ` · Hand #${state.handNumber}` : ''}</div>
           <div className="poker-communityCards">
             {[0, 1, 2, 3, 4].map((i) => {
               const card = state.communityCards[i];
               if (!card && state.street === 'preflop') return <PokerCardDisplay key={i} faceDown size="md" />;
-              return card ? <PokerCardDisplay key={`community-${i}-${card.suit}-${card.rank}`} card={card} size="md" /> : <div key={i} className="w-14 h-20 rounded-lg border-2 border-white/10 bg-white/5" />;
+              return card ? <PokerCardDisplay key={`community-${i}-${card.suit}-${card.rank}`} card={card} size="md" skipFlip={showHandWinners} /> : <div key={i} className="w-14 h-20 rounded-lg border-2 border-white/10 bg-white/5" />;
             })}
           </div>
         </div>
@@ -330,98 +275,162 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
         <p className="poker-headsUpText">{headsUpMessage || '\u00a0'}</p>
       </div>
 
-      {me && (
-        <div ref={handContainerRef} className={`poker-hand ${isHandZoomed ? 'poker-hand--zoom' : ''}`}>
-          <div
-            className="poker-handSpread"
-            style={{
-              width: `${handLayout.spreadWidth}px`,
-              height: `${handLayout.cardHeight + handLayout.hoverLift}px`,
-              transition: 'width 0.16s ease',
-            }}
-          >
-            {visibleHandCards.map((card, i) => {
-              const isLast = i === visibleHandCards.length - 1;
-              const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
-
+      {showHandWinners ? (
+        <>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 space-y-2">
+            <div className="flex items-center gap-2 text-amber-400 font-bold">
+              <Trophy className="w-5 h-5" />
+              {state.winners.length === 1 ? 'Winner' : 'Winners'}
+            </div>
+            {state.winners.map((w) => {
+              const player = state.players.find(p => p.id === w.playerId);
               return (
-                <div
-                  key={card ? `hole-${i}-${card.suit}-${card.rank}` : `hole-back-${i}`}
-                  className="poker-handHitbox"
-                  style={{
-                    left: `${i * handLayout.step}px`,
-                    width: `${hitboxWidth}px`,
-                    height: `${handLayout.cardHeight + handLayout.hoverLift}px`,
-                    zIndex: i + 1,
-                  }}
-                >
-                  <div
-                    className="poker-handCardWrap poker-handCardWrap--active"
-                    style={{
-                      top: `${handLayout.hoverLift}px`,
-                      width: `${handLayout.cardWidth}px`,
-                      height: `${handLayout.cardHeight}px`,
-                    }}
-                  >
-                    <PokerCardDisplay card={card} faceDown={!card} size="sm" />
+                <div key={w.playerId} className="flex items-start justify-between gap-4 text-sm">
+                  <div className="min-w-0">
+                    <span className="text-white font-medium text-left block">{player?.id === myId ? 'You' : player?.name ?? w.playerId}</span>
+                    {w.winningCards && w.winningCards.length > 0 && (
+                      <div className="poker-winnerCards mt-1 flex flex-wrap gap-1">
+                        {w.winningCards.map((card, idx) => (
+                          <PokerCardDisplay
+                            key={`${w.playerId}-winner-card-${idx}-${card.suit}-${card.rank}`}
+                            card={card}
+                            size="sm"
+                            skipFlip
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
+                  <span className="text-amber-300 font-bold text-right whitespace-nowrap">+{w.amount} · {w.handName}</span>
                 </div>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      {me && (
-        <div className="poker-actionRow">
-          {isMyTurn && !me.folded && !me.allIn && (
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'contents' }}>
-              <button type="button" onClick={() => sendAction({ type: 'fold' })} className="poker-actionButton border-white/20 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white">
-                Fold
+          </motion.div>
+          {isHost && (
+            <div className="space-y-3">
+              <button
+                onClick={() => sendAction({ type: 'next-hand' })}
+                className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-primary-600 text-white font-bold text-lg hover:bg-primary-500 cursor-pointer"
+              >
+                <Play className="w-5 h-5" />
+                Deal Next Hand
               </button>
-              {canCheck ? (
-                <button type="button" onClick={() => sendAction({ type: 'check' })} className="poker-actionButton bg-primary-600 border-primary-700 text-white hover:bg-primary-500">
-                  Check
-                </button>
-              ) : (
-                <button type="button" onClick={() => sendAction({ type: 'call' })} className="poker-actionButton bg-primary-600 border-primary-700 text-white hover:bg-primary-500">
-                  Call {Math.min(toCall, me.chips)}
-                </button>
-              )}
-              {me.chips > toCall && (
-                <>
-                  <button type="button" onClick={() => setRaiseAmount(prev => Math.max(effectiveMinRaise, prev - state.bigBlind))} className="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer">
-                    <ChevronDown className="w-4 h-4 text-white" />
-                  </button>
-                  <div className="flex flex-col items-center min-w-[80px]">
-                    <div className="poker-raiseSliderTrack">
-                      <input
-                        type="range"
-                        min={effectiveMinRaise}
-                        max={maxRaiseTotal}
-                        step={state.bigBlind}
-                        value={raiseAmount || effectiveMinRaise}
-                        onChange={e => setRaiseAmount(Number(e.target.value))}
-                        className="w-full accent-amber-500"
-                      />
-                    </div>
-                  </div>
-                  <button type="button" onClick={() => setRaiseAmount(prev => Math.min(maxRaiseTotal, (prev || effectiveMinRaise) + state.bigBlind))} className="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer">
-                    <ChevronUp className="w-4 h-4 text-white" />
-                  </button>
-                  <button type="button" onClick={handleRaise} className="poker-actionButton bg-amber-600 border-amber-700 text-white hover:bg-amber-500">
-                    Raise {raiseAmount || effectiveMinRaise}
-                  </button>
-                </>
-              )}
-              {me.chips > 0 && (
-                <button type="button" onClick={() => sendAction({ type: 'raise', amount: me.betThisStreet + me.chips })} className="poker-actionButton border-red-500/30 text-red-300 hover:bg-red-500/20">
-                  All In ({me.chips})
-                </button>
-              )}
-            </motion.div>
+              <button
+                onClick={() => sendAction({ type: 'end-session' })}
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-red-600/90 text-white font-semibold hover:bg-red-500 cursor-pointer"
+              >
+                End Game
+              </button>
+            </div>
           )}
-        </div>
+          {!isHost && (
+            <div className="space-y-3">
+              <p className="text-center text-sm text-white/70">Waiting for host to deal next hand...</p>
+              {onLeave && (
+                <button onClick={onLeave} className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 cursor-pointer font-medium">
+                  <LogOut className="w-4 h-4" />
+                  Leave Table
+                </button>
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {me && (
+            <div ref={handContainerRef} className={`poker-hand ${isHandZoomed ? 'poker-hand--zoom' : ''}`}>
+              <div
+                className="poker-handSpread"
+                style={{
+                  width: `${handLayout.spreadWidth}px`,
+                  height: `${handLayout.cardHeight + handLayout.hoverLift}px`,
+                  transition: 'width 0.16s ease',
+                }}
+              >
+                {visibleHandCards.map((card, i) => {
+                  const isLast = i === visibleHandCards.length - 1;
+                  const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
+
+                  return (
+                    <div
+                      key={card ? `hole-${i}-${card.suit}-${card.rank}` : `hole-back-${i}`}
+                      className="poker-handHitbox"
+                      style={{
+                        left: `${i * handLayout.step}px`,
+                        width: `${hitboxWidth}px`,
+                        height: `${handLayout.cardHeight + handLayout.hoverLift}px`,
+                        zIndex: i + 1,
+                      }}
+                    >
+                      <div
+                        className="poker-handCardWrap poker-handCardWrap--active"
+                        style={{
+                          top: `${handLayout.hoverLift}px`,
+                          width: `${handLayout.cardWidth}px`,
+                          height: `${handLayout.cardHeight}px`,
+                        }}
+                      >
+                        <PokerCardDisplay card={card} faceDown={!card} size="sm" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {me && (
+            <div className="poker-actionRow">
+              {isMyTurn && !me.folded && !me.allIn && (
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'contents' }}>
+                  <button type="button" onClick={() => sendAction({ type: 'fold' })} className="poker-actionButton bg-gray-700 border-black text-white hover:bg-gray-600">
+                    Fold
+                  </button>
+                  {canCheck ? (
+                    <button type="button" onClick={() => sendAction({ type: 'check' })} className="poker-actionButton bg-primary-600 border-primary-700 text-white hover:bg-primary-500">
+                      Check
+                    </button>
+                  ) : (
+                    <button type="button" onClick={() => sendAction({ type: 'call' })} className="poker-actionButton bg-primary-600 border-primary-700 text-white hover:bg-primary-500">
+                      Call {Math.min(toCall, me.chips)}
+                    </button>
+                  )}
+                  {me.chips > toCall && (
+                    <>
+                      <button type="button" onClick={() => setRaiseAmount(prev => Math.max(effectiveMinRaise, prev - state.bigBlind))} className="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer">
+                        <ChevronDown className="w-4 h-4 text-white" />
+                      </button>
+                      <div className="flex flex-col items-center min-w-[80px]">
+                        <div className="poker-raiseSliderTrack">
+                          <input
+                            type="range"
+                            min={effectiveMinRaise}
+                            max={maxRaiseTotal}
+                            step={state.bigBlind}
+                            value={raiseAmount || effectiveMinRaise}
+                            onChange={e => setRaiseAmount(Number(e.target.value))}
+                            className="w-full accent-green-500"
+                          />
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => setRaiseAmount(prev => Math.min(maxRaiseTotal, (prev || effectiveMinRaise) + state.bigBlind))} className="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer">
+                        <ChevronUp className="w-4 h-4 text-white" />
+                      </button>
+                      <button type="button" onClick={handleRaise} className="poker-actionButton poker-raiseButton bg-amber-600 border-amber-700 text-white hover:bg-amber-500">
+                        Raise {raiseAmount || effectiveMinRaise}
+                      </button>
+                    </>
+                  )}
+                  {me.chips > 0 && (
+                    <button type="button" onClick={() => sendAction({ type: 'raise', amount: me.betThisStreet + me.chips })} className="poker-actionButton bg-red-600 border-red-700 text-white hover:bg-red-500">
+                      All In ({me.chips})
+                    </button>
+                  )}
+                </motion.div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -10,7 +10,7 @@ import type { GameStartOptions, GameType, PlayerColor } from '../networking/type
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 import { GAME_CATALOG } from '../games/gameCatalog';
 
-const PRODUCTION_GAME_TYPES: GameType[] = ['yahtzee', 'hearts', 'up-and-down-the-river'];
+const PRODUCTION_GAME_TYPES: GameType[] = ['yahtzee', 'hearts', 'up-and-down-the-river', 'poker'];
 const allGameTypes: GameType[] = ['yahtzee', 'hearts', 'up-and-down-the-river', 'battleship', 'liars-dice', 'poker'];
 const gameTypesToShow = import.meta.env.DEV ? allGameTypes : PRODUCTION_GAME_TYPES;
 

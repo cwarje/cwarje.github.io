@@ -174,13 +174,7 @@ export default function GamePage() {
               Back to Lobby
             </motion.button>
           )}
-          <LobbyMenu variant="icon" />
-        </div>
-      </div>
-
-      {showHandZoomToggle && (
-        <div className="absolute bottom-0 left-0 right-0 z-20 p-3 sm:p-4 pointer-events-none">
-          <div className="pointer-events-auto ml-auto w-fit">
+          {showHandZoomToggle && (
             <button
               type="button"
               onClick={() => setIsHandZoomed(v => !v)}
@@ -191,9 +185,10 @@ export default function GamePage() {
             >
               <Search className="w-6 h-6 stroke-white" />
             </button>
-          </div>
+          )}
+          <LobbyMenu variant="icon" />
         </div>
-      )}
+      </div>
 
       {error && (
         <div className="absolute top-4 left-1/2 z-20 w-[min(90vw,40rem)] -translate-x-1/2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">

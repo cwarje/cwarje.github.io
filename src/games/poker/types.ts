@@ -33,6 +33,7 @@ export interface WinnerInfo {
   playerId: string;
   amount: number;
   handName: string;
+  winningCards?: Card[];
 }
 
 export interface PokerState {
@@ -62,4 +63,5 @@ export type PokerAction =
   | { type: 'call' }
   | { type: 'raise'; amount: number }
   | { type: 'next-hand' }
+  | { type: 'end-session' }
   | { type: 'leave-table' };

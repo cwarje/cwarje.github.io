@@ -154,17 +154,27 @@ function compareHandScores(a: HandScore, b: HandScore): number {
   return 0;
 }
 
-export function bestHand(holeCards: Card[], communityCards: Card[]): { score: HandScore; name: string } {
+export function bestHand(holeCards: Card[], communityCards: Card[]): { score: HandScore; name: string; cards: Card[] } {
   const allCards = [...holeCards, ...communityCards];
   const combos = combinations5(allCards);
-  let best = evaluate5(combos[0]);
+  const initialCombo = combos[0];
+  if (!initialCombo) {
+    // Defensive fallback: this should never happen in normal showdown resolution.
+    return { score: [HAND_RANK.HIGH_CARD], name: getHandName(HAND_RANK.HIGH_CARD), cards: [] };
+  }
+
+  let best = evaluate5(initialCombo);
+  let bestCards = initialCombo;
   for (let i = 1; i < combos.length; i++) {
-    const score = evaluate5(combos[i]);
+    const combo = combos[i];
+    if (!combo) continue;
+    const score = evaluate5(combo);
     if (compareHandScores(score, best) > 0) {
       best = score;
+      bestCards = combo;
     }
   }
-  return { score: best, name: getHandName(best[0]) };
+  return { score: best, name: getHandName(best[0]), cards: bestCards };
 }
 
 // ────────────────────────────────────────────
@@ -464,6 +474,14 @@ export function processPokerAction(state: unknown, action: unknown, playerId: st
     return startNextHand(s);
   }
 
+  // Handle end-session action (host triggers between hands)
+  if (a.type === 'end-session' && s.gameOver && !s.sessionOver) {
+    return {
+      ...s,
+      sessionOver: true,
+    };
+  }
+
   // Handle leave-table action (player leaves mid-game)
   if (a.type === 'leave-table') {
     return removePlayerFromPoker(s, playerId);
@@ -662,17 +680,17 @@ function resolveHand(s: PokerState, players: PokerPlayer[]): PokerState {
   for (const pot of sidePots) {
     // Find best hand among eligible
     let bestScore: HandScore | null = null;
-    let potWinners: { id: string; handName: string }[] = [];
+    let potWinners: { id: string; handName: string; winningCards: Card[] }[] = [];
 
     for (const pid of pot.eligiblePlayerIds) {
       const player = players.find(p => p.id === pid)!;
-      const { score, name } = bestHand(player.holeCards, s.communityCards);
+      const { score, name, cards } = bestHand(player.holeCards, s.communityCards);
 
       if (!bestScore || compareHandScores(score, bestScore) > 0) {
         bestScore = score;
-        potWinners = [{ id: pid, handName: name }];
+        potWinners = [{ id: pid, handName: name, winningCards: cards }];
       } else if (compareHandScores(score, bestScore) === 0) {
-        potWinners.push({ id: pid, handName: name });
+        potWinners.push({ id: pid, handName: name, winningCards: cards });
       }
     }
 
@@ -687,8 +705,11 @@ function resolveHand(s: PokerState, players: PokerPlayer[]): PokerState {
       const existing = winnersInfo.find(wi => wi.playerId === w.id);
       if (existing) {
         existing.amount += award;
+        if (!existing.winningCards?.length) {
+          existing.winningCards = w.winningCards;
+        }
       } else {
-        winnersInfo.push({ playerId: w.id, amount: award, handName: w.handName });
+        winnersInfo.push({ playerId: w.id, amount: award, handName: w.handName, winningCards: w.winningCards });
       }
     });
   }
