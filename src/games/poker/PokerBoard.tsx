@@ -33,16 +33,25 @@ function rankLabel(rank: number): string {
 function PokerCardDisplay({ card, faceDown = false, size = 'md' }: { card?: Card; faceDown?: boolean; size?: 'sm' | 'md' }) {
   if (faceDown || !card) {
     return (
-      <div className={`poker-card ${size === 'sm' ? '!w-10 !h-14' : ''} bg-gradient-to-br from-blue-800 to-blue-950 border-2 border-blue-700/50 flex items-center justify-center shadow-md`}>
-        <div className="w-3/4 h-3/4 rounded border border-blue-600/30 bg-blue-900/50" />
-      </div>
+      <div className={`poker-card poker-cardBack ${size === 'sm' ? '!w-10 !h-14' : ''}`} />
     );
   }
 
+  const sizeClass = size === 'sm' ? 'poker-cardFlip--sm' : '';
   return (
-    <div className={`poker-card ${size === 'sm' ? '!w-10 !h-14' : ''}`}>
-      <span className={`poker-cardRank ${SUIT_COLORS[card.suit]}`}>{rankLabel(card.rank)}</span>
-      <span className={`poker-cardSuit text-xs leading-none ${SUIT_COLORS[card.suit]}`}>{SUIT_SYMBOLS[card.suit]}</span>
+    <div className={`poker-cardFlip ${sizeClass}`}>
+      <motion.div
+        className="poker-cardFlipInner"
+        initial={{ rotateY: 0 }}
+        animate={{ rotateY: 180 }}
+        transition={{ duration: 0.45, ease: 'easeInOut' }}
+      >
+        <div className="poker-cardFlipBack" aria-hidden="true" />
+        <div className="poker-cardFlipFront">
+          <span className={`poker-cardRank ${SUIT_COLORS[card.suit]}`}>{rankLabel(card.rank)}</span>
+          <span className={`poker-cardSuit text-xs leading-none ${SUIT_COLORS[card.suit]}`}>{SUIT_SYMBOLS[card.suit]}</span>
+        </div>
+      </motion.div>
     </div>
   );
 }
@@ -273,7 +282,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
             {[0, 1, 2, 3, 4].map((i) => {
               const card = state.communityCards[i];
               if (!card && state.street === 'preflop') return <PokerCardDisplay key={i} faceDown size="md" />;
-              return card ? <PokerCardDisplay key={i} card={card} size="md" /> : <div key={i} className="w-14 h-20 rounded-lg border-2 border-white/10 bg-white/5" />;
+              return card ? <PokerCardDisplay key={`community-${i}-${card.suit}-${card.rank}`} card={card} size="md" /> : <div key={i} className="w-14 h-20 rounded-lg border-2 border-white/10 bg-white/5" />;
             })}
           </div>
         </div>
@@ -286,7 +295,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
       {me && (
         <div className={`poker-hand ${isHandZoomed ? 'poker-hand--zoom' : ''}`}>
           {me.holeCards.length > 0 ? (
-            me.holeCards.map((c, i) => <PokerCardDisplay key={i} card={c} size="sm" />)
+            me.holeCards.map((c, i) => <PokerCardDisplay key={`hole-${i}-${c.suit}-${c.rank}`} card={c} size="sm" />)
           ) : (
             [0, 1].map((i) => <PokerCardDisplay key={i} faceDown size="sm" />)
           )}
