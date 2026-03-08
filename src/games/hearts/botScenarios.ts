@@ -39,7 +39,7 @@ function baseState(player0Hand: Card[]): HeartsState {
     trickNumber: 4,
     roundNumber: 1,
     gameOver: false,
-    winner: null,
+    winners: [],
     trickWinner: null,
   };
 }

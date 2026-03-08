@@ -35,7 +35,7 @@ export interface HeartsState {
   trickNumber: number;
   roundNumber: number;
   gameOver: boolean;
-  winner: string | null;
+  winners: string[];
   trickWinner: string | null; // playerId of trick winner, set when trick is complete but not yet resolved
 }
 

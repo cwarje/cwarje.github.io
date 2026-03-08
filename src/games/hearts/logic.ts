@@ -89,7 +89,7 @@ export function createHeartsState(players: Player[], options?: { targetScore?: 5
     trickNumber: 1,
     roundNumber: 1,
     gameOver: false,
-    winner: null,
+    winners: [],
     trickWinner: null,
   };
 }
@@ -270,13 +270,13 @@ function endRound(s: HeartsState): HeartsState {
 
   if (isOver) {
     const minScore = Math.min(...newPlayers.map(p => p.totalScore));
-    const winner = newPlayers.find(p => p.totalScore === minScore)!;
+    const winners = newPlayers.filter(p => p.totalScore === minScore).map(p => p.id);
     return {
       ...s,
       players: newPlayers,
       phase: 'round-end',
       gameOver: true,
-      winner: winner.id,
+      winners,
       trickWinner: null,
     };
   }
@@ -308,7 +308,7 @@ function endRound(s: HeartsState): HeartsState {
     trickNumber: 1,
     roundNumber: nextRound,
     gameOver: false,
-    winner: null,
+    winners: [],
     trickWinner: null,
   };
 }

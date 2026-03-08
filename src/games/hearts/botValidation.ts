@@ -114,8 +114,8 @@ export function runHeartsBotValidation(gameCount = 40): HeartsBotValidationMetri
     }
 
     metrics.gamesPlayed++;
-    if (state.winner) {
-      winsByPlayerId[state.winner] = (winsByPlayerId[state.winner] ?? 0) + 1;
+    for (const winnerId of state.winners) {
+      winsByPlayerId[winnerId] = (winsByPlayerId[winnerId] ?? 0) + 1;
     }
   }
 

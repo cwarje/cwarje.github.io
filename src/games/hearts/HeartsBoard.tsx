@@ -26,6 +26,14 @@ function rankDisplay(rank: number): string {
   return String(rank);
 }
 
+function placementLabel(position: number): string {
+  if (position % 100 >= 11 && position % 100 <= 13) return `${position}th`;
+  if (position % 10 === 1) return `${position}st`;
+  if (position % 10 === 2) return `${position}nd`;
+  if (position % 10 === 3) return `${position}rd`;
+  return `${position}th`;
+}
+
 function getFittedTextSize(text: string, availableWidth: number, minSize: number, maxSize: number): number {
   if (typeof document === 'undefined' || availableWidth <= 0) return minSize;
   const canvas = document.createElement('canvas');
@@ -288,6 +296,22 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
 
   if (state.gameOver) {
     const sorted = [...state.players].sort((a, b) => a.totalScore - b.totalScore);
+    const groupedPlacements = sorted.reduce<{ placement: number; score: number; players: HeartsPlayer[] }[]>((groups, player) => {
+      const lastGroup = groups[groups.length - 1];
+      if (lastGroup && lastGroup.score === player.totalScore) {
+        lastGroup.players.push(player);
+        return groups;
+      }
+
+      const priorPlayersCount = groups.reduce((count, group) => count + group.players.length, 0);
+      groups.push({
+        placement: priorPlayersCount + 1,
+        score: player.totalScore,
+        players: [player],
+      });
+      return groups;
+    }, []);
+
     return (
       <motion.div
         initial={{ opacity: 0 }}
@@ -297,13 +321,13 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
         <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
         <h2 className="text-3xl font-extrabold text-white">Game Over</h2>
         <div className="space-y-3 w-full max-w-2xl">
-          {sorted.map((p, i) => (
-            <div key={p.id} className="hearts-resultRow">
+          {groupedPlacements.map((group) => (
+            <div key={`placement-${group.placement}-${group.score}`} className="hearts-resultRow">
               <div className="flex items-center gap-3">
-                <span className="text-lg font-bold">#{i + 1}</span>
-                <span className="font-semibold">{p.name}</span>
+                <span className="text-lg font-bold">{placementLabel(group.placement)}</span>
+                <span className="font-semibold">{group.players.map(player => player.name).join(', ')}</span>
               </div>
-              <span className="text-xl font-bold">{p.totalScore} pts</span>
+              <span className="text-xl font-bold">{group.score} pts</span>
             </div>
           ))}
         </div>

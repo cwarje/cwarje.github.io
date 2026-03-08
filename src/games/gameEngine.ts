@@ -76,7 +76,7 @@ export function getGameWinners(gameType: GameType, gameState: unknown): string[]
     }
     case 'hearts': {
       const state = gameState as HeartsState;
-      return state.winner ? [state.winner] : [];
+      return state.winners ?? [];
     }
     case 'battleship': {
       const state = gameState as BattleshipState;
