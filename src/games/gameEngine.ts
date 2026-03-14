@@ -5,12 +5,14 @@ import { createBattleshipState, processBattleshipAction, isBattleshipOver, runBa
 import { createLiarsDiceState, processLiarsDiceAction, isLiarsDiceOver, runLiarsDiceBotTurn } from './liars-dice/logic';
 import { createPokerState, processPokerAction, isPokerOver, runPokerBotTurn } from './poker/logic';
 import { createUpRiverState, processUpRiverAction, isUpRiverOver, runUpRiverBotTurn } from './up-and-down-the-river/logic';
+import { createTwelveState, isTwelveOver, processTwelveAction, runTwelveBotTurn } from './twelve/logic';
 import type { YahtzeeState } from './yahtzee/types';
 import type { HeartsState } from './hearts/types';
 import type { BattleshipState } from './battleship/types';
 import type { LiarsDiceState } from './liars-dice/types';
 import type { PokerState } from './poker/types';
 import type { UpRiverState } from './up-and-down-the-river/types';
+import type { TwelveState } from './twelve/types';
 
 export function createInitialGameState(gameType: GameType, players: Player[], options?: GameStartOptions): unknown {
   switch (gameType) {
@@ -20,6 +22,7 @@ export function createInitialGameState(gameType: GameType, players: Player[], op
     case 'liars-dice': return createLiarsDiceState(players);
     case 'poker': return createPokerState(players);
     case 'up-and-down-the-river': return createUpRiverState(players, { upRiverStartMode: options?.upRiverStartMode });
+    case 'twelve': return createTwelveState(players, { pileCount: options?.pileCount });
   }
 }
 
@@ -32,10 +35,11 @@ export function processGameAction(gameType: GameType, state: unknown, action: un
     case 'liars-dice': newState = processLiarsDiceAction(state, action, playerId); break;
     case 'poker': newState = processPokerAction(state, action, playerId); break;
     case 'up-and-down-the-river': newState = processUpRiverAction(state, action, playerId); break;
+    case 'twelve': newState = processTwelveAction(state, action, playerId); break;
     default: return state;
   }
   // Bot turns are scheduled with delays by the host — don't auto-run them
-  if (gameType === 'hearts' || gameType === 'liars-dice' || gameType === 'poker' || gameType === 'battleship' || gameType === 'yahtzee' || gameType === 'up-and-down-the-river') return newState;
+  if (gameType === 'hearts' || gameType === 'liars-dice' || gameType === 'poker' || gameType === 'battleship' || gameType === 'yahtzee' || gameType === 'up-and-down-the-river' || gameType === 'twelve') return newState;
   // For other games, run bot turns synchronously as before
   return runBotTurns(gameType, newState);
 }
@@ -48,6 +52,7 @@ export function checkGameOver(gameType: GameType, state: unknown): boolean {
     case 'liars-dice': return isLiarsDiceOver(state);
     case 'poker': return isPokerOver(state);
     case 'up-and-down-the-river': return isUpRiverOver(state);
+    case 'twelve': return isTwelveOver(state);
     default: return false;
   }
 }
@@ -62,6 +67,7 @@ export function runSingleBotTurn(gameType: GameType, state: unknown): unknown {
     case 'liars-dice': return runLiarsDiceBotTurn(state);
     case 'poker': return runPokerBotTurn(state);
     case 'up-and-down-the-river': return runUpRiverBotTurn(state);
+    case 'twelve': return runTwelveBotTurn(state);
     default: return state;
   }
 }
@@ -98,6 +104,10 @@ export function getGameWinners(gameType: GameType, gameState: unknown): string[]
       const maxScore = Math.max(...state.players.map(p => p.totalScore));
       return state.players.filter(p => p.totalScore === maxScore).map(p => p.id);
     }
+    case 'twelve': {
+      const state = gameState as TwelveState;
+      return state.winners;
+    }
     default:
       return [];
   }
@@ -118,6 +128,7 @@ function runBotTurns(gameType: GameType, state: unknown): unknown {
       case 'liars-dice': next = runLiarsDiceBotTurn(current); break;
       case 'poker': next = runPokerBotTurn(current); break;
       case 'up-and-down-the-river': next = runUpRiverBotTurn(current); break;
+      case 'twelve': next = runTwelveBotTurn(current); break;
       default: return current;
     }
     if (next === current) break; // No bot action taken

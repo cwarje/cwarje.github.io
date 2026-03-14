@@ -1163,6 +1163,95 @@
   text-align: right;
 }
 
+/* Twelve board additions */
+.twelve-seatStack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.twelve-pileRow {
+  display: flex;
+  gap: 5px;
+}
+
+.twelve-pileButton {
+  position: relative;
+  width: 40px;
+  height: 56px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.twelve-pileButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.twelve-pileBottom {
+  position: absolute;
+  inset: 0;
+}
+
+.twelve-pileTop {
+  position: absolute;
+  inset: -8px 0 0 0;
+}
+
+.twelve-pilePlaceholder {
+  width: 40px;
+  height: 56px;
+  border-radius: 8px;
+  border: 2px dashed rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.twelve-actionPanel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  color: #fff;
+}
+
+.twelve-actionGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.twelve-actionLabel {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.twelve-actionButtons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.twelve-actionButton {
+  width: 34px;
+  height: 34px;
+  border: 3px solid #111827;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #111827;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.twelve-actionButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Poker board */
 .poker-board {
   --poker-bg: #0d5c2e;

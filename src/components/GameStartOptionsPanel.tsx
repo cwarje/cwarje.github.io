@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Minus, Plus } from 'lucide-react';
-import type { GameType, GameStartOptions, HeartsTargetScore, UpRiverStartMode } from '../networking/types';
+import type { GameType, GameStartOptions, HeartsTargetScore, TwelvePileCount, UpRiverStartMode } from '../networking/types';
 import { GAME_CATALOG } from '../games/gameCatalog';
 import { CARD_BORDER, BUTTON_COLORS, LABEL_COLORS, PANEL_BG } from './gameCardThemes';
 
 const DEFAULT_HEARTS_TARGET: HeartsTargetScore = 100;
 const DEFAULT_UP_RIVER_MODE: UpRiverStartMode = 'down-up'; // 7-1-7
+const DEFAULT_TWELVE_PILE_COUNT: TwelvePileCount = 4;
 const DEFAULT_BOT_COUNT = 0;
 
 interface GameStartOptionsPanelProps {
@@ -29,6 +30,7 @@ export default function GameStartOptionsPanel({
 
   const [heartsTarget, setHeartsTarget] = useState<HeartsTargetScore>(DEFAULT_HEARTS_TARGET);
   const [upRiverMode, setUpRiverMode] = useState<UpRiverStartMode>(DEFAULT_UP_RIVER_MODE);
+  const [pileCount, setPileCount] = useState<TwelvePileCount>(DEFAULT_TWELVE_PILE_COUNT);
   const [botCount, setBotCount] = useState(DEFAULT_BOT_COUNT);
 
   useEffect(() => {
@@ -50,6 +52,7 @@ export default function GameStartOptionsPanel({
       options.upRiverStartMode = upRiverMode;
       if (showBots) options.botCount = botCount;
     }
+    if (gameType === 'twelve') options.pileCount = pileCount;
     if (showBots && gameType !== 'up-and-down-the-river') options.botCount = botCount;
     onStart(Object.keys(options).length ? options : undefined);
   };
@@ -118,6 +121,28 @@ export default function GameStartOptionsPanel({
               >
                 7 - 1 - 7
               </button>
+            </div>
+          </div>
+        )}
+
+        {gameType === 'twelve' && (
+          <div className="space-y-2">
+            <p className={`text-sm font-semibold uppercase tracking-wider ${labelClass}`}>Piles per player</p>
+            <div className="flex gap-2">
+              {([3, 4, 5, 6] as const).map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  onClick={() => setPileCount(count)}
+                  className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-colors ${
+                    pileCount === count
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10'
+                  }`}
+                >
+                  {count}
+                </button>
+              ))}
             </div>
           </div>
         )}

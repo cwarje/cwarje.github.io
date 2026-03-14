@@ -1,10 +1,12 @@
-export type GameType = 'yahtzee' | 'hearts' | 'battleship' | 'liars-dice' | 'poker' | 'up-and-down-the-river';
+export type GameType = 'yahtzee' | 'hearts' | 'battleship' | 'liars-dice' | 'poker' | 'up-and-down-the-river' | 'twelve';
 export type PlayerColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet' | 'dark-purple';
 export type HeartsTargetScore = 50 | 100;
 export type UpRiverStartMode = 'up-down' | 'down-up';
+export type TwelvePileCount = 3 | 4 | 5 | 6;
 export interface GameStartOptions {
   targetScore?: HeartsTargetScore;
   upRiverStartMode?: UpRiverStartMode;
+  pileCount?: TwelvePileCount;
   botCount?: number;
 }
 

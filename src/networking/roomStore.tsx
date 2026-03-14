@@ -13,6 +13,7 @@ import type { PokerState } from '../games/poker/types';
 import type { BattleshipState } from '../games/battleship/types';
 import type { YahtzeeState } from '../games/yahtzee/types';
 import type { UpRiverState } from '../games/up-and-down-the-river/types';
+import type { TwelveState } from '../games/twelve/types';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 import { GAME_CATALOG } from '../games/gameCatalog';
 
@@ -109,6 +110,17 @@ function applyProfileToGameState(
     }
     case 'poker': {
       const current = state as PokerState;
+      let changed = false;
+      const players = current.players.map((player) => {
+        if (player.id !== playerId) return player;
+        if (player.name === playerName && player.color === playerColor) return player;
+        changed = true;
+        return { ...player, name: playerName, color: playerColor };
+      });
+      return changed ? { ...current, players } : current;
+    }
+    case 'twelve': {
+      const current = state as TwelveState;
       let changed = false;
       const players = current.players.map((player) => {
         if (player.id !== playerId) return player;
@@ -878,6 +890,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const LIARS_DICE_NEXT_ROUND_DELAY = 2000; // ms before starting next round
   const UP_RIVER_BOT_DELAY = 900; // ms between bot bid/card play
   const UP_RIVER_ROUND_END_DELAY = 5000; // ms to show bid result borders before next round
+  const TWELVE_BOT_DELAY = 900; // ms between bot actions
+  const TWELVE_ROUND_END_DELAY = 5500; // ms to show round summary before next round
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -1017,6 +1031,81 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
           }
         }, UP_RIVER_BOT_DELAY);
+      }
+      return;
+    }
+
+    // ── Twelve bot scheduling ──
+    if (room.gameType === 'twelve') {
+      const ts = gameState as TwelveState;
+      if (ts.gameOver) return;
+
+      if (ts.phase === 'playing' && ts.trickWinner) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as TwelveState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'playing' || !currentGs.trickWinner) return;
+
+          const resolved = processGameAction('twelve', currentGs, { type: 'resolve-trick' }, '');
+          if (resolved !== currentGs) {
+            setGameState(resolved);
+            broadcastGameState(resolved);
+            if (checkGameOver('twelve', resolved)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, TRICK_DISPLAY_DELAY);
+        return;
+      }
+
+      if (ts.phase === 'flipping') {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as TwelveState | null;
+          if (!currentGs || currentGs.phase !== 'flipping') return;
+          const next = processGameAction('twelve', currentGs, { type: 'flip-exposed' }, '');
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+          }
+        }, 900);
+        return;
+      }
+
+      if (ts.phase === 'round-end') {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as TwelveState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'round-end' || currentGs.gameOver) return;
+
+          const next = processGameAction('twelve', currentGs, { type: 'start-next-round' }, '');
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+          }
+        }, TWELVE_ROUND_END_DELAY);
+        return;
+      }
+
+      const currentPlayer = ts.players[ts.currentPlayerIndex];
+      if (currentPlayer && currentPlayer.isBot) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom) return;
+
+          const next = runSingleBotTurn('twelve', currentGs);
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('twelve', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, TWELVE_BOT_DELAY);
       }
       return;
     }

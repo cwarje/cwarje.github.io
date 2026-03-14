@@ -7,6 +7,7 @@ export const GAME_GRADIENT: Record<GameType, string> = {
   'liars-dice': 'from-emerald-500/20 to-green-600/20',
   poker: 'from-violet-500/20 to-purple-600/20',
   'up-and-down-the-river': 'from-teal-500/20 to-sky-600/20',
+  twelve: 'from-blue-500/20 to-indigo-600/20',
 };
 
 export const CARD_BORDER: Record<GameType, string> = {
@@ -16,6 +17,7 @@ export const CARD_BORDER: Record<GameType, string> = {
   'liars-dice': 'border-emerald-500/20',
   poker: 'border-violet-500/20',
   'up-and-down-the-river': 'border-teal-500/20',
+  twelve: 'border-blue-500/20',
 };
 
 export const BORDER_COLORS: Record<GameType, string> = {
@@ -25,6 +27,7 @@ export const BORDER_COLORS: Record<GameType, string> = {
   'liars-dice': 'hover:border-emerald-500/30',
   poker: 'hover:border-violet-500/30',
   'up-and-down-the-river': 'hover:border-teal-500/30',
+  twelve: 'hover:border-blue-500/30',
 };
 
 export const PLAYERS_TAG: Record<GameType, string> = {
@@ -34,6 +37,7 @@ export const PLAYERS_TAG: Record<GameType, string> = {
   'liars-dice': 'bg-emerald-500/25 text-emerald-200 border border-emerald-500/30',
   poker: 'bg-violet-500/25 text-violet-200 border border-violet-500/30',
   'up-and-down-the-river': 'bg-teal-500/25 text-teal-200 border border-teal-500/30',
+  twelve: 'bg-blue-500/25 text-blue-200 border border-blue-500/30',
 };
 
 export const ICON_COLORS: Record<GameType, string> = {
@@ -43,6 +47,7 @@ export const ICON_COLORS: Record<GameType, string> = {
   'liars-dice': 'text-emerald-400',
   poker: 'text-violet-400',
   'up-and-down-the-river': 'text-teal-300',
+  twelve: 'text-blue-300',
 };
 
 /** Primary button (e.g. Play) background and hover */
@@ -53,6 +58,7 @@ export const BUTTON_COLORS: Record<GameType, string> = {
   'liars-dice': 'bg-emerald-600 hover:bg-emerald-500',
   poker: 'bg-violet-600 hover:bg-violet-500',
   'up-and-down-the-river': 'bg-teal-600 hover:bg-teal-500',
+  twelve: 'bg-blue-600 hover:bg-blue-500',
 };
 
 /** Solid background for options panel (no glass) */
@@ -63,6 +69,7 @@ export const PANEL_BG: Record<GameType, string> = {
   'liars-dice': 'bg-emerald-950',
   poker: 'bg-violet-950',
   'up-and-down-the-river': 'bg-teal-950',
+  twelve: 'bg-blue-950',
 };
 
 /** Label / option group text color for options panel */
@@ -73,4 +80,5 @@ export const LABEL_COLORS: Record<GameType, string> = {
   'liars-dice': 'text-emerald-200',
   poker: 'text-violet-200',
   'up-and-down-the-river': 'text-teal-200',
+  twelve: 'text-blue-200',
 };

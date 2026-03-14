@@ -12,12 +12,14 @@ import BattleshipBoard from '../games/battleship/BattleshipBoard';
 import LiarsDiceBoard from '../games/liars-dice/LiarsDiceBoard';
 import PokerBoard from '../games/poker/PokerBoard';
 import UpAndDownTheRiverBoard from '../games/up-and-down-the-river/UpAndDownTheRiverBoard';
+import TwelveBoard from '../games/twelve/TwelveBoard';
 import type { YahtzeeState } from '../games/yahtzee/types';
 import type { HeartsState } from '../games/hearts/types';
 import type { BattleshipState } from '../games/battleship/types';
 import type { LiarsDiceState } from '../games/liars-dice/types';
 import type { PokerState } from '../games/poker/types';
 import type { UpRiverState } from '../games/up-and-down-the-river/types';
+import type { TwelveState } from '../games/twelve/types';
 
 function rankDisplay(rank: number | null | undefined): string {
   if (!rank) return '';
@@ -84,11 +86,12 @@ export default function GamePage() {
   const isHearts = room.gameType === 'hearts';
   const heartsState = isHearts ? (gameState as HeartsState) : null;
   const isUpRiver = room.gameType === 'up-and-down-the-river';
+  const isTwelve = room.gameType === 'twelve';
   const heartsTargetScore = heartsState?.targetScore ?? 100;
   const heartsBroken = heartsState?.heartsBroken ?? false;
   const upRiverState = isUpRiver ? (gameState as UpRiverState) : null;
-  const fullBoardGame = isHearts || isUpRiver || room.gameType === 'yahtzee' || isPoker;
-  const showHandZoomToggle = isHearts || isUpRiver || isPoker;
+  const fullBoardGame = isHearts || isUpRiver || room.gameType === 'yahtzee' || isPoker || isTwelve;
+  const showHandZoomToggle = isHearts || isUpRiver || isPoker || isTwelve;
   const gameTitle = room.gameType ? GAME_CATALOG[room.gameType].title : 'Game';
   const suitSymbols = { hearts: '\u2665', diamonds: '\u2666', clubs: '\u2663', spades: '\u2660' } as const;
   const suitColors = { hearts: 'text-red-400', diamonds: 'text-red-400', clubs: 'text-gray-800', spades: 'text-gray-800' } as const;
@@ -223,6 +226,9 @@ export default function GamePage() {
           )}
           {room.gameType === 'up-and-down-the-river' && (
             <UpAndDownTheRiverBoard state={gameState as UpRiverState} myId={myId} onAction={sendAction} isHandZoomed={isHandZoomed} />
+          )}
+          {room.gameType === 'twelve' && (
+            <TwelveBoard state={gameState as TwelveState} myId={myId} onAction={sendAction} isHandZoomed={isHandZoomed} />
           )}
         </motion.div>
       </div>

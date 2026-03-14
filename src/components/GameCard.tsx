@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import type { GameType } from '../networking/types';
-import { Dice5, Heart, Ship, Crosshair, Club, Info, ArrowUpDown } from 'lucide-react';
+import { Dice5, Heart, Ship, Crosshair, Club, Info, ArrowUpDown, Crown } from 'lucide-react';
 import { GAME_GRADIENT, CARD_BORDER, BORDER_COLORS, PLAYERS_TAG, ICON_COLORS } from './gameCardThemes';
 
 const GAME_INFO: Record<GameType, { title: string; players: string; icon: typeof Dice5 }> = {
@@ -10,6 +10,7 @@ const GAME_INFO: Record<GameType, { title: string; players: string; icon: typeof
   'liars-dice': { title: "Liar's Dice", players: '2-4 Players', icon: Crosshair },
   poker: { title: 'Poker', players: '2-8 Players', icon: Club },
   'up-and-down-the-river': { title: 'Up and Down the River', players: '4-6 Players', icon: ArrowUpDown },
+  twelve: { title: 'Twelve', players: '2-3 Players', icon: Crown },
 };
 
 interface GameCardProps {

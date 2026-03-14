@@ -167,4 +167,29 @@ export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
       ],
     },
   },
+  twelve: {
+    title: 'Twelve',
+    shortDescription: 'Trick-taking with table piles, optional trump, and race-to-12 scoring.',
+    playersLabel: '2-3 Players',
+    minPlayers: 2,
+    maxPlayers: 3,
+    info: {
+      goal: 'Reach 12 game points by timing trump and shog calls, winning round points, and taking the last trick.',
+      rules: [
+        'Play uses a 36-card deck: 6 through Ace in each suit (2-5 removed). Aces are high.',
+        'At round start, each player gets 3/4/5/6 table piles (chosen at launch): one face-down card with one face-up card on top of each pile. Remaining cards are dealt to hand.',
+        'On your turn, play either a hand card or the exposed top card from one of your table piles.',
+        'You must follow suit if able (from either hand or exposed pile cards). If you cannot, you may play any card.',
+        'If trump is set, highest trump wins the trick; otherwise highest card of the lead suit wins.',
+        'When a top pile card is played, any newly exposed face-down card flips face up at the start of the next trick.',
+      ],
+      howToPlay: [
+        'Choose the pile count at launch, then review your hand and table piles.',
+        'If it is your turn and you have a royal pair (K+Q same suit), you may set trump (+2) unless your score is 10 or more.',
+        'After trump is set, you may call shog (+1 each suit) for each royal pair suit you have; at 11 you cannot call shog.',
+        'Round points from captured cards: J=2, Q=3, K=4, 10=10, A=11, 6-9=0 (total 120).',
+        'End of round: +1 for most round points (if unique), +1 for last trick. First to 12 wins; if multiple hit 12 in one round, most round points breaks the tie.',
+      ],
+    },
+  },
 };
