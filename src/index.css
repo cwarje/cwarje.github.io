@@ -1199,6 +1199,11 @@
   gap: 6px;
 }
 
+.twelve-seatStack .river-seatPillLabels,
+.twelve-seatStack .river-seatPillValues {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .twelve-pileRow {
   display: flex;
   gap: 5px;

@@ -297,12 +297,6 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
       : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
-    const cardsLeft = player.hand.length + player.frontPiles.reduce((sum, pile) => {
-      let count = sum;
-      if (pile.topCard) count += 1;
-      if (pile.bottomCard) count += 1;
-      return count;
-    }, 0);
     const roundPoints = state.roundCardPoints[player.id] ?? 0;
 
     return (
@@ -315,12 +309,10 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
         </div>
         <div className="river-seatPillLabels">
           <span className="river-seatCell river-seatCell--bid">Score</span>
-          <span className="river-seatCell river-seatCell--tricks">Left</span>
           <span className="river-seatCell river-seatCell--total">Rnd</span>
         </div>
         <div className="river-seatPillValues">
           <span className="river-seatCell river-seatCell--bid">{player.totalScore}</span>
-          <span className="river-seatCell river-seatCell--tricks">{cardsLeft}</span>
           <span className="river-seatCell river-seatCell--total">{roundPoints}</span>
         </div>
       </div>
