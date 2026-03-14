@@ -27,6 +27,12 @@ function isThreePairs(dice: number[]): boolean {
   return counts.filter((count) => count === 2).length === 3;
 }
 
+function isTwoTriplets(dice: number[]): boolean {
+  if (dice.length !== 6) return false;
+  const counts = countValues(dice);
+  return counts.filter((count) => count === 3).length === 2;
+}
+
 function scoreForCount(face: number, count: number): number {
   if (count >= 6) return 3000;
   if (count === 5) return 2000;
@@ -45,6 +51,7 @@ export function scoreKeptDice(dice: number[]): number | null {
   if (dice.length === 0) return null;
 
   if (isStraight(dice)) return 1500;
+  if (isTwoTriplets(dice)) return 2500;
   if (isThreePairs(dice)) return 1500;
 
   const counts = countValues(dice);
