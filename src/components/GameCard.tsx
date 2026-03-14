@@ -1,17 +1,7 @@
 import { motion } from 'framer-motion';
+import { Info } from 'lucide-react';
 import type { GameType } from '../networking/types';
-import { Dice5, Heart, Ship, Crosshair, Club, Info, ArrowUpDown, Crown } from 'lucide-react';
-import { GAME_GRADIENT, CARD_BORDER, BORDER_COLORS, PLAYERS_TAG, ICON_COLORS } from './gameCardThemes';
-
-const GAME_INFO: Record<GameType, { title: string; players: string; icon: typeof Dice5 }> = {
-  yahtzee: { title: 'Yahtzee', players: '1-4 Players', icon: Dice5 },
-  hearts: { title: 'Hearts', players: '4 Players', icon: Heart },
-  battleship: { title: 'Battleship', players: '2 Players', icon: Ship },
-  'liars-dice': { title: "Liar's Dice", players: '2-4 Players', icon: Crosshair },
-  poker: { title: 'Poker', players: '2-8 Players', icon: Club },
-  'up-and-down-the-river': { title: 'Up and Down the River', players: '4-6 Players', icon: ArrowUpDown },
-  twelve: { title: 'Twelve', players: '2-4 Players', icon: Crown },
-};
+import { GAME_REGISTRY } from '../games/registry';
 
 interface GameCardProps {
   gameType: GameType;
@@ -22,8 +12,9 @@ interface GameCardProps {
 }
 
 export default function GameCard({ gameType, onSelect, onInfo, disabled, isExpanded }: GameCardProps) {
-  const info = GAME_INFO[gameType];
-  const Icon = info.icon;
+  const gameDef = GAME_REGISTRY[gameType];
+  const { theme } = gameDef;
+  const Icon = gameDef.icon;
 
   return (
     <motion.div
@@ -40,25 +31,25 @@ export default function GameCard({ gameType, onSelect, onInfo, disabled, isExpan
       tabIndex={disabled ? -1 : 0}
       aria-disabled={disabled}
       aria-expanded={isExpanded}
-      className={`relative w-full flex flex-col p-6 min-h-[140px] rounded-2xl bg-gradient-to-br ${GAME_GRADIENT[gameType]} backdrop-blur-md border ${CARD_BORDER[gameType]} ${isExpanded ? 'rounded-b-none border-b-0' : ''} ${disabled ? 'opacity-40 cursor-not-allowed' : `${BORDER_COLORS[gameType]} cursor-pointer`} transition-colors duration-300 group`}
+      className={`relative w-full flex flex-col p-6 min-h-[140px] rounded-2xl bg-gradient-to-br ${theme.gradient} backdrop-blur-md border ${theme.cardBorder} ${isExpanded ? 'rounded-b-none border-b-0' : ''} ${disabled ? 'opacity-40 cursor-not-allowed' : `${theme.hoverBorder} cursor-pointer`} transition-colors duration-300 group`}
     >
       <span
-        className={`absolute top-3 right-3 px-2.5 py-1 rounded-md text-xs font-medium uppercase tracking-wider ${PLAYERS_TAG[gameType]}`}
+        className={`absolute top-3 right-3 px-2.5 py-1 rounded-md text-xs font-medium uppercase tracking-wider ${theme.playersTag}`}
       >
-        {info.players}
+        {gameDef.playersLabel}
       </span>
       <div className="flex-1 flex items-center justify-start">
         <div className="flex items-center gap-4">
           <div className="shrink-0 flex items-center justify-center">
-            <Icon className={`w-14 h-14 ${ICON_COLORS[gameType]}`} />
+            <Icon className={`w-14 h-14 ${theme.iconColor}`} />
           </div>
-          <h3 className="text-xl font-bold text-white">{info.title}</h3>
+          <h3 className="text-xl font-bold text-white">{gameDef.title}</h3>
         </div>
       </div>
       {onInfo && (
         <button
           type="button"
-          aria-label={`About ${info.title}`}
+          aria-label={`About ${gameDef.title}`}
           onClick={(e) => {
             e.stopPropagation();
             onInfo(gameType);

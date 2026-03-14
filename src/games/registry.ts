@@ -1,4 +1,35 @@
-import type { GameType } from '../networking/types';
+import type { LucideIcon } from 'lucide-react';
+import { Dice5, Heart, Ship, Crosshair, Club, ArrowUpDown, Crown } from 'lucide-react';
+import type { GameType, Player, GameStartOptions } from '../networking/types';
+
+import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
+import { createHeartsState, processHeartsAction, isHeartsOver, runHeartsBotTurn, getHeartsWinners } from './hearts/logic';
+import { createBattleshipState, processBattleshipAction, isBattleshipOver, runBattleshipBotTurn, getBattleshipWinners } from './battleship/logic';
+import { createLiarsDiceState, processLiarsDiceAction, isLiarsDiceOver, runLiarsDiceBotTurn, getLiarsDiceWinners } from './liars-dice/logic';
+import { createPokerState, processPokerAction, isPokerOver, runPokerBotTurn, getPokerWinners } from './poker/logic';
+import { createUpRiverState, processUpRiverAction, isUpRiverOver, runUpRiverBotTurn, getUpRiverWinners } from './up-and-down-the-river/logic';
+import { createTwelveState, processTwelveAction, isTwelveOver, runTwelveBotTurn, getTwelveWinners } from './twelve/logic';
+
+import YahtzeeBoard from './yahtzee/YahtzeeBoard';
+import HeartsBoard from './hearts/HeartsBoard';
+import BattleshipBoard from './battleship/BattleshipBoard';
+import LiarsDiceBoard from './liars-dice/LiarsDiceBoard';
+import PokerBoard from './poker/PokerBoard';
+import UpAndDownTheRiverBoard from './up-and-down-the-river/UpAndDownTheRiverBoard';
+import TwelveBoard from './twelve/TwelveBoard';
+
+import HeartsOptions from './hearts/HeartsOptions';
+import UpRiverOptions from './up-and-down-the-river/UpRiverOptions';
+import TwelveOptions from './twelve/TwelveOptions';
+
+import HeartsTitleExtra from './hearts/HeartsTitleExtra';
+import PokerTitleExtra from './poker/PokerTitleExtra';
+import UpRiverToolbarExtra from './up-and-down-the-river/UpRiverToolbarExtra';
+import TwelveToolbarExtra from './twelve/TwelveToolbarExtra';
+
+// ---------------------------------------------------------------------------
+// Shared types
+// ---------------------------------------------------------------------------
 
 export interface HowToPlay {
   goal: string;
@@ -6,16 +37,74 @@ export interface HowToPlay {
   howToPlay: string[];
 }
 
-export interface GameCatalogEntry {
+export interface GameTheme {
+  gradient: string;
+  cardBorder: string;
+  hoverBorder: string;
+  playersTag: string;
+  iconColor: string;
+  buttonColors: string;
+  panelBg: string;
+  labelColor: string;
+}
+
+export interface BoardProps {
+  state: unknown;
+  myId: string;
+  onAction: (payload: unknown) => void;
+  isHost?: boolean;
+  isHandZoomed?: boolean;
+  onLeave?: () => void;
+}
+
+export interface GameOptionsPanelProps {
+  onChange: (options: Partial<GameStartOptions>) => void;
+  labelClass: string;
+  playerCount: number;
+  botCount: number;
+}
+
+export interface GameHudProps {
+  state: unknown;
+}
+
+// ---------------------------------------------------------------------------
+// GameDefinition — the single source of truth for every game
+// ---------------------------------------------------------------------------
+
+export interface GameDefinition {
   title: string;
   shortDescription: string;
   playersLabel: string;
   minPlayers: number;
   maxPlayers: number;
   info: HowToPlay;
+  icon: LucideIcon;
+  theme: GameTheme;
+
+  createState: (players: Player[], options?: GameStartOptions) => unknown;
+  processAction: (state: unknown, action: unknown, playerId: string) => unknown;
+  isOver: (state: unknown) => boolean;
+  runBotTurn: (state: unknown) => unknown;
+  getWinners: (state: unknown) => string[];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Board: React.ComponentType<any>;
+  OptionsPanel?: React.ComponentType<GameOptionsPanelProps>;
+  TitleExtra?: React.ComponentType<GameHudProps>;
+  ToolbarExtra?: React.ComponentType<GameHudProps>;
+
+  fullBoard?: boolean;
+  hasHandZoom?: boolean;
+  production?: boolean;
+  hudTitleLines?: string[];
 }
 
-export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
+// ---------------------------------------------------------------------------
+// Registry
+// ---------------------------------------------------------------------------
+
+export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
   yahtzee: {
     title: 'Yahtzee',
     shortDescription: 'Roll dice, pick categories, and chase that perfect score. Classic dice game for 1-4 players.',
@@ -39,7 +128,27 @@ export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
         'Play continues until all 13 categories are filled. Highest total wins!',
       ],
     },
+    icon: Dice5,
+    theme: {
+      gradient: 'from-amber-500/20 to-orange-600/20',
+      cardBorder: 'border-amber-500/20',
+      hoverBorder: 'hover:border-amber-500/30',
+      playersTag: 'bg-amber-500/25 text-amber-200 border border-amber-500/30',
+      iconColor: 'text-amber-400',
+      buttonColors: 'bg-amber-600 hover:bg-amber-500',
+      panelBg: 'bg-amber-950',
+      labelColor: 'text-amber-200',
+    },
+    createState: createYahtzeeState,
+    processAction: processYahtzeeAction,
+    isOver: isYahtzeeOver,
+    runBotTurn: runYahtzeeBotTurn,
+    getWinners: getYahtzeeWinners,
+    Board: YahtzeeBoard,
+    fullBoard: true,
+    production: true,
   },
+
   hearts: {
     title: 'Hearts',
     shortDescription: 'Avoid tricks with hearts and the dreaded Queen of Spades. Or shoot the moon!',
@@ -64,7 +173,30 @@ export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
         'The round ends when all cards are played. A new round begins until someone hits 100 points.',
       ],
     },
+    icon: Heart,
+    theme: {
+      gradient: 'from-rose-500/20 to-pink-600/20',
+      cardBorder: 'border-rose-500/20',
+      hoverBorder: 'hover:border-rose-500/30',
+      playersTag: 'bg-rose-500/25 text-rose-200 border border-rose-500/30',
+      iconColor: 'text-rose-400',
+      buttonColors: 'bg-rose-600 hover:bg-rose-500',
+      panelBg: 'bg-rose-950',
+      labelColor: 'text-rose-200',
+    },
+    createState: (players, options) => createHeartsState(players, { targetScore: options?.targetScore }),
+    processAction: processHeartsAction,
+    isOver: isHeartsOver,
+    runBotTurn: runHeartsBotTurn,
+    getWinners: getHeartsWinners,
+    Board: HeartsBoard,
+    OptionsPanel: HeartsOptions,
+    TitleExtra: HeartsTitleExtra,
+    fullBoard: true,
+    hasHandZoom: true,
+    production: true,
   },
+
   battleship: {
     title: 'Battleship',
     shortDescription: 'Place your fleet and hunt down the enemy ships. Strategic naval combat for two.',
@@ -88,7 +220,26 @@ export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
         'The result (hit or miss) is shown immediately. Keep firing until all enemy ships are sunk!',
       ],
     },
+    icon: Ship,
+    theme: {
+      gradient: 'from-cyan-500/20 to-blue-600/20',
+      cardBorder: 'border-cyan-500/20',
+      hoverBorder: 'hover:border-cyan-500/30',
+      playersTag: 'bg-cyan-500/25 text-cyan-200 border border-cyan-500/30',
+      iconColor: 'text-cyan-400',
+      buttonColors: 'bg-cyan-600 hover:bg-cyan-500',
+      panelBg: 'bg-cyan-950',
+      labelColor: 'text-cyan-200',
+    },
+    createState: createBattleshipState,
+    processAction: processBattleshipAction,
+    isOver: isBattleshipOver,
+    runBotTurn: runBattleshipBotTurn,
+    getWinners: getBattleshipWinners,
+    Board: BattleshipBoard,
+    production: false,
   },
+
   'liars-dice': {
     title: "Liar's Dice",
     shortDescription: "Bluff, bid, and call liars. Losers face the revolver. Last player standing wins. Inspired by Liar's Bar.",
@@ -114,7 +265,26 @@ export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
         'Last player standing wins!',
       ],
     },
+    icon: Crosshair,
+    theme: {
+      gradient: 'from-emerald-500/20 to-green-600/20',
+      cardBorder: 'border-emerald-500/20',
+      hoverBorder: 'hover:border-emerald-500/30',
+      playersTag: 'bg-emerald-500/25 text-emerald-200 border border-emerald-500/30',
+      iconColor: 'text-emerald-400',
+      buttonColors: 'bg-emerald-600 hover:bg-emerald-500',
+      panelBg: 'bg-emerald-950',
+      labelColor: 'text-emerald-200',
+    },
+    createState: createLiarsDiceState,
+    processAction: processLiarsDiceAction,
+    isOver: isLiarsDiceOver,
+    runBotTurn: runLiarsDiceBotTurn,
+    getWinners: getLiarsDiceWinners,
+    Board: LiarsDiceBoard,
+    production: false,
   },
+
   poker: {
     title: 'Poker',
     shortDescription: 'Texas Hold\'em with blinds, betting rounds, and side pots. Bluff your way to the chips!',
@@ -139,7 +309,29 @@ export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
         'After the final betting round, the best hand wins the pot. Play continues until one player has all the chips!',
       ],
     },
+    icon: Club,
+    theme: {
+      gradient: 'from-violet-500/20 to-purple-600/20',
+      cardBorder: 'border-violet-500/20',
+      hoverBorder: 'hover:border-violet-500/30',
+      playersTag: 'bg-violet-500/25 text-violet-200 border border-violet-500/30',
+      iconColor: 'text-violet-400',
+      buttonColors: 'bg-violet-600 hover:bg-violet-500',
+      panelBg: 'bg-violet-950',
+      labelColor: 'text-violet-200',
+    },
+    createState: createPokerState,
+    processAction: processPokerAction,
+    isOver: isPokerOver,
+    runBotTurn: runPokerBotTurn,
+    getWinners: getPokerWinners,
+    Board: PokerBoard,
+    TitleExtra: PokerTitleExtra,
+    fullBoard: true,
+    hasHandZoom: true,
+    production: true,
   },
+
   'up-and-down-the-river': {
     title: 'Up and Down the River',
     shortDescription: 'Bid your exact tricks as rounds rise and fall between 1 and 7 cards. Choose 1-7-1 or 7-1-7 and nail your bids to rack up points.',
@@ -166,7 +358,31 @@ export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
         'After the final 1-card round, highest total score wins.',
       ],
     },
+    icon: ArrowUpDown,
+    theme: {
+      gradient: 'from-teal-500/20 to-sky-600/20',
+      cardBorder: 'border-teal-500/20',
+      hoverBorder: 'hover:border-teal-500/30',
+      playersTag: 'bg-teal-500/25 text-teal-200 border border-teal-500/30',
+      iconColor: 'text-teal-300',
+      buttonColors: 'bg-teal-600 hover:bg-teal-500',
+      panelBg: 'bg-teal-950',
+      labelColor: 'text-teal-200',
+    },
+    createState: (players, options) => createUpRiverState(players, { upRiverStartMode: options?.upRiverStartMode }),
+    processAction: processUpRiverAction,
+    isOver: isUpRiverOver,
+    runBotTurn: runUpRiverBotTurn,
+    getWinners: getUpRiverWinners,
+    Board: UpAndDownTheRiverBoard,
+    OptionsPanel: UpRiverOptions,
+    ToolbarExtra: UpRiverToolbarExtra,
+    fullBoard: true,
+    hasHandZoom: true,
+    production: true,
+    hudTitleLines: ['Up and Down', 'the River'],
   },
+
   twelve: {
     title: 'Twelve',
     shortDescription: 'Trick-taking with table piles, optional trump, and race-to-12 scoring.',
@@ -191,5 +407,35 @@ export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
         'End of round: +1 for most round points (if unique), +1 for last trick. First to 12 wins; if multiple hit 12 in one round, most round points breaks the tie.',
       ],
     },
+    icon: Crown,
+    theme: {
+      gradient: 'from-blue-500/20 to-indigo-600/20',
+      cardBorder: 'border-blue-500/20',
+      hoverBorder: 'hover:border-blue-500/30',
+      playersTag: 'bg-blue-500/25 text-blue-200 border border-blue-500/30',
+      iconColor: 'text-blue-300',
+      buttonColors: 'bg-blue-600 hover:bg-blue-500',
+      panelBg: 'bg-blue-950',
+      labelColor: 'text-blue-200',
+    },
+    createState: (players, options) => createTwelveState(players, { pileCount: options?.pileCount }),
+    processAction: processTwelveAction,
+    isOver: isTwelveOver,
+    runBotTurn: runTwelveBotTurn,
+    getWinners: getTwelveWinners,
+    Board: TwelveBoard,
+    OptionsPanel: TwelveOptions,
+    ToolbarExtra: TwelveToolbarExtra,
+    fullBoard: true,
+    hasHandZoom: true,
+    production: true,
   },
 };
+
+/** All registered game types */
+export const ALL_GAME_TYPES = Object.keys(GAME_REGISTRY) as GameType[];
+
+/** Game types shown in production */
+export const PRODUCTION_GAME_TYPES = ALL_GAME_TYPES.filter(
+  (gt) => GAME_REGISTRY[gt].production,
+);

@@ -15,7 +15,7 @@ import type { YahtzeeState } from '../games/yahtzee/types';
 import type { UpRiverState } from '../games/up-and-down-the-river/types';
 import type { TwelveState } from '../games/twelve/types';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
-import { GAME_CATALOG } from '../games/gameCatalog';
+import { GAME_REGISTRY } from '../games/registry';
 
 export const BOT_NAMES = ['Nova', 'Pixel', 'Byte', 'Chip', 'Blaze', 'Echo', 'Neon', 'Volt'];
 
@@ -791,17 +791,17 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   // Start game (host only) — gameType is chosen at start time
   const startGame = useCallback((gameType: GameType, options?: GameStartOptions) => {
     if (!isHost || !room) return;
-    const catalog = GAME_CATALOG[gameType];
+    const gameDef = GAME_REGISTRY[gameType];
     let players = room.players;
 
-    if (catalog.minPlayers === catalog.maxPlayers) {
+    if (gameDef.minPlayers === gameDef.maxPlayers) {
       // Fixed-count game: auto-fill with bots
-      if (players.length > catalog.maxPlayers) return;
-      if (players.length < catalog.maxPlayers) {
-        players = [...players, ...createBots(catalog.maxPlayers - players.length, players)];
+      if (players.length > gameDef.maxPlayers) return;
+      if (players.length < gameDef.maxPlayers) {
+        players = [...players, ...createBots(gameDef.maxPlayers - players.length, players)];
       }
     } else if (options?.botCount && options.botCount > 0) {
-      const maxBots = catalog.maxPlayers - players.length;
+      const maxBots = gameDef.maxPlayers - players.length;
       const botsToAdd = Math.min(options.botCount, maxBots);
       if (botsToAdd > 0) {
         players = [...players, ...createBots(botsToAdd, players)];

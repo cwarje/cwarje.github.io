@@ -738,6 +738,14 @@ export function isPokerOver(state: unknown): boolean {
   return (state as PokerState).gameOver;
 }
 
+export function getPokerWinners(state: unknown): string[] {
+  const s = state as PokerState;
+  const activePlayers = s.players.filter(p => !p.leftGame);
+  if (activePlayers.length === 0) return [];
+  const maxChips = Math.max(...activePlayers.map(p => p.chips));
+  return activePlayers.filter(p => p.chips === maxChips).map(p => p.id);
+}
+
 // ────────────────────────────────────────────
 // Bot AI (simple heuristic)
 // ────────────────────────────────────────────

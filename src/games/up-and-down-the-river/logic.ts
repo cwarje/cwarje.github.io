@@ -257,6 +257,12 @@ export function processUpRiverAction(state: unknown, action: unknown, playerId: 
   return state;
 }
 
+export function getUpRiverWinners(state: unknown): string[] {
+  const s = state as UpRiverState;
+  const maxScore = Math.max(...s.players.map(p => p.totalScore));
+  return s.players.filter(p => p.totalScore === maxScore).map(p => p.id);
+}
+
 export function isUpRiverOver(state: unknown): boolean {
   return (state as UpRiverState).gameOver;
 }

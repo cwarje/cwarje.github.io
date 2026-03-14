@@ -1,13 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Minus, Plus } from 'lucide-react';
-import type { GameType, GameStartOptions, HeartsTargetScore, TwelvePileCount, UpRiverStartMode } from '../networking/types';
-import { GAME_CATALOG } from '../games/gameCatalog';
-import { CARD_BORDER, BUTTON_COLORS, LABEL_COLORS, PANEL_BG } from './gameCardThemes';
+import type { GameType, GameStartOptions } from '../networking/types';
+import { GAME_REGISTRY } from '../games/registry';
 
-const DEFAULT_HEARTS_TARGET: HeartsTargetScore = 100;
-const DEFAULT_UP_RIVER_MODE: UpRiverStartMode = 'down-up'; // 7-1-7
-const DEFAULT_TWELVE_PILE_COUNT: TwelvePileCount = 4;
 const DEFAULT_BOT_COUNT = 0;
 
 interface GameStartOptionsPanelProps {
@@ -23,23 +19,18 @@ export default function GameStartOptionsPanel({
   isHost,
   onStart,
 }: GameStartOptionsPanelProps) {
-  const catalog = GAME_CATALOG[gameType];
-  const minBots = Math.max(0, catalog.minPlayers - playerCount);
-  const maxBots = catalog.maxPlayers - playerCount;
-  const showBots = catalog.minPlayers !== catalog.maxPlayers && playerCount < catalog.maxPlayers;
+  const gameDef = GAME_REGISTRY[gameType];
+  const { theme } = gameDef;
+  const minBots = Math.max(0, gameDef.minPlayers - playerCount);
+  const maxBots = gameDef.maxPlayers - playerCount;
+  const showBots = gameDef.minPlayers !== gameDef.maxPlayers && playerCount < gameDef.maxPlayers;
 
-  const [heartsTarget, setHeartsTarget] = useState<HeartsTargetScore>(DEFAULT_HEARTS_TARGET);
-  const [upRiverMode, setUpRiverMode] = useState<UpRiverStartMode>(DEFAULT_UP_RIVER_MODE);
-  const [pileCount, setPileCount] = useState<TwelvePileCount>(DEFAULT_TWELVE_PILE_COUNT);
   const [botCount, setBotCount] = useState(DEFAULT_BOT_COUNT);
-  const twelvePileOptions: TwelvePileCount[] = [3, 4, 5, 6];
-  const projectedPlayerCount = Math.min(catalog.maxPlayers, playerCount + (showBots ? botCount : 0));
-  const pileCountPlayerBasis = gameType === 'twelve' ? projectedPlayerCount : playerCount;
-  const isPileCountSupported = (count: TwelvePileCount) => pileCountPlayerBasis * count * 2 <= 36;
-  const supportedTwelvePileOptions = twelvePileOptions.filter(isPileCountSupported);
-  const effectivePileCount = supportedTwelvePileOptions.includes(pileCount)
-    ? pileCount
-    : (supportedTwelvePileOptions[supportedTwelvePileOptions.length - 1] ?? DEFAULT_TWELVE_PILE_COUNT);
+  const [gameOptions, setGameOptions] = useState<Partial<GameStartOptions>>({});
+
+  const handleOptionsChange = useCallback((opts: Partial<GameStartOptions>) => {
+    setGameOptions(opts);
+  }, []);
 
   useEffect(() => {
     if (showBots) {
@@ -49,26 +40,17 @@ export default function GameStartOptionsPanel({
 
   const canStart =
     playerCount >= 1 &&
-    playerCount <= catalog.maxPlayers &&
-    (catalog.minPlayers === catalog.maxPlayers || playerCount + botCount >= catalog.minPlayers);
+    playerCount <= gameDef.maxPlayers &&
+    (gameDef.minPlayers === gameDef.maxPlayers || playerCount + botCount >= gameDef.minPlayers);
 
   const handlePlay = () => {
     if (!canStart || !isHost) return;
-    const options: GameStartOptions = {};
-    if (gameType === 'hearts') options.targetScore = heartsTarget;
-    if (gameType === 'up-and-down-the-river') {
-      options.upRiverStartMode = upRiverMode;
-      if (showBots) options.botCount = botCount;
-    }
-    if (gameType === 'twelve') options.pileCount = effectivePileCount;
-    if (showBots && gameType !== 'up-and-down-the-river') options.botCount = botCount;
+    const options: GameStartOptions = { ...gameOptions };
+    if (showBots) options.botCount = botCount;
     onStart(Object.keys(options).length ? options : undefined);
   };
 
-  const panelBg = PANEL_BG[gameType];
-  const border = CARD_BORDER[gameType];
-  const buttonClass = BUTTON_COLORS[gameType];
-  const labelClass = LABEL_COLORS[gameType];
+  const GameOptions = gameDef.OptionsPanel;
 
   return (
     <motion.div
@@ -76,89 +58,23 @@ export default function GameStartOptionsPanel({
       animate={{ height: 'auto', opacity: 1 }}
       exit={{ height: 0, opacity: 0 }}
       transition={{ duration: 0.25, ease: 'easeInOut' }}
-      className={`w-full min-w-0 -mt-px overflow-hidden rounded-b-2xl border border-t-0 ${border} ${panelBg}`}
+      className={`w-full min-w-0 -mt-px overflow-hidden rounded-b-2xl border border-t-0 ${theme.cardBorder} ${theme.panelBg}`}
       role="region"
-      aria-label={`Options for ${catalog.title}`}
+      aria-label={`Options for ${gameDef.title}`}
     >
       <div className="p-4 pt-2 pb-5 space-y-4">
-        {gameType === 'hearts' && (
-          <div className="space-y-2">
-            <p className={`text-sm font-semibold uppercase tracking-wider ${labelClass}`}>Game to</p>
-            <div className="flex gap-2">
-              {([50, 100] as const).map((score) => (
-                <button
-                  key={score}
-                  type="button"
-                  onClick={() => setHeartsTarget(score)}
-                  className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-colors ${
-                    heartsTarget === score
-                      ? 'bg-rose-600 text-white'
-                      : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10'
-                  }`}
-                >
-                  {score}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {gameType === 'up-and-down-the-river' && (
-          <div className="space-y-2">
-            <p className={`text-sm font-semibold uppercase tracking-wider ${labelClass}`}>Round order</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setUpRiverMode('up-down')}
-                className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-colors ${
-                  upRiverMode === 'up-down'
-                    ? 'bg-teal-600 text-white'
-                    : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10'
-                }`}
-              >
-                1 - 7 - 1
-              </button>
-              <button
-                type="button"
-                onClick={() => setUpRiverMode('down-up')}
-                className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-colors ${
-                  upRiverMode === 'down-up'
-                    ? 'bg-teal-600 text-white'
-                    : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10'
-                }`}
-              >
-                7 - 1 - 7
-              </button>
-            </div>
-          </div>
-        )}
-
-        {gameType === 'twelve' && (
-          <div className="space-y-2">
-            <p className={`text-sm font-semibold uppercase tracking-wider ${labelClass}`}>Piles per player</p>
-            <div className="flex gap-2">
-              {twelvePileOptions.map((count) => (
-                <button
-                  key={count}
-                  type="button"
-                  onClick={() => setPileCount(count)}
-                  disabled={!isPileCountSupported(count)}
-                  className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-colors ${
-                    effectivePileCount === count
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10 disabled:opacity-40 disabled:pointer-events-none'
-                  }`}
-                >
-                  {count}
-                </button>
-              ))}
-            </div>
-          </div>
+        {GameOptions && (
+          <GameOptions
+            onChange={handleOptionsChange}
+            labelClass={theme.labelColor}
+            playerCount={playerCount}
+            botCount={showBots ? botCount : 0}
+          />
         )}
 
         {showBots && (
           <div className="space-y-2">
-            <p className={`text-sm font-semibold uppercase tracking-wider ${labelClass}`}>Bots</p>
+            <p className={`text-sm font-semibold uppercase tracking-wider ${theme.labelColor}`}>Bots</p>
             <div
               className="flex items-center justify-center gap-4 py-1"
               role="group"
@@ -198,7 +114,7 @@ export default function GameStartOptionsPanel({
           type="button"
           onClick={handlePlay}
           disabled={!canStart || !isHost}
-          className={`w-full py-3 px-4 rounded-xl text-white font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none ${buttonClass}`}
+          className={`w-full py-3 px-4 rounded-xl text-white font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none ${theme.buttonColors}`}
         >
           Play
         </button>

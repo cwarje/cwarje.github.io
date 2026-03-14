@@ -417,6 +417,10 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
   return state;
 }
 
+export function getTwelveWinners(state: unknown): string[] {
+  return (state as TwelveState).winners;
+}
+
 export function isTwelveOver(state: unknown): boolean {
   return (state as TwelveState).gameOver;
 }

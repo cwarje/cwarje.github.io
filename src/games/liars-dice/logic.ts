@@ -372,6 +372,11 @@ export function isLiarsDiceOver(state: unknown): boolean {
   return s.phase === 'gameOver';
 }
 
+export function getLiarsDiceWinners(state: unknown): string[] {
+  const s = state as LiarsDiceState;
+  return s.players.filter(p => p.alive).map(p => p.id);
+}
+
 // ── Bot AI ───────────────────────────────────────────────────────────────────
 
 export function runLiarsDiceBotTurn(state: unknown): unknown {

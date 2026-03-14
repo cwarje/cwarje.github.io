@@ -6,14 +6,17 @@ This project runs fully peer-to-peer in the browser: one player hosts a lobby an
 
 ## Games included
 
-Current game types (from `src/games/gameCatalog.ts` and `src/networking/types.ts`):
+Current game types (from `src/games/registry.ts` and `src/networking/types.ts`):
 
 - `yahtzee` (1-4 players)
 - `hearts` (4 players, target score options 50 or 100)
 - `battleship` (2 players)
 - `liars-dice` (2-4 players)
 - `poker` (2-8 players)
-- `up-and-down-the-river` (4 players)
+- `up-and-down-the-river` (4-6 players)
+- `twelve` (2-4 players)
+
+Production builds show a subset (yahtzee, hearts, poker, up-and-down-the-river, twelve); battleship and liars-dice are available in dev mode.
 
 ## Key features
 
@@ -75,7 +78,7 @@ sequenceDiagram
 
 - Host is always the source of truth for room and game state.
 - Clients never mutate authoritative state directly; they send actions.
-- Game logic is isolated per game module and orchestrated through `src/games/gameEngine.ts`.
+- Game logic is isolated per game module and orchestrated through `src/games/gameEngine.ts`, which dispatches via `src/games/registry.ts`.
 - Bots run on the host side and follow the same action pipeline as humans.
 
 ## How the project works
@@ -125,7 +128,10 @@ Reconnect behavior:
 ```text
 src/
   components/        # Shared UI components
-  games/             # Game catalog, engine, and per-game modules
+  games/             # Game registry, engine, and per-game modules
+    registry.ts      # Single source of truth for all game definitions
+    gameEngine.ts    # Orchestrates logic via registry lookups
+    <game-name>/     # Per-game types, logic, board, and optional options/HUD
   networking/        # Peer/network state and messaging
   pages/             # Route-level pages (Home/GamePage)
   utils/             # Device ID and room code helpers
@@ -187,26 +193,25 @@ Deployment:
 
 ## Adding a new game
 
-Use this checklist when extending the platform.
+Use this checklist when extending the platform. The game registry centralizes all per-game configuration, so adding a game requires edits in only three places.
 
-1. Add type in `src/networking/types.ts`
-   - Extend `GameType` union.
-   - Add any new game-start options if needed.
-2. Add catalog entry in `src/games/gameCatalog.ts`
-   - Provide title, player constraints, descriptions, and rules/how-to-play text.
-3. Create game module folder `src/games/<game-name>/`
-   - `types.ts`
-   - `logic.ts`
-   - `<GameName>Board.tsx`
-   - (optional) `rules.ts`
-4. Wire game into `src/games/gameEngine.ts`
-   - `createInitialGameState`
-   - `processGameAction`
-   - `checkGameOver`
-   - `runSingleBotTurn`
-   - `getGameWinners`
-5. Render board in `src/pages/GamePage.tsx`
-6. Add selectable game to `src/pages/Home.tsx`
+1. **Add type** in `src/networking/types.ts`
+   - Extend the `GameType` union with your game key (e.g. `'my-game'`).
+   - Add any new game-start options to `GameStartOptions` if needed.
+
+2. **Create game module** `src/games/<game-name>/`
+   - `types.ts` — state and action types
+   - `logic.ts` — `createState`, `processAction`, `isOver`, `runBotTurn`, `getWinners`
+   - `<GameName>Board.tsx` — React board component
+   - (optional) `rules.ts` — rule helpers
+   - (optional) `*Options.tsx` — start options panel (e.g. Hearts target, Twelve pile count)
+   - (optional) `*TitleExtra.tsx` / `*ToolbarExtra.tsx` — HUD content
+
+3. **Register the game** in `src/games/registry.ts`
+   - Add one entry to `GAME_REGISTRY` with metadata, theme, logic functions, Board component, and optional OptionsPanel/HUD components.
+   - Set `production: true` to include it in production builds, or `false` for dev-only.
+
+All other wiring (GamePage, Home, GameCard, GameEngine) is derived from the registry automatically.
 
 ### Conventions to follow
 
@@ -224,7 +229,7 @@ Use this map to find where changes should go quickly:
 - Lobby/network behavior -> `src/networking/roomStore.tsx`, `src/networking/peer.ts`
 - Game rule bugs/features -> `src/games/<game>/logic.ts` and `src/games/<game>/types.ts`
 - Cross-game orchestration -> `src/games/gameEngine.ts`
-- Game discoverability/info -> `src/games/gameCatalog.ts`
+- Game metadata, themes, and discoverability -> `src/games/registry.ts`
 
 Recommended implementation workflow:
 

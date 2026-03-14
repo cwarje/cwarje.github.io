@@ -5,30 +5,7 @@ import { Home, Loader2, Search } from 'lucide-react';
 import { useRoomContext } from '../networking/roomStore';
 import { useToast } from '../components/Toast';
 import LobbyMenu from '../components/LobbyMenu';
-import { GAME_CATALOG } from '../games/gameCatalog';
-import YahtzeeBoard from '../games/yahtzee/YahtzeeBoard';
-import HeartsBoard from '../games/hearts/HeartsBoard';
-import BattleshipBoard from '../games/battleship/BattleshipBoard';
-import LiarsDiceBoard from '../games/liars-dice/LiarsDiceBoard';
-import PokerBoard from '../games/poker/PokerBoard';
-import UpAndDownTheRiverBoard from '../games/up-and-down-the-river/UpAndDownTheRiverBoard';
-import TwelveBoard from '../games/twelve/TwelveBoard';
-import type { YahtzeeState } from '../games/yahtzee/types';
-import type { HeartsState } from '../games/hearts/types';
-import type { BattleshipState } from '../games/battleship/types';
-import type { LiarsDiceState } from '../games/liars-dice/types';
-import type { PokerState } from '../games/poker/types';
-import type { UpRiverState } from '../games/up-and-down-the-river/types';
-import type { TwelveState } from '../games/twelve/types';
-
-function rankDisplay(rank: number | null | undefined): string {
-  if (!rank) return '';
-  if (rank === 11) return 'J';
-  if (rank === 12) return 'Q';
-  if (rank === 13) return 'K';
-  if (rank === 14) return 'A';
-  return String(rank);
-}
+import { GAME_REGISTRY } from '../games/registry';
 
 export default function GamePage() {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -79,38 +56,21 @@ export default function GamePage() {
     );
   }
 
+  const gameDef = room.gameType ? GAME_REGISTRY[room.gameType] : null;
   const isFinished = room.phase === 'finished';
-  const isPoker = room.gameType === 'poker';
-  const pokerState = isPoker ? (gameState as PokerState) : null;
-  const isPokerSessionOver = pokerState?.sessionOver ?? false;
-  const isHearts = room.gameType === 'hearts';
-  const heartsState = isHearts ? (gameState as HeartsState) : null;
-  const isUpRiver = room.gameType === 'up-and-down-the-river';
-  const isTwelve = room.gameType === 'twelve';
-  const heartsTargetScore = heartsState?.targetScore ?? 100;
-  const heartsBroken = heartsState?.heartsBroken ?? false;
-  const upRiverState = isUpRiver ? (gameState as UpRiverState) : null;
-  const twelveState = isTwelve ? (gameState as TwelveState) : null;
-  const fullBoardGame = isHearts || isUpRiver || room.gameType === 'yahtzee' || isPoker || isTwelve;
-  const showHandZoomToggle = isHearts || isUpRiver || isPoker || isTwelve;
-  const gameTitle = room.gameType ? GAME_CATALOG[room.gameType].title : 'Game';
-  const suitSymbols = { hearts: '\u2665', diamonds: '\u2666', clubs: '\u2663', spades: '\u2660' } as const;
-  const suitColors = { hearts: 'text-red-400', diamonds: 'text-red-400', clubs: 'text-gray-800', spades: 'text-gray-800' } as const;
 
-  // Show "Back to Lobby" for host when game is finished (non-poker) or poker session is over
+  // Show "Back to Lobby" for host when game is finished or poker session is over
   const showBackToLobby = isHost && (
-    (isFinished && !isPoker) || (isPoker && isPokerSessionOver)
+    isFinished || (gameState as Record<string, unknown>)?.sessionOver === true
   );
 
-  const handlePokerLeave = () => {
+  const handleLeave = () => {
     leaveRoom();
     toast('Left the table.', 'info');
     navigate('/');
   };
 
-  const handleReturnToLobby = () => {
-    returnToLobby();
-  };
+  const Board = gameDef?.Board;
 
   return (
     <div className="relative h-full flex flex-col">
@@ -135,62 +95,28 @@ export default function GamePage() {
       <div className="absolute top-0 left-0 right-0 z-20 flex items-start justify-between p-3 sm:p-4 pointer-events-none">
         <div className="pointer-events-none">
           <h1 className="text-xl sm:text-2xl font-bold text-white">
-            {room.gameType === 'up-and-down-the-river' ? (
-              <>
-                Up and Down
-                <br />
-                the River
-              </>
-            ) : (
-              gameTitle
-            )}
+            {gameDef?.hudTitleLines
+              ? gameDef.hudTitleLines.map((line, i) => (
+                  <span key={i}>{i > 0 && <br />}{line}</span>
+                ))
+              : gameDef?.title ?? 'Game'}
           </h1>
-          {isHearts && heartsTargetScore && (
-            <>
-              <p className="text-xs sm:text-sm text-white/80">Game to {heartsTargetScore}</p>
-              {heartsBroken && (
-                <p className="text-xs sm:text-sm text-white/80">
-                  <span className="text-red-400">♥</span> broken
-                </p>
-              )}
-            </>
-          )}
-          {isPoker && pokerState?.handNumber != null && pokerState.handNumber > 0 && (
-            <p className="text-xs sm:text-sm text-white/80">Hand #{pokerState.handNumber}</p>
-          )}
+          {gameDef?.TitleExtra && <gameDef.TitleExtra state={gameState} />}
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
-          {isUpRiver && upRiverState?.trumpCard && (
-            <div className="river-hudTrumpCard">
-              <div className="river-card river-card--compact">
-                <div className="river-cardCorner">
-                  <span className={`river-cardRank ${suitColors[upRiverState.trumpCard.suit]}`}>{rankDisplay(upRiverState.trumpCard.rank)}</span>
-                  <span className={`river-cardSuit ${suitColors[upRiverState.trumpCard.suit]}`}>{suitSymbols[upRiverState.trumpCard.suit]}</span>
-                </div>
-              </div>
-            </div>
-          )}
-          {isTwelve && twelveState?.trumpSuit && (
-            <div className="river-hudTrumpCard">
-              <div className="river-card river-card--compact">
-                <div className="river-cardCorner">
-                  <span className={`river-cardSuit ${suitColors[twelveState.trumpSuit]}`}>{suitSymbols[twelveState.trumpSuit]}</span>
-                </div>
-              </div>
-            </div>
-          )}
+          {gameDef?.ToolbarExtra && <gameDef.ToolbarExtra state={gameState} />}
           {showBackToLobby && (
             <motion.button
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              onClick={handleReturnToLobby}
+              onClick={returnToLobby}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-medium hover:bg-primary-500 transition-colors cursor-pointer"
             >
               <Home className="w-4 h-4" />
               Back to Lobby
             </motion.button>
           )}
-          {showHandZoomToggle && (
+          {gameDef?.hasHandZoom && (
             <button
               type="button"
               onClick={() => setIsHandZoomed(v => !v)}
@@ -217,28 +143,17 @@ export default function GamePage() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className={fullBoardGame ? 'h-full p-0' : 'p-4 sm:p-6 lg:p-8'}
+          className={gameDef?.fullBoard ? 'h-full p-0' : 'p-4 sm:p-6 lg:p-8'}
         >
-          {room.gameType === 'yahtzee' && (
-            <YahtzeeBoard state={gameState as YahtzeeState} myId={myId} onAction={sendAction} />
-          )}
-          {room.gameType === 'hearts' && (
-            <HeartsBoard state={gameState as HeartsState} myId={myId} onAction={sendAction} isHandZoomed={isHandZoomed} />
-          )}
-          {room.gameType === 'battleship' && (
-            <BattleshipBoard state={gameState as BattleshipState} myId={myId} onAction={sendAction} />
-          )}
-          {room.gameType === 'liars-dice' && (
-            <LiarsDiceBoard state={gameState as LiarsDiceState} myId={myId} onAction={sendAction} />
-          )}
-          {room.gameType === 'poker' && (
-            <PokerBoard state={gameState as PokerState} myId={myId} onAction={sendAction} isHost={isHost} onLeave={handlePokerLeave} isHandZoomed={isHandZoomed} />
-          )}
-          {room.gameType === 'up-and-down-the-river' && (
-            <UpAndDownTheRiverBoard state={gameState as UpRiverState} myId={myId} onAction={sendAction} isHandZoomed={isHandZoomed} />
-          )}
-          {room.gameType === 'twelve' && (
-            <TwelveBoard state={gameState as TwelveState} myId={myId} onAction={sendAction} isHandZoomed={isHandZoomed} />
+          {Board && (
+            <Board
+              state={gameState}
+              myId={myId}
+              onAction={sendAction}
+              isHost={isHost}
+              isHandZoomed={isHandZoomed}
+              onLeave={handleLeave}
+            />
           )}
         </motion.div>
       </div>

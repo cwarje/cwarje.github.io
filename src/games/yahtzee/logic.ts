@@ -252,6 +252,12 @@ export function isYahtzeeOver(state: unknown): boolean {
   return (state as YahtzeeState).gameOver;
 }
 
+export function getYahtzeeWinners(state: unknown): string[] {
+  const s = state as YahtzeeState;
+  const maxScore = Math.max(...s.players.map(p => p.totalScore));
+  return s.players.filter(p => p.totalScore === maxScore).map(p => p.id);
+}
+
 /** Returns true when the bot's next step will be scoring (not rolling).
  *  Used by the host scheduler to show the dice longer before the score clears them. */
 export function willYahtzeeBotScore(state: unknown): boolean {

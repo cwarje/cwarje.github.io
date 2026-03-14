@@ -313,6 +313,10 @@ function endRound(s: HeartsState): HeartsState {
   };
 }
 
+export function getHeartsWinners(state: unknown): string[] {
+  return (state as HeartsState).winners ?? [];
+}
+
 export function isHeartsOver(state: unknown): boolean {
   return (state as HeartsState).gameOver;
 }

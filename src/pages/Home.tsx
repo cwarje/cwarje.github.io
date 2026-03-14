@@ -8,11 +8,9 @@ import RoomCodeInput from '../components/RoomCodeInput';
 import { useRoomContext } from '../networking/roomStore';
 import type { GameStartOptions, GameType, PlayerColor } from '../networking/types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
-import { GAME_CATALOG } from '../games/gameCatalog';
+import { GAME_REGISTRY, ALL_GAME_TYPES, PRODUCTION_GAME_TYPES } from '../games/registry';
 
-const PRODUCTION_GAME_TYPES: GameType[] = ['yahtzee', 'hearts', 'up-and-down-the-river', 'poker', 'twelve'];
-const allGameTypes: GameType[] = ['yahtzee', 'hearts', 'up-and-down-the-river', 'battleship', 'liars-dice', 'poker', 'twelve'];
-const gameTypesToShow = import.meta.env.DEV ? allGameTypes : PRODUCTION_GAME_TYPES;
+const gameTypesToShow = import.meta.env.DEV ? ALL_GAME_TYPES : PRODUCTION_GAME_TYPES;
 
 export default function Home() {
   const navigate = useNavigate();
@@ -119,8 +117,8 @@ export default function Home() {
   const handleSelectGame = (gameType: GameType) => {
     if (!isHost || !room) return;
     const count = room.players.length;
-    const catalog = GAME_CATALOG[gameType];
-    if (count > catalog.maxPlayers) return;
+    const gameDef = GAME_REGISTRY[gameType];
+    if (count > gameDef.maxPlayers) return;
     setExpandedGameType((current) => (current === gameType ? null : gameType));
   };
 
@@ -188,8 +186,8 @@ export default function Home() {
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {gameTypesToShow.map((game, i) => {
-            const catalog = GAME_CATALOG[game];
-            const tooManyPlayers = room ? playerCount > catalog.maxPlayers : false;
+            const gameDef = GAME_REGISTRY[game];
+            const tooManyPlayers = room ? playerCount > gameDef.maxPlayers : false;
             const isDisabled = room ? (!isHost || tooManyPlayers) : false;
             const isExpanded = expandedGameType === game;
 
@@ -243,7 +241,7 @@ export default function Home() {
             onClick={closeInfo}
             role="dialog"
             aria-modal="true"
-            aria-label={`About ${GAME_CATALOG[infoGameType].title}`}
+            aria-label={`About ${GAME_REGISTRY[infoGameType].title}`}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -254,7 +252,7 @@ export default function Home() {
             >
               {/* Header */}
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-white">{GAME_CATALOG[infoGameType].title}</h2>
+                <h2 className="text-xl font-bold text-white">{GAME_REGISTRY[infoGameType].title}</h2>
                 <button
                   onClick={closeInfo}
                   className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
@@ -267,14 +265,14 @@ export default function Home() {
               {/* Goal */}
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold text-primary-400 uppercase tracking-wider">Goal</h3>
-                <p className="text-sm text-gray-300 leading-relaxed">{GAME_CATALOG[infoGameType].info.goal}</p>
+                <p className="text-sm text-gray-300 leading-relaxed">{GAME_REGISTRY[infoGameType].info.goal}</p>
               </div>
 
               {/* How to Play */}
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold text-primary-400 uppercase tracking-wider">How to Play</h3>
                 <ol className="space-y-1.5 list-decimal list-inside">
-                  {GAME_CATALOG[infoGameType].info.howToPlay.map((step, i) => (
+                  {GAME_REGISTRY[infoGameType].info.howToPlay.map((step, i) => (
                     <li key={i} className="text-sm text-gray-300 leading-relaxed">{step}</li>
                   ))}
                 </ol>
@@ -284,7 +282,7 @@ export default function Home() {
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold text-primary-400 uppercase tracking-wider">Rules</h3>
                 <ul className="space-y-1.5 list-disc list-inside">
-                  {GAME_CATALOG[infoGameType].info.rules.map((rule, i) => (
+                  {GAME_REGISTRY[infoGameType].info.rules.map((rule, i) => (
                     <li key={i} className="text-sm text-gray-300 leading-relaxed">{rule}</li>
                   ))}
                 </ul>

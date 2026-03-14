@@ -210,6 +210,11 @@ export function isBattleshipOver(state: unknown): boolean {
   return (state as BattleshipState).phase === 'finished';
 }
 
+export function getBattleshipWinners(state: unknown): string[] {
+  const s = state as BattleshipState;
+  return s.winner ? [s.winner] : [];
+}
+
 // Bot AI - Hunt and Target
 export function runBattleshipBotTurn(state: unknown): unknown {
   const s = state as BattleshipState;
