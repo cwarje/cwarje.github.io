@@ -297,23 +297,15 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
       : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
-    const roundPoints = state.roundCardPoints[player.id] ?? 0;
-
     return (
       <div
         ref={shouldMeasure ? setSeatPillElement : undefined}
         className={`river-seatPill ${seatPillStateClass} ${isMe ? 'river-seatPill--me' : ''}`}
       >
         <div className="river-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
-          <span className="river-seatName">{isMe ? 'You' : player.name}</span>
-        </div>
-        <div className="river-seatPillLabels">
-          <span className="river-seatCell river-seatCell--bid">Score</span>
-          <span className="river-seatCell river-seatCell--total">Rnd</span>
-        </div>
-        <div className="river-seatPillValues">
-          <span className="river-seatCell river-seatCell--bid">{player.totalScore}</span>
-          <span className="river-seatCell river-seatCell--total">{roundPoints}</span>
+          <span className="river-seatName">
+            {isMe ? 'You' : player.name} ({player.totalScore})
+          </span>
         </div>
       </div>
     );
