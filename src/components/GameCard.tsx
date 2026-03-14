@@ -10,7 +10,7 @@ const GAME_INFO: Record<GameType, { title: string; players: string; icon: typeof
   'liars-dice': { title: "Liar's Dice", players: '2-4 Players', icon: Crosshair },
   poker: { title: 'Poker', players: '2-8 Players', icon: Club },
   'up-and-down-the-river': { title: 'Up and Down the River', players: '4-6 Players', icon: ArrowUpDown },
-  twelve: { title: 'Twelve', players: '2-3 Players', icon: Crown },
+  twelve: { title: 'Twelve', players: '2-4 Players', icon: Crown },
 };
 
 interface GameCardProps {

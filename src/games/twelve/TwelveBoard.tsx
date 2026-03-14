@@ -58,10 +58,17 @@ const TRICK_SLOT_PLACEMENTS: Record<number, TrickSlotPlacement[]> = {
     { row: 1, col: 1, dx: 'calc(var(--river-slot-w) * 0.45)', dy: '0px' },
     { row: 1, col: 3, dx: 'calc(var(--river-slot-w) * -0.45)', dy: '0px' },
   ],
+  4: [
+    { row: 2, col: 2, dx: '0px', dy: '0px' },
+    { row: 2, col: 1, dx: '0px', dy: 'calc(var(--river-slot-h) * -0.5)' },
+    { row: 1, col: 2, dx: '0px', dy: '0px' },
+    { row: 2, col: 3, dx: '0px', dy: 'calc(var(--river-slot-h) * -0.5)' },
+  ],
 };
 
 function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
   if (playerCount === 2) return { seatRadiusX: 30, seatRadiusY: 34 };
+  if (playerCount === 4) return { seatRadiusX: 35, seatRadiusY: 31 };
   return { seatRadiusX: 34, seatRadiusY: 30 };
 }
 

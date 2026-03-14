@@ -32,6 +32,14 @@ export default function GameStartOptionsPanel({
   const [upRiverMode, setUpRiverMode] = useState<UpRiverStartMode>(DEFAULT_UP_RIVER_MODE);
   const [pileCount, setPileCount] = useState<TwelvePileCount>(DEFAULT_TWELVE_PILE_COUNT);
   const [botCount, setBotCount] = useState(DEFAULT_BOT_COUNT);
+  const twelvePileOptions: TwelvePileCount[] = [3, 4, 5, 6];
+  const projectedPlayerCount = Math.min(catalog.maxPlayers, playerCount + (showBots ? botCount : 0));
+  const pileCountPlayerBasis = gameType === 'twelve' ? projectedPlayerCount : playerCount;
+  const isPileCountSupported = (count: TwelvePileCount) => pileCountPlayerBasis * count * 2 <= 36;
+  const supportedTwelvePileOptions = twelvePileOptions.filter(isPileCountSupported);
+  const effectivePileCount = supportedTwelvePileOptions.includes(pileCount)
+    ? pileCount
+    : (supportedTwelvePileOptions[supportedTwelvePileOptions.length - 1] ?? DEFAULT_TWELVE_PILE_COUNT);
 
   useEffect(() => {
     if (showBots) {
@@ -52,7 +60,7 @@ export default function GameStartOptionsPanel({
       options.upRiverStartMode = upRiverMode;
       if (showBots) options.botCount = botCount;
     }
-    if (gameType === 'twelve') options.pileCount = pileCount;
+    if (gameType === 'twelve') options.pileCount = effectivePileCount;
     if (showBots && gameType !== 'up-and-down-the-river') options.botCount = botCount;
     onStart(Object.keys(options).length ? options : undefined);
   };
@@ -129,15 +137,16 @@ export default function GameStartOptionsPanel({
           <div className="space-y-2">
             <p className={`text-sm font-semibold uppercase tracking-wider ${labelClass}`}>Piles per player</p>
             <div className="flex gap-2">
-              {([3, 4, 5, 6] as const).map((count) => (
+              {twelvePileOptions.map((count) => (
                 <button
                   key={count}
                   type="button"
                   onClick={() => setPileCount(count)}
+                  disabled={!isPileCountSupported(count)}
                   className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-colors ${
-                    pileCount === count
+                    effectivePileCount === count
                       ? 'bg-blue-600 text-white'
-                      : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10'
+                      : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10 disabled:opacity-40 disabled:pointer-events-none'
                   }`}
                 >
                   {count}

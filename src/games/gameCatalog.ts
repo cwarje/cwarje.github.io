@@ -170,14 +170,14 @@ export const GAME_CATALOG: Record<GameType, GameCatalogEntry> = {
   twelve: {
     title: 'Twelve',
     shortDescription: 'Trick-taking with table piles, optional trump, and race-to-12 scoring.',
-    playersLabel: '2-3 Players',
+    playersLabel: '2-4 Players',
     minPlayers: 2,
-    maxPlayers: 3,
+    maxPlayers: 4,
     info: {
       goal: 'Reach 12 game points by timing trump and shog calls, winning round points, and taking the last trick.',
       rules: [
         'Play uses a 36-card deck: 6 through Ace in each suit (2-5 removed). Aces are high.',
-        'At round start, each player gets 3/4/5/6 table piles (chosen at launch): one face-down card with one face-up card on top of each pile. Remaining cards are dealt to hand.',
+        'At round start, each player gets table piles chosen at launch: one face-down card with one face-up card on top of each pile. Remaining cards are dealt to hand.',
         'On your turn, play either a hand card or the exposed top card from one of your table piles.',
         'You must follow suit if able (from either hand or exposed pile cards). If you cannot, you may play any card.',
         'If trump is set, highest trump wins the trick; otherwise highest card of the lead suit wins.',

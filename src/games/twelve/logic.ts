@@ -4,6 +4,7 @@ import { cardEquals, cardPointValue, getPilePlayableCard, getTrickWinnerPlayerId
 
 const SUITS: Suit[] = ['clubs', 'diamonds', 'spades', 'hearts'];
 const RANKS: Rank[] = [6, 7, 8, 9, 10, 11, 12, 13, 14];
+const ALL_PILE_COUNTS: TwelvePileCount[] = [3, 4, 5, 6];
 
 function createDeck(): Card[] {
   const deck: Card[] = [];
@@ -78,6 +79,17 @@ function decideGameWinners(players: TwelvePlayer[], roundCardPoints: Record<stri
   return byRoundPoints.filter(player => player.totalScore === bestTotal).map(player => player.id);
 }
 
+function allowedPileCounts(playerCount: number): TwelvePileCount[] {
+  return ALL_PILE_COUNTS.filter((count) => playerCount * count * 2 <= 36);
+}
+
+function resolvePileCount(requested: TwelvePileCount, playerCount: number): TwelvePileCount {
+  const allowed = allowedPileCounts(playerCount);
+  if (allowed.length === 0) return 3;
+  if (allowed.includes(requested)) return requested;
+  return allowed[allowed.length - 1];
+}
+
 function startRound(
   players: TwelvePlayer[],
   pileCount: TwelvePileCount,
@@ -85,11 +97,11 @@ function startRound(
   roundNumber: number,
 ): TwelveState {
   const playerCount = players.length;
+  const pilesPerPlayer = resolvePileCount(pileCount, playerCount);
   const deck = shuffle(createDeck());
-  const pilesPerPlayer = pileCount;
   const cardsForPiles = playerCount * pilesPerPlayer * 2;
   const cardsForHands = 36 - cardsForPiles;
-  const handCardsEach = cardsForHands / playerCount;
+  const handCardsEach = Math.floor(cardsForHands / playerCount);
   let cursor = 0;
 
   const dealtPlayers: TwelvePlayer[] = players.map((player) => {
@@ -118,7 +130,7 @@ function startRound(
   const leaderIndex = (dealerIndex + 1) % playerCount;
   return {
     players: dealtPlayers,
-    pileCount,
+    pileCount: pilesPerPlayer,
     phase: 'playing',
     dealerIndex,
     leaderIndex,
@@ -184,8 +196,8 @@ function canCallShog(state: TwelveState, player: TwelvePlayer, suit: Suit): bool
 }
 
 export function createTwelveState(players: Player[], options?: { pileCount?: TwelvePileCount }): TwelveState {
-  const gamePlayers = players.slice(0, 3);
-  const pileCount = options?.pileCount ?? 4;
+  const gamePlayers = players.slice(0, 4);
+  const pileCount = resolvePileCount(options?.pileCount ?? 4, gamePlayers.length);
   const initialPlayers: TwelvePlayer[] = gamePlayers.map(player => ({
     id: player.id,
     name: player.name,

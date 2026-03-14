@@ -1176,6 +1176,10 @@
   gap: 5px;
 }
 
+.river-table--players-4 .twelve-pileRow {
+  gap: 3px;
+}
+
 .twelve-pileButton {
   position: relative;
   width: 40px;
@@ -1184,6 +1188,11 @@
   background: transparent;
   padding: 0;
   cursor: pointer;
+}
+
+.river-table--players-4 .twelve-pileButton {
+  width: 34px;
+  height: 50px;
 }
 
 .twelve-pileButton:disabled {
@@ -1207,6 +1216,11 @@
   border-radius: 8px;
   border: 2px dashed rgba(255, 255, 255, 0.35);
   background: rgba(255, 255, 255, 0.08);
+}
+
+.river-table--players-4 .twelve-pilePlaceholder {
+  width: 34px;
+  height: 50px;
 }
 
 .twelve-actionPanel {
