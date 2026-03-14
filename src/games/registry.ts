@@ -3,6 +3,7 @@ import { Dice5, Heart, Ship, Crosshair, Club, ArrowUpDown, Crown } from 'lucide-
 import type { GameType, Player, GameStartOptions } from '../networking/types';
 
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
+import { createFarkleState, processFarkleAction, isFarkleOver, runFarkleBotTurn, getFarkleWinners } from './farkle/logic';
 import { createHeartsState, processHeartsAction, isHeartsOver, runHeartsBotTurn, getHeartsWinners } from './hearts/logic';
 import { createBattleshipState, processBattleshipAction, isBattleshipOver, runBattleshipBotTurn, getBattleshipWinners } from './battleship/logic';
 import { createLiarsDiceState, processLiarsDiceAction, isLiarsDiceOver, runLiarsDiceBotTurn, getLiarsDiceWinners } from './liars-dice/logic';
@@ -11,6 +12,7 @@ import { createUpRiverState, processUpRiverAction, isUpRiverOver, runUpRiverBotT
 import { createTwelveState, processTwelveAction, isTwelveOver, runTwelveBotTurn, getTwelveWinners } from './twelve/logic';
 
 import YahtzeeBoard from './yahtzee/YahtzeeBoard';
+import FarkleBoard from './farkle/FarkleBoard';
 import HeartsBoard from './hearts/HeartsBoard';
 import BattleshipBoard from './battleship/BattleshipBoard';
 import LiarsDiceBoard from './liars-dice/LiarsDiceBoard';
@@ -145,6 +147,53 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     runBotTurn: runYahtzeeBotTurn,
     getWinners: getYahtzeeWinners,
     Board: YahtzeeBoard,
+    fullBoard: true,
+    production: true,
+  },
+
+  farkle: {
+    title: 'Farkle',
+    shortDescription: 'Push your luck with six dice. Keep scoring combos, avoid a farkle, and bank at the right time.',
+    playersLabel: '2-6 Players',
+    minPlayers: 2,
+    maxPlayers: 6,
+    info: {
+      goal: 'Be the first player to reach 10,000 points by rolling six dice and banking your turn score.',
+      rules: [
+        'On your turn, roll all available dice and set aside at least one scoring die or combo.',
+        'Single 1s score 100 and single 5s score 50.',
+        'Three of a kind scores face value × 100, except three 1s score 1000.',
+        'Four/five/six of a kind score 1000/2000/3000 respectively.',
+        'A straight (1-2-3-4-5-6) scores 1500 and three pairs score 1500.',
+        'If a roll has no scoring dice, you farkle: your unbanked turn points are lost and your turn ends.',
+        'If you score with all six dice, you get hot dice and may roll all six again in the same turn.',
+        'You must bank at least 500 points in a single turn to get on the board for your first score.',
+      ],
+      howToPlay: [
+        'Click Roll to roll all available dice.',
+        'When scoring dice appear, select the dice you want to keep and click Keep Selected.',
+        'After keeping dice, choose to keep pushing with Roll or secure points with Bank.',
+        'If you farkle, your turn score resets to 0 and the next player starts.',
+        'Use risk management: large turn totals are tempting, but one bad roll loses the whole turn.',
+      ],
+    },
+    icon: Dice5,
+    theme: {
+      gradient: 'from-orange-500/20 to-amber-600/20',
+      cardBorder: 'border-orange-500/20',
+      hoverBorder: 'hover:border-orange-500/30',
+      playersTag: 'bg-orange-500/25 text-orange-200 border border-orange-500/30',
+      iconColor: 'text-orange-300',
+      buttonColors: 'bg-orange-600 hover:bg-orange-500',
+      panelBg: 'bg-orange-950',
+      labelColor: 'text-orange-200',
+    },
+    createState: createFarkleState,
+    processAction: processFarkleAction,
+    isOver: isFarkleOver,
+    runBotTurn: runFarkleBotTurn,
+    getWinners: getFarkleWinners,
+    Board: FarkleBoard,
     fullBoard: true,
     production: true,
   },

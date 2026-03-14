@@ -4,8 +4,15 @@
   );
 }
 
+.farkle-roll-area {
+  --dice-stage-width: calc(
+    (var(--dice-size, 3.5rem) * 6) + (var(--dice-gap, 1.5rem) * 5)
+  );
+}
+
 @media (max-width: 639px) {
-  .yahtzee-roll-area {
+  .yahtzee-roll-area,
+  .farkle-roll-area {
     --dice-size: 3.25rem;
     --dice-gap: 1.25rem;
   }

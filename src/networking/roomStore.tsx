@@ -12,6 +12,7 @@ import type { LiarsDiceState } from '../games/liars-dice/types';
 import type { PokerState } from '../games/poker/types';
 import type { BattleshipState } from '../games/battleship/types';
 import type { YahtzeeState } from '../games/yahtzee/types';
+import type { FarkleState } from '../games/farkle/types';
 import type { UpRiverState } from '../games/up-and-down-the-river/types';
 import type { TwelveState } from '../games/twelve/types';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
@@ -66,6 +67,17 @@ function applyProfileToGameState(
     }
     case 'hearts': {
       const current = state as HeartsState;
+      let changed = false;
+      const players = current.players.map((player) => {
+        if (player.id !== playerId) return player;
+        if (player.name === playerName && player.color === playerColor) return player;
+        changed = true;
+        return { ...player, name: playerName, color: playerColor };
+      });
+      return changed ? { ...current, players } : current;
+    }
+    case 'farkle': {
+      const current = state as FarkleState;
       let changed = false;
       const players = current.players.map((player) => {
         if (player.id !== playerId) return player;
@@ -883,6 +895,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const BATTLESHIP_BOT_DELAY = 800; // ms before bot fires in Battleship
   const YAHTZEE_BOT_ROLL_DELAY = 800;  // ms between each bot roll in Yahtzee
   const YAHTZEE_BOT_SCORE_DELAY = 4000; // ms to show dice before bot scores
+  const FARKLE_BOT_DELAY = 900; // ms between bot actions in Farkle
   const TRICK_DISPLAY_DELAY = 2000; // ms to show completed trick before collecting
   const LIARS_DICE_BOT_DELAY = 1200; // ms between bot actions in Liar's Dice
   const LIARS_DICE_REVEAL_DELAY = 2500; // ms to show reveal before revolver
@@ -1263,6 +1276,32 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
           }
         }, delay);
+      }
+    }
+
+    // ── Farkle bot scheduling ──
+    if (room.gameType === 'farkle') {
+      const fs = gameState as FarkleState;
+      if (fs.gameOver) return;
+
+      const currentPlayer = fs.players[fs.currentPlayerIndex];
+      if (currentPlayer && currentPlayer.isBot) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom) return;
+
+          const next = runSingleBotTurn('farkle', currentGs);
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('farkle', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, FARKLE_BOT_DELAY);
       }
     }
   }, [gameState, isHost, room, broadcastGameState, broadcastRoomState]);
