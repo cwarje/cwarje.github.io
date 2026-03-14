@@ -192,6 +192,7 @@ function canCallShog(state: TwelveState, player: TwelvePlayer, suit: Suit): bool
   if (state.trumpSuit === null) return false;
   if (player.totalScore >= 11) return false;
   if (player.shogSuitsCalled.includes(suit)) return false;
+  if (state.trumpSetterId === player.id && suit === state.trumpSuit) return false;
   return suitsWithRoyalPair(player).includes(suit);
 }
 
@@ -454,7 +455,9 @@ export function runTwelveBotTurn(state: unknown): unknown {
   }
 
   if (s.trumpSuit !== null && currentPlayer.totalScore <= 10) {
-    const suits = suitsWithRoyalPair(currentPlayer).filter(suit => !currentPlayer.shogSuitsCalled.includes(suit));
+    const suits = suitsWithRoyalPair(currentPlayer)
+      .filter(suit => !currentPlayer.shogSuitsCalled.includes(suit))
+      .filter(suit => !(s.trumpSetterId === currentPlayer.id && suit === s.trumpSuit));
     if (suits.length > 0 && Math.random() < 0.45) {
       return processTwelveAction(s, { type: 'call-shog', suit: suits[0] }, currentPlayer.id);
     }

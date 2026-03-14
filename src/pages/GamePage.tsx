@@ -90,6 +90,7 @@ export default function GamePage() {
   const heartsTargetScore = heartsState?.targetScore ?? 100;
   const heartsBroken = heartsState?.heartsBroken ?? false;
   const upRiverState = isUpRiver ? (gameState as UpRiverState) : null;
+  const twelveState = isTwelve ? (gameState as TwelveState) : null;
   const fullBoardGame = isHearts || isUpRiver || room.gameType === 'yahtzee' || isPoker || isTwelve;
   const showHandZoomToggle = isHearts || isUpRiver || isPoker || isTwelve;
   const gameTitle = room.gameType ? GAME_CATALOG[room.gameType].title : 'Game';
@@ -165,6 +166,15 @@ export default function GamePage() {
                 <div className="river-cardCorner">
                   <span className={`river-cardRank ${suitColors[upRiverState.trumpCard.suit]}`}>{rankDisplay(upRiverState.trumpCard.rank)}</span>
                   <span className={`river-cardSuit ${suitColors[upRiverState.trumpCard.suit]}`}>{suitSymbols[upRiverState.trumpCard.suit]}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          {isTwelve && twelveState?.trumpSuit && (
+            <div className="river-hudTrumpCard">
+              <div className="river-card river-card--compact">
+                <div className="river-cardCorner">
+                  <span className={`river-cardSuit ${suitColors[twelveState.trumpSuit]}`}>{suitSymbols[twelveState.trumpSuit]}</span>
                 </div>
               </div>
             </div>

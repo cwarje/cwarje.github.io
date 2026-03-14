@@ -239,11 +239,17 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
 
   const myRoyalSuits = myPlayer ? suitsWithRoyalPair(myPlayer) : [];
   const myShogSuits = myPlayer
-    ? myRoyalSuits.filter(suit => !myPlayer.shogSuitsCalled.includes(suit))
+    ? myRoyalSuits.filter((suit) => {
+        if (myPlayer.shogSuitsCalled.includes(suit)) return false;
+        if (state.trumpSetterId === myPlayer.id && suit === state.trumpSuit) return false;
+        return true;
+      })
     : [];
   const canUseActionButtons = state.phase === 'playing' && isMyTurn && !state.trickWinner;
   const canSetTrump = !!myPlayer && canUseActionButtons && state.trumpSuit === null && myPlayer.totalScore < 10;
   const canCallShog = !!myPlayer && canUseActionButtons && state.trumpSuit !== null && myPlayer.totalScore < 11;
+  const showSetTrumpActions = canSetTrump && myRoyalSuits.length > 0;
+  const showCallShogActions = canCallShog && myShogSuits.length > 0;
 
   const renderCardFace = (card: Card, disabled = false, compact = false) => (
     <div className={`river-card ${disabled ? 'river-card--disabled' : ''} ${compact ? 'river-card--compact' : ''}`}>
@@ -468,43 +474,43 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
 
           <div className="river-actionRow">
             <div className="twelve-actionPanel">
-              <div className="twelve-actionGroup">
-                <span className="twelve-actionLabel">Set Trump</span>
-                <div className="twelve-actionButtons">
-                  {myRoyalSuits.length > 0 ? myRoyalSuits.map((suit) => (
-                    <button
-                      key={`set-${suit}`}
-                      type="button"
-                      disabled={!canSetTrump}
-                      onClick={() => setTrump(suit)}
-                      className="twelve-actionButton"
-                    >
-                      {SUIT_SYMBOLS[suit]}
-                    </button>
-                  )) : (
-                    <button type="button" disabled className="twelve-actionButton">—</button>
-                  )}
+              {showSetTrumpActions && (
+                <div className="twelve-actionGroup">
+                  <span className="twelve-actionLabel">Set Trump</span>
+                  <div className="twelve-actionButtons">
+                    {myRoyalSuits.map((suit) => (
+                      <button
+                        key={`set-${suit}`}
+                        type="button"
+                        disabled={!canSetTrump}
+                        onClick={() => setTrump(suit)}
+                        className="twelve-actionButton"
+                      >
+                        {SUIT_SYMBOLS[suit]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="twelve-actionGroup">
-                <span className="twelve-actionLabel">Call Shog</span>
-                <div className="twelve-actionButtons">
-                  {myShogSuits.length > 0 ? myShogSuits.map((suit) => (
-                    <button
-                      key={`shog-${suit}`}
-                      type="button"
-                      disabled={!canCallShog}
-                      onClick={() => callShog(suit)}
-                      className="twelve-actionButton"
-                    >
-                      {SUIT_SYMBOLS[suit]}
-                    </button>
-                  )) : (
-                    <button type="button" disabled className="twelve-actionButton">—</button>
-                  )}
+              {showCallShogActions && (
+                <div className="twelve-actionGroup">
+                  <span className="twelve-actionLabel">Call Shog</span>
+                  <div className="twelve-actionButtons">
+                    {myShogSuits.map((suit) => (
+                      <button
+                        key={`shog-${suit}`}
+                        type="button"
+                        disabled={!canCallShog}
+                        onClick={() => callShog(suit)}
+                        className="twelve-actionButton"
+                      >
+                        {SUIT_SYMBOLS[suit]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
