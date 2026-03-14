@@ -104,7 +104,7 @@ export default function GamePage() {
           {gameDef?.TitleExtra && <gameDef.TitleExtra state={gameState} />}
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
-          {gameDef?.ToolbarExtra && <gameDef.ToolbarExtra state={gameState} />}
+          {gameDef?.ToolbarExtra && <gameDef.ToolbarExtra state={gameState} isHandZoomed={gameDef?.hasHandZoom ? isHandZoomed : undefined} />}
           {showBackToLobby && (
             <motion.button
               initial={{ opacity: 0, scale: 0.9 }}

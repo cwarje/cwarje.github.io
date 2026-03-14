@@ -769,8 +769,8 @@
   position: absolute;
   inset: 0;
   z-index: 1;
-  --river-slot-w: 72px;
-  --river-slot-h: 104px;
+  --river-slot-w: 69px;
+  --river-slot-h: 100px;
   --river-slot-gap: 6px;
 }
 
@@ -858,9 +858,20 @@
   font-size: 1.3rem;
 }
 
+.river-hudTrumpCard--zoom .river-cardSuit {
+  font-size: 1.8rem;
+}
+
 .river-hudTrumpCard .river-card {
   padding: 0;
-  padding-top: 3px;
+  align-items: center;
+  justify-content: center;
+}
+
+.river-hudTrumpCard .river-cardCorner {
+  width: 100%;
+  height: 100%;
+  justify-content: center;
 }
 
 .river-cardCorner {
@@ -913,6 +924,39 @@
   line-height: 1.35;
 }
 
+.twelve-statusRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.twelve-statusCol {
+  width: 100%;
+}
+
+.twelve-statusCol .river-headsUp {
+  margin-top: 0;
+}
+
+.twelve-statusCol .river-actionRow {
+  min-height: 30px;
+  padding-top: 0;
+  align-items: center;
+}
+
+@media (min-width: 640px) {
+  .twelve-statusRow {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .twelve-statusCol {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+}
+
 .river-bidPanel {
   width: 100%;
   margin: 0 auto;
@@ -958,17 +1002,17 @@
 }
 
 .river-actionRow {
-  min-height: 56px;
+  min-height: 52px;
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: 12px;
+  padding-top: 10px;
 }
 
 @media (min-width: 640px) {
   .river-actionRow {
-    min-height: 62px;
-    padding-top: 18px;
+    min-height: 58px;
+    padding-top: 14px;
   }
 }
 
@@ -1058,17 +1102,20 @@
     width: 1.8em;
   }
 
-  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardRank {
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardRank,
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .poker-cardRank {
     font-size: 1.8rem;
     line-height: 1;
   }
 
-  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardSuit {
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardSuit,
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .poker-cardSuit {
     font-size: 1.8rem;
     line-height: 1;
   }
 
-  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardCorner {
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardCorner,
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .poker-cardCorner {
     width: 1.8em;
   }
 }
@@ -1105,8 +1152,8 @@
   }
 
   .river-center {
-    --river-slot-w: 58px;
-    --river-slot-h: 84px;
+    --river-slot-w: 56px;
+    --river-slot-h: 81px;
     --river-slot-gap: 4px;
   }
 
@@ -1170,17 +1217,20 @@
     width: 1.75em;
   }
 
-  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardRank {
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardRank,
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .poker-cardRank {
     font-size: 1.6rem;
     line-height: 1;
   }
 
-  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardSuit {
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardSuit,
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .poker-cardSuit {
     font-size: 1.5rem;
     line-height: 1;
   }
 
-  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardCorner {
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardCorner,
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .poker-cardCorner {
     width: 1.75em;
   }
 }
@@ -1271,7 +1321,7 @@
 .twelve-actionPanel {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   flex-wrap: wrap;
   justify-content: center;
   color: #fff;
@@ -1280,7 +1330,7 @@
 .twelve-actionGroup {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .twelve-actionLabel {
@@ -1291,12 +1341,12 @@
 .twelve-actionButtons {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .twelve-actionButton {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border: 3px solid #111827;
   border-radius: 10px;
   background: #f8fafc;
@@ -1627,6 +1677,22 @@
 .twelve-pileButton .river-card {
   width: 100%;
   height: 100%;
+}
+
+.twelve-pileButton .river-card,
+.twelve-pileButton .poker-cardFlipFront {
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  gap: 0;
+}
+
+.twelve-pileButton .river-cardCorner,
+.twelve-pileButton .poker-cardCorner {
+  width: auto;
+  height: 100%;
+  justify-content: center;
+  gap: 0;
 }
 
 .poker-cardFlipInner {

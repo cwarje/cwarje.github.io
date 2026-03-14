@@ -67,8 +67,8 @@ const TRICK_SLOT_PLACEMENTS: Record<number, TrickSlotPlacement[]> = {
 };
 
 function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
-  if (playerCount === 2) return { seatRadiusX: 30, seatRadiusY: 34 };
-  if (playerCount === 4) return { seatRadiusX: 35, seatRadiusY: 31 };
+  if (playerCount === 2) return { seatRadiusX: 30, seatRadiusY: 29 };
+  if (playerCount === 4) return { seatRadiusX: 35, seatRadiusY: 27 };
   return { seatRadiusX: 34, seatRadiusY: 30 };
 }
 
@@ -130,7 +130,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
           const usableHalfHeight = tableSize.height / 2 - seatPillSize.height / 2 - RIVER_SEAT_EDGE_GAP_PX;
           return {
             seatRadiusX: Math.max(0, Math.min(50, (usableHalfWidth / tableSize.width) * 100)),
-            seatRadiusY: Math.max(0, Math.min(50, (usableHalfHeight / tableSize.height) * 100)),
+            seatRadiusY: Math.max(0, Math.min(50, ((usableHalfHeight / tableSize.height) * 100) * 0.9)),
           };
         })()
       : fallbackRadii;
@@ -187,7 +187,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
     if (state.phase === 'round-end') {
       return state.roundSummary || 'Round over';
     }
-    if (state.phase === 'flipping') return 'Flipping exposed cards...';
+    if (state.phase === 'flipping') return '';
     if (state.trickWinner) {
       const winnerName = state.players.find(player => player.id === state.trickWinner)?.name ?? 'Player';
       return `${winnerName} won the trick`;
@@ -409,61 +409,15 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
         </div>
       </div>
 
-      <div className="river-headsUp" aria-live="polite">
-        <p className={`river-headsUpText ${state.phase === 'round-end' ? 'river-headsUpText--roundEnd' : ''}`}>
-          {headsUpMessage || '\u00a0'}
-        </p>
-      </div>
-
-      {myPlayer && (
-        <div className="space-y-3">
-          <div ref={handContainerRef} className={`river-hand ${isHandZoomed ? 'river-hand--zoom' : ''}`}>
-            <div
-              className="river-handSpread"
-              style={{
-                width: `${handLayout.spreadWidth}px`,
-                height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
-                transition: 'width 0.16s ease',
-              }}
-            >
-              {myPlayer.hand.map((card, i) => {
-                const canPlay =
-                  canUseActionButtons &&
-                  myIndex >= 0 &&
-                  isLegalPlay(state, myIndex, card, 'hand');
-                const isDisabled = !canPlay;
-                const isLast = i === myPlayer.hand.length - 1;
-                const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
-                return (
-                  <motion.button
-                    key={`${card.suit}-${card.rank}-${i}`}
-                    type="button"
-                    initial={{ y: 50, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: i * 0.02 }}
-                    onClick={() => playHandCard(card)}
-                    disabled={isDisabled}
-                    className="river-handHitbox"
-                    style={{
-                      left: `${i * handLayout.step}px`,
-                      width: `${hitboxWidth}px`,
-                      height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
-                      zIndex: i + 1,
-                    }}
-                    aria-label={`Play ${rankDisplay(card.rank)} of ${card.suit}`}
-                  >
-                    <span
-                      className={`river-handCardWrap ${canPlay ? 'river-handCardWrap--active' : ''}`}
-                      style={{ width: `${handLayout.cardWidth}px`, height: `${handLayout.cardHeight}px` }}
-                    >
-                      {renderCardFace(card, state.phase === 'playing' && isDisabled)}
-                    </span>
-                  </motion.button>
-                );
-              })}
-            </div>
+      <div className="twelve-statusRow">
+        <div className="twelve-statusCol">
+          <div className="river-headsUp" aria-live="polite">
+            <p className={`river-headsUpText ${state.phase === 'round-end' ? 'river-headsUpText--roundEnd' : ''}`}>
+              {headsUpMessage || '\u00a0'}
+            </p>
           </div>
-
+        </div>
+        <div className="twelve-statusCol">
           <div className="river-actionRow">
             <div className="twelve-actionPanel">
               {showSetTrumpActions && (
@@ -503,6 +457,57 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {myPlayer && (
+        <div className="space-y-3">
+          <div ref={handContainerRef} className={`river-hand ${isHandZoomed ? 'river-hand--zoom' : ''}`}>
+            <div
+              className="river-handSpread"
+              style={{
+                width: `${handLayout.spreadWidth}px`,
+                height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
+                transition: 'width 0.16s ease',
+              }}
+            >
+              {myPlayer.hand.map((card, i) => {
+                const canPlay =
+                  canUseActionButtons &&
+                  myIndex >= 0 &&
+                  isLegalPlay(state, myIndex, card, 'hand');
+                const isDisabled = !canPlay;
+                const isLast = i === myPlayer.hand.length - 1;
+                const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
+                return (
+                  <motion.button
+                    key={`${card.suit}-${card.rank}`}
+                    type="button"
+                    initial={{ y: 50, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: i * 0.02 }}
+                    onClick={() => playHandCard(card)}
+                    disabled={isDisabled}
+                    className="river-handHitbox"
+                    style={{
+                      left: `${i * handLayout.step}px`,
+                      width: `${hitboxWidth}px`,
+                      height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
+                      zIndex: i + 1,
+                    }}
+                    aria-label={`Play ${rankDisplay(card.rank)} of ${card.suit}`}
+                  >
+                    <span
+                      className={`river-handCardWrap ${canPlay ? 'river-handCardWrap--active' : ''}`}
+                      style={{ width: `${handLayout.cardWidth}px`, height: `${handLayout.cardHeight}px` }}
+                    >
+                      {renderCardFace(card, state.phase === 'playing' && isDisabled)}
+                    </span>
+                  </motion.button>
+                );
+              })}
             </div>
           </div>
         </div>

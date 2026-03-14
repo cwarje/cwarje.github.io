@@ -68,6 +68,7 @@ export interface GameOptionsPanelProps {
 
 export interface GameHudProps {
   state: unknown;
+  isHandZoomed?: boolean;
 }
 
 // ---------------------------------------------------------------------------
