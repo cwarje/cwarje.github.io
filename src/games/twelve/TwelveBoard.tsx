@@ -330,7 +330,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
             className={`river-seat ${layout.relativeIndex === 0 ? 'river-seat--self' : ''}`}
             style={{ left: `${layout.seatLeft}%`, top: `${layout.seatTop}%` }}
           >
-            <div className="twelve-seatStack">
+            <div className={`twelve-seatStack ${isHandZoomed ? 'twelve-seatStack--zoom' : ''}`}>
               {renderSeatPill(layout, layout.relativeIndex === 0)}
               <div className="twelve-pileRow">
                 {layout.player.frontPiles.map((pile, pileIndex) => {

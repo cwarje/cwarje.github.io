@@ -1040,6 +1040,20 @@
   .river-center.river-center--zoom .river-cardCorner {
     width: 1.8em;
   }
+
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardRank {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardSuit {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardCorner {
+    width: 1.8em;
+  }
 }
 
 .river-handSpread {
@@ -1138,6 +1152,20 @@
   .river-center.river-center--zoom .river-cardCorner {
     width: 1.75em;
   }
+
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardRank {
+    font-size: 1.6rem;
+    line-height: 1;
+  }
+
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardSuit {
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+
+  .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardCorner {
+    width: 1.75em;
+  }
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1182,8 +1210,8 @@
 
 .twelve-pileButton {
   position: relative;
-  width: 40px;
-  height: 56px;
+  width: 42px;
+  height: 58px;
   border: 0;
   background: transparent;
   padding: 0;
@@ -1191,8 +1219,8 @@
 }
 
 .river-table--players-4 .twelve-pileButton {
-  width: 34px;
-  height: 50px;
+  width: 36px;
+  height: 52px;
 }
 
 .twelve-pileButton:disabled {
@@ -1207,20 +1235,15 @@
 
 .twelve-pileTop {
   position: absolute;
-  inset: -8px 0 0 0;
+  inset: 0;
 }
 
 .twelve-pilePlaceholder {
-  width: 40px;
-  height: 56px;
+  width: 100%;
+  height: 100%;
   border-radius: 8px;
   border: 2px dashed rgba(255, 255, 255, 0.35);
   background: rgba(255, 255, 255, 0.08);
-}
-
-.river-table--players-4 .twelve-pilePlaceholder {
-  width: 34px;
-  height: 50px;
 }
 
 .twelve-actionPanel {
@@ -1572,6 +1595,16 @@
 .poker-cardFlip.poker-cardFlip--sm {
   width: 2.5rem;
   height: 3.5rem;
+}
+
+/* Keep Twelve pile cards and placeholders exactly aligned with pile slots. */
+.twelve-pileButton .poker-card,
+.twelve-pileButton .poker-cardBack,
+.twelve-pileButton .poker-cardFlip,
+.twelve-pileButton .poker-cardFlip.poker-cardFlip--sm,
+.twelve-pileButton .river-card {
+  width: 100%;
+  height: 100%;
 }
 
 .poker-cardFlipInner {
