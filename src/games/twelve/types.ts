@@ -51,6 +51,7 @@ export interface TwelveState {
   pendingFlip: { playerId: string; pileIndex: number }[];
   lastTrickWinnerId: string | null;
   roundNumber: number;
+  knownVoidSuitsByPlayer: Record<string, Suit[]>;
   roundCardPoints: Record<string, number>;
   roundSummary: string;
   gameOver: boolean;

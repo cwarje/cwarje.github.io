@@ -56,6 +56,7 @@ function makeState(players: TwelvePlayer[], currentPlayerIndex: number): TwelveS
     pendingFlip: [],
     lastTrickWinnerId: null,
     roundNumber: 1,
+    knownVoidSuitsByPlayer: {},
     roundCardPoints: {},
     roundSummary: '',
     gameOver: false,
@@ -209,6 +210,54 @@ function mustPlayTrumpWhenVoidScenario(): TwelveBotScenarioResult {
   };
 }
 
+function forceTrumpDrainLeadScenario(): TwelveBotScenarioResult {
+  const bot = makePlayer('p0', true, [card('hearts', 6), card('hearts', 13), card('clubs', 7)], []);
+  const target = makePlayer(
+    'p1',
+    true,
+    [card('spades', 8)],
+    [{ topCard: card('diamonds', 10) }],
+  );
+  const other = makePlayer('p2', true, [card('clubs', 6)], []);
+  const state = makeState([bot, target, other], 0);
+  state.trumpSuit = 'diamonds';
+  state.knownVoidSuitsByPlayer = { p1: ['hearts'] };
+
+  const next = runTwelveBotTurn(state) as TwelveState;
+  const botPlay = next.currentTrick.find(entry => entry.playerId === 'p0');
+  const passed = !!botPlay && botPlay.card.suit === 'hearts' && botPlay.card.rank === 6;
+  return {
+    name: 'lead-low-void-suit-to-drain-trump',
+    passed,
+    details: passed
+      ? 'Bot led low in a suit target opponent is known void in.'
+      : `Unexpected lead: ${JSON.stringify(botPlay)}`,
+  };
+}
+
+function chooseLowestForcedTrumpScenario(): TwelveBotScenarioResult {
+  const bot = makePlayer('p0', true, [card('diamonds', 6), card('diamonds', 14)], []);
+  const p1 = makePlayer('p1', true, [card('hearts', 7)], []);
+  const p2 = makePlayer('p2', true, [card('clubs', 7)], []);
+  const state = makeState([bot, p1, p2], 0);
+  state.trumpSuit = 'diamonds';
+  state.currentTrick = [
+    { playerId: 'p1', card: card('hearts', 11), source: 'hand' },
+    { playerId: 'p2', card: card('clubs', 7), source: 'hand' },
+  ];
+
+  const next = runTwelveBotTurn(state) as TwelveState;
+  const botPlay = next.currentTrick.find(entry => entry.playerId === 'p0');
+  const passed = !!botPlay && botPlay.card.suit === 'diamonds' && botPlay.card.rank === 6;
+  return {
+    name: 'forced-trump-uses-lowest-legal-trump',
+    passed,
+    details: passed
+      ? 'Bot used the lowest trump in a low-stakes forced-trump spot.'
+      : `Unexpected forced trump play: ${JSON.stringify(botPlay)}`,
+  };
+}
+
 export function runTwelveBotScenarioChecks(): TwelveBotScenarioResult[] {
   return [
     blockDeclarationWindowScenario(),
@@ -217,5 +266,7 @@ export function runTwelveBotScenarioChecks(): TwelveBotScenarioResult[] {
     preferHandOverRevealScenario(),
     endgameLastTrickControlScenario(),
     mustPlayTrumpWhenVoidScenario(),
+    forceTrumpDrainLeadScenario(),
+    chooseLowestForcedTrumpScenario(),
   ];
 }

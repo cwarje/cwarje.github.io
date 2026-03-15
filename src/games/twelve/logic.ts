@@ -150,6 +150,7 @@ function startRound(
     pendingFlip: [],
     lastTrickWinnerId: null,
     roundNumber,
+    knownVoidSuitsByPlayer: {},
     roundCardPoints: {},
     roundSummary: '',
     gameOver: false,
@@ -287,12 +288,14 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
       const updatedPlayers = [...s.players];
       updatedPlayers[playerIndex] = { ...player, hand: updatedHand };
       const nextTrick = [...s.currentTrick, { playerId, card: a.card, source: 'hand' as const }];
+      const knownVoidSuitsByPlayer = updateKnownVoidSuitsAfterPlay(s, playerId, a.card);
 
       if (nextTrick.length === s.players.length) {
         return {
           ...s,
           players: updatedPlayers,
           currentTrick: nextTrick,
+          knownVoidSuitsByPlayer,
           trickWinner: getTrickWinnerPlayerId(nextTrick, s.trumpSuit),
         };
       }
@@ -301,6 +304,7 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
         ...s,
         players: updatedPlayers,
         currentTrick: nextTrick,
+        knownVoidSuitsByPlayer,
         currentPlayerIndex: (s.currentPlayerIndex + 1) % s.players.length,
       };
     }
@@ -340,12 +344,14 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
           pileIndex: a.pileIndex,
         },
       ];
+      const knownVoidSuitsByPlayer = updateKnownVoidSuitsAfterPlay(s, playerId, playable.card);
 
       if (nextTrick.length === s.players.length) {
         return {
           ...s,
           players: updatedPlayers,
           currentTrick: nextTrick,
+          knownVoidSuitsByPlayer,
           trickWinner: getTrickWinnerPlayerId(nextTrick, s.trumpSuit),
           pendingFlip,
         };
@@ -355,6 +361,7 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
         ...s,
         players: updatedPlayers,
         currentTrick: nextTrick,
+        knownVoidSuitsByPlayer,
         currentPlayerIndex: (s.currentPlayerIndex + 1) % s.players.length,
         pendingFlip,
       };
@@ -454,6 +461,42 @@ function createSuitCounter(): Record<Suit, number> {
   return { clubs: 0, diamonds: 0, spades: 0, hearts: 0 };
 }
 
+function deserializeKnownVoidSuits(state: TwelveState): Record<string, Set<Suit>> {
+  const byPlayer: Record<string, Set<Suit>> = {};
+  for (const [playerId, suits] of Object.entries(state.knownVoidSuitsByPlayer ?? {})) {
+    byPlayer[playerId] = new Set(suits);
+  }
+  return byPlayer;
+}
+
+function serializeKnownVoidSuits(byPlayer: Record<string, Set<Suit>>): Record<string, Suit[]> {
+  const serialized: Record<string, Suit[]> = {};
+  for (const [playerId, suits] of Object.entries(byPlayer)) {
+    const ordered = SUITS.filter(suit => suits.has(suit));
+    if (ordered.length > 0) serialized[playerId] = ordered;
+  }
+  return serialized;
+}
+
+function updateKnownVoidSuitsAfterPlay(state: TwelveState, playerId: string, playedCard: Card): Record<string, Suit[]> {
+  const byPlayer = deserializeKnownVoidSuits(state);
+  const knownVoids = byPlayer[playerId] ?? new Set<Suit>();
+
+  if (state.currentTrick.length > 0) {
+    const leadSuit = state.currentTrick[0].card.suit;
+    if (playedCard.suit !== leadSuit) {
+      knownVoids.add(leadSuit);
+    } else {
+      knownVoids.delete(leadSuit);
+    }
+  }
+
+  // Seeing a player play a suit means they are not void in that suit anymore.
+  knownVoids.delete(playedCard.suit);
+  byPlayer[playerId] = knownVoids;
+  return serializeKnownVoidSuits(byPlayer);
+}
+
 function countRemainingCards(player: TwelvePlayer): number {
   let count = player.hand.length;
   for (const pile of player.frontPiles) {
@@ -509,8 +552,8 @@ function getPublicRoyalPairSuits(player: TwelvePlayer): Suit[] {
   });
 }
 
-function getKnownVoidSuitsFromCurrentTrick(state: TwelveState): Record<string, Set<Suit>> {
-  const voids: Record<string, Set<Suit>> = {};
+function getKnownVoidSuits(state: TwelveState): Record<string, Set<Suit>> {
+  const voids = deserializeKnownVoidSuits(state);
   if (state.currentTrick.length === 0) return voids;
   const leadSuit = state.currentTrick[0].card.suit;
   for (const entry of state.currentTrick.slice(1)) {
@@ -577,6 +620,30 @@ function findDangerousSetTrumpOpponentId(state: TwelveState, myPlayerId: string)
   return bestId;
 }
 
+function findTrumpPressureTargetId(
+  state: TwelveState,
+  myPlayerId: string,
+  knownVoidsByPlayer: Record<string, Set<Suit>>,
+): string | null {
+  if (state.trumpSuit === null) return null;
+  const trumpSuit = state.trumpSuit;
+  let bestId: string | null = null;
+  let bestScore = 0;
+  for (const opponent of state.players) {
+    if (opponent.id === myPlayerId) continue;
+    const knownVoids = knownVoidsByPlayer[opponent.id] ?? new Set<Suit>();
+    const nonTrumpVoidCount = SUITS.filter(suit => suit !== trumpSuit && knownVoids.has(suit)).length;
+    if (nonTrumpVoidCount === 0) continue;
+    const visibleTrump = getVisibleSuitCounts(opponent)[trumpSuit];
+    const score = nonTrumpVoidCount * 3 + visibleTrump * 1.6;
+    if (score > bestScore) {
+      bestScore = score;
+      bestId = opponent.id;
+    }
+  }
+  return bestId;
+}
+
 function listLegalBotOptions(state: TwelveState, playerIndex: number): BotPlayOption[] {
   const player = state.players[playerIndex];
   if (!player) return [];
@@ -617,6 +684,8 @@ function scoreLeadOption(
   playerIndex: number,
   option: BotPlayOption,
   dangerousOpponentId: string | null,
+  trumpPressureTargetId: string | null,
+  knownVoidsByPlayer: Record<string, Set<Suit>>,
   endgame: EndgameInfo,
   roundRace: ReturnType<typeof getRoundRaceInfo>,
 ): number {
@@ -639,6 +708,23 @@ function scoreLeadOption(
     if (dangerousPlayer) {
       const visibleCounts = getVisibleSuitCounts(dangerousPlayer);
       score += visibleCounts[card.suit] * 1.25;
+    }
+  }
+
+  if (state.trumpSuit !== null && trumpPressureTargetId) {
+    const targetVoids = knownVoidsByPlayer[trumpPressureTargetId] ?? new Set<Suit>();
+    const pressureSuits = SUITS.filter(suit => suit !== state.trumpSuit && targetVoids.has(suit));
+    const target = state.players.find(player => player.id === trumpPressureTargetId);
+    const visibleTrump = target ? getVisibleSuitCounts(target)[state.trumpSuit] : 0;
+
+    if (pressureSuits.includes(card.suit)) {
+      score += 4.8 + visibleTrump * 1.4;
+      score += (8 - rankStrength(card.rank)) * 0.55;
+      score -= cardPointValue(card) * 0.25;
+    }
+
+    if (pressureSuits.length > 0 && card.suit === state.trumpSuit) {
+      score -= 2.2;
     }
   }
 
@@ -745,6 +831,42 @@ function scoreDiscardOption(
   return score;
 }
 
+function scoreForcedTrumpOption(
+  state: TwelveState,
+  playerIndex: number,
+  option: BotPlayOption,
+  dangerousOpponentId: string | null,
+  endgame: EndgameInfo,
+  roundRace: ReturnType<typeof getRoundRaceInfo>,
+): number {
+  const player = state.players[playerIndex];
+  const card = option.card;
+  const trickPoints = getCurrentTrickPointValue(state);
+  const currentLeader = getCurrentTrickLeaderId(state);
+  const dangerousLeads = !!dangerousOpponentId && currentLeader === dangerousOpponentId;
+  const wouldLead = wouldLeadCurrentTrick(state, player, option);
+  let score = 0;
+
+  // Forced trumps usually want to be as cheap as possible.
+  score -= rankStrength(card.rank) * 0.95;
+  score -= cardPointValue(card) * 0.2;
+
+  if (wouldLead) {
+    score -= 1.6;
+    if (dangerousLeads) score += 8.5;
+    if (trickPoints >= 10) score += 3.2 + trickPoints * 0.3;
+    if (roundRace.isUniqueLeader && roundRace.leaderId === currentLeader) score += 2.4;
+    if (endgame.isLate) score += 5.2;
+    if (endgame.isVeryLate) score += 2.3;
+  } else {
+    score += 0.8;
+    if (endgame.isVeryLate) score -= 1.3;
+  }
+
+  score += scorePileVsHand(option, player);
+  return score;
+}
+
 function pickBestScoredOption(
   options: BotPlayOption[],
   scorer: (option: BotPlayOption) => number,
@@ -769,8 +891,9 @@ function chooseBotCard(state: TwelveState, playerIndex: number): { type: 'hand';
   const options = listLegalBotOptions(state, playerIndex);
   if (options.length === 0) return null;
 
-  const voidInfo = getKnownVoidSuitsFromCurrentTrick(state);
+  const voidInfo = getKnownVoidSuits(state);
   const dangerousOpponentId = findDangerousSetTrumpOpponentId(state, player.id);
+  const trumpPressureTargetId = findTrumpPressureTargetId(state, player.id, voidInfo);
   const endgame = estimateEndgame(state);
   const roundRace = getRoundRaceInfo(state, player.id);
   const leadSuit = state.currentTrick[0]?.card.suit ?? null;
@@ -779,7 +902,16 @@ function chooseBotCard(state: TwelveState, playerIndex: number): { type: 'hand';
   if (!leadSuit) {
     chosen = pickBestScoredOption(
       options,
-      option => scoreLeadOption(state, playerIndex, option, dangerousOpponentId, endgame, roundRace),
+      option => scoreLeadOption(
+        state,
+        playerIndex,
+        option,
+        dangerousOpponentId,
+        trumpPressureTargetId,
+        voidInfo,
+        endgame,
+        roundRace,
+      ),
     );
   } else {
     const followSuitOptions = options.filter(option => option.card.suit === leadSuit);
@@ -789,18 +921,19 @@ function chooseBotCard(state: TwelveState, playerIndex: number): { type: 'hand';
         option => scoreFollowSuitOption(state, playerIndex, option, dangerousOpponentId, endgame, roundRace),
       );
     } else {
+      const forcedTrump = !!state.trumpSuit && options.every(option => option.card.suit === state.trumpSuit);
       chosen = pickBestScoredOption(
         options,
-        option => scoreDiscardOption(state, playerIndex, option, dangerousOpponentId, endgame, roundRace),
+        option => (
+          forcedTrump
+            ? scoreForcedTrumpOption(state, playerIndex, option, dangerousOpponentId, endgame, roundRace)
+            : scoreDiscardOption(state, playerIndex, option, dangerousOpponentId, endgame, roundRace)
+        ),
       );
     }
   }
 
   if (!chosen) return null;
-  if (dangerousOpponentId && voidInfo[dangerousOpponentId]?.has(chosen.card.suit)) {
-    const fallback = options.find(option => option.card.suit !== chosen?.card.suit);
-    if (fallback) chosen = fallback;
-  }
 
   if (chosen.source === 'hand') return { type: 'hand', card: chosen.card };
   return { type: 'pile', pileIndex: chosen.pileIndex ?? 0 };
