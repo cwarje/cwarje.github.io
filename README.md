@@ -14,9 +14,9 @@ Current game types (from `src/games/registry.ts` and `src/networking/types.ts`):
 - `liars-dice` (2-4 players)
 - `poker` (2-8 players)
 - `up-and-down-the-river` (4-6 players)
-- `twelve` (2-4 players)
+- `tolva` (2-4 players)
 
-Production builds show a subset (yahtzee, hearts, poker, up-and-down-the-river, twelve); battleship and liars-dice are available in dev mode.
+Production builds show a subset (yahtzee, hearts, poker, up-and-down-the-river, tolva); battleship and liars-dice are available in dev mode.
 
 ## Key features
 

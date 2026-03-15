@@ -437,7 +437,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
   },
 
   twelve: {
-    title: 'Twelve',
+    title: 'Tolva',
     shortDescription: 'Trick-taking with table piles, optional trump, and race-to-12 scoring.',
     playersLabel: '2-4 Players',
     minPlayers: 2,
