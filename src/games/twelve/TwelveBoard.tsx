@@ -403,6 +403,16 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
               const trickEntry = trickByRelativeSeat[layout.relativeIndex];
               const isWinningCard = trickWinnerRelativeSeat === layout.relativeIndex && !!state.trickWinner;
               const placement = getTrickSlotPlacement(state.players.length, layout.relativeIndex);
+              const trickEntryOffset = (() => {
+                const deltaX = layout.seatLeft - 50;
+                const deltaY = layout.seatTop - 50;
+                const distance = Math.hypot(deltaX, deltaY);
+                if (distance < 0.001) return { x: 0, y: 12 };
+                return {
+                  x: (deltaX / distance) * TRICK_EXIT_DISTANCE_PX,
+                  y: (deltaY / distance) * TRICK_EXIT_DISTANCE_PX,
+                };
+              })();
               return (
                 <div
                   key={`slot-${layout.player.id}`}
@@ -417,8 +427,8 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
                     {trickEntry ? (
                       <motion.div
                         key={`${state.trickNumber}-${trickEntry.playerId}-${trickEntry.card.suit}-${trickEntry.card.rank}`}
-                        initial={{ scale: 0.8, opacity: 0, y: 12 }}
-                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        initial={{ scale: 0.8, opacity: 0, x: trickEntryOffset.x, y: trickEntryOffset.y }}
+                        animate={{ scale: 1, opacity: 1, x: 0, y: 0 }}
                         exit={{ x: trickExitOffset.x, y: trickExitOffset.y, opacity: 0 }}
                         transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
                         className={`river-slotCard ${isWinningCard ? 'river-slotCard--winner' : ''}`}

@@ -349,6 +349,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
               const trickEntry = trickBySeat[seat];
               const isWinningCard = trickWinnerSeat === seat && !!state.trickWinner;
               const placement = TRICK_SLOT_PLACEMENTS[seat];
+              const trickEntryOffset = TRICK_EXIT_OFFSETS[seat];
               return (
                 <div
                   key={seat}
@@ -363,8 +364,8 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
                     {trickEntry ? (
                       <motion.div
                         key={`${state.trickNumber}-${trickEntry.playerId}-${trickEntry.card.suit}-${trickEntry.card.rank}`}
-                        initial={{ scale: 0.8, opacity: 0, y: 12 }}
-                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        initial={{ scale: 0.8, opacity: 0, x: trickEntryOffset.x, y: trickEntryOffset.y }}
+                        animate={{ scale: 1, opacity: 1, x: 0, y: 0 }}
                         exit={{
                           x: trickExitOffset.x,
                           y: trickExitOffset.y,
