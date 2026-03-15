@@ -1271,10 +1271,6 @@
   gap: 5px;
 }
 
-.river-table--players-4 .twelve-pileRow {
-  gap: 3px;
-}
-
 .twelve-pileButton {
   position: relative;
   width: 45px;
@@ -1283,11 +1279,6 @@
   background: transparent;
   padding: 0;
   cursor: pointer;
-}
-
-.river-table--players-4 .twelve-pileButton {
-  width: 36px;
-  height: 52px;
 }
 
 .twelve-pileButton:disabled {
