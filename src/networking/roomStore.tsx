@@ -921,8 +921,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const UP_RIVER_ROUND_END_DELAY = 5000; // ms to show bid result borders before next round
   const TWELVE_BOT_DELAY = 900; // ms between bot actions
   const TWELVE_ANNOUNCEMENT_DELAY = 4000; // ms to show trump/tjog announcement
-  const TWELVE_ROUND_END_DELAY = 5500; // ms to show round summary before next round
-  const TWELVE_FINAL_RESULTS_DELAY = 5000; // ms to hold final round summary before end screen
+  const TWELVE_ROUND_END_DELAY = 6500; // ms to show round summary before next round
+  const TWELVE_FINAL_RESULTS_DELAY = 6000; // ms to hold final round summary before end screen
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
