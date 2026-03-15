@@ -130,7 +130,7 @@ function startRound(
       hand: sortHand(hand),
       frontPiles,
       capturedCards: [],
-      shogSuitsCalled: [],
+      tjogSuitsCalled: [],
     };
   });
 
@@ -199,12 +199,12 @@ function canSetTrump(state: TwelveState, player: TwelvePlayer): boolean {
   return suitsWithRoyalPair(player).length > 0;
 }
 
-function canCallShog(state: TwelveState, player: TwelvePlayer, suit: Suit): boolean {
+function canCallTjog(state: TwelveState, player: TwelvePlayer, suit: Suit): boolean {
   if (state.currentTrick.length !== 0) return false;
   if (state.lastTrickWinnerId !== player.id) return false;
   if (state.trumpSuit === null) return false;
   if (player.totalScore >= 11) return false;
-  if (player.shogSuitsCalled.includes(suit)) return false;
+  if (player.tjogSuitsCalled.includes(suit)) return false;
   if (state.trumpSetterId === player.id && suit === state.trumpSuit) return false;
   return suitsWithRoyalPair(player).includes(suit);
 }
@@ -221,7 +221,7 @@ export function createTwelveState(players: Player[], options?: { pileCount?: Twe
     frontPiles: [],
     capturedCards: [],
     totalScore: 0,
-    shogSuitsCalled: [],
+    tjogSuitsCalled: [],
   }));
   return startRound(initialPlayers, pileCount, 0, 1);
 }
@@ -261,18 +261,18 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
       };
     }
 
-    case 'call-shog': {
+    case 'call-tjog': {
       if (s.phase !== 'playing' || s.trickWinner) return state;
       const playerIndex = s.players.findIndex(player => player.id === playerId);
       if (playerIndex === -1 || playerIndex !== s.currentPlayerIndex) return state;
       const player = s.players[playerIndex];
-      if (!canCallShog(s, player, a.suit)) return state;
+      if (!canCallTjog(s, player, a.suit)) return state;
 
       const updatedPlayers = [...s.players];
       updatedPlayers[playerIndex] = {
         ...player,
         totalScore: player.totalScore + 1,
-        shogSuitsCalled: [...player.shogSuitsCalled, a.suit],
+        tjogSuitsCalled: [...player.tjogSuitsCalled, a.suit],
       };
 
       return {
@@ -280,7 +280,7 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
         players: updatedPlayers,
         phase: 'announcement',
         announcement: {
-          kind: 'call-shog',
+          kind: 'call-tjog',
           playerId: player.id,
           suit: a.suit,
         },
@@ -977,14 +977,14 @@ function scoreSetTrumpSuit(state: TwelveState, playerIndex: number, suit: Suit):
   const playable = listPlayableCards(player).map(entry => entry.card);
   const inSuit = playable.filter(card => card.suit === suit);
   const controlValue = inSuit.reduce((sum, card) => sum + rankStrength(card.rank), 0);
-  const futureShogPairs = pairs.filter(pairSuit => pairSuit !== suit).length;
+  const futureTjogPairs = pairs.filter(pairSuit => pairSuit !== suit).length;
   const preservationCost = inSuit.reduce((sum, card) => sum + cardPointValue(card) + rankStrength(card.rank) * 0.4, 0);
   const dangerousOpponentId = findDangerousSetTrumpOpponentId(state, player.id);
   const immediateFinish = player.totalScore + 2 >= 12;
   const runwayPenalty = player.totalScore === 9 ? 4.2 : player.totalScore === 8 ? 2.2 : 0;
   return 10
     + controlValue * 0.12
-    + futureShogPairs * 2.2
+    + futureTjogPairs * 2.2
     - (pairs.length > 1 ? preservationCost * 0.14 : 0)
     + (dangerousOpponentId ? 3.2 : 0)
     + (immediateFinish ? 8 : 0)
@@ -1007,9 +1007,9 @@ function chooseSetTrumpSuit(state: TwelveState, playerIndex: number): { suit: Su
   return { suit: bestSuit, score: bestScore };
 }
 
-function scoreShogSuit(state: TwelveState, playerIndex: number, suit: Suit): number {
+function scoreTjogSuit(state: TwelveState, playerIndex: number, suit: Suit): number {
   const player = state.players[playerIndex];
-  if (!canCallShog(state, player, suit)) return Number.NEGATIVE_INFINITY;
+  if (!canCallTjog(state, player, suit)) return Number.NEGATIVE_INFINITY;
   const endgame = estimateEndgame(state);
   let score = 6.5;
   if (player.totalScore === 10) score += 2.2;
@@ -1018,16 +1018,16 @@ function scoreShogSuit(state: TwelveState, playerIndex: number, suit: Suit): num
   return score;
 }
 
-function chooseShogSuit(state: TwelveState, playerIndex: number): { suit: Suit; score: number } | null {
+function chooseTjogSuit(state: TwelveState, playerIndex: number): { suit: Suit; score: number } | null {
   const player = state.players[playerIndex];
   const suits = suitsWithRoyalPair(player)
-    .filter(suit => !player.shogSuitsCalled.includes(suit))
+    .filter(suit => !player.tjogSuitsCalled.includes(suit))
     .filter(suit => !(state.trumpSetterId === player.id && suit === state.trumpSuit));
   if (suits.length === 0) return null;
   let bestSuit = suits[0];
-  let bestScore = scoreShogSuit(state, playerIndex, bestSuit);
+  let bestScore = scoreTjogSuit(state, playerIndex, bestSuit);
   for (const suit of suits.slice(1)) {
-    const score = scoreShogSuit(state, playerIndex, suit);
+    const score = scoreTjogSuit(state, playerIndex, suit);
     if (score > bestScore) {
       bestSuit = suit;
       bestScore = score;
@@ -1054,9 +1054,9 @@ export function runTwelveBotTurn(state: unknown): unknown {
   }
 
   if (s.currentTrick.length === 0 && s.trumpSuit !== null) {
-    const choice = chooseShogSuit(s, s.currentPlayerIndex);
+    const choice = chooseTjogSuit(s, s.currentPlayerIndex);
     if (choice && choice.score >= 6) {
-      return processTwelveAction(s, { type: 'call-shog', suit: choice.suit }, currentPlayer.id);
+      return processTwelveAction(s, { type: 'call-tjog', suit: choice.suit }, currentPlayer.id);
     }
   }
 

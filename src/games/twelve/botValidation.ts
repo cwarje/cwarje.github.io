@@ -61,10 +61,10 @@ function runLegacyTwelveBotTurn(state: TwelveState): TwelveState {
     && currentPlayer.totalScore <= 10
   ) {
     const suits = suitsWithRoyalPair(currentPlayer)
-      .filter(suit => !currentPlayer.shogSuitsCalled.includes(suit))
+      .filter(suit => !currentPlayer.tjogSuitsCalled.includes(suit))
       .filter(suit => !(state.trumpSetterId === currentPlayer.id && suit === state.trumpSuit));
     if (suits.length > 0 && Math.random() < 0.45) {
-      return processTwelveAction(state, { type: 'call-shog', suit: suits[0] }, currentPlayer.id) as TwelveState;
+      return processTwelveAction(state, { type: 'call-tjog', suit: suits[0] }, currentPlayer.id) as TwelveState;
     }
   }
 

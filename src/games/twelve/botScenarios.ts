@@ -36,7 +36,7 @@ function makePlayer(
     frontPiles: makePiles(frontPiles),
     capturedCards: [],
     totalScore,
-    shogSuitsCalled: [],
+    tjogSuitsCalled: [],
   };
 }
 
@@ -120,7 +120,7 @@ function setTrumpWhenThreatenedScenario(): TwelveBotScenarioResult {
   };
 }
 
-function preserveBetterPairForShogScenario(): TwelveBotScenarioResult {
+function preserveBetterPairForTjogScenario(): TwelveBotScenarioResult {
   const bot = makePlayer(
     'p0',
     true,
@@ -143,7 +143,7 @@ function preserveBetterPairForShogScenario(): TwelveBotScenarioResult {
   const next = runTwelveBotTurn(state) as TwelveState;
   const passed = next.trumpSuit === 'clubs';
   return {
-    name: 'preserve-stronger-pair-for-future-shog',
+    name: 'preserve-stronger-pair-for-future-tjog',
     passed,
     details: passed ? 'Bot selected weaker pair as trump to preserve stronger pair.' : `Trump selected: ${String(next.trumpSuit)}`,
   };
@@ -263,7 +263,7 @@ export function runTwelveBotScenarioChecks(): TwelveBotScenarioResult[] {
   return [
     blockDeclarationWindowScenario(),
     setTrumpWhenThreatenedScenario(),
-    preserveBetterPairForShogScenario(),
+    preserveBetterPairForTjogScenario(),
     preferHandOverRevealScenario(),
     endgameLastTrickControlScenario(),
     mustPlayTrumpWhenVoidScenario(),

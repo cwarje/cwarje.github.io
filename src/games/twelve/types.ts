@@ -23,14 +23,14 @@ export interface TwelvePlayer {
   frontPiles: FrontPile[];
   capturedCards: Card[];
   totalScore: number;
-  shogSuitsCalled: Suit[];
+  tjogSuitsCalled: Suit[];
 }
 
 export type TwelvePhase = 'playing' | 'announcement' | 'flipping' | 'round-end' | 'game-over';
 export type PlaySource = 'hand' | 'pile-top' | 'pile-bottom';
 
 export interface TwelveAnnouncement {
-  kind: 'set-trump' | 'call-shog';
+  kind: 'set-trump' | 'call-tjog';
   playerId: string;
   suit: Suit;
 }
@@ -69,7 +69,7 @@ export type TwelveAction =
   | { type: 'play-hand-card'; card: Card }
   | { type: 'play-pile-card'; pileIndex: number }
   | { type: 'set-trump'; suit: Suit }
-  | { type: 'call-shog'; suit: Suit }
+  | { type: 'call-tjog'; suit: Suit }
   | { type: 'finish-announcement' }
   | { type: 'resolve-trick' }
   | { type: 'flip-exposed' }

@@ -247,7 +247,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
       return (
         <>
           <span style={{ color: getPlayerColorHex(player) }}>{player.name}</span>
-          {` called shog in ${state.announcement.suit}`}
+          {` called tjog in ${state.announcement.suit}`}
         </>
       );
     }
@@ -315,23 +315,23 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
   }, [handWidth, myPlayer?.hand.length]);
 
   const myRoyalSuits = myPlayer ? suitsWithRoyalPair(myPlayer) : [];
-  const myShogSuits = myPlayer
+  const myTjogSuits = myPlayer
     ? myRoyalSuits.filter((suit) => {
-        if (myPlayer.shogSuitsCalled.includes(suit)) return false;
+        if (myPlayer.tjogSuitsCalled.includes(suit)) return false;
         if (state.trumpSetterId === myPlayer.id && suit === state.trumpSuit) return false;
         return true;
       })
     : [];
   const canUseActionButtons = state.phase === 'playing' && isMyTurn && !state.trickWinner;
-  const canAnnounceTrumpOrShog =
+  const canAnnounceTrumpOrTjog =
     !!myPlayer
     && canUseActionButtons
     && state.currentTrick.length === 0
     && state.lastTrickWinnerId === myPlayer.id;
-  const canSetTrump = canAnnounceTrumpOrShog && state.trumpSuit === null && !!myPlayer && myPlayer.totalScore < 10;
-  const canCallShog = canAnnounceTrumpOrShog && state.trumpSuit !== null && !!myPlayer && myPlayer.totalScore < 11;
+  const canSetTrump = canAnnounceTrumpOrTjog && state.trumpSuit === null && !!myPlayer && myPlayer.totalScore < 10;
+  const canCallTjog = canAnnounceTrumpOrTjog && state.trumpSuit !== null && !!myPlayer && myPlayer.totalScore < 11;
   const showSetTrumpActions = canSetTrump && myRoyalSuits.length > 0;
-  const showCallShogActions = canCallShog && myShogSuits.length > 0;
+  const showCallTjogActions = canCallTjog && myTjogSuits.length > 0;
 
   const renderCardFace = (card: Card, disabled = false, compact = false) => (
     <div className={`river-card ${disabled ? 'river-card--disabled' : ''} ${compact ? 'river-card--compact' : ''}`}>
@@ -363,9 +363,9 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
     onAction({ type: 'set-trump', suit });
   };
 
-  const callShog = (suit: Suit) => {
-    if (!canCallShog) return;
-    onAction({ type: 'call-shog', suit });
+  const callTjog = (suit: Suit) => {
+    if (!canCallTjog) return;
+    onAction({ type: 'call-tjog', suit });
   };
 
   if (state.phase === 'game-over') {
@@ -551,16 +551,16 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
                 </div>
               )}
 
-              {showCallShogActions && (
+              {showCallTjogActions && (
                 <div className="twelve-actionGroup">
-                  <span className="twelve-actionLabel">Call Shog</span>
+                  <span className="twelve-actionLabel">Call Tjog</span>
                   <div className="twelve-actionButtons">
-                    {myShogSuits.map((suit) => (
+                    {myTjogSuits.map((suit) => (
                       <button
-                        key={`shog-${suit}`}
+                        key={`tjog-${suit}`}
                         type="button"
-                        disabled={!canCallShog}
-                        onClick={() => callShog(suit)}
+                        disabled={!canCallTjog}
+                        onClick={() => callTjog(suit)}
                         className="twelve-actionButton"
                       >
                         <span className={SUIT_COLORS[suit]}>{SUIT_SYMBOLS[suit]}</span>
