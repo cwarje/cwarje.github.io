@@ -18,14 +18,18 @@ import type { TwelveState } from '../games/twelve/types';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 import { GAME_REGISTRY } from '../games/registry';
 
-export const BOT_NAMES = ['Nova', 'Pixel', 'Byte', 'Chip', 'Blaze', 'Echo', 'Neon', 'Volt'];
+export const BOT_NAMES = ['Pippi', 'Maja', 'Stina', 'Kajsa', 'Lotta', 'Ebba', 'Ida', 'Tova', 'Sigge', 'Nisse', 'Kalle', 'Hasse', 'Kekke', 'Challe', 'Bönne', 'Migge', 'Sune'];
+
+function pickRandom<T>(arr: T[]): T | undefined {
+  return arr.length > 0 ? arr[Math.floor(Math.random() * arr.length)] : undefined;
+}
 
 function createBots(count: number, existingPlayers: Player[]): Player[] {
   const usedNames = existingPlayers.map(p => p.name);
   const bots: Player[] = [];
   for (let i = 0; i < count; i++) {
     const available = BOT_NAMES.filter(n => !usedNames.includes(n) && !bots.some(b => b.name === n));
-    const name = available[0] || `Bot ${existingPlayers.length + i}`;
+    const name = pickRandom(available) ?? `Bot ${existingPlayers.length + i}`;
     bots.push({
       id: `bot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       name,
@@ -778,7 +782,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     if (!isHost || !room) return;
     const usedNames = room.players.map(p => p.name);
     const availableNames = BOT_NAMES.filter(n => !usedNames.includes(n));
-    const botName = availableNames[0] || `Bot ${room.players.length}`;
+    const botName = pickRandom(availableNames) ?? `Bot ${room.players.length}`;
     const botId = `bot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
     const bot: Player = {
