@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Copy, X, LogOut, Loader2, Settings } from 'lucide-react';
+import { Users, Copy, X, LogOut, Loader2, Settings, StopCircle } from 'lucide-react';
 import PlayerList from './PlayerList';
 import { useRoomContext } from '../networking/roomStore';
 import { useToast } from './Toast';
@@ -11,7 +11,7 @@ import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_CO
 type LobbyMenuProps = { variant?: 'default' | 'icon' };
 
 export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
-  const { room, myId, myPlayer, isHost, removeBot, removePlayer, leaveRoom, updateProfile, connecting } = useRoomContext();
+  const { room, myId, myPlayer, isHost, removeBot, removePlayer, leaveRoom, endGame, updateProfile, connecting } = useRoomContext();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -22,6 +22,7 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
   const playerCount = room?.players.length ?? 0;
   const hasRoom = !!room;
   const isLobbyPhase = room?.phase === 'lobby';
+  const gameInProgress = room?.phase === 'playing' || room?.phase === 'finished';
   const canManagePlayers = isHost && isLobbyPhase;
 
   useEffect(() => {
@@ -64,6 +65,11 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
     leaveRoom();
     toast(isHost ? 'Lobby closed.' : 'Left lobby.', 'info');
     navigate('/');
+  };
+
+  const handleEndGame = () => {
+    setOpen(false);
+    endGame();
   };
 
   const handleSaveProfile = () => {
@@ -217,15 +223,25 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                     </div>
                   </div>
 
-                  {/* Leave button */}
+                  {/* Leave button(s) */}
                   <div className="px-5 py-3">
-                    <button
-                      onClick={handleLeave}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/30 transition-all duration-200 cursor-pointer"
-                    >
-                      {isHost ? <X className="w-4 h-4" /> : <LogOut className="w-4 h-4" />}
-                      <span className="text-sm font-medium">{isHost ? 'Close Lobby' : 'Leave Lobby'}</span>
-                    </button>
+                    {isHost && gameInProgress ? (
+                      <button
+                        onClick={handleEndGame}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/30 transition-all duration-200 cursor-pointer"
+                      >
+                        <StopCircle className="w-4 h-4" />
+                        <span className="text-sm font-medium">End Game</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleLeave}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/30 transition-all duration-200 cursor-pointer"
+                      >
+                        {isHost ? <X className="w-4 h-4" /> : <LogOut className="w-4 h-4" />}
+                        <span className="text-sm font-medium">{isHost ? 'Close Lobby' : 'Leave Lobby'}</span>
+                      </button>
+                    )}
                   </div>
                 </>
               )}

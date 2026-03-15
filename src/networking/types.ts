@@ -61,6 +61,7 @@ export interface RoomContextValue {
   startGame: (gameType: GameType, options?: GameStartOptions) => void;
   sendAction: (payload: unknown) => void;
   returnToLobby: () => void;
+  endGame: () => void;
   error: string | null;
   clearError: () => void;
   connecting: boolean;

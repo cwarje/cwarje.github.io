@@ -887,6 +887,22 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     broadcastRoomState(lobbyRoom);
   }, [isHost, room, broadcastRoomState]);
 
+  // End game without recording winners (host only) — resets to lobby, keeps wins unchanged
+  const endGame = useCallback(() => {
+    if (!isHost || !room) return;
+
+    const lobbyRoom: RoomState = {
+      ...room,
+      gameType: null,
+      phase: 'lobby' as const,
+      players: room.players.filter(p => !p.isBot),
+      wins: room.wins,
+    };
+    setRoom(lobbyRoom);
+    setGameState(null);
+    broadcastRoomState(lobbyRoom);
+  }, [isHost, room, broadcastRoomState]);
+
   // Clear error
   const clearError = useCallback(() => setError(null), []);
 
@@ -1372,6 +1388,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         startGame,
         sendAction,
         returnToLobby,
+        endGame,
         error,
         clearError,
         connecting,
