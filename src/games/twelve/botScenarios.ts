@@ -45,6 +45,7 @@ function makeState(players: TwelvePlayer[], currentPlayerIndex: number): TwelveS
     players,
     pileCount: 4,
     phase: 'playing',
+    announcement: null,
     dealerIndex: 0,
     leaderIndex: 0,
     currentPlayerIndex,

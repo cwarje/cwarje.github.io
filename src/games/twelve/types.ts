@@ -26,8 +26,14 @@ export interface TwelvePlayer {
   shogSuitsCalled: Suit[];
 }
 
-export type TwelvePhase = 'playing' | 'flipping' | 'round-end';
+export type TwelvePhase = 'playing' | 'announcement' | 'flipping' | 'round-end' | 'game-over';
 export type PlaySource = 'hand' | 'pile-top' | 'pile-bottom';
+
+export interface TwelveAnnouncement {
+  kind: 'set-trump' | 'call-shog';
+  playerId: string;
+  suit: Suit;
+}
 
 export interface TrickPlay {
   playerId: string;
@@ -40,6 +46,7 @@ export interface TwelveState {
   players: TwelvePlayer[];
   pileCount: TwelvePileCount;
   phase: TwelvePhase;
+  announcement: TwelveAnnouncement | null;
   dealerIndex: number;
   leaderIndex: number;
   currentPlayerIndex: number;
@@ -63,6 +70,8 @@ export type TwelveAction =
   | { type: 'play-pile-card'; pileIndex: number }
   | { type: 'set-trump'; suit: Suit }
   | { type: 'call-shog'; suit: Suit }
+  | { type: 'finish-announcement' }
   | { type: 'resolve-trick' }
   | { type: 'flip-exposed' }
-  | { type: 'start-next-round' };
+  | { type: 'start-next-round' }
+  | { type: 'show-final-results' };

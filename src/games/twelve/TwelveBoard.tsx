@@ -187,6 +187,13 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
     if (state.phase === 'round-end') {
       return state.roundSummary || 'Round over';
     }
+    if (state.phase === 'announcement' && state.announcement) {
+      const playerName = state.players.find(player => player.id === state.announcement?.playerId)?.name ?? 'Player';
+      if (state.announcement.kind === 'set-trump') {
+        return `${playerName} set trump to ${state.announcement.suit}`;
+      }
+      return `${playerName} called shog in ${state.announcement.suit}`;
+    }
     if (state.phase === 'flipping') return '';
     if (state.trickWinner) {
       const winnerName = state.players.find(player => player.id === state.trickWinner)?.name ?? 'Player';
@@ -194,7 +201,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
     }
     if (isMyTurn) return 'Your turn';
     return `Waiting for ${state.players[state.currentPlayerIndex]?.name ?? 'player'}`;
-  }, [state.phase, state.roundSummary, state.trickWinner, state.players, state.currentPlayerIndex, isMyTurn]);
+  }, [state.phase, state.roundSummary, state.announcement, state.trickWinner, state.players, state.currentPlayerIndex, isMyTurn]);
 
   useEffect(() => {
     const element = tableRef.current;
@@ -291,6 +298,31 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
     onAction({ type: 'call-shog', suit });
   };
 
+  if (state.phase === 'game-over') {
+    const rankedPlayers = [...state.players].sort((a, b) => b.totalScore - a.totalScore);
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="river-board h-full flex flex-col items-center justify-center space-y-6 text-center"
+      >
+        <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
+        <h2 className="text-3xl font-extrabold text-white">Game Over</h2>
+        <div className="space-y-3 w-full max-w-2xl">
+          {rankedPlayers.map((player, i) => (
+            <div key={player.id} className="river-resultRow">
+              <div className="flex items-center gap-3">
+                <span className="text-lg font-bold">#{i + 1}</span>
+                <span className="font-semibold">{player.name}</span>
+              </div>
+              <span className="text-xl font-bold">{player.totalScore} pts</span>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    );
+  }
+
   const renderSeatPill = (seatLayout: SeatLayout, shouldMeasure = false) => {
     const player = seatLayout.player;
     const isCurrentTurn = state.players[state.currentPlayerIndex]?.id === player.id && !state.trickWinner;
@@ -353,7 +385,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
                         )}
                       </div>
                       {pile.topCard && (
-                        <div className="twelve-pileTop">
+                        <div className={`twelve-pileTop ${pile.bottomCard ? 'twelve-pileTop--stacked' : ''}`}>
                           {renderCardFace(pile.topCard, !canPlayPile, true)}
                         </div>
                       )}
@@ -429,7 +461,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
                         onClick={() => setTrump(suit)}
                         className="twelve-actionButton"
                       >
-                        {SUIT_SYMBOLS[suit]}
+                        <span className={SUIT_COLORS[suit]}>{SUIT_SYMBOLS[suit]}</span>
                       </button>
                     ))}
                   </div>
@@ -448,7 +480,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
                         onClick={() => callShog(suit)}
                         className="twelve-actionButton"
                       >
-                        {SUIT_SYMBOLS[suit]}
+                        <span className={SUIT_COLORS[suit]}>{SUIT_SYMBOLS[suit]}</span>
                       </button>
                     ))}
                   </div>

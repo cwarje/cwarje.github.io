@@ -139,6 +139,7 @@ function startRound(
     players: dealtPlayers,
     pileCount: pilesPerPlayer,
     phase: 'playing',
+    announcement: null,
     dealerIndex,
     leaderIndex,
     currentPlayerIndex: leaderIndex,
@@ -228,7 +229,8 @@ export function createTwelveState(players: Player[], options?: { pileCount?: Twe
 export function processTwelveAction(state: unknown, action: unknown, playerId: string): unknown {
   const s = state as TwelveState;
   const a = action as TwelveAction;
-  if (s.gameOver) return state;
+  if (s.phase === 'game-over') return state;
+  if (s.gameOver && a.type !== 'show-final-results') return state;
 
   switch (a.type) {
     case 'set-trump': {
@@ -248,6 +250,12 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
       return {
         ...s,
         players: updatedPlayers,
+        phase: 'announcement',
+        announcement: {
+          kind: 'set-trump',
+          playerId: player.id,
+          suit: a.suit,
+        },
         trumpSuit: a.suit,
         trumpSetterId: player.id,
       };
@@ -270,6 +278,21 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
       return {
         ...s,
         players: updatedPlayers,
+        phase: 'announcement',
+        announcement: {
+          kind: 'call-shog',
+          playerId: player.id,
+          suit: a.suit,
+        },
+      };
+    }
+
+    case 'finish-announcement': {
+      if (s.phase !== 'announcement') return state;
+      return {
+        ...s,
+        phase: 'playing',
+        announcement: null,
       };
     }
 
@@ -430,6 +453,14 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
       const nextDealer = (s.dealerIndex + 1) % s.players.length;
       return startRound(s.players, s.pileCount, nextDealer, s.roundNumber + 1);
     }
+
+    case 'show-final-results': {
+      if (s.phase !== 'round-end' || !s.gameOver) return state;
+      return {
+        ...s,
+        phase: 'game-over',
+      };
+    }
   }
 
   return state;
@@ -440,7 +471,7 @@ export function getTwelveWinners(state: unknown): string[] {
 }
 
 export function isTwelveOver(state: unknown): boolean {
-  return (state as TwelveState).gameOver;
+  return (state as TwelveState).phase === 'game-over';
 }
 
 interface BotPlayOption {
@@ -1007,7 +1038,7 @@ function chooseShogSuit(state: TwelveState, playerIndex: number): { suit: Suit; 
 
 export function runTwelveBotTurn(state: unknown): unknown {
   const s = state as TwelveState;
-  if (s.gameOver || s.phase === 'round-end' || s.trickWinner) return state;
+  if (s.phase === 'game-over' || s.gameOver || s.phase === 'round-end' || s.trickWinner) return state;
   if (s.phase === 'flipping') {
     return processTwelveAction(s, { type: 'flip-exposed' }, '');
   }

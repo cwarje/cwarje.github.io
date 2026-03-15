@@ -904,7 +904,9 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const UP_RIVER_BOT_DELAY = 900; // ms between bot bid/card play
   const UP_RIVER_ROUND_END_DELAY = 5000; // ms to show bid result borders before next round
   const TWELVE_BOT_DELAY = 900; // ms between bot actions
+  const TWELVE_ANNOUNCEMENT_DELAY = 4000; // ms to show trump/shog announcement
   const TWELVE_ROUND_END_DELAY = 5500; // ms to show round summary before next round
+  const TWELVE_FINAL_RESULTS_DELAY = 5000; // ms to hold final round summary before end screen
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -1051,7 +1053,21 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     // ── Twelve bot scheduling ──
     if (room.gameType === 'twelve') {
       const ts = gameState as TwelveState;
-      if (ts.gameOver) return;
+
+      if (ts.phase === 'announcement') {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as TwelveState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'announcement') return;
+
+          const next = processGameAction('twelve', currentGs, { type: 'finish-announcement' }, '');
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+          }
+        }, TWELVE_ANNOUNCEMENT_DELAY);
+        return;
+      }
 
       if (ts.phase === 'playing' && ts.trickWinner) {
         botTimerRef.current = setTimeout(() => {
@@ -1087,17 +1103,31 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (ts.phase === 'round-end') {
+        const roundEndDelay = ts.gameOver ? TWELVE_FINAL_RESULTS_DELAY : TWELVE_ROUND_END_DELAY;
+        const roundEndAction = ts.gameOver
+          ? ({ type: 'show-final-results' } as const)
+          : ({ type: 'start-next-round' } as const);
         botTimerRef.current = setTimeout(() => {
           const currentGs = gameStateRef.current as TwelveState | null;
           const currentRoom = roomRef.current;
-          if (!currentGs || !currentRoom || currentGs.phase !== 'round-end' || currentGs.gameOver) return;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'round-end') return;
+          if (currentGs.gameOver !== ts.gameOver) return;
 
-          const next = processGameAction('twelve', currentGs, { type: 'start-next-round' }, '');
+          const next = processGameAction('twelve', currentGs, roundEndAction, '');
           if (next !== currentGs) {
             setGameState(next);
             broadcastGameState(next);
+            if (checkGameOver('twelve', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
           }
-        }, TWELVE_ROUND_END_DELAY);
+        }, roundEndDelay);
+        return;
+      }
+
+      if (ts.phase === 'game-over') {
         return;
       }
 
