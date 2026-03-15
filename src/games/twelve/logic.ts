@@ -48,12 +48,52 @@ function getRoundCardPoints(players: TwelvePlayer[]): Record<string, number> {
   return scores;
 }
 
+export function getTeammateIndex(playerIndex: number, playerCount: number): number | null {
+  if (playerCount !== 4) return null;
+  return (playerIndex + 2) % 4;
+}
+
+function getTeammateId(players: TwelvePlayer[], playerId: string): string | null {
+  if (players.length !== 4) return null;
+  const idx = players.findIndex(p => p.id === playerId);
+  if (idx === -1) return null;
+  return players[(idx + 2) % 4]?.id ?? null;
+}
+
+export function getTeamRoundCardPoints(players: TwelvePlayer[], perPlayer: Record<string, number>): [number, number] {
+  const team0 = (perPlayer[players[0]?.id] ?? 0) + (perPlayer[players[2]?.id] ?? 0);
+  const team1 = (perPlayer[players[1]?.id] ?? 0) + (perPlayer[players[3]?.id] ?? 0);
+  return [team0, team1];
+}
+
 function buildRoundSummary(
   players: TwelvePlayer[],
   roundCardPoints: Record<string, number>,
   gotMostPoint: string | null,
   lastTrickWinnerId: string | null,
 ): string {
+  if (players.length === 4) {
+    const teamPoints = getTeamRoundCardPoints(players, roundCardPoints);
+    const team0Names = `${players[0].name} & ${players[2].name}`;
+    const team1Names = `${players[1].name} & ${players[3].name}`;
+    const pointsLine = `Team card points (${team0Names}: ${teamPoints[0]} · ${team1Names}: ${teamPoints[1]})`;
+    const mostPointsLine = gotMostPoint === null
+      ? 'Most-points bonus tied — no team scores it.'
+      : (() => {
+          const winnerIdx = players.findIndex(p => p.id === gotMostPoint);
+          const teamNames = winnerIdx % 2 === 0 ? team0Names : team1Names;
+          return `${teamNames} took the most points and earn +1.`;
+        })();
+    const lastTrickLine = lastTrickWinnerId === null
+      ? 'Last-trick bonus unavailable.'
+      : (() => {
+          const winnerIdx = players.findIndex(p => p.id === lastTrickWinnerId);
+          const teamNames = winnerIdx % 2 === 0 ? team0Names : team1Names;
+          return `${players.find(p => p.id === lastTrickWinnerId)?.name ?? 'Player'} won the last trick, earning +1 for ${teamNames}.`;
+        })();
+    return `${pointsLine}. ${mostPointsLine} ${lastTrickLine}`;
+  }
+
   const chunks = players.map((player) => {
     const label = roundCardPoints[player.id] ?? 0;
     return `${player.name}: ${label}`;
@@ -69,6 +109,22 @@ function buildRoundSummary(
 }
 
 function decideGameWinners(players: TwelvePlayer[], roundCardPoints: Record<string, number>): string[] {
+  if (players.length === 4) {
+    const team0Score = players[0].totalScore;
+    const team1Score = players[1].totalScore;
+    const team0Qualifies = team0Score >= 12;
+    const team1Qualifies = team1Score >= 12;
+    if (!team0Qualifies && !team1Qualifies) return [];
+    if (team0Qualifies && !team1Qualifies) return [players[0].id, players[2].id];
+    if (team1Qualifies && !team0Qualifies) return [players[1].id, players[3].id];
+    const teamPoints = getTeamRoundCardPoints(players, roundCardPoints);
+    if (teamPoints[0] > teamPoints[1]) return [players[0].id, players[2].id];
+    if (teamPoints[1] > teamPoints[0]) return [players[1].id, players[3].id];
+    if (team0Score > team1Score) return [players[0].id, players[2].id];
+    if (team1Score > team0Score) return [players[1].id, players[3].id];
+    return [players[0].id, players[2].id, players[1].id, players[3].id];
+  }
+
   const contenders = players.filter(player => player.totalScore >= 12);
   if (contenders.length === 0) return [];
   if (contenders.length === 1) return [contenders[0].id];
@@ -161,20 +217,50 @@ function startRound(
 
 function endRound(state: TwelveState): TwelveState {
   const roundCardPoints = getRoundCardPoints(state.players);
-  const roundValues = Object.values(roundCardPoints);
-  const maxPoints = roundValues.length > 0 ? Math.max(...roundValues) : 0;
-  const mostPointIds = state.players.filter(player => (roundCardPoints[player.id] ?? 0) === maxPoints).map(player => player.id);
-  const gotMostPoint = mostPointIds.length === 1 ? mostPointIds[0] : null;
+  const isTeam = state.players.length === 4;
 
-  const updatedPlayers = state.players.map((player) => {
-    let nextScore = player.totalScore;
-    if (gotMostPoint === player.id) nextScore += 1;
-    if (state.lastTrickWinnerId === player.id) nextScore += 1;
-    return {
+  let gotMostPoint: string | null = null;
+  let updatedPlayers: TwelvePlayer[];
+
+  if (isTeam) {
+    const teamPoints = getTeamRoundCardPoints(state.players, roundCardPoints);
+    if (teamPoints[0] > teamPoints[1]) {
+      gotMostPoint = state.players[0].id;
+    } else if (teamPoints[1] > teamPoints[0]) {
+      gotMostPoint = state.players[1].id;
+    }
+
+    const lastTrickWinnerIndex = state.lastTrickWinnerId
+      ? state.players.findIndex(p => p.id === state.lastTrickWinnerId)
+      : -1;
+    const lastTrickTeam = lastTrickWinnerIndex >= 0 ? lastTrickWinnerIndex % 2 : -1;
+    const mostPointsTeam = gotMostPoint !== null
+      ? state.players.findIndex(p => p.id === gotMostPoint) % 2
+      : -1;
+
+    const teamBonus = [0, 0];
+    if (mostPointsTeam >= 0) teamBonus[mostPointsTeam] += 1;
+    if (lastTrickTeam >= 0) teamBonus[lastTrickTeam] += 1;
+
+    updatedPlayers = state.players.map((player, i) => ({
       ...player,
-      totalScore: nextScore,
-    };
-  });
+      totalScore: player.totalScore + teamBonus[i % 2],
+    }));
+  } else {
+    const roundValues = Object.values(roundCardPoints);
+    const maxPoints = roundValues.length > 0 ? Math.max(...roundValues) : 0;
+    const mostPointIds = state.players
+      .filter(player => (roundCardPoints[player.id] ?? 0) === maxPoints)
+      .map(player => player.id);
+    gotMostPoint = mostPointIds.length === 1 ? mostPointIds[0] : null;
+
+    updatedPlayers = state.players.map((player) => {
+      let nextScore = player.totalScore;
+      if (gotMostPoint === player.id) nextScore += 1;
+      if (state.lastTrickWinnerId === player.id) nextScore += 1;
+      return { ...player, totalScore: nextScore };
+    });
+  }
 
   const winners = decideGameWinners(updatedPlayers, roundCardPoints);
   return {
@@ -241,11 +327,13 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
       if (!canSetTrump(s, player)) return state;
       if (!suitsWithRoyalPair(player).includes(a.suit)) return state;
 
+      const newScore = player.totalScore + 2;
       const updatedPlayers = [...s.players];
-      updatedPlayers[playerIndex] = {
-        ...player,
-        totalScore: player.totalScore + 2,
-      };
+      updatedPlayers[playerIndex] = { ...player, totalScore: newScore };
+      const trumpTeammateIdx = getTeammateIndex(playerIndex, s.players.length);
+      if (trumpTeammateIdx !== null) {
+        updatedPlayers[trumpTeammateIdx] = { ...updatedPlayers[trumpTeammateIdx], totalScore: newScore };
+      }
 
       return {
         ...s,
@@ -268,12 +356,17 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
       const player = s.players[playerIndex];
       if (!canCallTjog(s, player, a.suit)) return state;
 
+      const tjogNewScore = player.totalScore + 1;
       const updatedPlayers = [...s.players];
       updatedPlayers[playerIndex] = {
         ...player,
-        totalScore: player.totalScore + 1,
+        totalScore: tjogNewScore,
         tjogSuitsCalled: [...player.tjogSuitsCalled, a.suit],
       };
+      const tjogTeammateIdx = getTeammateIndex(playerIndex, s.players.length);
+      if (tjogTeammateIdx !== null) {
+        updatedPlayers[tjogTeammateIdx] = { ...updatedPlayers[tjogTeammateIdx], totalScore: tjogNewScore };
+      }
 
       return {
         ...s,
@@ -638,10 +731,11 @@ function estimateDeclarationThreat(state: TwelveState, player: TwelvePlayer, isC
 function findDangerousSetTrumpOpponentId(state: TwelveState, myPlayerId: string): string | null {
   if (state.trumpSuit !== null) return null;
   const currentLeaderId = getCurrentTrickLeaderId(state);
+  const myTeammateId = getTeammateId(state.players, myPlayerId);
   let bestId: string | null = null;
   let bestScore = 0;
   for (const player of state.players) {
-    if (player.id === myPlayerId) continue;
+    if (player.id === myPlayerId || player.id === myTeammateId) continue;
     const score = estimateDeclarationThreat(state, player, player.id === currentLeaderId);
     if (score > bestScore) {
       bestScore = score;
@@ -658,10 +752,11 @@ function findTrumpPressureTargetId(
 ): string | null {
   if (state.trumpSuit === null) return null;
   const trumpSuit = state.trumpSuit;
+  const myTeammateId = getTeammateId(state.players, myPlayerId);
   let bestId: string | null = null;
   let bestScore = 0;
   for (const opponent of state.players) {
-    if (opponent.id === myPlayerId) continue;
+    if (opponent.id === myPlayerId || opponent.id === myTeammateId) continue;
     const knownVoids = knownVoidsByPlayer[opponent.id] ?? new Set<Suit>();
     const nonTrumpVoidCount = SUITS.filter(suit => suit !== trumpSuit && knownVoids.has(suit)).length;
     if (nonTrumpVoidCount === 0) continue;

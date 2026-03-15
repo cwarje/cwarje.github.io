@@ -451,6 +451,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
         'You must follow suit if able (from either hand or exposed pile cards). If you cannot and trump is set, you must play trump if possible; otherwise you may play any card.',
         'If trump is set, highest trump wins the trick; otherwise highest card of the lead suit wins.',
         'When a top pile card is played, any newly exposed face-down card flips face up at the start of the next trick.',
+        'With 4 players, opposite seats form fixed teams. Teams share their score toward 12, and captured card points are combined at the end of each round.',
         'Tjog is pronounced like "chog" (soft \'tj\' sound).',
       ],
       howToPlay: [

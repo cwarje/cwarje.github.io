@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Card, Suit, TwelvePlayer, TwelveState } from './types';
 import { getPilePlayableCard, isLegalPlay, rankDisplay, suitsWithRoyalPair } from './rules';
+import { getTeamRoundCardPoints } from './logic';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX } from '../../networking/playerColors';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
@@ -191,6 +192,60 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
   const headsUpContent = useMemo((): ReactNode => {
     if (state.phase === 'round-end') {
       const roundCardPoints = state.roundCardPoints;
+      const isTeam = state.players.length === 4;
+
+      if (isTeam) {
+        const teamPoints = getTeamRoundCardPoints(state.players, roundCardPoints);
+        const renderTeam = (teamIdx: 0 | 1) => {
+          const p1 = state.players[teamIdx === 0 ? 0 : 1];
+          const p2 = state.players[teamIdx === 0 ? 2 : 3];
+          return (
+            <>
+              <span style={{ color: getPlayerColorHex(p1) }}>{p1.name}</span>
+              {' & '}
+              <span style={{ color: getPlayerColorHex(p2) }}>{p2.name}</span>
+            </>
+          );
+        };
+        const pointsChunks = [
+          <span key="team0">{renderTeam(0)}{`: ${teamPoints[0]}`}</span>,
+          <span key="team1">{renderTeam(1)}{`: ${teamPoints[1]}`}</span>,
+        ];
+        const pointsLine = (
+          <>
+            Team card points (
+            {pointsChunks.reduce<ReactNode[]>((acc, node, i) => (i === 0 ? [node] : [...acc, ' · ', node]), [])}
+            )
+          </>
+        );
+        const winningTeam: 0 | 1 | null = teamPoints[0] > teamPoints[1] ? 0 : teamPoints[1] > teamPoints[0] ? 1 : null;
+        const mostPointsLine = winningTeam === null ? (
+          'Most-points bonus tied — no team scores it.'
+        ) : (
+          <>{renderTeam(winningTeam)}{' took the most points and earn +1.'}</>
+        );
+        const lastTrickLine = state.lastTrickWinnerId === null ? (
+          'Last-trick bonus unavailable.'
+        ) : (() => {
+          const winner = state.players.find(p => p.id === state.lastTrickWinnerId)!;
+          const winnerIdx = state.players.findIndex(p => p.id === state.lastTrickWinnerId);
+          const team = (winnerIdx % 2) as 0 | 1;
+          return (
+            <>
+              <span style={{ color: getPlayerColorHex(winner) }}>{winner.name}</span>
+              {' won the last trick, earning +1 for '}
+              {renderTeam(team)}
+              {'.'}
+            </>
+          );
+        })();
+        return (
+          <>
+            {pointsLine}. {mostPointsLine} {lastTrickLine}
+          </>
+        );
+      }
+
       const roundValues = Object.values(roundCardPoints);
       const maxPoints = roundValues.length > 0 ? Math.max(...roundValues) : 0;
       const mostPointIds = state.players.filter(p => (roundCardPoints[p.id] ?? 0) === maxPoints).map(p => p.id);
@@ -369,6 +424,37 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
   };
 
   if (state.phase === 'game-over') {
+    const isTeam = state.players.length === 4;
+
+    if (isTeam) {
+      const teams = [
+        { players: [state.players[0], state.players[2]], score: state.players[0].totalScore },
+        { players: [state.players[1], state.players[3]], score: state.players[1].totalScore },
+      ].sort((a, b) => b.score - a.score);
+
+      return (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="river-board h-full flex flex-col items-center justify-center space-y-6 text-center"
+        >
+          <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
+          <h2 className="text-3xl font-extrabold text-white">Game Over</h2>
+          <div className="space-y-3 w-full max-w-2xl">
+            {teams.map((team, i) => (
+              <div key={team.players[0].id} className="river-resultRow">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-bold">#{i + 1}</span>
+                  <span className="font-semibold">{team.players[0].name} & {team.players[1].name}</span>
+                </div>
+                <span className="text-xl font-bold">{team.score} pts</span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      );
+    }
+
     const rankedPlayers = [...state.players].sort((a, b) => b.totalScore - a.totalScore);
     return (
       <motion.div

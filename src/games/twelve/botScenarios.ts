@@ -1,5 +1,5 @@
 import type { Card, FrontPile, Rank, Suit, TwelvePlayer, TwelveState } from './types';
-import { runTwelveBotTurn } from './logic';
+import { runTwelveBotTurn, processTwelveAction } from './logic';
 import { isLegalPlay } from './rules';
 
 export interface TwelveBotScenarioResult {
@@ -259,6 +259,144 @@ function chooseLowestForcedTrumpScenario(): TwelveBotScenarioResult {
   };
 }
 
+function teamCardPointAggregationScenario(): TwelveBotScenarioResult {
+  const p0 = makePlayer('p0', true, [], [], 5);
+  const p1 = makePlayer('p1', true, [], [], 5);
+  const p2 = makePlayer('p2', true, [], [], 5);
+  const p3 = makePlayer('p3', true, [], [], 5);
+
+  p0.capturedCards = [card('hearts', 14), card('hearts', 10)]; // 21
+  p2.capturedCards = [card('clubs', 14), card('clubs', 10)]; // 21 => team 0 = 42
+  p1.capturedCards = [card('diamonds', 14)]; // 11
+  p3.capturedCards = [card('spades', 14)]; // 11 => team 1 = 22
+
+  const state = makeState([p0, p1, p2, p3], 0);
+  state.currentTrick = [
+    { playerId: 'p0', card: card('hearts', 6), source: 'hand' },
+    { playerId: 'p1', card: card('diamonds', 6), source: 'hand' },
+    { playerId: 'p2', card: card('clubs', 6), source: 'hand' },
+    { playerId: 'p3', card: card('spades', 6), source: 'hand' },
+  ];
+  state.trickWinner = 'p0';
+
+  const next = processTwelveAction(state, { type: 'resolve-trick' }, 'p0') as TwelveState;
+
+  const team0Score = next.players[0].totalScore;
+  const team0Mate = next.players[2].totalScore;
+  const team1Score = next.players[1].totalScore;
+  const team1Mate = next.players[3].totalScore;
+
+  const scoreSynced = team0Score === team0Mate && team1Score === team1Mate;
+  const correctBonus = team0Score === 7 && team1Score === 5;
+  const passed = scoreSynced && correctBonus;
+
+  return {
+    name: 'team-card-point-aggregation',
+    passed,
+    details: passed
+      ? 'Team card points aggregated correctly, bonuses applied to team.'
+      : `Scores: team0=[${team0Score},${team0Mate}] team1=[${team1Score},${team1Mate}]`,
+  };
+}
+
+function teamTrumpScoreSyncScenario(): TwelveBotScenarioResult {
+  const p0 = makePlayer('p0', true, [card('clubs', 12), card('clubs', 13)], [], 6);
+  const p1 = makePlayer('p1', true, [card('hearts', 7)], [], 4);
+  const p2 = makePlayer('p2', true, [card('diamonds', 6)], [], 6);
+  const p3 = makePlayer('p3', true, [card('spades', 7)], [], 4);
+
+  const state = makeState([p0, p1, p2, p3], 0);
+  state.lastTrickWinnerId = 'p0';
+
+  const next = processTwelveAction(state, { type: 'set-trump', suit: 'clubs' }, 'p0') as TwelveState;
+
+  const passed =
+    next.players[0].totalScore === 8 &&
+    next.players[2].totalScore === 8 &&
+    next.players[1].totalScore === 4 &&
+    next.players[3].totalScore === 4;
+
+  return {
+    name: 'team-trump-score-sync',
+    passed,
+    details: passed
+      ? 'Set-trump +2 applied to both teammates.'
+      : `Scores: p0=${next.players[0].totalScore} p2=${next.players[2].totalScore} p1=${next.players[1].totalScore} p3=${next.players[3].totalScore}`,
+  };
+}
+
+function teamWinnerResolutionScenario(): TwelveBotScenarioResult {
+  const p0 = makePlayer('p0', true, [], [], 11);
+  const p1 = makePlayer('p1', true, [], [], 5);
+  const p2 = makePlayer('p2', true, [], [], 11);
+  const p3 = makePlayer('p3', true, [], [], 5);
+
+  p0.capturedCards = [card('hearts', 14)]; // 11
+  p2.capturedCards = [card('clubs', 14)]; // 11 => team 0 = 22
+  p1.capturedCards = [card('diamonds', 6)]; // 0
+  p3.capturedCards = [card('spades', 6)]; // 0 => team 1 = 0
+
+  const state = makeState([p0, p1, p2, p3], 0);
+  state.currentTrick = [
+    { playerId: 'p0', card: card('hearts', 6), source: 'hand' },
+    { playerId: 'p1', card: card('diamonds', 7), source: 'hand' },
+    { playerId: 'p2', card: card('clubs', 6), source: 'hand' },
+    { playerId: 'p3', card: card('spades', 7), source: 'hand' },
+  ];
+  state.trickWinner = 'p1';
+
+  const next = processTwelveAction(state, { type: 'resolve-trick' }, 'p1') as TwelveState;
+
+  const gameOver = next.gameOver;
+  const winnersIncludeBoth = next.winners.includes('p0') && next.winners.includes('p2');
+  const winnersExcludeOpponents = !next.winners.includes('p1') && !next.winners.includes('p3');
+  const passed = gameOver && winnersIncludeBoth && winnersExcludeOpponents;
+
+  return {
+    name: 'team-winner-resolution',
+    passed,
+    details: passed
+      ? 'Both teammates returned as winners when team reaches 12.'
+      : `gameOver=${gameOver} winners=${JSON.stringify(next.winners)} scores=[${next.players.map(p => p.totalScore)}]`,
+  };
+}
+
+function teamBonusCountedOnceScenario(): TwelveBotScenarioResult {
+  const p0 = makePlayer('p0', true, [], [], 0);
+  const p1 = makePlayer('p1', true, [], [], 0);
+  const p2 = makePlayer('p2', true, [], [], 0);
+  const p3 = makePlayer('p3', true, [], [], 0);
+
+  p0.capturedCards = [card('hearts', 14)]; // 11
+  p2.capturedCards = [card('clubs', 14)]; // 11 => team 0 = 22
+  p1.capturedCards = [card('diamonds', 6)]; // 0
+  p3.capturedCards = [card('spades', 6)]; // 0 => team 1 = 0
+
+  const state = makeState([p0, p1, p2, p3], 0);
+  state.currentTrick = [
+    { playerId: 'p0', card: card('hearts', 6), source: 'hand' },
+    { playerId: 'p1', card: card('diamonds', 7), source: 'hand' },
+    { playerId: 'p2', card: card('clubs', 6), source: 'hand' },
+    { playerId: 'p3', card: card('spades', 7), source: 'hand' },
+  ];
+  state.trickWinner = 'p0';
+
+  const next = processTwelveAction(state, { type: 'resolve-trick' }, 'p0') as TwelveState;
+
+  const team0Score = next.players[0].totalScore;
+  const team0MateScore = next.players[2].totalScore;
+  const team1Score = next.players[1].totalScore;
+  const passed = team0Score === 2 && team0MateScore === 2 && team1Score === 0;
+
+  return {
+    name: 'team-bonus-counted-once',
+    passed,
+    details: passed
+      ? 'Team bonuses counted once toward race-to-12 (not per-player).'
+      : `Scores: team0=[${team0Score},${team0MateScore}] team1=${team1Score}`,
+  };
+}
+
 export function runTwelveBotScenarioChecks(): TwelveBotScenarioResult[] {
   return [
     blockDeclarationWindowScenario(),
@@ -269,5 +407,9 @@ export function runTwelveBotScenarioChecks(): TwelveBotScenarioResult[] {
     mustPlayTrumpWhenVoidScenario(),
     forceTrumpDrainLeadScenario(),
     chooseLowestForcedTrumpScenario(),
+    teamCardPointAggregationScenario(),
+    teamTrumpScoreSyncScenario(),
+    teamWinnerResolutionScenario(),
+    teamBonusCountedOnceScenario(),
   ];
 }
