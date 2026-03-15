@@ -78,7 +78,7 @@ function getTrickSlotPlacement(playerCount: number, relativeIndex: number): Tric
   return { row: 2, col: 2, dx: '0px', dy: '0px' };
 }
 
-function PokerFlipCard({ card, faceDown }: { card?: Card | null; faceDown: boolean }) {
+function PokerFlipCard({ card, faceDown, disabled = false }: { card?: Card | null; faceDown: boolean; disabled?: boolean }) {
   if (faceDown || !card) {
     return <div className="poker-card poker-cardBack poker-cardFlip--sm" />;
   }
@@ -92,7 +92,7 @@ function PokerFlipCard({ card, faceDown }: { card?: Card | null; faceDown: boole
         transition={{ duration: 0.42, ease: 'easeInOut' }}
       >
         <div className="poker-cardFlipBack" aria-hidden="true" />
-        <div className="poker-cardFlipFront">
+        <div className={`poker-cardFlipFront ${disabled ? 'poker-cardFlipFront--disabled' : ''}`}>
           <div className="poker-cardCorner">
             <span className={`poker-cardRank ${SUIT_COLORS[card.suit]}`}>{rankDisplay(card.rank)}</span>
             <span className={`poker-cardSuit ${SUIT_COLORS[card.suit]}`}>{SUIT_SYMBOLS[card.suit]}</span>
@@ -379,7 +379,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
                     >
                       <div className="twelve-pileBottom">
                         {pile.bottomCard ? (
-                          <PokerFlipCard card={pile.bottomCard} faceDown={!pile.bottomFaceUp} />
+                          <PokerFlipCard card={pile.bottomCard} faceDown={!pile.bottomFaceUp} disabled={!canPlayPile} />
                         ) : (
                           <div className="twelve-pilePlaceholder" />
                         )}
