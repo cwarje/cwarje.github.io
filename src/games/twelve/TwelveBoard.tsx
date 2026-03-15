@@ -490,12 +490,28 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
       : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
+    const isTeam = state.players.length === 4;
+    const pillTopStyle = isTeam
+      ? (() => {
+          const teammateIndex = (seatLayout.playerIndex + 2) % 4;
+          const leftIndex = Math.min(seatLayout.playerIndex, teammateIndex);
+          const rightIndex = Math.max(seatLayout.playerIndex, teammateIndex);
+          const leftColor =
+            PLAYER_COLOR_HEX[state.players[leftIndex]?.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+          const rightColor =
+            PLAYER_COLOR_HEX[state.players[rightIndex]?.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+          return {
+            background: `linear-gradient(to right, ${leftColor} 50%, ${rightColor} 50%)`,
+            color: seatTextColor,
+          };
+        })()
+      : { backgroundColor: seatColor, color: seatTextColor };
     return (
       <div
         ref={shouldMeasure ? setSeatPillElement : undefined}
         className={`river-seatPill ${seatPillStateClass} ${isMe ? 'river-seatPill--me' : ''}`}
       >
-        <div className="river-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
+        <div className="river-seatPillTop" style={pillTopStyle}>
           <span className="river-seatName">
             {isMe ? 'You' : player.name} ({player.totalScore})
           </span>
