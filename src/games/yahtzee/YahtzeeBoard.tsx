@@ -53,6 +53,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
   const isMyTurn = state.players[state.currentPlayerIndex]?.id === myId;
   const myPlayer = state.players.find(p => p.id === myId);
   const hasRolled = state.rollsLeft < 3;
+  const allDiceHeld = state.held.every(Boolean);
 
   const [isRolling, setIsRolling] = useState(false);
   const spectatorRollsLeftText =
@@ -149,7 +150,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
       : [];
 
   const handleRoll = () => {
-    if (isMyTurn && state.rollsLeft > 0 && !isRolling) {
+    if (isMyTurn && state.rollsLeft > 0 && !isRolling && !allDiceHeld) {
       setIsRolling(true);
       onAction({ type: 'roll' });
     }
@@ -382,7 +383,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
         {isMyTurn && (
           <button
             onClick={handleRoll}
-            disabled={state.rollsLeft === 0 || isRolling}
+            disabled={state.rollsLeft === 0 || isRolling || allDiceHeld}
             className={`yahtzee-roll-button flex items-center gap-2 px-6 py-3 rounded-xl text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer ${
               isYahtzeeCelebrationVisible
                 ? 'yahtzee-roll-button--gold'
