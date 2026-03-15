@@ -292,7 +292,7 @@ export default function FarkleBoard({ state, myId, onAction }: FarkleBoardProps)
               disabled={!isMyTurn || !canKeep}
               className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-500 disabled:pointer-events-none disabled:opacity-40"
             >
-              Keep Selected
+              Set Aside
               {selectedScore !== null ? ` (+${selectedScore})` : ''}
             </button>
             <button

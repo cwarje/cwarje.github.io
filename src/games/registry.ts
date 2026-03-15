@@ -173,7 +173,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
       ],
       howToPlay: [
         'Click Roll to roll all available dice.',
-        'When scoring dice appear, select the dice you want to keep and click Keep Selected.',
+        'When scoring dice appear, select the dice you want to keep and click Set Aside.',
         'After keeping dice, choose to keep pushing with Roll or secure points with Bank.',
         'If you farkle, your turn score resets to 0 and the next player starts.',
         'Use risk management: large turn totals are tempting, but one bad roll loses the whole turn.',
