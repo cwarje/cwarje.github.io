@@ -1,5 +1,6 @@
 import type { Card, FrontPile, Rank, Suit, TwelvePlayer, TwelveState } from './types';
 import { runTwelveBotTurn } from './logic';
+import { isLegalPlay } from './rules';
 
 export interface TwelveBotScenarioResult {
   name: string;
@@ -188,6 +189,26 @@ function endgameLastTrickControlScenario(): TwelveBotScenarioResult {
   };
 }
 
+function mustPlayTrumpWhenVoidScenario(): TwelveBotScenarioResult {
+  const bot = makePlayer('p0', true, [card('diamonds', 6), card('clubs', 10)], []);
+  const p1 = makePlayer('p1', true, [card('hearts', 7)], []);
+  const p2 = makePlayer('p2', true, [card('spades', 6)], []);
+  const state = makeState([bot, p1, p2], 0);
+  state.trumpSuit = 'diamonds';
+  state.currentTrick = [{ playerId: 'p1', card: card('hearts', 11), source: 'hand' }];
+
+  const canPlayTrump = isLegalPlay(state, 0, card('diamonds', 6), 'hand');
+  const canPlayOffSuit = isLegalPlay(state, 0, card('clubs', 10), 'hand');
+  const passed = canPlayTrump && !canPlayOffSuit;
+  return {
+    name: 'must-play-trump-when-void-in-lead',
+    passed,
+    details: passed
+      ? 'Void in lead suit with trump set: only trump is legal.'
+      : `Unexpected legality. trump=${String(canPlayTrump)} offsuit=${String(canPlayOffSuit)}`,
+  };
+}
+
 export function runTwelveBotScenarioChecks(): TwelveBotScenarioResult[] {
   return [
     blockDeclarationWindowScenario(),
@@ -195,5 +216,6 @@ export function runTwelveBotScenarioChecks(): TwelveBotScenarioResult[] {
     preserveBetterPairForShogScenario(),
     preferHandOverRevealScenario(),
     endgameLastTrickControlScenario(),
+    mustPlayTrumpWhenVoidScenario(),
   ];
 }

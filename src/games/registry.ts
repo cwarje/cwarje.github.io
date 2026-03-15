@@ -445,7 +445,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
         'Play uses a 36-card deck: 6 through Ace in each suit (2-5 removed). Rank order is 6-9, J, Q, K, 10, A (Aces high).',
         'At round start, each player gets table piles chosen at launch: one face-down card with one face-up card on top of each pile. Remaining cards are dealt to hand.',
         'On your turn, play either a hand card or the exposed top card from one of your table piles.',
-        'You must follow suit if able (from either hand or exposed pile cards). If you cannot, you may play any card.',
+        'You must follow suit if able (from either hand or exposed pile cards). If you cannot and trump is set, you must play trump if possible; otherwise you may play any card.',
         'If trump is set, highest trump wins the trick; otherwise highest card of the lead suit wins.',
         'When a top pile card is played, any newly exposed face-down card flips face up at the start of the next trick.',
       ],

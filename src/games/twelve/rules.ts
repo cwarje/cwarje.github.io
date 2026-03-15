@@ -88,7 +88,14 @@ export function isLegalPlay(
   if (state.currentTrick.length === 0) return true;
   const leadSuit = state.currentTrick[0].card.suit;
   const hasLeadSuit = available.some(entry => entry.card.suit === leadSuit);
-  if (hasLeadSuit && card.suit !== leadSuit) return false;
+  if (hasLeadSuit) return card.suit === leadSuit;
+
+  const trumpSuit = state.trumpSuit;
+  if (trumpSuit) {
+    const hasTrump = available.some(entry => entry.card.suit === trumpSuit);
+    if (hasTrump) return card.suit === trumpSuit;
+  }
+
   return true;
 }
 
