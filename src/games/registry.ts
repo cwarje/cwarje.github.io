@@ -21,6 +21,7 @@ import UpAndDownTheRiverBoard from './up-and-down-the-river/UpAndDownTheRiverBoa
 import TwelveBoard from './twelve/TwelveBoard';
 
 import HeartsOptions from './hearts/HeartsOptions';
+import FarkleOptions from './farkle/FarkleOptions';
 import UpRiverOptions from './up-and-down-the-river/UpRiverOptions';
 import TwelveOptions from './twelve/TwelveOptions';
 
@@ -189,12 +190,14 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
       panelBg: 'bg-violet-950',
       labelColor: 'text-violet-200',
     },
-    createState: createFarkleState,
+    createState: (players, options) =>
+      createFarkleState(players, { targetScore: options?.farkleTargetScore }),
     processAction: processFarkleAction,
     isOver: isFarkleOver,
     runBotTurn: runFarkleBotTurn,
     getWinners: getFarkleWinners,
     Board: FarkleBoard,
+    OptionsPanel: FarkleOptions,
     fullBoard: true,
     production: true,
   },

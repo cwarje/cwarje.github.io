@@ -1,4 +1,4 @@
-import type { Player } from '../../networking/types';
+import type { FarkleTargetScore, Player } from '../../networking/types';
 import type { FarkleAction, FarklePlayer, FarkleState } from './types';
 
 const DICE_COUNT = 6;
@@ -147,7 +147,10 @@ function getBestScoringSelection(state: FarkleState): number[] {
   return bestIndices;
 }
 
-export function createFarkleState(players: Player[]): FarkleState {
+export function createFarkleState(
+  players: Player[],
+  options?: { targetScore?: FarkleTargetScore }
+): FarkleState {
   return {
     players: players.map((player) => ({
       id: player.id,
@@ -157,7 +160,7 @@ export function createFarkleState(players: Player[]): FarkleState {
       totalScore: 0,
     })),
     currentPlayerIndex: 0,
-    targetScore: DEFAULT_TARGET_SCORE,
+    targetScore: options?.targetScore ?? DEFAULT_TARGET_SCORE,
     dice: Array.from({ length: DICE_COUNT }, () => 1),
     kept: Array.from({ length: DICE_COUNT }, () => false),
     turnScore: 0,

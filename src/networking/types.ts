@@ -1,10 +1,12 @@
 export type GameType = 'yahtzee' | 'farkle' | 'hearts' | 'battleship' | 'liars-dice' | 'poker' | 'up-and-down-the-river' | 'twelve';
 export type PlayerColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet' | 'dark-purple';
 export type HeartsTargetScore = 50 | 100;
+export type FarkleTargetScore = 3000 | 5000 | 10000;
 export type UpRiverStartMode = 'up-down' | 'down-up';
 export type TwelvePileCount = 3 | 4 | 5 | 6;
 export interface GameStartOptions {
   targetScore?: HeartsTargetScore;
+  farkleTargetScore?: FarkleTargetScore;
   upRiverStartMode?: UpRiverStartMode;
   pileCount?: TwelvePileCount;
   botCount?: number;
