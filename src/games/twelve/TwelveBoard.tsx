@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Card, Suit, TwelvePlayer, TwelveState } from './types';
@@ -76,6 +77,10 @@ function getTrickSlotPlacement(playerCount: number, relativeIndex: number): Tric
   const layout = TRICK_SLOT_PLACEMENTS[playerCount]?.[relativeIndex];
   if (layout) return layout;
   return { row: 2, col: 2, dx: '0px', dy: '0px' };
+}
+
+function getPlayerColorHex(player: TwelvePlayer): string {
+  return PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
 }
 
 function PokerFlipCard({ card, faceDown, disabled = false }: { card?: Card | null; faceDown: boolean; disabled?: boolean }) {
@@ -183,25 +188,90 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
     };
   }, [trickWinnerRelativeSeat, seatLayouts]);
 
-  const headsUpMessage = useMemo(() => {
+  const headsUpContent = useMemo((): ReactNode => {
     if (state.phase === 'round-end') {
-      return state.roundSummary || 'Round over';
+      const roundCardPoints = state.roundCardPoints;
+      const roundValues = Object.values(roundCardPoints);
+      const maxPoints = roundValues.length > 0 ? Math.max(...roundValues) : 0;
+      const mostPointIds = state.players.filter(p => (roundCardPoints[p.id] ?? 0) === maxPoints).map(p => p.id);
+      const gotMostPoint = mostPointIds.length === 1 ? mostPointIds[0] : null;
+      const pointsChunks = state.players.map((player) => (
+        <span key={player.id} style={{ color: getPlayerColorHex(player) }}>
+          {player.name}: {roundCardPoints[player.id] ?? 0}
+        </span>
+      ));
+      const pointsLine = (
+        <>
+          Round card points (
+          {pointsChunks.reduce<ReactNode[]>((acc, node, i) => (i === 0 ? [node] : [...acc, ' · ', node]), [])}
+          )
+        </>
+      );
+      const mostPointsLine = gotMostPoint === null ? (
+        'Most-points bonus tied — no one scores it.'
+      ) : (
+        <>
+          <span style={{ color: getPlayerColorHex(state.players.find(p => p.id === gotMostPoint)!) }}>
+            {state.players.find(p => p.id === gotMostPoint)?.name ?? 'Player'}
+          </span>
+          {' took the most points and earns +1.'}
+        </>
+      );
+      const lastTrickLine = state.lastTrickWinnerId === null ? (
+        'Last-trick bonus unavailable.'
+      ) : (
+        <>
+          <span style={{ color: getPlayerColorHex(state.players.find(p => p.id === state.lastTrickWinnerId)!) }}>
+            {state.players.find(p => p.id === state.lastTrickWinnerId)?.name ?? 'Player'}
+          </span>
+          {' won the last trick and earns +1.'}
+        </>
+      );
+      return (
+        <>
+          {pointsLine}. {mostPointsLine} {lastTrickLine}
+        </>
+      );
     }
     if (state.phase === 'announcement' && state.announcement) {
-      const playerName = state.players.find(player => player.id === state.announcement?.playerId)?.name ?? 'Player';
+      const player = state.players.find(p => p.id === state.announcement?.playerId);
+      if (!player) return null;
       if (state.announcement.kind === 'set-trump') {
-        return `${playerName} set trump to ${state.announcement.suit}`;
+        return (
+          <>
+            <span style={{ color: getPlayerColorHex(player) }}>{player.name}</span>
+            {` set trump to ${state.announcement.suit}`}
+          </>
+        );
       }
-      return `${playerName} called shog in ${state.announcement.suit}`;
+      return (
+        <>
+          <span style={{ color: getPlayerColorHex(player) }}>{player.name}</span>
+          {` called shog in ${state.announcement.suit}`}
+        </>
+      );
     }
-    if (state.phase === 'flipping') return '';
+    if (state.phase === 'flipping') return null;
     if (state.trickWinner) {
-      const winnerName = state.players.find(player => player.id === state.trickWinner)?.name ?? 'Player';
-      return `${winnerName} won the trick`;
+      const winner = state.players.find(p => p.id === state.trickWinner);
+      if (!winner) return null;
+      return (
+        <>
+          <span style={{ color: getPlayerColorHex(winner) }}>{winner.name}</span>
+          {' won the trick'}
+        </>
+      );
     }
     if (isMyTurn) return 'Your turn';
-    return `Waiting for ${state.players[state.currentPlayerIndex]?.name ?? 'player'}`;
-  }, [state.phase, state.roundSummary, state.announcement, state.trickWinner, state.players, state.currentPlayerIndex, isMyTurn]);
+    const waitingPlayer = state.players[state.currentPlayerIndex];
+    if (!waitingPlayer) return null;
+    return (
+      <>
+        {'Waiting for '}
+        <span style={{ color: getPlayerColorHex(waitingPlayer) }}>{waitingPlayer.name}</span>
+      </>
+    );
+  }, [state.phase, state.roundCardPoints, state.lastTrickWinnerId, state.announcement, state.trickWinner, state.players, state.currentPlayerIndex, isMyTurn]);
 
   useEffect(() => {
     const element = tableRef.current;
@@ -451,8 +521,11 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
       <div className="twelve-statusRow">
         <div className="twelve-statusCol">
           <div className="river-headsUp" aria-live="polite">
-            <p className={`river-headsUpText ${state.phase === 'round-end' ? 'river-headsUpText--roundEnd' : ''}`}>
-              {headsUpMessage || '\u00a0'}
+            <p
+              className={`river-headsUpText ${state.phase === 'round-end' ? 'river-headsUpText--roundEnd' : ''}`}
+              aria-label={state.phase === 'round-end' ? state.roundSummary : undefined}
+            >
+              {headsUpContent ?? '\u00a0'}
             </p>
           </div>
         </div>

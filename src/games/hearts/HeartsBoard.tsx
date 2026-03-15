@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { HeartsState, Card, Suit, HeartsPlayer } from './types';
@@ -32,6 +33,10 @@ function placementLabel(position: number): string {
   if (position % 10 === 2) return `${position}nd`;
   if (position % 10 === 3) return `${position}rd`;
   return `${position}th`;
+}
+
+function getPlayerColorHex(player: HeartsPlayer): string {
+  return PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
 }
 
 function getFittedTextSize(text: string, availableWidth: number, minSize: number, maxSize: number): number {
@@ -196,30 +201,46 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
     return getSeatForPlayerIndex(winnerIndex, myIndex, state.players.length);
   }, [state.trickWinner, state.players, myIndex]);
 
-  const trickWinnerName = useMemo(
-    () => state.players.find(p => p.id === state.trickWinner)?.name,
+  const trickWinnerPlayer = useMemo(
+    () => (state.trickWinner ? state.players.find(p => p.id === state.trickWinner) ?? null : null),
     [state.players, state.trickWinner],
   );
   const trickExitOffset = useMemo(() => getTrickExitOffset(trickWinnerSeat), [trickWinnerSeat]);
 
-  const headsUpMessage = useMemo(() => {
+  const headsUpContent = useMemo((): ReactNode => {
     if (state.phase === 'passing') {
       if (myPassConfirmed) {
         const waitingOn = state.players.filter(p => !p.isBot && !state.passConfirmed[p.id]);
         if (waitingOn.length > 0) {
-          return `Waiting on ${waitingOn.map(p => p.name).join(', ')}...`;
+          return (
+            <>
+              {'Waiting on '}
+              {waitingOn.map((p, i) => (
+                <span key={p.id}>
+                  {i > 0 && ', '}
+                  <span style={{ color: getPlayerColorHex(p) }}>{p.name}</span>
+                </span>
+              ))}
+              ...
+            </>
+          );
         }
         return 'All players confirmed. Starting round...';
       }
       return `Pass 3 cards ${state.passDirection} · Selected ${selectedPass.length}/3`;
     }
-    if (state.trickWinner && trickWinnerName) {
-      return `${trickWinnerName} won the trick`;
+    if (state.trickWinner && trickWinnerPlayer) {
+      return (
+        <>
+          <span style={{ color: getPlayerColorHex(trickWinnerPlayer) }}>{trickWinnerPlayer.name}</span>
+          {' won the trick'}
+        </>
+      );
     }
     if (state.phase === 'playing' && isMyTurn) {
       return 'Your turn';
     }
-    return '';
+    return null;
   }, [
     state.phase,
     state.passDirection,
@@ -228,7 +249,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
     state.players,
     state.passConfirmed,
     state.trickWinner,
-    trickWinnerName,
+    trickWinnerPlayer,
     isMyTurn,
   ]);
 
@@ -391,7 +412,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
 
       <div className="hearts-headsUp" aria-live="polite">
         <p className="hearts-headsUpText">
-          {headsUpMessage || '\u00a0'}
+          {headsUpContent ?? '\u00a0'}
         </p>
       </div>
 

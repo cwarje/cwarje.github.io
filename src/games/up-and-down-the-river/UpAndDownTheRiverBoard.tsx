@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Card, Suit, UpRiverPlayer, UpRiverState } from './types';
@@ -113,6 +114,10 @@ function getTrickSlotPlacement(playerCount: number, relativeIndex: number): Tric
   };
 }
 
+function getPlayerColorHex(player: UpRiverPlayer): string {
+  return PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+}
+
 export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZoomed = false }: UpRiverBoardProps) {
   const myIndex = state.players.findIndex(player => player.id === myId);
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
@@ -196,30 +201,80 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
     };
   }, [trickWinnerRelativeSeat, seatLayouts]);
 
-  const headsUpMessage = useMemo(() => {
+  const roundEndAriaLabel = useMemo(() => {
+    if (state.phase !== 'round-end') return undefined;
+    const madeBidNames = state.players
+      .filter(player => player.bid !== null && player.bid === player.tricksWon)
+      .map(player => (player.id === myId ? 'You' : player.name));
+    const missedBidNames = state.players
+      .filter(player => player.bid === null || player.bid !== player.tricksWon)
+      .map(player => (player.id === myId ? 'You' : player.name));
+    const madeBidText = madeBidNames.length > 0 ? madeBidNames.join(', ') : 'None';
+    const missedBidText = missedBidNames.length > 0 ? missedBidNames.join(', ') : 'None';
+    return `Made bid: ${madeBidText} · Missed bid: ${missedBidText}`;
+  }, [state.phase, state.players, myId]);
+
+  const headsUpContent = useMemo((): ReactNode => {
     if (state.phase === 'round-end') {
-      const madeBidNames = state.players
-        .filter(player => player.bid !== null && player.bid === player.tricksWon)
-        .map(player => (player.id === myId ? 'You' : player.name));
-      const missedBidNames = state.players
-        .filter(player => player.bid === null || player.bid !== player.tricksWon)
-        .map(player => (player.id === myId ? 'You' : player.name));
-      const madeBidText = madeBidNames.length > 0 ? madeBidNames.join(', ') : 'None';
-      const missedBidText = missedBidNames.length > 0 ? missedBidNames.join(', ') : 'None';
-      return `Made bid: ${madeBidText} · Missed bid: ${missedBidText}`;
+      const madeBidPlayers = state.players.filter(
+        player => player.bid !== null && player.bid === player.tricksWon,
+      );
+      const missedBidPlayers = state.players.filter(
+        player => player.bid === null || player.bid !== player.tricksWon,
+      );
+      return (
+        <>
+          {'Made bid: '}
+          {madeBidPlayers.length > 0 ? (
+            madeBidPlayers.map((p, i) => (
+              <span key={p.id}>
+                {i > 0 && ', '}
+                {p.id === myId ? 'You' : <span style={{ color: getPlayerColorHex(p) }}>{p.name}</span>}
+              </span>
+            ))
+          ) : (
+            'None'
+          )}
+          {' · Missed bid: '}
+          {missedBidPlayers.length > 0 ? (
+            missedBidPlayers.map((p, i) => (
+              <span key={p.id}>
+                {i > 0 && ', '}
+                {p.id === myId ? 'You' : <span style={{ color: getPlayerColorHex(p) }}>{p.name}</span>}
+              </span>
+            ))
+          ) : (
+            'None'
+          )}
+        </>
+      );
     }
 
     if (state.phase === 'bidding') {
       if (isMyTurn) return 'Your turn to bid';
-      return `Waiting for ${state.players[state.currentPlayerIndex]?.name ?? 'player'} to bid`;
+      const waitingPlayer = state.players[state.currentPlayerIndex];
+      if (!waitingPlayer) return null;
+      return (
+        <>
+          {'Waiting for '}
+          <span style={{ color: getPlayerColorHex(waitingPlayer) }}>{waitingPlayer.name}</span>
+          {' to bid'}
+        </>
+      );
     }
     if (state.phase === 'playing' && state.trickWinner) {
-      const winnerName = state.players.find(player => player.id === state.trickWinner)?.name ?? 'Player';
-      return `${winnerName} won the trick`;
+      const winner = state.players.find(player => player.id === state.trickWinner);
+      if (!winner) return null;
+      return (
+        <>
+          <span style={{ color: getPlayerColorHex(winner) }}>{winner.name}</span>
+          {' won the trick'}
+        </>
+      );
     }
     if (state.phase === 'playing' && isMyTurn) return 'Your turn';
-    return '';
-  }, [state.phase, state.players, state.currentPlayerIndex, state.trickWinner, isMyTurn]);
+    return null;
+  }, [state.phase, state.players, state.currentPlayerIndex, state.trickWinner, isMyTurn, myId]);
 
   useEffect(() => {
     const element = tableRef.current;
@@ -434,8 +489,11 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
       </div>
 
       <div className="river-headsUp" aria-live="polite">
-        <p className={`river-headsUpText ${state.phase === 'round-end' ? 'river-headsUpText--roundEnd' : ''}`}>
-          {headsUpMessage || '\u00a0'}
+        <p
+          className={`river-headsUpText ${state.phase === 'round-end' ? 'river-headsUpText--roundEnd' : ''}`}
+          aria-label={roundEndAriaLabel}
+        >
+          {headsUpContent ?? '\u00a0'}
         </p>
       </div>
 

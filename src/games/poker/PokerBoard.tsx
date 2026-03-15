@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, ChevronUp, ChevronDown, Play, LogOut } from 'lucide-react';
@@ -69,6 +70,11 @@ function getPokerLayoutRadii(playerCount: number): { seatRadiusX: number; seatRa
   if (playerCount === 4) return { seatRadiusX: 36, seatRadiusY: 30 };
   if (playerCount === 3) return { seatRadiusX: 32, seatRadiusY: 28 };
   return { seatRadiusX: 28, seatRadiusY: 24 }; // 2
+}
+
+function getPlayerColorHex(player: PokerPlayer): string {
+  const color = normalizePlayerColor((player as { color?: string }).color ?? null);
+  return PLAYER_COLOR_HEX[color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
 }
 
 interface PokerSeatLayout {
@@ -152,21 +158,45 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
     });
   }, [state.players, anchorIndex]);
 
-  const headsUpMessage = useMemo(() => {
+  const headsUpContent = useMemo((): ReactNode => {
     if (state.gameOver && state.winners.length > 0) {
-      const names = state.winners.map(w => {
-        const p = state.players.find(x => x.id === w.playerId);
-        return p?.id === myId ? 'You' : (p?.name ?? w.playerId);
-      });
-      return names.length === 1
-        ? (names[0] === 'You' ? 'You win the hand' : `${names[0]} wins the hand`)
-        : `${names.join(' and ')} win the hand`;
+      const winnerPlayers = state.winners
+        .map(w => state.players.find(x => x.id === w.playerId))
+        .filter((p): p is PokerPlayer => !!p);
+      if (winnerPlayers.length === 1) {
+        const p = winnerPlayers[0];
+        if (p.id === myId) return 'You win the hand';
+        return (
+          <>
+            <span style={{ color: getPlayerColorHex(p) }}>{p.name}</span>
+            {' wins the hand'}
+          </>
+        );
+      }
+      return (
+        <>
+          {winnerPlayers.map((p, i) => (
+            <span key={p.id}>
+              {i > 0 && ' and '}
+              {p.id === myId ? 'You' : <span style={{ color: getPlayerColorHex(p) }}>{p.name}</span>}
+            </span>
+          ))}
+          {' win the hand'}
+        </>
+      );
     }
     if (state.gameOver && state.sessionOver) return 'Session over';
     if (state.gameOver && !state.sessionOver) return 'Hand over — waiting for host to deal next hand';
     if (!state.gameOver && currentPlayer) {
-      const name = currentPlayer.id === myId ? 'Your' : `${currentPlayer.name}'s`;
-      return `${state.street.charAt(0).toUpperCase() + state.street.slice(1)} · ${name} turn`;
+      const streetCapitalized = state.street.charAt(0).toUpperCase() + state.street.slice(1);
+      if (currentPlayer.id === myId) {
+        return `${streetCapitalized} · Your turn`;
+      }
+      return (
+        <>
+          {streetCapitalized} · <span style={{ color: getPlayerColorHex(currentPlayer) }}>{currentPlayer.name}</span>'s turn
+        </>
+      );
     }
     return '\u00a0';
   }, [state.gameOver, state.sessionOver, state.winners, state.players, state.street, currentPlayer, myId]);
@@ -272,7 +302,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
       </div>
 
       <div className="poker-headsUp" aria-live="polite">
-        <p className="poker-headsUpText">{headsUpMessage || '\u00a0'}</p>
+        <p className="poker-headsUpText">{headsUpContent ?? '\u00a0'}</p>
       </div>
 
       {showHandWinners ? (
