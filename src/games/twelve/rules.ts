@@ -20,17 +20,12 @@ export function rankDisplay(rank: number): string {
   return String(rank);
 }
 
-const RANK_STRENGTH: Record<Rank, number> = {
-  6: 6,
-  7: 7,
-  8: 8,
-  9: 9,
-  10: 13,
-  11: 10,
-  12: 11,
-  13: 12,
-  14: 14,
-};
+// Twelve uses Ace-Ten ordering: 6-9, J, Q, K, 10, A.
+const TRICK_RANK_ORDER: Rank[] = [6, 7, 8, 9, 11, 12, 13, 10, 14];
+const RANK_STRENGTH = TRICK_RANK_ORDER.reduce<Record<Rank, number>>((strengths, rank, index) => {
+  strengths[rank] = index;
+  return strengths;
+}, {} as Record<Rank, number>);
 
 export function rankStrength(rank: Rank): number {
   return RANK_STRENGTH[rank];

@@ -246,8 +246,13 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
       })
     : [];
   const canUseActionButtons = state.phase === 'playing' && isMyTurn && !state.trickWinner;
-  const canSetTrump = !!myPlayer && canUseActionButtons && state.trumpSuit === null && myPlayer.totalScore < 10;
-  const canCallShog = !!myPlayer && canUseActionButtons && state.trumpSuit !== null && myPlayer.totalScore < 11;
+  const canAnnounceTrumpOrShog =
+    !!myPlayer
+    && canUseActionButtons
+    && state.currentTrick.length === 0
+    && state.lastTrickWinnerId === myPlayer.id;
+  const canSetTrump = canAnnounceTrumpOrShog && state.trumpSuit === null && !!myPlayer && myPlayer.totalScore < 10;
+  const canCallShog = canAnnounceTrumpOrShog && state.trumpSuit !== null && !!myPlayer && myPlayer.totalScore < 11;
   const showSetTrumpActions = canSetTrump && myRoyalSuits.length > 0;
   const showCallShogActions = canCallShog && myShogSuits.length > 0;
 

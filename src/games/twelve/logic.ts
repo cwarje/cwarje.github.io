@@ -190,12 +190,16 @@ function endRound(state: TwelveState): TwelveState {
 }
 
 function canSetTrump(state: TwelveState, player: TwelvePlayer): boolean {
+  if (state.currentTrick.length !== 0) return false;
+  if (state.lastTrickWinnerId !== player.id) return false;
   if (state.trumpSuit !== null) return false;
   if (player.totalScore >= 10) return false;
   return suitsWithRoyalPair(player).length > 0;
 }
 
 function canCallShog(state: TwelveState, player: TwelvePlayer, suit: Suit): boolean {
+  if (state.currentTrick.length !== 0) return false;
+  if (state.lastTrickWinnerId !== player.id) return false;
   if (state.trumpSuit === null) return false;
   if (player.totalScore >= 11) return false;
   if (player.shogSuitsCalled.includes(suit)) return false;
@@ -432,20 +436,440 @@ export function isTwelveOver(state: unknown): boolean {
   return (state as TwelveState).gameOver;
 }
 
+interface BotPlayOption {
+  card: Card;
+  source: 'hand' | 'pile';
+  pileIndex?: number;
+  fromTop?: boolean;
+}
+
+interface EndgameInfo {
+  remainingCards: number;
+  remainingTricks: number;
+  isLate: boolean;
+  isVeryLate: boolean;
+}
+
+function createSuitCounter(): Record<Suit, number> {
+  return { clubs: 0, diamonds: 0, spades: 0, hearts: 0 };
+}
+
+function countRemainingCards(player: TwelvePlayer): number {
+  let count = player.hand.length;
+  for (const pile of player.frontPiles) {
+    if (pile.topCard) count += 1;
+    if (pile.bottomCard) count += 1;
+  }
+  return count;
+}
+
+function estimateEndgame(state: TwelveState): EndgameInfo {
+  const remainingCards = state.players.reduce((sum, player) => sum + countRemainingCards(player), 0);
+  const remainingTricks = Math.ceil(remainingCards / Math.max(1, state.players.length));
+  return {
+    remainingCards,
+    remainingTricks,
+    isLate: remainingTricks <= 3,
+    isVeryLate: remainingTricks <= 2,
+  };
+}
+
+function getCurrentTrickPointValue(state: TwelveState): number {
+  return state.currentTrick.reduce((sum, entry) => sum + cardPointValue(entry.card), 0);
+}
+
+function getCurrentTrickLeaderId(state: TwelveState): string | null {
+  if (state.currentTrick.length === 0) return null;
+  return getTrickWinnerPlayerId(state.currentTrick, state.trumpSuit);
+}
+
+function getVisibleCards(player: TwelvePlayer): Card[] {
+  const cards: Card[] = [];
+  for (const pile of player.frontPiles) {
+    if (pile.topCard) cards.push(pile.topCard);
+    if (pile.bottomCard && pile.bottomFaceUp && !pile.topCard) cards.push(pile.bottomCard);
+  }
+  return cards;
+}
+
+function getVisibleSuitCounts(player: TwelvePlayer): Record<Suit, number> {
+  const counts = createSuitCounter();
+  for (const card of getVisibleCards(player)) {
+    counts[card.suit] += 1;
+  }
+  return counts;
+}
+
+function getPublicRoyalPairSuits(player: TwelvePlayer): Suit[] {
+  const cards = getVisibleCards(player);
+  return SUITS.filter((suit) => {
+    const hasQ = cards.some(card => card.suit === suit && card.rank === 12);
+    const hasK = cards.some(card => card.suit === suit && card.rank === 13);
+    return hasQ && hasK;
+  });
+}
+
+function getKnownVoidSuitsFromCurrentTrick(state: TwelveState): Record<string, Set<Suit>> {
+  const voids: Record<string, Set<Suit>> = {};
+  if (state.currentTrick.length === 0) return voids;
+  const leadSuit = state.currentTrick[0].card.suit;
+  for (const entry of state.currentTrick.slice(1)) {
+    if (entry.card.suit !== leadSuit) {
+      voids[entry.playerId] = voids[entry.playerId] ?? new Set<Suit>();
+      voids[entry.playerId].add(leadSuit);
+    }
+  }
+  return voids;
+}
+
+function getRoundRaceInfo(state: TwelveState, myPlayerId: string): {
+  myPoints: number;
+  leaderId: string | null;
+  leaderPoints: number;
+  isUniqueLeader: boolean;
+} {
+  const roundPoints = getRoundCardPoints(state.players);
+  const myPoints = roundPoints[myPlayerId] ?? 0;
+  let leaderId: string | null = null;
+  let leaderPoints = -1;
+  let ties = 0;
+  for (const player of state.players) {
+    const points = roundPoints[player.id] ?? 0;
+    if (points > leaderPoints) {
+      leaderPoints = points;
+      leaderId = player.id;
+      ties = 1;
+    } else if (points === leaderPoints) {
+      ties += 1;
+    }
+  }
+  return {
+    myPoints,
+    leaderId,
+    leaderPoints: Math.max(0, leaderPoints),
+    isUniqueLeader: ties === 1 && leaderId !== null,
+  };
+}
+
+function estimateDeclarationThreat(state: TwelveState, player: TwelvePlayer, isCurrentLeader: boolean): number {
+  if (state.trumpSuit !== null || player.totalScore >= 10) return 0;
+  let threat = 0;
+  const publicPairs = getPublicRoyalPairSuits(player);
+  if (publicPairs.length > 0) threat += 3 + publicPairs.length;
+  if (isCurrentLeader) threat += 2;
+  if (player.totalScore <= 7) threat += 1;
+  return threat;
+}
+
+function findDangerousSetTrumpOpponentId(state: TwelveState, myPlayerId: string): string | null {
+  if (state.trumpSuit !== null) return null;
+  const currentLeaderId = getCurrentTrickLeaderId(state);
+  let bestId: string | null = null;
+  let bestScore = 0;
+  for (const player of state.players) {
+    if (player.id === myPlayerId) continue;
+    const score = estimateDeclarationThreat(state, player, player.id === currentLeaderId);
+    if (score > bestScore) {
+      bestScore = score;
+      bestId = player.id;
+    }
+  }
+  return bestId;
+}
+
+function listLegalBotOptions(state: TwelveState, playerIndex: number): BotPlayOption[] {
+  const player = state.players[playerIndex];
+  if (!player) return [];
+  return listPlayableCards(player).filter((entry) => {
+    if (entry.source === 'hand') return isLegalPlay(state, playerIndex, entry.card, 'hand');
+    return isLegalPlay(state, playerIndex, entry.card, 'pile', entry.pileIndex);
+  }).map((entry) => ({
+    card: entry.card,
+    source: entry.source,
+    pileIndex: entry.pileIndex,
+    fromTop: entry.fromTop,
+  }));
+}
+
+function scorePileVsHand(option: BotPlayOption, player: TwelvePlayer): number {
+  if (option.source === 'hand') return 0.7;
+  const pile = player.frontPiles[option.pileIndex ?? -1];
+  if (!pile) return 0;
+  let score = -0.4;
+  if (option.fromTop && pile.bottomCard && !pile.bottomFaceUp) {
+    score -= 1.5;
+    score -= cardPointValue(pile.bottomCard) * 0.35;
+    score -= rankStrength(pile.bottomCard.rank) * 0.2;
+    if (pile.bottomCard.rank === 12 || pile.bottomCard.rank === 13) score -= 0.8;
+  } else if (option.fromTop === false) {
+    score += 0.8;
+  }
+  return score;
+}
+
+function wouldLeadCurrentTrick(state: TwelveState, player: TwelvePlayer, option: BotPlayOption): boolean {
+  const next = [...state.currentTrick, { playerId: player.id, card: option.card }];
+  return getTrickWinnerPlayerId(next, state.trumpSuit) === player.id;
+}
+
+function scoreLeadOption(
+  state: TwelveState,
+  playerIndex: number,
+  option: BotPlayOption,
+  dangerousOpponentId: string | null,
+  endgame: EndgameInfo,
+  roundRace: ReturnType<typeof getRoundRaceInfo>,
+): number {
+  const player = state.players[playerIndex];
+  const card = option.card;
+  let score = 0;
+  score -= rankStrength(card.rank) * 0.8;
+  score -= cardPointValue(card) * 0.45;
+
+  if (state.trumpSuit !== null) {
+    if (card.suit === state.trumpSuit) {
+      score += 1.2 + rankStrength(card.rank) * 0.25;
+    } else {
+      score -= 0.6;
+    }
+  }
+
+  if (dangerousOpponentId) {
+    const dangerousPlayer = state.players.find(p => p.id === dangerousOpponentId);
+    if (dangerousPlayer) {
+      const visibleCounts = getVisibleSuitCounts(dangerousPlayer);
+      score += visibleCounts[card.suit] * 1.25;
+    }
+  }
+
+  if (state.trumpSuit === null && player.totalScore <= 9 && suitsWithRoyalPair(player).length > 0) {
+    score += rankStrength(card.rank) * 0.35;
+  }
+
+  if (endgame.isLate) score += rankStrength(card.rank) * 0.75;
+  if (endgame.isVeryLate) score += cardPointValue(card) * 0.6;
+  if (roundRace.isUniqueLeader && roundRace.leaderId === player.id) {
+    score += cardPointValue(card) * 0.2;
+  }
+
+  score += scorePileVsHand(option, player);
+  return score;
+}
+
+function scoreFollowSuitOption(
+  state: TwelveState,
+  playerIndex: number,
+  option: BotPlayOption,
+  dangerousOpponentId: string | null,
+  endgame: EndgameInfo,
+  roundRace: ReturnType<typeof getRoundRaceInfo>,
+): number {
+  const player = state.players[playerIndex];
+  const card = option.card;
+  const trickPoints = getCurrentTrickPointValue(state);
+  const currentLeader = getCurrentTrickLeaderId(state);
+  const dangerousLeads = !!dangerousOpponentId && currentLeader === dangerousOpponentId;
+  const wouldLead = wouldLeadCurrentTrick(state, player, option);
+  let score = 0;
+
+  if (wouldLead) {
+    score -= 3.5;
+    score -= cardPointValue(card) * 0.4;
+    score -= rankStrength(card.rank) * 0.35;
+    if (dangerousLeads) score += 8;
+    if (trickPoints >= 10) score += 4 + trickPoints * 0.25;
+    if (roundRace.isUniqueLeader && roundRace.leaderId === currentLeader) score += 2.2;
+    if (state.trumpSuit === null && player.totalScore <= 9 && suitsWithRoyalPair(player).length > 0) score += 3;
+    if (endgame.isLate) score += 8;
+    if (endgame.isVeryLate) score += 3;
+  } else {
+    score += rankStrength(card.rank) * 0.6;
+    score -= cardPointValue(card) * 0.15;
+    if (endgame.isVeryLate) score -= 2;
+  }
+
+  if (
+    state.trumpSuit === null
+    && (card.rank === 12 || card.rank === 13)
+    && suitsWithRoyalPair(player).includes(card.suit)
+  ) {
+    score -= 1.2;
+  }
+
+  score += scorePileVsHand(option, player);
+  return score;
+}
+
+function scoreDiscardOption(
+  state: TwelveState,
+  playerIndex: number,
+  option: BotPlayOption,
+  dangerousOpponentId: string | null,
+  endgame: EndgameInfo,
+  roundRace: ReturnType<typeof getRoundRaceInfo>,
+): number {
+  const player = state.players[playerIndex];
+  const card = option.card;
+  const trickPoints = getCurrentTrickPointValue(state);
+  const currentLeader = getCurrentTrickLeaderId(state);
+  const dangerousLeads = !!dangerousOpponentId && currentLeader === dangerousOpponentId;
+  const wouldLead = wouldLeadCurrentTrick(state, player, option);
+  let score = 0;
+
+  if (wouldLead) {
+    score -= 2;
+    score -= rankStrength(card.rank) * 0.3;
+    if (dangerousLeads) score += 9;
+    if (trickPoints > 0) score += trickPoints * 0.5;
+    if (roundRace.isUniqueLeader && roundRace.leaderId === currentLeader) score += 2.6;
+    if (endgame.isLate) score += 8;
+    if (endgame.isVeryLate) score += 3.2;
+  } else {
+    score += rankStrength(card.rank) * 0.7;
+    score += cardPointValue(card) * 0.4;
+    if (state.trumpSuit !== null && card.suit === state.trumpSuit) score -= 1;
+
+    if (
+      state.trumpSuit === null
+      && player.totalScore <= 10
+      && (card.rank === 12 || card.rank === 13)
+      && suitsWithRoyalPair(player).includes(card.suit)
+    ) {
+      score -= 2.5;
+    }
+
+    if (endgame.isVeryLate) score -= 1.5;
+  }
+
+  score += scorePileVsHand(option, player);
+  return score;
+}
+
+function pickBestScoredOption(
+  options: BotPlayOption[],
+  scorer: (option: BotPlayOption) => number,
+): BotPlayOption | null {
+  if (options.length === 0) return null;
+  let best = options[0];
+  let bestScore = scorer(best);
+  for (const option of options.slice(1)) {
+    const score = scorer(option);
+    if (score > bestScore) {
+      best = option;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
 function chooseBotCard(state: TwelveState, playerIndex: number): { type: 'hand'; card: Card } | { type: 'pile'; pileIndex: number } | null {
   const player = state.players[playerIndex];
   if (!player) return null;
 
-  const options = listPlayableCards(player).filter((entry) => {
-    if (entry.source === 'hand') return isLegalPlay(state, playerIndex, entry.card, 'hand');
-    return isLegalPlay(state, playerIndex, entry.card, 'pile', entry.pileIndex);
-  });
+  const options = listLegalBotOptions(state, playerIndex);
   if (options.length === 0) return null;
 
-  const sorted = [...options].sort((a, b) => rankStrength(a.card.rank) - rankStrength(b.card.rank));
-  const chosen = sorted[0];
+  const voidInfo = getKnownVoidSuitsFromCurrentTrick(state);
+  const dangerousOpponentId = findDangerousSetTrumpOpponentId(state, player.id);
+  const endgame = estimateEndgame(state);
+  const roundRace = getRoundRaceInfo(state, player.id);
+  const leadSuit = state.currentTrick[0]?.card.suit ?? null;
+
+  let chosen: BotPlayOption | null = null;
+  if (!leadSuit) {
+    chosen = pickBestScoredOption(
+      options,
+      option => scoreLeadOption(state, playerIndex, option, dangerousOpponentId, endgame, roundRace),
+    );
+  } else {
+    const followSuitOptions = options.filter(option => option.card.suit === leadSuit);
+    if (followSuitOptions.length > 0) {
+      chosen = pickBestScoredOption(
+        followSuitOptions,
+        option => scoreFollowSuitOption(state, playerIndex, option, dangerousOpponentId, endgame, roundRace),
+      );
+    } else {
+      chosen = pickBestScoredOption(
+        options,
+        option => scoreDiscardOption(state, playerIndex, option, dangerousOpponentId, endgame, roundRace),
+      );
+    }
+  }
+
+  if (!chosen) return null;
+  if (dangerousOpponentId && voidInfo[dangerousOpponentId]?.has(chosen.card.suit)) {
+    const fallback = options.find(option => option.card.suit !== chosen?.card.suit);
+    if (fallback) chosen = fallback;
+  }
+
   if (chosen.source === 'hand') return { type: 'hand', card: chosen.card };
   return { type: 'pile', pileIndex: chosen.pileIndex ?? 0 };
+}
+
+function scoreSetTrumpSuit(state: TwelveState, playerIndex: number, suit: Suit): number {
+  const player = state.players[playerIndex];
+  const pairs = suitsWithRoyalPair(player);
+  if (!pairs.includes(suit)) return Number.NEGATIVE_INFINITY;
+  const playable = listPlayableCards(player).map(entry => entry.card);
+  const inSuit = playable.filter(card => card.suit === suit);
+  const controlValue = inSuit.reduce((sum, card) => sum + rankStrength(card.rank), 0);
+  const futureShogPairs = pairs.filter(pairSuit => pairSuit !== suit).length;
+  const preservationCost = inSuit.reduce((sum, card) => sum + cardPointValue(card) + rankStrength(card.rank) * 0.4, 0);
+  const dangerousOpponentId = findDangerousSetTrumpOpponentId(state, player.id);
+  const immediateFinish = player.totalScore + 2 >= 12;
+  const runwayPenalty = player.totalScore === 9 ? 4.2 : player.totalScore === 8 ? 2.2 : 0;
+  return 10
+    + controlValue * 0.12
+    + futureShogPairs * 2.2
+    - (pairs.length > 1 ? preservationCost * 0.14 : 0)
+    + (dangerousOpponentId ? 3.2 : 0)
+    + (immediateFinish ? 8 : 0)
+    - runwayPenalty;
+}
+
+function chooseSetTrumpSuit(state: TwelveState, playerIndex: number): { suit: Suit; score: number } | null {
+  const player = state.players[playerIndex];
+  const pairs = suitsWithRoyalPair(player);
+  if (pairs.length === 0) return null;
+  let bestSuit = pairs[0];
+  let bestScore = scoreSetTrumpSuit(state, playerIndex, bestSuit);
+  for (const suit of pairs.slice(1)) {
+    const score = scoreSetTrumpSuit(state, playerIndex, suit);
+    if (score > bestScore) {
+      bestSuit = suit;
+      bestScore = score;
+    }
+  }
+  return { suit: bestSuit, score: bestScore };
+}
+
+function scoreShogSuit(state: TwelveState, playerIndex: number, suit: Suit): number {
+  const player = state.players[playerIndex];
+  if (!canCallShog(state, player, suit)) return Number.NEGATIVE_INFINITY;
+  const endgame = estimateEndgame(state);
+  let score = 6.5;
+  if (player.totalScore === 10) score += 2.2;
+  if (player.totalScore + 1 >= 12) score += 4.2;
+  if (endgame.isLate) score += 1.4;
+  return score;
+}
+
+function chooseShogSuit(state: TwelveState, playerIndex: number): { suit: Suit; score: number } | null {
+  const player = state.players[playerIndex];
+  const suits = suitsWithRoyalPair(player)
+    .filter(suit => !player.shogSuitsCalled.includes(suit))
+    .filter(suit => !(state.trumpSetterId === player.id && suit === state.trumpSuit));
+  if (suits.length === 0) return null;
+  let bestSuit = suits[0];
+  let bestScore = scoreShogSuit(state, playerIndex, bestSuit);
+  for (const suit of suits.slice(1)) {
+    const score = scoreShogSuit(state, playerIndex, suit);
+    if (score > bestScore) {
+      bestSuit = suit;
+      bestScore = score;
+    }
+  }
+  return { suit: bestSuit, score: bestScore };
 }
 
 export function runTwelveBotTurn(state: unknown): unknown {
@@ -458,19 +882,17 @@ export function runTwelveBotTurn(state: unknown): unknown {
   const currentPlayer = s.players[s.currentPlayerIndex];
   if (!currentPlayer?.isBot) return state;
 
-  if (s.trumpSuit === null && currentPlayer.totalScore <= 9) {
-    const pairs = suitsWithRoyalPair(currentPlayer);
-    if (pairs.length > 0 && Math.random() < 0.55) {
-      return processTwelveAction(s, { type: 'set-trump', suit: pairs[0] }, currentPlayer.id);
+  if (s.currentTrick.length === 0 && canSetTrump(s, currentPlayer)) {
+    const choice = chooseSetTrumpSuit(s, s.currentPlayerIndex);
+    if (choice && choice.score >= 8.5) {
+      return processTwelveAction(s, { type: 'set-trump', suit: choice.suit }, currentPlayer.id);
     }
   }
 
-  if (s.trumpSuit !== null && currentPlayer.totalScore <= 10) {
-    const suits = suitsWithRoyalPair(currentPlayer)
-      .filter(suit => !currentPlayer.shogSuitsCalled.includes(suit))
-      .filter(suit => !(s.trumpSetterId === currentPlayer.id && suit === s.trumpSuit));
-    if (suits.length > 0 && Math.random() < 0.45) {
-      return processTwelveAction(s, { type: 'call-shog', suit: suits[0] }, currentPlayer.id);
+  if (s.currentTrick.length === 0 && s.trumpSuit !== null) {
+    const choice = chooseShogSuit(s, s.currentPlayerIndex);
+    if (choice && choice.score >= 6) {
+      return processTwelveAction(s, { type: 'call-shog', suit: choice.suit }, currentPlayer.id);
     }
   }
 
