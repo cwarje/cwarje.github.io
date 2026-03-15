@@ -442,7 +442,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     info: {
       goal: 'Reach 12 game points by timing trump and shog calls, winning round points, and taking the last trick.',
       rules: [
-        'Play uses a 36-card deck: 6 through Ace in each suit (2-5 removed). Aces are high.',
+        'Play uses a 36-card deck: 6 through Ace in each suit (2-5 removed). Rank order is 6-9, J, Q, K, 10, A (Aces high).',
         'At round start, each player gets table piles chosen at launch: one face-down card with one face-up card on top of each pile. Remaining cards are dealt to hand.',
         'On your turn, play either a hand card or the exposed top card from one of your table piles.',
         'You must follow suit if able (from either hand or exposed pile cards). If you cannot, you may play any card.',

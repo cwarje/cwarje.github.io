@@ -1,4 +1,4 @@
-import type { Card, FrontPile, Suit, TwelvePlayer, TwelveState } from './types';
+import type { Card, FrontPile, Rank, Suit, TwelvePlayer, TwelveState } from './types';
 
 export interface PlayableCard {
   card: Card;
@@ -18,6 +18,22 @@ export function rankDisplay(rank: number): string {
   if (rank === 13) return 'K';
   if (rank === 14) return 'A';
   return String(rank);
+}
+
+const RANK_STRENGTH: Record<Rank, number> = {
+  6: 6,
+  7: 7,
+  8: 8,
+  9: 9,
+  10: 13,
+  11: 10,
+  12: 11,
+  13: 12,
+  14: 14,
+};
+
+export function rankStrength(rank: Rank): number {
+  return RANK_STRENGTH[rank];
 }
 
 export function cardPointValue(card: Card): number {
@@ -102,7 +118,7 @@ export function getTrickWinnerPlayerId(
     if (!challengerTrump && currentTrump) continue;
 
     if (challengerTrump && currentTrump) {
-      if (challenger.rank > current.rank) winner = entry;
+      if (rankStrength(challenger.rank) > rankStrength(current.rank)) winner = entry;
       continue;
     }
 
@@ -110,7 +126,11 @@ export function getTrickWinnerPlayerId(
       winner = entry;
       continue;
     }
-    if (challenger.suit === leadSuit && current.suit === leadSuit && challenger.rank > current.rank) {
+    if (
+      challenger.suit === leadSuit
+      && current.suit === leadSuit
+      && rankStrength(challenger.rank) > rankStrength(current.rank)
+    ) {
       winner = entry;
     }
   }

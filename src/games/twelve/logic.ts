@@ -1,6 +1,6 @@
 import type { Player, TwelvePileCount } from '../../networking/types';
 import type { Card, FrontPile, Rank, Suit, TwelveAction, TwelvePlayer, TwelveState } from './types';
-import { cardEquals, cardPointValue, getPilePlayableCard, getTrickWinnerPlayerId, isLegalPlay, listPlayableCards, suitsWithRoyalPair } from './rules';
+import { cardEquals, cardPointValue, getPilePlayableCard, getTrickWinnerPlayerId, isLegalPlay, listPlayableCards, rankStrength, suitsWithRoyalPair } from './rules';
 
 const SUITS: Suit[] = ['clubs', 'diamonds', 'spades', 'hearts'];
 const RANKS: Rank[] = [6, 7, 8, 9, 10, 11, 12, 13, 14];
@@ -29,7 +29,7 @@ function sortHand(hand: Card[]): Card[] {
   const suitOrder: Record<Suit, number> = { clubs: 0, diamonds: 1, spades: 2, hearts: 3 };
   return [...hand].sort((a, b) => {
     if (suitOrder[a.suit] !== suitOrder[b.suit]) return suitOrder[a.suit] - suitOrder[b.suit];
-    return a.rank - b.rank;
+    return rankStrength(a.rank) - rankStrength(b.rank);
   });
 }
 
@@ -48,17 +48,24 @@ function getRoundCardPoints(players: TwelvePlayer[]): Record<string, number> {
   return scores;
 }
 
-function buildRoundSummary(players: TwelvePlayer[], roundCardPoints: Record<string, number>, gotMostPoint: string | null): string {
+function buildRoundSummary(
+  players: TwelvePlayer[],
+  roundCardPoints: Record<string, number>,
+  gotMostPoint: string | null,
+  lastTrickWinnerId: string | null,
+): string {
   const chunks = players.map((player) => {
     const label = roundCardPoints[player.id] ?? 0;
     return `${player.name}: ${label}`;
   });
   const pointsLine = `Round card points (${chunks.join(' · ')})`;
-  if (gotMostPoint === null) {
-    return `${pointsLine}. Most-points bonus tied — no one scores it.`;
-  }
-  const playerName = players.find(player => player.id === gotMostPoint)?.name ?? 'Player';
-  return `${pointsLine}. ${playerName} took the most points and earns +1.`;
+  const mostPointsLine = gotMostPoint === null
+    ? 'Most-points bonus tied — no one scores it.'
+    : `${players.find(player => player.id === gotMostPoint)?.name ?? 'Player'} took the most points and earns +1.`;
+  const lastTrickLine = lastTrickWinnerId === null
+    ? 'Last-trick bonus unavailable.'
+    : `${players.find(player => player.id === lastTrickWinnerId)?.name ?? 'Player'} won the last trick and earns +1.`;
+  return `${pointsLine}. ${mostPointsLine} ${lastTrickLine}`;
 }
 
 function decideGameWinners(players: TwelvePlayer[], roundCardPoints: Record<string, number>): string[] {
@@ -173,7 +180,7 @@ function endRound(state: TwelveState): TwelveState {
     players: updatedPlayers,
     phase: 'round-end',
     roundCardPoints,
-    roundSummary: buildRoundSummary(updatedPlayers, roundCardPoints, gotMostPoint),
+    roundSummary: buildRoundSummary(updatedPlayers, roundCardPoints, gotMostPoint, state.lastTrickWinnerId),
     gameOver: winners.length > 0,
     winners,
     trickWinner: null,
@@ -435,7 +442,7 @@ function chooseBotCard(state: TwelveState, playerIndex: number): { type: 'hand';
   });
   if (options.length === 0) return null;
 
-  const sorted = [...options].sort((a, b) => a.card.rank - b.card.rank);
+  const sorted = [...options].sort((a, b) => rankStrength(a.card.rank) - rankStrength(b.card.rank));
   const chosen = sorted[0];
   if (chosen.source === 'hand') return { type: 'hand', card: chosen.card };
   return { type: 'pile', pileIndex: chosen.pileIndex ?? 0 };
