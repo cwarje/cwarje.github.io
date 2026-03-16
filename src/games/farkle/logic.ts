@@ -219,7 +219,7 @@ export function processFarkleAction(state: unknown, action: unknown, playerId: s
         ...s,
         kept: allKept ? Array.from({ length: DICE_COUNT }, () => false) : kept,
         turnScore: s.turnScore + score,
-        phase: allKept ? 'roll' : 'roll-or-bank',
+        phase: 'roll-or-bank',
         lastEvent: allKept ? `${currentPlayer.name} has hot dice!` : null,
       };
     }

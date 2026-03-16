@@ -168,7 +168,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
         'Four/five/six of a kind score 1000/2000/3000 respectively.',
         'A straight (1-2-3-4-5-6) scores 1500, three pairs score 1500, and two triplets score 2500.',
         'If a roll has no scoring dice, you farkle: your unbanked turn points are lost and your turn ends.',
-        'If you score with all six dice, you get hot dice and may roll all six again in the same turn.',
+        'If you score with all six dice (hot dice), you may bank those points and end your turn, or roll all six again to try to add more—but a farkle on that roll loses the whole turn.',
         'You must bank at least 500 points in a single turn to get on the board for your first score.',
       ],
       howToPlay: [
