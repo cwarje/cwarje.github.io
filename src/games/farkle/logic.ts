@@ -186,7 +186,14 @@ export function processFarkleAction(state: unknown, action: unknown, playerId: s
       const rolledDice = newDice.filter((_, index) => !s.kept[index]);
 
       if (!hasAnyScoringSubset(rolledDice)) {
-        return advanceTurn(s, `${currentPlayer.name} farkled.`);
+        return {
+          ...s,
+          dice: newDice,
+          kept: s.kept,
+          turnScore: 0,
+          phase: 'farkle',
+          lastEvent: `${currentPlayer.name} farkled.`,
+        };
       }
 
       return {
@@ -217,6 +224,7 @@ export function processFarkleAction(state: unknown, action: unknown, playerId: s
       const allKept = kept.every(Boolean);
       return {
         ...s,
+        dice: allKept ? Array.from({ length: DICE_COUNT }, () => 1) : s.dice,
         kept: allKept ? Array.from({ length: DICE_COUNT }, () => false) : kept,
         turnScore: s.turnScore + score,
         phase: 'roll-or-bank',
@@ -254,6 +262,11 @@ export function processFarkleAction(state: unknown, action: unknown, playerId: s
       return advanceTurn(updatedState, `${updatedPlayer.name} banked ${s.turnScore} points.`);
     }
 
+    case 'end-farkle': {
+      if (s.phase !== 'farkle') return state;
+      return { ...advanceTurn(s, ''), lastEvent: null };
+    }
+
     default:
       return state;
   }
@@ -270,7 +283,7 @@ export function getFarkleWinners(state: unknown): string[] {
   return s.players.filter((player) => player.totalScore === maxScore).map((player) => player.id);
 }
 
-function shouldBotBank(state: FarkleState): boolean {
+export function shouldBotBank(state: FarkleState): boolean {
   const player = state.players[state.currentPlayerIndex];
   if (!player) return false;
   if (!canBank(player, state.turnScore)) return false;
@@ -288,6 +301,8 @@ export function runFarkleBotTurn(state: unknown): unknown {
 
   const currentPlayer = s.players[s.currentPlayerIndex];
   if (!currentPlayer || !currentPlayer.isBot) return state;
+
+  if (s.phase === 'farkle') return state;
 
   if (s.phase === 'choose') {
     const keepIndices = getBestScoringSelection(s);

@@ -155,6 +155,12 @@
   }
 }
 
+.farkle-board .yahtzee-playerHeader {
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 500;
+}
+
 .yahtzee-playerHeader {
   border: 3px solid transparent;
   border-radius: 10px;

@@ -8,7 +8,7 @@ export interface FarklePlayer {
   totalScore: number;
 }
 
-export type FarklePhase = 'roll' | 'choose' | 'roll-or-bank';
+export type FarklePhase = 'roll' | 'choose' | 'roll-or-bank' | 'farkle';
 
 export interface FarkleState {
   players: FarklePlayer[];
@@ -25,4 +25,5 @@ export interface FarkleState {
 export type FarkleAction =
   | { type: 'roll' }
   | { type: 'keep'; indices: number[] }
-  | { type: 'bank' };
+  | { type: 'bank' }
+  | { type: 'end-farkle' };

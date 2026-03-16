@@ -16,6 +16,7 @@ import type { FarkleState } from '../games/farkle/types';
 import type { UpRiverState } from '../games/up-and-down-the-river/types';
 import type { TwelveState } from '../games/twelve/types';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
+import { shouldBotBank } from '../games/farkle/logic';
 import { GAME_REGISTRY } from '../games/registry';
 
 export const BOT_NAMES = ['Pippi', 'Maja', 'Stina', 'Kajsa', 'Lotta', 'Ebba', 'Ida', 'Tova', 'Sigge', 'Nisse', 'Kalle', 'Hasse', 'Kekke', 'Challe', 'Bönne', 'Migge', 'Sune'];
@@ -913,9 +914,12 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   // --- Bot turn scheduling (host only, Hearts & Liar's Dice & Poker) ---
   const BOT_PLAY_DELAY = 800;   // ms between each bot card play (Hearts)
   const BATTLESHIP_BOT_DELAY = 800; // ms before bot fires in Battleship
-  const YAHTZEE_BOT_ROLL_DELAY = 800;  // ms between each bot roll in Yahtzee
+  const YAHTZEE_BOT_ROLL_DELAY = 2000;  // ms between each bot roll in Yahtzee
   const YAHTZEE_BOT_SCORE_DELAY = 4000; // ms to show dice before bot scores
-  const FARKLE_BOT_DELAY = 900; // ms between bot actions in Farkle
+  const FARKLE_BOT_DELAY = 900; // ms before bot banks in Farkle
+  const FARKLE_BOT_CHOOSE_DELAY = 2000; // ms before bot chooses dice to keep
+  const FARKLE_BOT_ROLL_DELAY = 2000; // ms before bot re-rolls
+  const FARKLE_FARKLE_DISPLAY_DELAY = 5500; // ms to show farkle roll + message before advancing (animation ~1.2s + 4s message)
   const TRICK_DISPLAY_DELAY = 2000; // ms to show completed trick before collecting
   const LIARS_DICE_BOT_DELAY = 1200; // ms between bot actions in Liar's Dice
   const LIARS_DICE_REVEAL_DELAY = 2500; // ms to show reveal before revolver
@@ -1335,7 +1339,31 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       if (fs.gameOver) return;
 
       const currentPlayer = fs.players[fs.currentPlayerIndex];
+      if (fs.phase === 'farkle' && currentPlayer?.isBot) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom) return;
+          const farkleState = currentGs as FarkleState;
+          const player = farkleState.players[farkleState.currentPlayerIndex];
+          if (!player || farkleState.phase !== 'farkle') return;
+
+          const next = processGameAction('farkle', currentGs, { type: 'end-farkle' }, player.id);
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+          }
+        }, FARKLE_FARKLE_DISPLAY_DELAY);
+        return;
+      }
+
       if (currentPlayer && currentPlayer.isBot) {
+        const delay =
+          fs.phase === 'choose'
+            ? FARKLE_BOT_CHOOSE_DELAY
+            : fs.phase === 'roll-or-bank' && !shouldBotBank(fs)
+              ? FARKLE_BOT_ROLL_DELAY
+              : FARKLE_BOT_DELAY;
         botTimerRef.current = setTimeout(() => {
           const currentGs = gameStateRef.current;
           const currentRoom = roomRef.current;
@@ -1351,7 +1379,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
               broadcastRoomState(finishedRoom);
             }
           }
-        }, FARKLE_BOT_DELAY);
+        }, delay);
       }
     }
   }, [gameState, isHost, room, broadcastGameState, broadcastRoomState]);

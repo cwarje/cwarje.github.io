@@ -55,6 +55,7 @@ export default function FarkleBoard({ state, myId, onAction }: FarkleBoardProps)
   const [infoOpen, setInfoOpen] = useState(false);
   const [orientations, setOrientations] = useState<CubeOrientation[]>(() => createInitialOrientations());
   const [rollingAnchorIndex, setRollingAnchorIndex] = useState<number | null>(null);
+  const [showFarkleMessage, setShowFarkleMessage] = useState(false);
   const prevDiceRef = useRef<number[] | null>(null);
   const currentPlayer = state.players[state.currentPlayerIndex];
   const currentPlayerColor =
@@ -103,39 +104,53 @@ export default function FarkleBoard({ state, myId, onAction }: FarkleBoardProps)
 
     const diceChanged = state.dice.some((value, index) => value !== prevDice[index]);
     if (diceChanged) {
-      setIsRolling(true);
+      const isTurnReset =
+        state.dice.every((v) => v === 1) && state.kept.every((k) => !k);
+      if (isTurnReset) {
+        setIsRolling(false);
+        setRollingAnchorIndex(null);
+        setOrientations(
+          state.dice.map((value) => {
+            const target = faceOrientations[(value as DiceValue) || 1];
+            return { ...target };
+          })
+        );
+        prevDiceRef.current = [...state.dice];
+      } else {
+        setIsRolling(true);
 
-      const activeIndices = state.kept
-        .map((isKept, index) => (isKept ? -1 : index))
-        .filter((index) => index !== -1);
-      setRollingAnchorIndex(activeIndices[0] ?? null);
+        const activeIndices = state.kept
+          .map((isKept, index) => (isKept ? -1 : index))
+          .filter((index) => index !== -1);
+        setRollingAnchorIndex(activeIndices[0] ?? null);
 
-      setOrientations((previousOrientations) =>
-        previousOrientations.map((previous, index) => {
-          if (state.kept[index]) return previous;
+        setOrientations((previousOrientations) =>
+          previousOrientations.map((previous, index) => {
+            if (state.kept[index]) return previous;
 
-          const targetOrientation = faceOrientations[(state.dice[index] as DiceValue) || 1];
-          const xSpins = (Math.floor(Math.random() * 2) + 2) * 360;
-          const ySpins = (Math.floor(Math.random() * 2) + 3) * 360;
+            const targetOrientation = faceOrientations[(state.dice[index] as DiceValue) || 1];
+            const xSpins = (Math.floor(Math.random() * 2) + 2) * 360;
+            const ySpins = (Math.floor(Math.random() * 2) + 3) * 360;
 
-          return {
-            x:
-              previous.x +
-              xSpins +
-              getForwardRotationDelta(
-                positiveModulo(previous.x, 360),
-                positiveModulo(targetOrientation.x, 360),
-              ),
-            y:
-              previous.y +
-              ySpins +
-              getForwardRotationDelta(
-                positiveModulo(previous.y, 360),
-                positiveModulo(targetOrientation.y, 360),
-              ),
-          };
-        })
-      );
+            return {
+              x:
+                previous.x +
+                xSpins +
+                getForwardRotationDelta(
+                  positiveModulo(previous.x, 360),
+                  positiveModulo(targetOrientation.x, 360),
+                ),
+              y:
+                previous.y +
+                ySpins +
+                getForwardRotationDelta(
+                  positiveModulo(previous.y, 360),
+                  positiveModulo(targetOrientation.y, 360),
+                ),
+            };
+          })
+        );
+      }
     } else {
       setIsRolling(false);
       setRollingAnchorIndex(null);
@@ -145,10 +160,19 @@ export default function FarkleBoard({ state, myId, onAction }: FarkleBoardProps)
           return { ...target };
         })
       );
+      prevDiceRef.current = [...state.dice];
     }
-
-    prevDiceRef.current = [...state.dice];
   }, [state.dice, state.kept]);
+
+  useEffect(() => {
+    if (state.phase !== 'farkle') setShowFarkleMessage(false);
+  }, [state.phase]);
+
+  useEffect(() => {
+    if (state.phase !== 'farkle' || !isMyTurn || isRolling) return;
+    const t = setTimeout(() => onAction({ type: 'end-farkle' }), 4000);
+    return () => clearTimeout(t);
+  }, [state.phase, isMyTurn, isRolling, onAction]);
 
   const toggleSelect = (index: number) => {
     if (!isMyTurn || state.phase !== 'choose' || state.kept[index]) return;
@@ -164,9 +188,49 @@ export default function FarkleBoard({ state, myId, onAction }: FarkleBoardProps)
 
   const handleRollEnd = (event: TransitionEvent<HTMLDivElement>) => {
     if (event.propertyName !== 'transform' || !isRolling) return;
+    if (state.phase === 'farkle') setShowFarkleMessage(true);
+    prevDiceRef.current = [...state.dice];
     setIsRolling(false);
     setRollingAnchorIndex(null);
   };
+
+  if (state.gameOver) {
+    const sorted = [...state.players].sort((a, b) => b.totalScore - a.totalScore);
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="farkle-board h-full flex flex-col items-center justify-center space-y-6 text-center"
+      >
+        <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
+        <h2 className="text-3xl font-extrabold text-white">Game Over!</h2>
+        <div className="space-y-3 w-full max-w-2xl">
+          {sorted.map((player, i) => (
+            <div
+              key={player.id}
+              className={`flex items-center justify-between gap-4 px-5 py-3 rounded-xl ${
+                i === 0
+                  ? 'bg-amber-500/10 border border-amber-500/20'
+                  : 'glass-light'
+              }`}
+            >
+              <div className="flex items-center gap-3 text-left">
+                <span
+                  className={`text-lg font-bold ${
+                    i === 0 ? 'text-amber-400' : 'text-white/60'
+                  }`}
+                >
+                  #{i + 1}
+                </span>
+                <span className="text-white font-medium">{player.id === myId ? 'You' : player.name}</span>
+              </div>
+              <span className="text-xl font-bold text-white text-right">{player.totalScore}</span>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <div className="farkle-board h-full w-full overflow-y-auto">
@@ -248,9 +312,11 @@ export default function FarkleBoard({ state, myId, onAction }: FarkleBoardProps)
           </div>
 
           <div className="min-h-12 text-center">
-            {state.lastEvent && <p className="text-sm text-amber-200">{state.lastEvent}</p>}
+            {state.lastEvent && (state.phase !== 'farkle' || showFarkleMessage) && (
+              <p className="text-[1.2rem] font-medium text-white">{state.lastEvent}</p>
+            )}
             {!!isMyTurn && myPlayer?.totalScore === 0 && state.turnScore < 500 && state.phase === 'roll-or-bank' && (
-              <p className="mt-2 text-sm text-rose-300">
+              <p className="mt-2 text-[1.2rem] font-medium text-white">
                 You need at least 500 unbanked points in a turn before your first bank.
               </p>
             )}
