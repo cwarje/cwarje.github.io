@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Dice5, Heart, Ship, Crosshair, Club, ArrowUpDown, Crown } from 'lucide-react';
+import { Dice5, Heart, Ship, Crosshair, Club, ArrowUpDown, Crown, LayoutGrid } from 'lucide-react';
 import type { GameType, Player, GameStartOptions } from '../networking/types';
 
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
@@ -10,6 +10,7 @@ import { createLiarsDiceState, processLiarsDiceAction, isLiarsDiceOver, runLiars
 import { createPokerState, processPokerAction, isPokerOver, runPokerBotTurn, getPokerWinners } from './poker/logic';
 import { createUpRiverState, processUpRiverAction, isUpRiverOver, runUpRiverBotTurn, getUpRiverWinners } from './up-and-down-the-river/logic';
 import { createTwelveState, processTwelveAction, isTwelveOver, runTwelveBotTurn, getTwelveWinners } from './twelve/logic';
+import { createCrossCribState, processCrossCribAction, isCrossCribOver, runCrossCribBotTurn, getCrossCribWinners } from './cross-crib/logic';
 
 import YahtzeeBoard from './yahtzee/YahtzeeBoard';
 import FarkleBoard from './farkle/FarkleBoard';
@@ -19,6 +20,7 @@ import LiarsDiceBoard from './liars-dice/LiarsDiceBoard';
 import PokerBoard from './poker/PokerBoard';
 import UpAndDownTheRiverBoard from './up-and-down-the-river/UpAndDownTheRiverBoard';
 import TwelveBoard from './twelve/TwelveBoard';
+import CrossCribBoard from './cross-crib/CrossCribBoard';
 
 import HeartsOptions from './hearts/HeartsOptions';
 import FarkleOptions from './farkle/FarkleOptions';
@@ -102,6 +104,8 @@ export interface GameDefinition {
   hasHandZoom?: boolean;
   production?: boolean;
   hudTitleLines?: string[];
+  /** If set, only these total player counts (humans + bots) are valid. */
+  allowedPlayerCounts?: number[];
 }
 
 // ---------------------------------------------------------------------------
@@ -484,6 +488,54 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: true,
     production: true,
+  },
+
+  'cross-crib': {
+    title: 'Cross Crib',
+    shortDescription: 'Score points by forming cribbage hands in a 5×5 grid. Rows vs columns over 4 rounds.',
+    playersLabel: '2 or 4 Players',
+    minPlayers: 2,
+    maxPlayers: 4,
+    allowedPlayerCounts: [2, 4],
+    info: {
+      goal: 'Score the most points by forming cribbage hands in rows and columns over 4 rounds.',
+      rules: [
+        '2-player or 4-player (teams of 2, partners sit across). Standard 52-card deck.',
+        '5×5 grid with one card dealt face-up to the center as the starter (used in both its row and column).',
+        '2 players: 12 cards each. 4 players: 6 cards each. No crib pile.',
+        'Players take turns placing one card into any empty space. Card fades in from your seat direction.',
+        'Each row and column is scored as a 5-card cribbage hand: 15s (2 pts each), pairs (2/6/12), runs, flush (5 pts), knobs (Jack matching starter suit).',
+        '2-player: one player scores rows, one scores columns. 4-player: one team scores rows, one scores columns.',
+        '4 rounds. Highest total wins.',
+      ],
+      howToPlay: [
+        'Place one card from your hand into any empty grid space on your turn.',
+        'Row scores appear to the right, column scores above. Both update live.',
+        'After all 24 cards are placed, a 7-second summary shows round scores.',
+        'After 4 rounds, the highest score wins.',
+      ],
+    },
+    icon: LayoutGrid,
+    theme: {
+      gradient: 'from-emerald-500/20 to-teal-600/20',
+      cardBorder: 'border-emerald-500/20',
+      hoverBorder: 'hover:border-emerald-500/30',
+      playersTag: 'bg-emerald-500/25 text-emerald-200 border border-emerald-500/30',
+      iconColor: 'text-emerald-300',
+      buttonColors: 'bg-emerald-600 hover:bg-emerald-500',
+      panelBg: 'bg-emerald-950',
+      labelColor: 'text-emerald-200',
+    },
+    createState: createCrossCribState,
+    processAction: processCrossCribAction,
+    isOver: isCrossCribOver,
+    runBotTurn: runCrossCribBotTurn,
+    getWinners: getCrossCribWinners,
+    Board: CrossCribBoard,
+    fullBoard: true,
+    hasHandZoom: true,
+    production: true,
+    hudTitleLines: ['Cross Crib'],
   },
 };
 

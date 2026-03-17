@@ -15,6 +15,7 @@ import type { YahtzeeState } from '../games/yahtzee/types';
 import type { FarkleState } from '../games/farkle/types';
 import type { UpRiverState } from '../games/up-and-down-the-river/types';
 import type { TwelveState } from '../games/twelve/types';
+import type { CrossCribState } from '../games/cross-crib/types';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 import { shouldBotBank } from '../games/farkle/logic';
 import { GAME_REGISTRY } from '../games/registry';
@@ -138,6 +139,17 @@ function applyProfileToGameState(
     }
     case 'twelve': {
       const current = state as TwelveState;
+      let changed = false;
+      const players = current.players.map((player) => {
+        if (player.id !== playerId) return player;
+        if (player.name === playerName && player.color === playerColor) return player;
+        changed = true;
+        return { ...player, name: playerName, color: playerColor };
+      });
+      return changed ? { ...current, players } : current;
+    }
+    case 'cross-crib': {
+      const current = state as CrossCribState;
       let changed = false;
       const players = current.players.map((player) => {
         if (player.id !== playerId) return player;
@@ -825,6 +837,9 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    const allowed = gameDef.allowedPlayerCounts;
+    if (allowed && !allowed.includes(players.length)) return;
+
     const gs = createInitialGameState(gameType, players, options);
     const startedRoom = { ...room, players, gameType, phase: 'playing' as const };
     setRoom(startedRoom);
@@ -931,6 +946,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const TWELVE_ANNOUNCEMENT_DELAY = 4000; // ms to show trump/tjog announcement
   const TWELVE_ROUND_END_DELAY = 6500; // ms to show round summary before next round
   const TWELVE_FINAL_RESULTS_DELAY = 6000; // ms to hold final round summary before end screen
+  const CROSS_CRIB_ROUND_END_DELAY = 7000; // ms to show round summary before next round
+  const CROSS_CRIB_BOT_DELAY = 900; // ms between bot card placements
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -1173,6 +1190,59 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
           }
         }, TWELVE_BOT_DELAY);
+      }
+      return;
+    }
+
+    // ── Cross Crib bot scheduling ──
+    if (room.gameType === 'cross-crib') {
+      const ccs = gameState as CrossCribState;
+      if (ccs.phase === 'game-over') return;
+
+      if (ccs.phase === 'round-end') {
+        const roundEndAction = ccs.gameOver
+          ? ({ type: 'show-final-results' } as const)
+          : ({ type: 'start-next-round' } as const);
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as CrossCribState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'round-end') return;
+          if (currentGs.gameOver !== ccs.gameOver) return;
+
+          const next = processGameAction('cross-crib', currentGs, roundEndAction, '');
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('cross-crib', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, CROSS_CRIB_ROUND_END_DELAY);
+        return;
+      }
+
+      if (ccs.phase === 'playing') {
+        const currentPlayer = ccs.players[ccs.currentPlayerIndex];
+        if (currentPlayer?.isBot) {
+          botTimerRef.current = setTimeout(() => {
+            const currentGs = gameStateRef.current;
+            const currentRoom = roomRef.current;
+            if (!currentGs || !currentRoom) return;
+
+            const next = runSingleBotTurn('cross-crib', currentGs);
+            if (next !== currentGs) {
+              setGameState(next);
+              broadcastGameState(next);
+              if (checkGameOver('cross-crib', next)) {
+                const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+                setRoom(finishedRoom);
+                broadcastRoomState(finishedRoom);
+              }
+            }
+          }, CROSS_CRIB_BOT_DELAY);
+        }
       }
       return;
     }

@@ -1264,6 +1264,136 @@
   text-align: right;
 }
 
+/* Cross Crib 5x5 grid */
+.crosscrib-center {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  --crosscrib-slot-w: 52px;
+  --crosscrib-slot-h: 74px;
+  --crosscrib-slot-gap: 4px;
+}
+
+.crosscrib-gridWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.crosscrib-colScores {
+  display: grid;
+  grid-template-columns: repeat(5, var(--crosscrib-slot-w));
+  gap: var(--crosscrib-slot-gap);
+  justify-content: center;
+}
+
+.crosscrib-gridRow {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.crosscrib-grid {
+  display: grid;
+  grid-template-columns: repeat(5, var(--crosscrib-slot-w));
+  grid-template-rows: repeat(5, var(--crosscrib-slot-h));
+  gap: var(--crosscrib-slot-gap);
+  place-items: center;
+}
+
+.crosscrib-rowScores {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: var(--crosscrib-slot-gap);
+  min-width: 28px;
+}
+
+.crosscrib-scoreCell {
+  width: var(--crosscrib-slot-w);
+  height: var(--crosscrib-slot-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fde68a;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+}
+
+.crosscrib-rowScores .crosscrib-scoreCell {
+  width: 28px;
+  height: var(--crosscrib-slot-h);
+}
+
+.crosscrib-cell {
+  width: var(--crosscrib-slot-w);
+  height: var(--crosscrib-slot-h);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.crosscrib-cell--empty {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.crosscrib-cell--placeable {
+  cursor: pointer;
+  background: rgba(34, 197, 94, 0.2);
+  border: 2px dashed rgba(34, 197, 94, 0.6);
+}
+
+.crosscrib-cell--placeable:hover {
+  background: rgba(34, 197, 94, 0.3);
+  border-color: rgba(34, 197, 94, 0.9);
+}
+
+.crosscrib-cellCard {
+  width: 100%;
+  height: 100%;
+}
+
+.crosscrib-cellCard--starter {
+  box-shadow: 0 0 0 2px rgba(253, 230, 138, 0.5);
+}
+
+.crosscrib-slotPlaceholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.crosscrib-handCard--selected {
+  transform: translateY(-12px);
+  box-shadow: 0 0 0 3px rgba(253, 230, 138, 0.8);
+}
+
+@media (max-width: 639px) {
+  .crosscrib-center {
+    --crosscrib-slot-w: 44px;
+    --crosscrib-slot-h: 62px;
+    --crosscrib-slot-gap: 3px;
+  }
+
+  .crosscrib-rowScores .crosscrib-scoreCell {
+    width: 24px;
+    font-size: 0.85rem;
+  }
+
+  .crosscrib-rowScores {
+    min-width: 24px;
+  }
+}
+
 /* Twelve board additions */
 .twelve-seatStack {
   display: flex;

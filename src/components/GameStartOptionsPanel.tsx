@@ -21,9 +21,15 @@ export default function GameStartOptionsPanel({
 }: GameStartOptionsPanelProps) {
   const gameDef = GAME_REGISTRY[gameType];
   const { theme } = gameDef;
-  const minBots = Math.max(0, gameDef.minPlayers - playerCount);
-  const maxBots = gameDef.maxPlayers - playerCount;
-  const showBots = gameDef.minPlayers !== gameDef.maxPlayers && playerCount < gameDef.maxPlayers;
+  const allowed = gameDef.allowedPlayerCounts;
+  const minBots = allowed
+    ? Math.max(0, Math.min(...allowed) - playerCount)
+    : Math.max(0, gameDef.minPlayers - playerCount);
+  const maxBots = allowed
+    ? Math.max(0, Math.max(...allowed) - playerCount)
+    : gameDef.maxPlayers - playerCount;
+  const validTotals = allowed ?? [gameDef.minPlayers];
+  const showBots = (allowed ? playerCount < Math.max(...allowed) : gameDef.minPlayers !== gameDef.maxPlayers && playerCount < gameDef.maxPlayers) && maxBots > 0;
 
   const [botCount, setBotCount] = useState(DEFAULT_BOT_COUNT);
   const [gameOptions, setGameOptions] = useState<Partial<GameStartOptions>>({});
@@ -38,10 +44,10 @@ export default function GameStartOptionsPanel({
     }
   }, [showBots, minBots, maxBots]);
 
+  const totalCount = playerCount + botCount;
   const canStart =
     playerCount >= 1 &&
-    playerCount <= gameDef.maxPlayers &&
-    (gameDef.minPlayers === gameDef.maxPlayers || playerCount + botCount >= gameDef.minPlayers);
+    validTotals.includes(totalCount);
 
   const handlePlay = () => {
     if (!canStart || !isHost) return;
