@@ -45,9 +45,13 @@ export default function GameStartOptionsPanel({
   }, [showBots, minBots, maxBots]);
 
   const totalCount = playerCount + botCount;
-  const canStart =
-    playerCount >= 1 &&
-    validTotals.includes(totalCount);
+  const canStart = (() => {
+    if (playerCount < 1) return false;
+    if (playerCount > gameDef.maxPlayers) return false;
+    if (allowed) return validTotals.includes(totalCount);
+    if (gameDef.minPlayers === gameDef.maxPlayers) return true; // start will auto-fill bots to fixed size
+    return totalCount >= gameDef.minPlayers && totalCount <= gameDef.maxPlayers;
+  })();
 
   const handlePlay = () => {
     if (!canStart || !isHost) return;

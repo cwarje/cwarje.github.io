@@ -837,8 +837,17 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    const totalPlayers = players.length;
+    if (totalPlayers < 1 || totalPlayers > gameDef.maxPlayers) return;
+
     const allowed = gameDef.allowedPlayerCounts;
-    if (allowed && !allowed.includes(players.length)) return;
+    if (allowed) {
+      if (!allowed.includes(totalPlayers)) return;
+    } else if (gameDef.minPlayers === gameDef.maxPlayers) {
+      if (totalPlayers !== gameDef.maxPlayers) return;
+    } else if (totalPlayers < gameDef.minPlayers) {
+      return;
+    }
 
     const gs = createInitialGameState(gameType, players, options);
     const startedRoom = { ...room, players, gameType, phase: 'playing' as const };
