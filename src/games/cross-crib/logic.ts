@@ -57,11 +57,11 @@ function recomputeScores(state: CrossCribState): { rowScores: number[]; columnSc
 
   for (let r = 0; r < 5; r++) {
     const rowCards = getRowCards(state.grid, r, starter);
-    rowScores.push(rowCards.length === 5 ? scoreCribbageHand(rowCards, starter.suit) : 0);
+    rowScores.push(scoreCribbageHand(rowCards, starter.suit));
   }
   for (let c = 0; c < 5; c++) {
     const colCards = getColumnCards(state.grid, c, starter);
-    columnScores.push(colCards.length === 5 ? scoreCribbageHand(colCards, starter.suit) : 0);
+    columnScores.push(scoreCribbageHand(colCards, starter.suit));
   }
 
   return { rowScores, columnScores };

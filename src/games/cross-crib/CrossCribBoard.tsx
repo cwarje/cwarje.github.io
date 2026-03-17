@@ -77,8 +77,6 @@ export default function CrossCribBoard({
 
   const playerCount = s.players.length;
   const isTeam = playerCount === 4;
-  const myTeamScoresColumns =
-    playerCount === 2 ? myIndex === 1 : myIndex === 1 || myIndex === 3;
 
   const seatLayouts = useMemo<SeatLayout[]>(() => {
     if (playerCount === 0) return [];
@@ -253,7 +251,7 @@ export default function CrossCribBoard({
       const current = s.players[s.currentPlayerIndex];
       if (!current) return '\u00a0';
       const isMe = current.id === myId;
-      return isMe ? 'Your turn — select a card, then click an empty space' : `${current.name}'s turn`;
+      return isMe ? 'Your turn' : `${current.name}'s turn`;
     }
     return '\u00a0';
   }, [s.phase, s.currentPlayerIndex, s.players, s.roundSummary, myId]);
@@ -319,8 +317,8 @@ export default function CrossCribBoard({
     );
   }
 
-  const scoresAbove = myTeamScoresColumns ? s.columnScores : s.rowScores;
-  const scoresRight = myTeamScoresColumns ? s.rowScores : s.columnScores;
+  const scoresAbove = s.columnScores;
+  const scoresRight = s.rowScores;
 
   return (
     <div className={`river-board river-board--players-${playerCount} space-y-3 sm:space-y-4`}>

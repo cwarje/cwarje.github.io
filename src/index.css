@@ -1108,6 +1108,20 @@
     width: 1.8em;
   }
 
+  .crosscrib-center.river-center--zoom .river-cardRank {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .crosscrib-center.river-center--zoom .river-cardSuit {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .crosscrib-center.river-center--zoom .river-cardCorner {
+    width: 1.8em;
+  }
+
   .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardRank,
   .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .poker-cardRank {
     font-size: 1.8rem;
@@ -1223,6 +1237,20 @@
     width: 1.75em;
   }
 
+  .crosscrib-center.river-center--zoom .river-cardRank {
+    font-size: 1.6rem;
+    line-height: 1;
+  }
+
+  .crosscrib-center.river-center--zoom .river-cardSuit {
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+
+  .crosscrib-center.river-center--zoom .river-cardCorner {
+    width: 1.75em;
+  }
+
   .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardRank,
   .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .poker-cardRank {
     font-size: 1.6rem;
@@ -1280,7 +1308,7 @@
 .crosscrib-gridWrapper {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
 }
 
@@ -1289,6 +1317,11 @@
   grid-template-columns: repeat(5, var(--crosscrib-slot-w));
   gap: var(--crosscrib-slot-gap);
   justify-content: center;
+  height: 28px;
+}
+
+.crosscrib-colScores .crosscrib-scoreCell {
+  height: 28px;
 }
 
 .crosscrib-gridRow {
@@ -1362,7 +1395,7 @@
 }
 
 .crosscrib-cellCard--starter {
-  box-shadow: 0 0 0 2px rgba(253, 230, 138, 0.5);
+  border-radius: 7px;
 }
 
 .crosscrib-slotPlaceholder {
@@ -1373,6 +1406,7 @@
 }
 
 .crosscrib-handCard--selected {
+  border-radius: 9px;
   transform: translateY(-12px);
   box-shadow: 0 0 0 3px rgba(253, 230, 138, 0.8);
 }
@@ -1382,6 +1416,14 @@
     --crosscrib-slot-w: 44px;
     --crosscrib-slot-h: 62px;
     --crosscrib-slot-gap: 3px;
+  }
+
+  .crosscrib-colScores {
+    height: 24px;
+  }
+
+  .crosscrib-colScores .crosscrib-scoreCell {
+    height: 24px;
   }
 
   .crosscrib-rowScores .crosscrib-scoreCell {
