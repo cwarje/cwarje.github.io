@@ -65,11 +65,11 @@ function PokerCardDisplay({ card, faceDown = false, size = 'md', skipFlip = fals
 // ────────────────────────────────────────────
 
 function getPokerLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
-  if (playerCount >= 6) return { seatRadiusX: 42, seatRadiusY: 36 };
-  if (playerCount === 5) return { seatRadiusX: 38, seatRadiusY: 32 };
-  if (playerCount === 4) return { seatRadiusX: 36, seatRadiusY: 30 };
-  if (playerCount === 3) return { seatRadiusX: 32, seatRadiusY: 28 };
-  return { seatRadiusX: 28, seatRadiusY: 24 }; // 2
+  if (playerCount >= 6) return { seatRadiusX: 44, seatRadiusY: 43 };
+  if (playerCount === 5) return { seatRadiusX: 40, seatRadiusY: 39 };
+  if (playerCount === 4) return { seatRadiusX: 38, seatRadiusY: 37 };
+  if (playerCount === 3) return { seatRadiusX: 34, seatRadiusY: 35 };
+  return { seatRadiusX: 30, seatRadiusY: 31 }; // 2
 }
 
 function getPlayerColorHex(player: PokerPlayer): string {
@@ -240,7 +240,6 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
         <div className="poker-seatPillTop" style={{ backgroundColor: seatColor }}>
           <span className="poker-seatPillName" style={{ color: seatTextColor }}>{isMe ? 'You' : player.name}{isDealer ? ' (Dealer)' : ''}</span>
           <div className="poker-seatPillBadges">
-            {player.allIn && <span className="text-[10px] font-bold bg-red-500/30 text-red-300 rounded px-1">AI</span>}
             {player.leftGame && <span className="text-[10px] text-gray-500">left</span>}
           </div>
         </div>
