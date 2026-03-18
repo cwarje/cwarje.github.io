@@ -65,9 +65,14 @@ export default function FarkleBoard({ state, myId, onAction }: FarkleBoardProps)
   const canBank = !!myPlayer && (myPlayer.totalScore > 0 || state.turnScore >= 500);
   const showActivePlayerHeader = state.players.length > 1;
   const turnToken = `${state.currentPlayerIndex}:${state.phase}:${state.turnScore}:${state.dice.join(',')}:${state.kept.join(',')}`;
-  const selected = selectionState.token === turnToken
+  const sharedSelected = useMemo(() => {
+    if (Array.isArray(state.selected) && state.selected.length === DICE_COUNT) return state.selected;
+    return Array.from({ length: DICE_COUNT }, () => false);
+  }, [state.selected]);
+  const localSelected = selectionState.token === turnToken
     ? selectionState.values
     : Array.from({ length: DICE_COUNT }, () => false);
+  const selected = isMyTurn ? localSelected : sharedSelected;
 
   const selectedIndices = useMemo(
     () => selected.map((isSelected, index) => (isSelected ? index : -1)).filter((index) => index !== -1),
@@ -184,6 +189,7 @@ export default function FarkleBoard({ state, myId, onAction }: FarkleBoardProps)
       next[index] = !next[index];
       return { token: turnToken, values: next };
     });
+    onAction({ type: 'toggle-select', index });
   };
 
   const handleRollEnd = (event: TransitionEvent<HTMLDivElement>) => {
@@ -317,7 +323,7 @@ export default function FarkleBoard({ state, myId, onAction }: FarkleBoardProps)
             )}
             {!!isMyTurn && myPlayer?.totalScore === 0 && state.turnScore < 500 && state.phase === 'roll-or-bank' && (
               <p className="mt-2 text-[1.2rem] font-medium text-white">
-                You need at least 500 unbanked points in a turn before your first bank.
+                500 minimum for first bank
               </p>
             )}
           </div>

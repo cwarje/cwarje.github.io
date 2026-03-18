@@ -89,11 +89,21 @@ function rollUnkeptDice(state: FarkleState): number[] {
   return state.dice.map((die, index) => (state.kept[index] ? die : rollDie()));
 }
 
+function createEmptySelection(): boolean[] {
+  return Array.from({ length: DICE_COUNT }, () => false);
+}
+
+function getSelection(state: FarkleState): boolean[] {
+  if (Array.isArray(state.selected) && state.selected.length === DICE_COUNT) return state.selected;
+  return createEmptySelection();
+}
+
 function resetTurnState(state: FarkleState): FarkleState {
   return {
     ...state,
     dice: Array.from({ length: DICE_COUNT }, () => 1),
     kept: Array.from({ length: DICE_COUNT }, () => false),
+    selected: createEmptySelection(),
     turnScore: 0,
     phase: 'roll',
   };
@@ -163,6 +173,7 @@ export function createFarkleState(
     targetScore: options?.targetScore ?? DEFAULT_TARGET_SCORE,
     dice: Array.from({ length: DICE_COUNT }, () => 1),
     kept: Array.from({ length: DICE_COUNT }, () => false),
+    selected: createEmptySelection(),
     turnScore: 0,
     phase: 'roll',
     gameOver: false,
@@ -190,6 +201,7 @@ export function processFarkleAction(state: unknown, action: unknown, playerId: s
           ...s,
           dice: newDice,
           kept: s.kept,
+          selected: createEmptySelection(),
           turnScore: 0,
           phase: 'farkle',
           lastEvent: `${currentPlayer.name} farkled.`,
@@ -199,14 +211,34 @@ export function processFarkleAction(state: unknown, action: unknown, playerId: s
       return {
         ...s,
         dice: newDice,
+        selected: createEmptySelection(),
         phase: 'choose',
         lastEvent: null,
       };
     }
 
+    case 'toggle-select': {
+      if (s.phase !== 'choose') return state;
+      if (a.index < 0 || a.index >= DICE_COUNT) return state;
+      if (s.kept[a.index]) return state;
+
+      const selected = [...getSelection(s)];
+      selected[a.index] = !selected[a.index];
+      return {
+        ...s,
+        selected,
+      };
+    }
+
     case 'keep': {
       if (s.phase !== 'choose') return state;
-      const uniqueIndices = [...new Set(a.indices)];
+      const selectedFromState = getSelection(s)
+        .map((isSelected, index) => (isSelected ? index : -1))
+        .filter((index) => index !== -1);
+      const payloadIndices = Array.isArray(a.indices) ? a.indices : [];
+      const uniqueIndices = [
+        ...new Set(selectedFromState.length > 0 ? selectedFromState : payloadIndices),
+      ];
       if (uniqueIndices.length === 0) return state;
 
       for (const index of uniqueIndices) {
@@ -226,6 +258,7 @@ export function processFarkleAction(state: unknown, action: unknown, playerId: s
         ...s,
         dice: allKept ? Array.from({ length: DICE_COUNT }, () => 1) : s.dice,
         kept: allKept ? Array.from({ length: DICE_COUNT }, () => false) : kept,
+        selected: createEmptySelection(),
         turnScore: s.turnScore + score,
         phase: 'roll-or-bank',
         lastEvent: allKept ? `${currentPlayer.name} has hot dice!` : null,

@@ -16,6 +16,7 @@ export interface FarkleState {
   targetScore: number;
   dice: number[];
   kept: boolean[];
+  selected: boolean[];
   turnScore: number;
   phase: FarklePhase;
   gameOver: boolean;
@@ -24,6 +25,7 @@ export interface FarkleState {
 
 export type FarkleAction =
   | { type: 'roll' }
+  | { type: 'toggle-select'; index: number }
   | { type: 'keep'; indices: number[] }
   | { type: 'bank' }
   | { type: 'end-farkle' };
