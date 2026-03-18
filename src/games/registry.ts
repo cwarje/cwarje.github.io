@@ -542,9 +542,25 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
 };
 
 /** All registered game types */
-export const ALL_GAME_TYPES = Object.keys(GAME_REGISTRY) as GameType[];
+export const ALL_GAME_TYPES: GameType[] = [
+  'yahtzee',
+  'hearts',
+  'twelve',
+  'up-and-down-the-river',
+  'farkle',
+  'cross-crib',
+  'poker',
+  'battleship',
+  'liars-dice',
+];
 
-/** Game types shown in production */
-export const PRODUCTION_GAME_TYPES = ALL_GAME_TYPES.filter(
-  (gt) => GAME_REGISTRY[gt].production,
-);
+/** Game types shown in production (homepage order) */
+export const PRODUCTION_GAME_TYPES: GameType[] = [
+  'yahtzee',
+  'hearts',
+  'twelve',
+  'up-and-down-the-river',
+  'farkle',
+  'cross-crib',
+  'poker',
+];
