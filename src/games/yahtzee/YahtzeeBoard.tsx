@@ -55,6 +55,12 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
   const hasRolled = state.rollsLeft < 3;
   const allDiceHeld = state.held.every(Boolean);
 
+  const myIndex = state.players.findIndex((p) => p.id === myId);
+  const viewOrderPlayers =
+    myIndex === -1
+      ? state.players
+      : state.players.map((_, i) => state.players[(myIndex + i) % state.players.length]);
+
   const [isRolling, setIsRolling] = useState(false);
   const spectatorRollsLeftText =
     !isMyTurn && state.rollsLeft > 0 && state.rollsLeft < 3
@@ -271,14 +277,14 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
         <table className="w-full table-fixed border-collapse text-[13px] sm:text-[15px]">
           <colgroup>
             <col className="w-[132px] sm:w-[200px]" />
-            {state.players.map((player) => (
+            {viewOrderPlayers.map((player) => (
               <col key={player.id} />
             ))}
           </colgroup>
           <thead>
             <tr className="border-b border-white/10">
               <th className="text-left py-2 px-2" />
-              {state.players.map((player) => {
+              {viewOrderPlayers.map((player) => {
                 const isMe = player.id === myId;
                 const isCurrent = state.players[state.currentPlayerIndex]?.id === player.id;
                 const activeHeaderClass =
@@ -314,14 +320,14 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
             {UPPER_CATEGORIES.map(({ key, label }) => (
               <tr key={key} className="border-b border-white/5">
                 <td className="py-1.5 px-2 text-white max-w-[300px] truncate">{label}</td>
-                {state.players.map((player) => renderScoreCell(player.id, key))}
+                {viewOrderPlayers.map((player) => renderScoreCell(player.id, key))}
               </tr>
             ))}
 
             {/* Upper Bonus */}
             <tr className="border-b border-white/10 bg-white/[0.03]">
               <td className="py-1.5 px-2 text-white font-medium max-w-[300px]">Bonus</td>
-              {state.players.map((player) => {
+              {viewOrderPlayers.map((player) => {
                 const earned = hasUpperBonus(player.scorecard);
                 const upperTotal = getUpperTotal(player.scorecard);
                 const remaining = Math.max(0, 63 - upperTotal);
@@ -347,7 +353,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
             {LOWER_CATEGORIES.map(({ key, label }) => (
               <tr key={key} className="border-b border-white/5">
                 <td className="py-1.5 px-2 text-white max-w-[300px] truncate">{label}</td>
-                {state.players.map((player) => renderScoreCell(player.id, key))}
+                {viewOrderPlayers.map((player) => renderScoreCell(player.id, key))}
               </tr>
             ))}
 
