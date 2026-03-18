@@ -1,5 +1,5 @@
 import type { Player } from '../../networking/types';
-import type { Card, CrossCribPlayer, CrossCribState } from './types';
+import type { Card, CrossCribPlayer, CrossCribState, Suit } from './types';
 import { scoreCribbageHand } from './rules';
 
 const SUITS: ('hearts' | 'diamonds' | 'clubs' | 'spades')[] = ['clubs', 'diamonds', 'spades', 'hearts'];
@@ -22,6 +22,14 @@ function shuffle<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+function sortHand(hand: Card[]): Card[] {
+  const suitOrder: Record<Suit, number> = { clubs: 0, diamonds: 1, spades: 2, hearts: 3 };
+  return [...hand].sort((a, b) => {
+    if (suitOrder[a.suit] !== suitOrder[b.suit]) return suitOrder[a.suit] - suitOrder[b.suit];
+    return a.rank - b.rank;
+  });
 }
 
 function createEmptyGrid(): (null)[][] {
@@ -108,7 +116,7 @@ function startRound(
   grid[2][2] = starterCard ? { card: starterCard, playerId: '' } : null;
 
   const dealtPlayers: CrossCribPlayer[] = players.map((p) => {
-    const hand = deck.slice(cursor, cursor + cardsPerPlayer);
+    const hand = sortHand(deck.slice(cursor, cursor + cardsPerPlayer));
     cursor += cardsPerPlayer;
     return { ...p, hand };
   });
@@ -282,6 +290,59 @@ export function runCrossCribBotTurn(state: unknown): unknown {
   const currentPlayer = s.players[s.currentPlayerIndex];
   if (!currentPlayer?.isBot || currentPlayer.hand.length === 0) return state;
 
+  const playerIndex = s.currentPlayerIndex;
+  const isRowTeam = playerIndex % 2 === 0;
+  const myCurrentTotal = isRowTeam
+    ? s.rowScores.reduce((a, b) => a + b, 0)
+    : s.columnScores.reduce((a, b) => a + b, 0);
+  const opponentCurrentTotal = isRowTeam
+    ? s.columnScores.reduce((a, b) => a + b, 0)
+    : s.rowScores.reduce((a, b) => a + b, 0);
+
+  let bestScore = -Infinity;
+  let bestMove: { card: Card; row: number; col: number } | null = null;
+
+  for (const card of currentPlayer.hand) {
+    for (let i = 0; i < 5; i++) {
+      for (let j = 0; j < 5; j++) {
+        if (i === 2 && j === 2) continue;
+        if (s.grid[i][j]) continue;
+
+        const nextState = processCrossCribAction(
+          s,
+          { type: 'place-card', card, row: i, col: j },
+          currentPlayer.id
+        ) as CrossCribState;
+        if (nextState === s) continue;
+
+        const myNewTotal = isRowTeam
+          ? nextState.rowScores.reduce((a, b) => a + b, 0)
+          : nextState.columnScores.reduce((a, b) => a + b, 0);
+        const opponentNewTotal = isRowTeam
+          ? nextState.columnScores.reduce((a, b) => a + b, 0)
+          : nextState.rowScores.reduce((a, b) => a + b, 0);
+
+        const myDelta = myNewTotal - myCurrentTotal;
+        const opponentDelta = opponentNewTotal - opponentCurrentTotal;
+        const moveScore = myDelta - opponentDelta;
+
+        if (moveScore > bestScore) {
+          bestScore = moveScore;
+          bestMove = { card, row: i, col: j };
+        }
+      }
+    }
+  }
+
+  if (bestMove) {
+    return processCrossCribAction(
+      s,
+      { type: 'place-card', card: bestMove.card, row: bestMove.row, col: bestMove.col },
+      currentPlayer.id
+    );
+  }
+
+  // Fallback: first card, first empty cell (should not happen with valid state)
   const card = currentPlayer.hand[0];
   for (let i = 0; i < 5; i++) {
     for (let j = 0; j < 5; j++) {
