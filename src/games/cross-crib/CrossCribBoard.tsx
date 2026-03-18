@@ -77,6 +77,12 @@ export default function CrossCribBoard({
 
   const playerCount = s.players.length;
   const isTeam = playerCount === 4;
+  const shouldRotate = myIndex >= 0 && myIndex % 2 === 0;
+
+  const toCanonicalPosition = (localRow: number, localCol: number) =>
+    shouldRotate
+      ? { row: 4 - localCol, col: 4 - localRow }
+      : { row: localRow, col: localCol };
 
   const seatLayouts = useMemo<SeatLayout[]>(() => {
     if (playerCount === 0) return [];
@@ -100,6 +106,24 @@ export default function CrossCribBoard({
     return Array.from({ length: playerCount }, (_, relativeIndex) => {
       const playerIndex = (anchorIndex + relativeIndex) % playerCount;
       const player = s.players[playerIndex];
+      if (playerCount === 2) {
+        if (relativeIndex === 0) {
+          return {
+            relativeIndex,
+            playerIndex,
+            player,
+            seatLeft: 50,
+            seatTop: 50 + radii.seatRadiusY,
+          };
+        }
+        return {
+          relativeIndex,
+          playerIndex,
+          player,
+          seatLeft: 50 - radii.seatRadiusX,
+          seatTop: 50,
+        };
+      }
       const angle = 90 + (360 * relativeIndex) / playerCount;
       const angleInRadians = (angle * Math.PI) / 180;
       return {
@@ -317,8 +341,8 @@ export default function CrossCribBoard({
     );
   }
 
-  const scoresAbove = s.columnScores;
-  const scoresRight = s.rowScores;
+  const scoresAbove = shouldRotate ? [...s.rowScores].reverse() : s.columnScores;
+  const scoresRight = shouldRotate ? [...s.columnScores].reverse() : s.rowScores;
 
   return (
     <div className={`river-board river-board--players-${playerCount} space-y-3 sm:space-y-4`}>
@@ -342,10 +366,11 @@ export default function CrossCribBoard({
             </div>
             <div className="crosscrib-gridRow">
               <div className="crosscrib-grid">
-                {[0, 1, 2, 3, 4].map((row) =>
-                  [0, 1, 2, 3, 4].map((col) => {
-                    const cell = s.grid[row][col];
-                    const isCenter = row === 2 && col === 2;
+                {[0, 1, 2, 3, 4].map((localRow) =>
+                  [0, 1, 2, 3, 4].map((localCol) => {
+                    const canonical = toCanonicalPosition(localRow, localCol);
+                    const cell = s.grid[canonical.row][canonical.col];
+                    const isCenter = canonical.row === 2 && canonical.col === 2;
                     const isEmpty = !cell;
                     const canPlace =
                       s.phase === 'playing' &&
@@ -356,11 +381,11 @@ export default function CrossCribBoard({
 
                     return (
                       <div
-                        key={`${row}-${col}`}
+                        key={`${localRow}-${localCol}`}
                         className={`crosscrib-cell ${isEmpty && !isCenter ? 'crosscrib-cell--empty' : ''} ${canPlace ? 'crosscrib-cell--placeable' : ''}`}
-                        onClick={() => canPlace && placeCard(row, col)}
+                        onClick={() => canPlace && placeCard(canonical.row, canonical.col)}
                         role={canPlace ? 'button' : undefined}
-                        aria-label={canPlace ? `Place card at row ${row + 1} column ${col + 1}` : undefined}
+                        aria-label={canPlace ? `Place card at row ${localRow + 1} column ${localCol + 1}` : undefined}
                       >
                         <AnimatePresence mode="wait" initial={false}>
                           {isCenter && s.starterCard ? (
