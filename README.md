@@ -9,14 +9,16 @@ This project runs fully peer-to-peer in the browser: one player hosts a lobby an
 Current game types (from `src/games/registry.ts` and `src/networking/types.ts`):
 
 - `yahtzee` (1-4 players)
+- `farkle` (2-6 players)
 - `hearts` (4 players, target score options 50 or 100)
 - `battleship` (2 players)
 - `liars-dice` (2-4 players)
 - `poker` (2-8 players)
 - `up-and-down-the-river` (4-6 players)
 - `tolva` (2-4 players)
+- `cross-crib` (2-4 players)
 
-Production builds show a subset (yahtzee, hearts, poker, up-and-down-the-river, tolva); battleship and liars-dice are available in dev mode.
+Production builds show a subset (yahtzee, farkle, hearts, poker, up-and-down-the-river, tolva, cross-crib); battleship and liars-dice are available in dev mode.
 
 ## Key features
 
@@ -155,6 +157,10 @@ npm run dev
 
 ```bash
 npm run lint
+npm run typecheck
+npm run test
+npm run test:watch
+npm run test:e2e
 npm run build
 npm run preview
 ```
@@ -164,7 +170,13 @@ Scripts are defined in `package.json`:
 - `dev`: run Vite dev server
 - `build`: `tsc -b && vite build`
 - `lint`: ESLint over project files
+- `typecheck`: TypeScript project reference checks without emit
+- `test`: run Vitest unit/component suites
+- `test:watch`: run Vitest in watch mode
+- `test:coverage`: run Vitest with coverage output
+- `test:e2e`: run Playwright smoke tests
 - `preview`: serve built app locally
+- `ci`: run lint + typecheck + tests + build locally (same order as CI)
 
 ### Local troubleshooting
 
@@ -183,13 +195,12 @@ Build stack:
 
 Deployment:
 
-- Workflow: `.github/workflows/deploy.yml`
-- Trigger: push to `master` (or manual workflow dispatch)
-- CI steps:
-  1. `npm ci`
-  2. `npm run build`
-  3. Upload `dist/` artifact
-  4. Deploy to GitHub Pages
+- Validation workflow: `.github/workflows/ci.yml`
+  - Triggers on pull requests and pushes to `master`
+  - Runs lint, typecheck, Vitest unit/component tests, build, and Playwright smoke tests
+- Deployment workflow: `.github/workflows/deploy.yml`
+  - Triggers on push to `master` (or manual workflow dispatch)
+  - Builds and deploys `dist/` to GitHub Pages
 
 ## Adding a new game
 
