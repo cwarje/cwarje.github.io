@@ -29,6 +29,7 @@ import TwelveOptions from './twelve/TwelveOptions';
 
 import HeartsTitleExtra from './hearts/HeartsTitleExtra';
 import PokerTitleExtra from './poker/PokerTitleExtra';
+import CrossCribTitleExtra from './cross-crib/CrossCribTitleExtra';
 import UpRiverToolbarExtra from './up-and-down-the-river/UpRiverToolbarExtra';
 import TwelveToolbarExtra from './twelve/TwelveToolbarExtra';
 
@@ -505,7 +506,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
         '2 players: 12 cards each. 4 players: 6 cards each. No crib pile.',
         'Players take turns placing one card into any empty space. Card fades in from your seat direction.',
         'Each row and column is scored as a 5-card cribbage hand: 15s (2 pts each), pairs (2/6/12), runs, flush (5 pts), knobs (Jack matching starter suit).',
-        '2-player: one player scores rows, one scores columns. 4-player: one team scores rows, one scores columns.',
+        'You count points in the column direction (the columns in front of you). Your opponents count the rows. In 4-player, your team counts columns; the other team counts rows.',
         '4 rounds. Highest total wins.',
       ],
       howToPlay: [
@@ -536,6 +537,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     hasHandZoom: true,
     production: true,
     hudTitleLines: ['Cross Crib'],
+    TitleExtra: CrossCribTitleExtra,
   },
 };
 

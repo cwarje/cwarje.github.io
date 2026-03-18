@@ -75,12 +75,12 @@ function buildRoundSummary(state: CrossCribState): string {
   if (state.players.length === 2) {
     const p0 = state.players[0];
     const p1 = state.players[1];
-    return `${p0.name} (rows): ${rowTotal} · ${p1.name} (columns): ${colTotal}. Round totals: ${p0.name} ${state.players[0].totalScore + rowTotal}, ${p1.name} ${state.players[1].totalScore + colTotal}`;
+    return `${p0.name}: ${rowTotal} · ${p1.name}: ${colTotal}`;
   }
 
   const team0 = `${state.players[0].name} & ${state.players[2].name}`;
   const team1 = `${state.players[1].name} & ${state.players[3].name}`;
-  return `Team rows (${team0}): ${rowTotal} · Team columns (${team1}): ${colTotal}`;
+  return `${team0}: ${rowTotal} · ${team1}: ${colTotal}`;
 }
 
 function countFilledCells(grid: CrossCribState['grid']): number {
