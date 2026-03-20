@@ -76,36 +76,36 @@ function buildRoundSummary(
     const teamPoints = getTeamRoundCardPoints(players, roundCardPoints);
     const team0Names = `${players[0].name} & ${players[2].name}`;
     const team1Names = `${players[1].name} & ${players[3].name}`;
-    const pointsLine = `Team card points (${team0Names}: ${teamPoints[0]} · ${team1Names}: ${teamPoints[1]})`;
+    const pointsLine = `${team0Names}: ${teamPoints[0]} · ${team1Names}: ${teamPoints[1]}`;
     const mostPointsLine = gotMostPoint === null
-      ? 'Most-points bonus tied — no team scores it.'
+      ? 'Most +1: tie'
       : (() => {
           const winnerIdx = players.findIndex(p => p.id === gotMostPoint);
           const teamNames = winnerIdx % 2 === 0 ? team0Names : team1Names;
-          return `${teamNames} took the most points and earn +1.`;
+          return `Most +1: ${teamNames}`;
         })();
     const lastTrickLine = lastTrickWinnerId === null
-      ? 'Last-trick bonus unavailable.'
+      ? 'Last +1: none'
       : (() => {
           const winnerIdx = players.findIndex(p => p.id === lastTrickWinnerId);
           const teamNames = winnerIdx % 2 === 0 ? team0Names : team1Names;
-          return `${players.find(p => p.id === lastTrickWinnerId)?.name ?? 'Player'} won the last trick, earning +1 for ${teamNames}.`;
+          return `Last +1: ${players.find(p => p.id === lastTrickWinnerId)?.name ?? 'Player'} (${teamNames})`;
         })();
-    return `${pointsLine}. ${mostPointsLine} ${lastTrickLine}`;
+    return `${pointsLine} · ${mostPointsLine} · ${lastTrickLine}`;
   }
 
   const chunks = players.map((player) => {
     const label = roundCardPoints[player.id] ?? 0;
     return `${player.name}: ${label}`;
   });
-  const pointsLine = `Round card points (${chunks.join(' · ')})`;
+  const pointsLine = chunks.join(' · ');
   const mostPointsLine = gotMostPoint === null
-    ? 'Most-points bonus tied — no one scores it.'
-    : `${players.find(player => player.id === gotMostPoint)?.name ?? 'Player'} took the most points and earns +1.`;
+    ? 'Most +1: tie'
+    : `Most +1: ${players.find(player => player.id === gotMostPoint)?.name ?? 'Player'}`;
   const lastTrickLine = lastTrickWinnerId === null
-    ? 'Last-trick bonus unavailable.'
-    : `${players.find(player => player.id === lastTrickWinnerId)?.name ?? 'Player'} won the last trick and earns +1.`;
-  return `${pointsLine}. ${mostPointsLine} ${lastTrickLine}`;
+    ? 'Last +1: none'
+    : `Last +1: ${players.find(player => player.id === lastTrickWinnerId)?.name ?? 'Player'}`;
+  return `${pointsLine} · ${mostPointsLine} · ${lastTrickLine}`;
 }
 
 function decideGameWinners(players: TwelvePlayer[], roundCardPoints: Record<string, number>): string[] {

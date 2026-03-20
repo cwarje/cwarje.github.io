@@ -207,37 +207,32 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
           <span key="team0">{renderTeam(0)}{`: ${teamPoints[0]}`}</span>,
           <span key="team1">{renderTeam(1)}{`: ${teamPoints[1]}`}</span>,
         ];
-        const pointsLine = (
-          <>
-            Team card points (
-            {pointsChunks.reduce<ReactNode[]>((acc, node, i) => (i === 0 ? [node] : [...acc, ' · ', node]), [])}
-            )
-          </>
-        );
+        const pointsLine = pointsChunks.reduce<ReactNode[]>((acc, node, i) => (i === 0 ? [node] : [...acc, ' · ', node]), []);
         const winningTeam: 0 | 1 | null = teamPoints[0] > teamPoints[1] ? 0 : teamPoints[1] > teamPoints[0] ? 1 : null;
         const mostPointsLine = winningTeam === null ? (
-          'Most-points bonus tied — no team scores it.'
+          'Most +1: tie'
         ) : (
-          <>{renderTeam(winningTeam)}{' took the most points and earn +1.'}</>
+          <>Most +1: {renderTeam(winningTeam)}</>
         );
         const lastTrickLine = state.lastTrickWinnerId === null ? (
-          'Last-trick bonus unavailable.'
+          'Last +1: none'
         ) : (() => {
           const winner = state.players.find(p => p.id === state.lastTrickWinnerId)!;
           const winnerIdx = state.players.findIndex(p => p.id === state.lastTrickWinnerId);
           const team = (winnerIdx % 2) as 0 | 1;
           return (
             <>
+              {'Last +1: '}
               <span style={{ color: getPlayerHudTextColor(winner.color) }}>{winner.name}</span>
-              {' won the last trick, earning +1 for '}
+              {' ('}
               {renderTeam(team)}
-              {'.'}
+              {')'}
             </>
           );
         })();
         return (
           <>
-            {pointsLine}. {mostPointsLine} {lastTrickLine}
+            {pointsLine} {' · '} {mostPointsLine} {' · '} {lastTrickLine}
           </>
         );
       }
@@ -251,36 +246,30 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
           {player.name}: {roundCardPoints[player.id] ?? 0}
         </span>
       ));
-      const pointsLine = (
-        <>
-          Round card points (
-          {pointsChunks.reduce<ReactNode[]>((acc, node, i) => (i === 0 ? [node] : [...acc, ' · ', node]), [])}
-          )
-        </>
-      );
+      const pointsLine = pointsChunks.reduce<ReactNode[]>((acc, node, i) => (i === 0 ? [node] : [...acc, ' · ', node]), []);
       const mostPointsLine = gotMostPoint === null ? (
-        'Most-points bonus tied — no one scores it.'
+        'Most +1: tie'
       ) : (
         <>
+          {'Most +1: '}
           <span style={{ color: getPlayerHudTextColor(state.players.find(p => p.id === gotMostPoint)!.color) }}>
             {state.players.find(p => p.id === gotMostPoint)?.name ?? 'Player'}
           </span>
-          {' took the most points and earns +1.'}
         </>
       );
       const lastTrickLine = state.lastTrickWinnerId === null ? (
-        'Last-trick bonus unavailable.'
+        'Last +1: none'
       ) : (
         <>
+          {'Last +1: '}
           <span style={{ color: getPlayerHudTextColor(state.players.find(p => p.id === state.lastTrickWinnerId)!.color) }}>
             {state.players.find(p => p.id === state.lastTrickWinnerId)?.name ?? 'Player'}
           </span>
-          {' won the last trick and earns +1.'}
         </>
       );
       return (
         <>
-          {pointsLine}. {mostPointsLine} {lastTrickLine}
+          {pointsLine} {' · '} {mostPointsLine} {' · '} {lastTrickLine}
         </>
       );
     }
