@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { HeartsState, Card, Suit, HeartsPlayer } from './types';
 import { isValidHeartsPlay } from './rules';
-import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX } from '../../networking/playerColors';
+import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
   hearts: '\u2665',
@@ -33,10 +33,6 @@ function placementLabel(position: number): string {
   if (position % 10 === 2) return `${position}nd`;
   if (position % 10 === 3) return `${position}rd`;
   return `${position}th`;
-}
-
-function getPlayerColorHex(player: HeartsPlayer): string {
-  return PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
 }
 
 function getFittedTextSize(text: string, availableWidth: number, minSize: number, maxSize: number): number {
@@ -218,7 +214,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
               {waitingOn.map((p, i) => (
                 <span key={p.id}>
                   {i > 0 && ', '}
-                  <span style={{ color: getPlayerColorHex(p) }}>{p.name}</span>
+                  <span style={{ color: getPlayerHudTextColor(p.color) }}>{p.name}</span>
                 </span>
               ))}
               ...
@@ -232,7 +228,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
     if (state.trickWinner && trickWinnerPlayer) {
       return (
         <>
-          <span style={{ color: getPlayerColorHex(trickWinnerPlayer) }}>{trickWinnerPlayer.name}</span>
+          <span style={{ color: getPlayerHudTextColor(trickWinnerPlayer.color) }}>{trickWinnerPlayer.name}</span>
           {' won the trick'}
         </>
       );

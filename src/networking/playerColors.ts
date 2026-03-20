@@ -26,6 +26,15 @@ export const PLAYER_COLOR_HEX: Record<PlayerColor, string> = {
 
 export const DARK_PLAYER_COLORS = new Set<PlayerColor>(['indigo', 'violet', 'dark-purple']);
 
+/** Base swatch share in HUD/status text (remainder mixes toward white). */
+export const PLAYER_HUD_TEXT_BASE_PERCENT = 68;
+
+export function getPlayerHudTextColor(color: PlayerColor | string | null | undefined): string {
+  const c = normalizePlayerColor(color == null ? null : String(color));
+  const hex = PLAYER_COLOR_HEX[c] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+  return `color-mix(in srgb, ${hex} ${PLAYER_HUD_TEXT_BASE_PERCENT}%, white)`;
+}
+
 export function isPlayerColor(value: string | null): value is PlayerColor {
   return !!value && PLAYER_COLOR_OPTIONS.some(option => option.value === value);
 }

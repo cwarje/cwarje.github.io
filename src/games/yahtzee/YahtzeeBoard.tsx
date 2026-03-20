@@ -16,7 +16,7 @@ import {
   type CubeOrientation,
   type DiceValue,
 } from '../../components/Dice';
-import { DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX } from '../../networking/playerColors';
+import { DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 
 const DICE_COUNT = 5;
 
@@ -303,8 +303,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
                       : 'yahtzee-playerHeader--activeOther font-semibold'
                     : '';
                 const displayName = isMe ? 'You' : player.name;
-                const playerNameColor =
-                  PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+                const playerNameColor = getPlayerHudTextColor(player.color);
                 return (
                   <th
                     key={player.id}

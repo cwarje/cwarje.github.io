@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import type { Card, Suit, TwelvePlayer, TwelveState } from './types';
 import { getPilePlayableCard, isLegalPlay, rankDisplay, suitsWithRoyalPair } from './rules';
 import { getTeamRoundCardPoints } from './logic';
-import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX } from '../../networking/playerColors';
+import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
   hearts: '\u2665',
@@ -78,10 +78,6 @@ function getTrickSlotPlacement(playerCount: number, relativeIndex: number): Tric
   const layout = TRICK_SLOT_PLACEMENTS[playerCount]?.[relativeIndex];
   if (layout) return layout;
   return { row: 2, col: 2, dx: '0px', dy: '0px' };
-}
-
-function getPlayerColorHex(player: TwelvePlayer): string {
-  return PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
 }
 
 function PokerFlipCard({ card, faceDown, disabled = false }: { card?: Card | null; faceDown: boolean; disabled?: boolean }) {
@@ -201,9 +197,9 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
           const p2 = state.players[teamIdx === 0 ? 2 : 3];
           return (
             <>
-              <span style={{ color: getPlayerColorHex(p1) }}>{p1.name}</span>
+              <span style={{ color: getPlayerHudTextColor(p1.color) }}>{p1.name}</span>
               {' & '}
-              <span style={{ color: getPlayerColorHex(p2) }}>{p2.name}</span>
+              <span style={{ color: getPlayerHudTextColor(p2.color) }}>{p2.name}</span>
             </>
           );
         };
@@ -232,7 +228,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
           const team = (winnerIdx % 2) as 0 | 1;
           return (
             <>
-              <span style={{ color: getPlayerColorHex(winner) }}>{winner.name}</span>
+              <span style={{ color: getPlayerHudTextColor(winner.color) }}>{winner.name}</span>
               {' won the last trick, earning +1 for '}
               {renderTeam(team)}
               {'.'}
@@ -251,7 +247,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
       const mostPointIds = state.players.filter(p => (roundCardPoints[p.id] ?? 0) === maxPoints).map(p => p.id);
       const gotMostPoint = mostPointIds.length === 1 ? mostPointIds[0] : null;
       const pointsChunks = state.players.map((player) => (
-        <span key={player.id} style={{ color: getPlayerColorHex(player) }}>
+        <span key={player.id} style={{ color: getPlayerHudTextColor(player.color) }}>
           {player.name}: {roundCardPoints[player.id] ?? 0}
         </span>
       ));
@@ -266,7 +262,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
         'Most-points bonus tied — no one scores it.'
       ) : (
         <>
-          <span style={{ color: getPlayerColorHex(state.players.find(p => p.id === gotMostPoint)!) }}>
+          <span style={{ color: getPlayerHudTextColor(state.players.find(p => p.id === gotMostPoint)!.color) }}>
             {state.players.find(p => p.id === gotMostPoint)?.name ?? 'Player'}
           </span>
           {' took the most points and earns +1.'}
@@ -276,7 +272,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
         'Last-trick bonus unavailable.'
       ) : (
         <>
-          <span style={{ color: getPlayerColorHex(state.players.find(p => p.id === state.lastTrickWinnerId)!) }}>
+          <span style={{ color: getPlayerHudTextColor(state.players.find(p => p.id === state.lastTrickWinnerId)!.color) }}>
             {state.players.find(p => p.id === state.lastTrickWinnerId)?.name ?? 'Player'}
           </span>
           {' won the last trick and earns +1.'}
@@ -294,14 +290,14 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
       if (state.announcement.kind === 'set-trump') {
         return (
           <>
-            <span style={{ color: getPlayerColorHex(player) }}>{player.name}</span>
+            <span style={{ color: getPlayerHudTextColor(player.color) }}>{player.name}</span>
             {` set trump to ${state.announcement.suit}`}
           </>
         );
       }
       return (
         <>
-          <span style={{ color: getPlayerColorHex(player) }}>{player.name}</span>
+          <span style={{ color: getPlayerHudTextColor(player.color) }}>{player.name}</span>
           {` called tjog in ${state.announcement.suit}`}
         </>
       );
@@ -312,7 +308,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
       if (!winner) return null;
       return (
         <>
-          <span style={{ color: getPlayerColorHex(winner) }}>{winner.name}</span>
+          <span style={{ color: getPlayerHudTextColor(winner.color) }}>{winner.name}</span>
           {' won the trick'}
         </>
       );
@@ -323,7 +319,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
     return (
       <>
         {'Waiting for '}
-        <span style={{ color: getPlayerColorHex(waitingPlayer) }}>{waitingPlayer.name}</span>
+        <span style={{ color: getPlayerHudTextColor(waitingPlayer.color) }}>{waitingPlayer.name}</span>
       </>
     );
   }, [state.phase, state.roundCardPoints, state.lastTrickWinnerId, state.announcement, state.trickWinner, state.players, state.currentPlayerIndex, isMyTurn]);

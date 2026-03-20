@@ -7,7 +7,7 @@ import Dice, {
   type CubeOrientation,
   type DiceValue,
 } from '../../components/Dice/Dice';
-import { DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX } from '../../networking/playerColors';
+import { getPlayerHudTextColor } from '../../networking/playerColors';
 import { scoreKeptDice } from './logic';
 import type { FarkleState } from './types';
 
@@ -58,8 +58,7 @@ export default function FarkleBoard({ state, myId, onAction }: FarkleBoardProps)
   const [showFarkleMessage, setShowFarkleMessage] = useState(false);
   const prevDiceRef = useRef<number[] | null>(null);
   const currentPlayer = state.players[state.currentPlayerIndex];
-  const currentPlayerColor =
-    PLAYER_COLOR_HEX[currentPlayer?.color ?? DEFAULT_PLAYER_COLOR] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+  const currentPlayerColor = getPlayerHudTextColor(currentPlayer?.color);
   const isMyTurn = currentPlayer?.id === myId;
   const myPlayer = state.players.find((player) => player.id === myId) ?? null;
   const canBank = !!myPlayer && (myPlayer.totalScore > 0 || state.turnScore >= 500);
@@ -265,8 +264,7 @@ export default function FarkleBoard({ state, myId, onAction }: FarkleBoardProps)
                         : 'yahtzee-playerHeader--activeOther font-semibold'
                       : '';
                   const displayName = isMe ? 'You' : player.name;
-                  const playerNameColor =
-                    PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+                  const playerNameColor = getPlayerHudTextColor(player.color);
                   return (
                     <th
                       key={player.id}

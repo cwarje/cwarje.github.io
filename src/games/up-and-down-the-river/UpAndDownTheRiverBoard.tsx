@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Card, Suit, UpRiverPlayer, UpRiverState } from './types';
 import { isValidUpRiverPlay } from './rules';
-import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX } from '../../networking/playerColors';
+import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
   hearts: '\u2665',
@@ -112,10 +112,6 @@ function getTrickSlotPlacement(playerCount: number, relativeIndex: number): Tric
     dx: '0px',
     dy: '0px',
   };
-}
-
-function getPlayerColorHex(player: UpRiverPlayer): string {
-  return PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
 }
 
 export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZoomed = false }: UpRiverBoardProps) {
@@ -229,7 +225,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
             madeBidPlayers.map((p, i) => (
               <span key={p.id}>
                 {i > 0 && ', '}
-                {p.id === myId ? 'You' : <span style={{ color: getPlayerColorHex(p) }}>{p.name}</span>}
+                {p.id === myId ? 'You' : <span style={{ color: getPlayerHudTextColor(p.color) }}>{p.name}</span>}
               </span>
             ))
           ) : (
@@ -240,7 +236,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
             missedBidPlayers.map((p, i) => (
               <span key={p.id}>
                 {i > 0 && ', '}
-                {p.id === myId ? 'You' : <span style={{ color: getPlayerColorHex(p) }}>{p.name}</span>}
+                {p.id === myId ? 'You' : <span style={{ color: getPlayerHudTextColor(p.color) }}>{p.name}</span>}
               </span>
             ))
           ) : (
@@ -257,7 +253,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
       return (
         <>
           {'Waiting for '}
-          <span style={{ color: getPlayerColorHex(waitingPlayer) }}>{waitingPlayer.name}</span>
+          <span style={{ color: getPlayerHudTextColor(waitingPlayer.color) }}>{waitingPlayer.name}</span>
           {' to bid'}
         </>
       );
@@ -267,7 +263,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
       if (!winner) return null;
       return (
         <>
-          <span style={{ color: getPlayerColorHex(winner) }}>{winner.name}</span>
+          <span style={{ color: getPlayerHudTextColor(winner.color) }}>{winner.name}</span>
           {' won the trick'}
         </>
       );

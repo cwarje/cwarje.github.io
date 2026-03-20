@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, ChevronUp, ChevronDown, Play, LogOut } from 'lucide-react';
-import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, normalizePlayerColor } from '../../networking/playerColors';
+import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor, normalizePlayerColor } from '../../networking/playerColors';
 import type { PokerState, PokerAction, Card, PokerPlayer } from './types';
 
 // ────────────────────────────────────────────
@@ -70,11 +70,6 @@ function getPokerLayoutRadii(playerCount: number): { seatRadiusX: number; seatRa
   if (playerCount === 4) return { seatRadiusX: 38, seatRadiusY: 37 };
   if (playerCount === 3) return { seatRadiusX: 34, seatRadiusY: 35 };
   return { seatRadiusX: 30, seatRadiusY: 31 }; // 2
-}
-
-function getPlayerColorHex(player: PokerPlayer): string {
-  const color = normalizePlayerColor((player as { color?: string }).color ?? null);
-  return PLAYER_COLOR_HEX[color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
 }
 
 interface PokerSeatLayout {
@@ -168,7 +163,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
         if (p.id === myId) return 'You win the hand';
         return (
           <>
-            <span style={{ color: getPlayerColorHex(p) }}>{p.name}</span>
+            <span style={{ color: getPlayerHudTextColor(p.color) }}>{p.name}</span>
             {' wins the hand'}
           </>
         );
@@ -178,7 +173,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
           {winnerPlayers.map((p, i) => (
             <span key={p.id}>
               {i > 0 && ' and '}
-              {p.id === myId ? 'You' : <span style={{ color: getPlayerColorHex(p) }}>{p.name}</span>}
+              {p.id === myId ? 'You' : <span style={{ color: getPlayerHudTextColor(p.color) }}>{p.name}</span>}
             </span>
           ))}
           {' win the hand'}
@@ -194,7 +189,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
       }
       return (
         <>
-          {streetCapitalized} · <span style={{ color: getPlayerColorHex(currentPlayer) }}>{currentPlayer.name}</span>'s turn
+          {streetCapitalized} · <span style={{ color: getPlayerHudTextColor(currentPlayer.color) }}>{currentPlayer.name}</span>'s turn
         </>
       );
     }
