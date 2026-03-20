@@ -386,6 +386,16 @@ function getCurrentTrickPoints(state: HeartsState): number {
   return state.currentTrick.reduce((sum, entry) => sum + cardPoints(entry.card), 0);
 }
 
+/** When we must win the trick (no duck), play high to slough only if the trick is still point-free and spades cannot still pull in Q♠. */
+function shouldSloughHighWhenWinningTrick(state: HeartsState, leadSuit: Suit): boolean {
+  if (getCurrentTrickPoints(state) !== 0) return false;
+  if (leadSuit === 'clubs' || leadSuit === 'diamonds') return true;
+  if (leadSuit === 'hearts') return false;
+  const played = collectPlayedCards(state);
+  if (hasCard(played, 'spades', 12)) return true;
+  return state.currentTrick.length === state.players.length - 1;
+}
+
 function getHigherUnseenCount(state: HeartsState, hand: Card[], card: Card): number {
   const played = collectPlayedCards(state);
   let count = 0;
@@ -492,6 +502,10 @@ function chooseFollowSuitCard(state: HeartsState, suitCards: Card[], myPlayer: H
       return winningCards[0];
     }
     return underCards[underCards.length - 1];
+  }
+
+  if (winningCards.length > 0 && shouldSloughHighWhenWinningTrick(state, leadSuit)) {
+    return winningCards[winningCards.length - 1];
   }
 
   return sortedSuitCards[0];
