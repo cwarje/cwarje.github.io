@@ -269,7 +269,7 @@ export function willYahtzeeBotScore(state: unknown): boolean {
   if (s.rollsLeft === 0) return true;  // must score
   const available = getAvailableCategories(s.dice, player.scorecard);
   const best = pickBestCategory(s.dice, available, player.scorecard);
-  return !shouldReroll(s.dice, best, player.scorecard);
+  return !shouldReroll(s.dice, best, player.scorecard, s.rollsLeft);
 }
 
 // Bot AI — performs exactly ONE step per call (one roll or one score)
@@ -297,7 +297,7 @@ export function runYahtzeeBotTurn(state: unknown): unknown {
   const bestCategory = pickBestCategory(s.dice, availableCategories, currentPlayer.scorecard);
 
   // Step 2: Reroll (rollsLeft > 0 and should reroll) — hold + roll once
-  if (s.rollsLeft > 0 && shouldReroll(s.dice, bestCategory, currentPlayer.scorecard)) {
+  if (s.rollsLeft > 0 && shouldReroll(s.dice, bestCategory, currentPlayer.scorecard, s.rollsLeft)) {
     const newHeld = decideBotHolds(s.dice, bestCategory);
     const newDice = rollDice(s.dice, newHeld);
     return {
@@ -312,48 +312,252 @@ export function runYahtzeeBotTurn(state: unknown): unknown {
   return processYahtzeeAction(s, { type: 'score', category: bestCategory }, currentPlayer.id);
 }
 
+const UPPER_FACE: Record<string, number> = {
+  ones: 1, twos: 2, threes: 3, fours: 4, fives: 5, sixes: 6,
+};
+
+const SMALL_STRAIGHT_WINDOWS = [
+  [1, 2, 3, 4],
+  [2, 3, 4, 5],
+  [3, 4, 5, 6],
+] as const;
+
+const LARGE_STRAIGHT_WINDOWS = [
+  [1, 2, 3, 4, 5],
+  [2, 3, 4, 5, 6],
+] as const;
+
+/** Prefer filling rare lower rows when weights tie */
+function categoryRarity(cat: ScoreCategory): number {
+  switch (cat) {
+    case 'yahtzee': return 100;
+    case 'largeStraight': return 90;
+    case 'fullHouse': return 80;
+    case 'smallStraight': return 70;
+    case 'fourOfAKind': return 60;
+    case 'threeOfAKind': return 50;
+    case 'chance': return 10;
+    default: return 40;
+  }
+}
+
+function pickBestStraightWindow(dice: number[], needFive: boolean): number[] {
+  const windows = needFive ? LARGE_STRAIGHT_WINDOWS : SMALL_STRAIGHT_WINDOWS;
+  const inDice = new Set(dice);
+  let best: number[] = [...windows[0]];
+  let bestDistinct = -1;
+  let bestSum = -1;
+  for (const w of windows) {
+    const present = w.filter(v => inDice.has(v));
+    const distinct = present.length;
+    const sumVals = present.reduce((a, v) => a + v, 0);
+    if (distinct > bestDistinct || (distinct === bestDistinct && sumVals > bestSum)) {
+      bestDistinct = distinct;
+      bestSum = sumVals;
+      best = [...w];
+    }
+  }
+  return best;
+}
+
+/** Hold one die per distinct value in `window` that appears in `dice` */
+function holdsForStraightWindow(dice: number[], window: number[]): boolean[] {
+  const heldFace = new Set<number>();
+  return dice.map(d => {
+    if (window.includes(d) && !heldFace.has(d)) {
+      heldFace.add(d);
+      return true;
+    }
+    return false;
+  });
+}
+
+function maxCountInDice(dice: number[]): number {
+  const c = countDice(dice);
+  return Math.max(0, ...Object.values(c));
+}
+
+function fullHousePatternOk(dice: number[]): boolean {
+  const vals = Object.values(countDice(dice)).sort((a, b) => b - a);
+  return vals.includes(3) && vals.includes(2);
+}
+
+/** Hold triple + pair candidates for full house */
+function holdsForFullHouse(dice: number[]): boolean[] {
+  const counts = countDice(dice);
+  const entries = Object.entries(counts)
+    .map(([v, n]) => [Number(v), n] as [number, number])
+    .sort((a, b) => b[1] - a[1] || b[0] - a[0]);
+  const vals = entries.map(([, n]) => n).sort((a, b) => b - a);
+
+  if (vals.includes(3) && vals.includes(2)) {
+    return dice.map(() => true);
+  }
+  if (vals[0] === 4) {
+    const face = entries[0][0];
+    let kept = 0;
+    return dice.map(d => {
+      if (d === face && kept < 3) {
+        kept++;
+        return true;
+      }
+      return false;
+    });
+  }
+  if (vals[0] === 3) {
+    const face = entries[0][0];
+    return dice.map(d => d === face);
+  }
+  if (vals[0] === 2 && vals[1] === 2) {
+    const a = entries[0][0];
+    const b = entries[1][0];
+    return dice.map(d => d === a || d === b);
+  }
+  const face = entries[0][0];
+  return dice.map(d => d === face);
+}
+
+/** Yahtzee / three- or four-of-a-kind: largest group; two pairs → hold both pairs */
+function holdsForMultiples(dice: number[]): boolean[] {
+  const counts = countDice(dice);
+  const entries = Object.entries(counts)
+    .map(([v, n]) => [Number(v), n] as [number, number])
+    .sort((a, b) => b[1] - a[1] || b[0] - a[0]);
+
+  if (entries.length >= 2 && entries[0][1] === 2 && entries[1][1] === 2) {
+    const a = entries[0][0];
+    const b = entries[1][0];
+    return dice.map(d => d === a || d === b);
+  }
+  const face = entries[0][0];
+  return dice.map(d => d === face);
+}
+
 function pickBestCategory(dice: number[], available: ScoreCategory[], scorecard: Scorecard): ScoreCategory {
   let best: ScoreCategory = available[0];
   let bestScore = -1;
+  let bestRarity = -1;
+  const upperTotal = getUpperTotal(scorecard);
+  const bonusDeficit = Math.max(0, 63 - upperTotal);
 
   for (const cat of available) {
     const score = calculateScoreWithJoker(dice, cat, scorecard);
-    // Weight categories by their value relative to expected
     let weight = score;
     if (cat === 'yahtzee' && score === 50) weight = 100;
     if (cat === 'largeStraight' && score === 40) weight = 80;
     if (cat === 'fullHouse' && score === 25) weight = 50;
-    if (weight > bestScore) {
+
+    if ((UPPER_CATS as string[]).includes(cat)) {
+      const face = UPPER_FACE[cat];
+      if (face !== undefined) {
+        const contribution = Math.min(score, 3 * face);
+        weight += (bonusDeficit / 63) * contribution * 0.5;
+      }
+    }
+
+    const rarity = categoryRarity(cat);
+    if (weight > bestScore || (weight === bestScore && rarity > bestRarity)) {
       bestScore = weight;
+      bestRarity = rarity;
       best = cat;
     }
   }
   return best;
 }
 
-function shouldReroll(dice: number[], bestCategory: ScoreCategory, scorecard: Scorecard): boolean {
-  // Don't reroll if joker is active (already have a Yahtzee!)
+export function shouldReroll(
+  dice: number[],
+  bestCategory: ScoreCategory,
+  scorecard: Scorecard,
+  rollsLeft: number,
+): boolean {
+  if (rollsLeft <= 0) return false;
   if (isJokerActive(dice, scorecard)) return false;
 
   const score = calculateScore(dice, bestCategory);
+  const sum = dice.reduce((a, b) => a + b, 0);
+  const counts = countDice(dice);
+  const maxRun = maxCountInDice(dice);
+
   if (bestCategory === 'yahtzee' && score === 50) return false;
   if (bestCategory === 'largeStraight' && score === 40) return false;
   if (bestCategory === 'fullHouse' && score === 25) return false;
+
+  if ((UPPER_CATS as string[]).includes(bestCategory)) {
+    const face = UPPER_FACE[bestCategory];
+    if (face === undefined) return score === 0;
+    const n = counts[face] || 0;
+    return n < 5;
+  }
+
+  if (bestCategory === 'yahtzee') {
+    if (maxRun >= 5) return false;
+    if (maxRun >= 3) return true;
+    return true;
+  }
+
+  if (bestCategory === 'fourOfAKind') {
+    if (maxRun >= 4) return false;
+    return true;
+  }
+
+  if (bestCategory === 'fullHouse') {
+    return !fullHousePatternOk(dice);
+  }
+
+  if (bestCategory === 'smallStraight') {
+    if (score > 0) return false;
+    return true;
+  }
+
+  if (bestCategory === 'largeStraight') {
+    if (score > 0) return false;
+    const uniq = [...new Set(dice)].sort((a, b) => a - b);
+    for (const w of LARGE_STRAIGHT_WINDOWS) {
+      const present = w.filter(v => uniq.includes(v)).length;
+      if (present >= 4) return true;
+    }
+    return true;
+  }
+
+  if (bestCategory === 'threeOfAKind') {
+    if (score === 0) return true;
+    if (maxRun >= 4) return false;
+    if (rollsLeft >= 2 && maxRun === 3 && sum < 24) return true;
+    return false;
+  }
+
+  if (bestCategory === 'chance') {
+    if (rollsLeft >= 2 && sum < 24) return true;
+    if (rollsLeft === 1 && sum < 14) return true;
+    return false;
+  }
+
   if (score === 0) return true;
-  const sum = dice.reduce((a, b) => a + b, 0);
-  return sum < 15;
+  if (rollsLeft === 1) return sum < 13;
+  return sum < 18;
 }
 
-function decideBotHolds(dice: number[], _targetCategory: ScoreCategory): boolean[] {
-  // Simple strategy: hold the most common value
-  const counts = countDice(dice);
-  let maxVal = 1;
-  let maxCount = 0;
-  for (const [val, count] of Object.entries(counts)) {
-    if (count > maxCount || (count === maxCount && Number(val) > maxVal)) {
-      maxCount = count;
-      maxVal = Number(val);
-    }
+export function decideBotHolds(dice: number[], targetCategory: ScoreCategory): boolean[] {
+  if ((UPPER_CATS as string[]).includes(targetCategory)) {
+    const face = UPPER_FACE[targetCategory];
+    if (face !== undefined) return dice.map(d => d === face);
   }
-  return dice.map(d => d === maxVal);
+
+  switch (targetCategory) {
+    case 'chance':
+      return dice.map(d => d >= 4);
+    case 'fullHouse':
+      return holdsForFullHouse(dice);
+    case 'smallStraight':
+      return holdsForStraightWindow(dice, pickBestStraightWindow(dice, false));
+    case 'largeStraight':
+      return holdsForStraightWindow(dice, pickBestStraightWindow(dice, true));
+    case 'yahtzee':
+    case 'fourOfAKind':
+    case 'threeOfAKind':
+      return holdsForMultiples(dice);
+    default:
+      return holdsForMultiples(dice);
+  }
 }
