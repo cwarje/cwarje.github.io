@@ -7,9 +7,9 @@ export function cardValueFor15(card: Card): number {
   return 1; // A
 }
 
-/** Rank for run comparison: 2-10, J=11, Q=12, K=13, A=14 */
+/** Rank for run comparison: A=1, 2-10, J=11, Q=12, K=13 */
 export function rankForRun(rank: number): number {
-  return rank;
+  return rank === 14 ? 1 : rank;
 }
 
 export function cardEquals(a: Card, b: Card): boolean {
@@ -71,7 +71,8 @@ export function scoreRuns(cards: Card[]): number {
 export function scoreRunsWithDuplicates(cards: Card[]): number {
   const rankCounts: Record<number, number> = {};
   for (const c of cards) {
-    rankCounts[c.rank] = (rankCounts[c.rank] ?? 0) + 1;
+    const runRank = rankForRun(c.rank);
+    rankCounts[runRank] = (rankCounts[runRank] ?? 0) + 1;
   }
   const ranks = [...new Set(cards.map(c => rankForRun(c.rank)))].sort((a, b) => a - b);
   if (ranks.length < 3) return 0;
