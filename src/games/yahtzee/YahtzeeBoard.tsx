@@ -239,14 +239,23 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
     const yahtzeeBonus = category === 'yahtzee' ? (state.yahtzeeBonus[playerId] || 0) * 100 : 0;
     const displayValue = scored !== null ? scored + yahtzeeBonus : potential;
     const displayText = displayValue === null ? '\u00A0' : String(displayValue);
+    const playerColorHex =
+      PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+    const isLastScoredCell = state.lastScoredCategory?.[playerId] === category;
+    const scoredCellMix = isLastScoredCell ? 35 : 25;
+    const scoredCellStyle =
+      scored !== null
+        ? { backgroundColor: `color-mix(in srgb, ${playerColorHex} ${scoredCellMix}%, transparent)` }
+        : undefined;
 
     return (
       <td
         key={playerId}
         onClick={() => canScore && handleScore(category)}
+        style={scoredCellStyle}
         className={`py-1.5 px-2 text-center text-[13px] sm:text-[15px] transition-colors ${
           scored !== null
-            ? 'bg-green-600/25 text-white'
+            ? 'text-white'
             : canScore
             ? 'text-primary-400 cursor-pointer hover:bg-primary-600/20 active:bg-primary-600/30'
             : 'text-white/30'

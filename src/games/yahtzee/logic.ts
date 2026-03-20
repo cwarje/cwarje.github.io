@@ -169,6 +169,7 @@ export function createYahtzeeState(players: Player[]): YahtzeeState {
     round: 1,
     gameOver: false,
     yahtzeeBonus: {},
+    lastScoredCategory: {},
   };
 }
 
@@ -231,6 +232,19 @@ export function processYahtzeeAction(state: unknown, action: unknown, playerId: 
       if (nextIndex === 0) nextRound++;
 
       const gameOver = nextRound > 13;
+      const scorerId = currentPlayer.id;
+      const nextPlayerId = newPlayers[nextIndex]?.id;
+      const lastScoredCategory = { ...(s.lastScoredCategory ?? {}) };
+      if (gameOver) {
+        lastScoredCategory[scorerId] = a.category;
+      } else if (nextPlayerId === scorerId) {
+        lastScoredCategory[scorerId] = null;
+      } else {
+        lastScoredCategory[scorerId] = a.category;
+        if (nextPlayerId) {
+          lastScoredCategory[nextPlayerId] = null;
+        }
+      }
 
       return {
         ...s,
@@ -242,6 +256,7 @@ export function processYahtzeeAction(state: unknown, action: unknown, playerId: 
         round: gameOver ? 13 : nextRound,
         gameOver,
         yahtzeeBonus: newBonuses,
+        lastScoredCategory,
       };
     }
   }

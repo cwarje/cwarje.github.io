@@ -36,6 +36,7 @@ export interface YahtzeeState {
   round: number;
   gameOver: boolean;
   yahtzeeBonus: Record<string, number>; // player id -> bonus count
+  lastScoredCategory: Record<string, ScoreCategory | null>; // player id -> most recently scored category
 }
 
 export type YahtzeeAction =
