@@ -572,10 +572,28 @@
 .settler-hand {
   width: 100%;
   display: flex;
-  justify-content: center;
+  align-items: center;
   overflow: hidden;
-  min-height: 132px;
-  padding: 2px 0 4px;
+  min-height: 96px;
+  padding: 0 0 2px;
+}
+
+.settler-hand--compact .settler-resourceCardSymbol {
+  font-size: clamp(1.25rem, 4.5vmin, 1.85rem);
+}
+
+.settler-handRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.settler-handGroup {
+  min-width: 0;
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-start;
 }
 
 .settler-handSpread {
@@ -595,7 +613,7 @@
 .settler-handCardWrap {
   position: absolute;
   left: 0;
-  top: 10px;
+  top: 4px;
   transition: transform 0.16s ease;
 }
 
@@ -605,11 +623,30 @@
   }
 }
 
+.settler-handCardWrap--discardSelected {
+  transform: translateY(-12px) !important;
+}
+
+.settler-handCardWrap--discardSelected .settler-resourceCard {
+  box-shadow:
+    0 0 0 2px rgba(251, 191, 36, 0.95),
+    0 12px 28px rgba(15, 23, 42, 0.45);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .settler-handCardWrap--active.settler-handCardWrap--discardSelected:hover {
+    transform: translateY(-14px) !important;
+  }
+}
+
 .settler-resourceCard {
+  position: relative;
+  --settler-resource-card-radius: 9px;
+  --settler-resource-card-border: 2px;
   width: 100%;
   height: 100%;
-  border: 3px solid #0f172a;
-  border-radius: 12px;
+  border: var(--settler-resource-card-border) solid transparent;
+  border-radius: var(--settler-resource-card-radius);
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.32);
   display: flex;
   flex-direction: column;
@@ -618,31 +655,87 @@
   gap: 5px;
   line-height: 1;
   color: #f8fafc;
+  --settler-resource-count-fg: #fff;
+  /* Inner curve at padding edge matches outer radius minus border (where the count sits). */
+  --settler-resource-count-corner-radius: calc(
+    var(--settler-resource-card-radius) - var(--settler-resource-card-border)
+  );
 }
 
 .settler-resourceCard--wood {
+  --settler-resource-count-bg: #22c55e;
   background: linear-gradient(140deg, #166534 0%, #052e16 100%);
+  border-color: var(--settler-resource-count-bg);
 }
 
 .settler-resourceCard--brick {
+  --settler-resource-count-bg: #ef4444;
   background: linear-gradient(140deg, #b91c1c 0%, #7f1d1d 100%);
+  border-color: var(--settler-resource-count-bg);
 }
 
 .settler-resourceCard--sheep {
+  --settler-resource-count-bg: #16a34a;
   background: linear-gradient(140deg, #4ade80 0%, #15803d 100%);
+  border-color: var(--settler-resource-count-bg);
 }
 
 .settler-resourceCard--wheat {
+  --settler-resource-count-bg: #ca8a04;
+  --settler-resource-count-fg: #422006;
   background: linear-gradient(140deg, #facc15 0%, #ca8a04 100%);
+  border-color: var(--settler-resource-count-bg);
   color: #422006;
 }
 
 .settler-resourceCard--ore {
+  --settler-resource-count-bg: #475569;
   background: linear-gradient(140deg, #64748b 0%, #1e293b 100%);
+  border-color: var(--settler-resource-count-bg);
+}
+
+.settler-resourceCardCount {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 0.22rem 0.38rem 0.32rem 0.42rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  border-top-right-radius: var(--settler-resource-count-corner-radius);
+  border-bottom-left-radius: var(--settler-resource-count-corner-radius);
+  background: var(--settler-resource-count-bg);
+  color: var(--settler-resource-count-fg);
 }
 
 .settler-resourceCardSymbol {
-  font-size: 1.5rem;
+  font-size: clamp(2rem, 6vmin, 2.85rem);
+}
+
+.settler-resourceCard--costPreview {
+  width: 28px;
+  height: 42px;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.38);
+  --settler-resource-card-radius: 6px;
+}
+
+.settler-resourceCard--costPreview .settler-resourceCardSymbol {
+  font-size: 1rem;
+}
+
+.settler-resourceCard--costPreview.settler-resourceCard--costPreviewUnaffordable::after {
+  content: '';
+  position: absolute;
+  /* Extend over the border (absolute inset is relative to the padding edge). */
+  inset: calc(-1 * var(--settler-resource-card-border));
+  border-radius: var(--settler-resource-card-radius);
+  background: rgba(0, 0, 0, 0.48);
+  pointer-events: none;
 }
 
 .settler-resourceCardLabel {

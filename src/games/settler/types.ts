@@ -13,6 +13,11 @@ export const RESOURCE_EMOJI: Record<Resource, string> = {
   ore: '🪨',
 };
 
+export const TERRAIN_EMOJI: Record<Terrain, string> = {
+  ...RESOURCE_EMOJI,
+  desert: '🏜️',
+};
+
 export const TERRAIN_DECK: Terrain[] = [
   ...Array(4).fill('wood'),
   ...Array(4).fill('sheep'),
@@ -183,6 +188,8 @@ export const COSTS: Record<BuildKind, Partial<Record<Resource, number>>> = {
   settlement: { wood: 1, brick: 1, sheep: 1, wheat: 1 },
   city: { ore: 3, wheat: 2 },
 };
+
+export const DEV_CARD_COST: Partial<Record<Resource, number>> = { sheep: 1, wheat: 1, ore: 1 };
 
 export const DEV_DECK: DevCard[] = [
   ...Array(14).fill('knight'),

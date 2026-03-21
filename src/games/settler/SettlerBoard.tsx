@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+  type TransitionEvent,
+} from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import {
   DEFAULT_BOARD_GRAPH,
@@ -6,15 +16,29 @@ import {
   flatTopHexPath,
   type EdgeLayout,
 } from './layout';
-import type { SettlerState, Resource, Terrain } from './types';
-import { COSTS, RESOURCE_EMOJI, RESOURCE_LIST, VP_TO_WIN } from './types';
+import type { ResourceHand, SettlerState, Resource, Terrain } from './types';
+import {
+  COSTS,
+  DEV_CARD_COST,
+  emptyHand,
+  RESOURCE_EMOJI,
+  RESOURCE_LIST,
+  TERRAIN_EMOJI,
+  VP_TO_WIN,
+} from './types';
 import {
   getLegalRoadEdgesForPlayer,
   getLegalSettlementVertices,
-  setupCurrentPlayerSlot,
   victoryPoints,
 } from './logic';
-import { Dice, faceOrientations, type DiceValue } from '../../components/Dice';
+import {
+  Dice,
+  faceOrientations,
+  getForwardRotationDelta,
+  positiveModulo,
+  type CubeOrientation,
+  type DiceValue,
+} from '../../components/Dice';
 import { PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 import type { PlayerColor } from '../../networking/types';
 
@@ -40,13 +64,13 @@ function renderActionLogText(text: string): ReactNode {
   });
 }
 
-const TERRAIN_STYLE: Record<Terrain, { fill: string; stroke: string; label: string }> = {
-  wood: { fill: 'url(#settlerWood)', stroke: '#14532d', label: 'Forest' },
-  brick: { fill: 'url(#settlerBrick)', stroke: '#7f1d1d', label: 'Brick' },
-  sheep: { fill: 'url(#settlerSheep)', stroke: '#166534', label: 'Pasture' },
-  wheat: { fill: 'url(#settlerWheat)', stroke: '#a16207', label: 'Fields' },
-  ore: { fill: 'url(#settlerOre)', stroke: '#334155', label: 'Mountains' },
-  desert: { fill: 'url(#settlerDesert)', stroke: '#92400e', label: 'Desert' },
+const TERRAIN_STYLE: Record<Terrain, { fill: string; stroke: string }> = {
+  wood: { fill: 'url(#settlerWood)', stroke: '#14532d' },
+  brick: { fill: 'url(#settlerBrick)', stroke: '#7f1d1d' },
+  sheep: { fill: 'url(#settlerSheep)', stroke: '#166534' },
+  wheat: { fill: 'url(#settlerWheat)', stroke: '#a16207' },
+  ore: { fill: 'url(#settlerOre)', stroke: '#334155' },
+  desert: { fill: 'url(#settlerDesert)', stroke: '#92400e' },
 };
 
 interface SettlerBoardProps {
@@ -56,9 +80,72 @@ interface SettlerBoardProps {
 }
 
 type BuildTapMode = 'none' | 'road' | 'settlement' | 'city';
+const RESOURCE_HAND_GAP = 3;
+/** Drawable hand width inside padded column (`min(100%, 22rem)` − horizontal `px-3`). */
+const SETTLER_HAND_LAYOUT_WIDTH = 328;
+const RESOURCE_CARD_WIDTH = 52;
+const RESOURCE_CARD_HEIGHT = 76;
+
+interface ResourceHandGroup {
+  resource: Resource;
+  count: number;
+  cards: Resource[];
+}
+
+interface ResourceHandLayout {
+  cardWidth: number;
+  cardHeight: number;
+  step: number;
+  spreadWidth: number;
+  selectedLift: number;
+}
+
+function getResourceHandLayout(cardCount: number, slotWidth: number): ResourceHandLayout {
+  const available = Math.max(slotWidth - 6, 40);
+  const cardWidth = RESOURCE_CARD_WIDTH;
+  const cardHeight = RESOURCE_CARD_HEIGHT;
+  const defaultStep = Math.round(cardWidth * 0.58);
+  const fitStep = cardCount > 1 ? (available - cardWidth) / (cardCount - 1) : defaultStep;
+  const step = cardCount > 1 ? Math.max(8, Math.min(defaultStep, fitStep)) : defaultStep;
+  const spreadWidth = cardCount > 1 ? cardWidth + step * (cardCount - 1) : cardWidth;
+  return {
+    cardWidth,
+    cardHeight,
+    step,
+    spreadWidth,
+    selectedLift: 8,
+  };
+}
+
 function resourceLabel(r: Resource): string {
   return r.charAt(0).toUpperCase() + r.slice(1);
 }
+
+function expandBuildCost(cost: Partial<Record<Resource, number>>): Resource[] {
+  const out: Resource[] = [];
+  for (const r of RESOURCE_LIST) {
+    const n = cost[r] ?? 0;
+    for (let i = 0; i < n; i++) out.push(r);
+  }
+  return out;
+}
+
+/** Per-slot affordance when paying `cards` in order from `hand`. */
+function costPreviewAffordableFlags(cards: Resource[], hand: ResourceHand): boolean[] {
+  const remaining: ResourceHand = { ...hand };
+  return cards.map((r) => {
+    if (remaining[r] > 0) {
+      remaining[r] -= 1;
+      return true;
+    }
+    return false;
+  });
+}
+
+const ROAD_COST_CARDS = expandBuildCost(COSTS.road);
+const SETTLEMENT_COST_CARDS = expandBuildCost(COSTS.settlement);
+const CITY_COST_CARDS = expandBuildCost(COSTS.city);
+const DEV_CARD_COST_CARDS = expandBuildCost(DEV_CARD_COST);
 
 function tokenPipCount(token: number): number {
   return Math.max(1, 6 - Math.abs(7 - token));
@@ -71,35 +158,145 @@ function canAfford(h: SettlerState['players'][0]['hand'], cost: Partial<Record<R
   return true;
 }
 
+function createNeutralOrientations(): [CubeOrientation, CubeOrientation] {
+  const o = faceOrientations[1];
+  return [{ ...o }, { ...o }];
+}
+
+function spinTowardFace(previous: CubeOrientation, target: CubeOrientation): CubeOrientation {
+  const xSpins = (Math.floor(Math.random() * 2) + 2) * 360;
+  const ySpins = (Math.floor(Math.random() * 2) + 3) * 360;
+  return {
+    x:
+      previous.x +
+      xSpins +
+      getForwardRotationDelta(positiveModulo(previous.x, 360), positiveModulo(target.x, 360)),
+    y:
+      previous.y +
+      ySpins +
+      getForwardRotationDelta(positiveModulo(previous.y, 360), positiveModulo(target.y, 360)),
+  };
+}
+
+function SettlerTurnDiceSlot({
+  dice,
+  showRollButton,
+  onRoll,
+}: {
+  dice: { d1: number; d2: number } | null;
+  showRollButton: boolean;
+  onRoll: () => void;
+}) {
+  const [isRolling, setIsRolling] = useState(false);
+  const [orientations, setOrientations] = useState<[CubeOrientation, CubeOrientation]>(() =>
+    createNeutralOrientations(),
+  );
+  const prevDiceRef = useRef<{ d1: number; d2: number } | null>(null);
+  const isFirstDiceEffect = useRef(true);
+
+  useEffect(() => {
+    if (!dice) {
+      prevDiceRef.current = null;
+      setIsRolling(false);
+      setOrientations(createNeutralOrientations());
+      if (isFirstDiceEffect.current) isFirstDiceEffect.current = false;
+      return;
+    }
+
+    const d1 = dice.d1 as DiceValue;
+    const d2 = dice.d2 as DiceValue;
+    const prev = prevDiceRef.current;
+
+    if (isFirstDiceEffect.current) {
+      isFirstDiceEffect.current = false;
+      setIsRolling(false);
+      setOrientations([{ ...faceOrientations[d1] }, { ...faceOrientations[d2] }]);
+      prevDiceRef.current = { d1, d2 };
+      return;
+    }
+
+    if (prev === null) {
+      setIsRolling(true);
+      setOrientations((prevO) => [
+        spinTowardFace(prevO[0], faceOrientations[d1]),
+        spinTowardFace(prevO[1], faceOrientations[d2]),
+      ]);
+      return;
+    }
+
+    if (prev.d1 !== d1 || prev.d2 !== d2) {
+      setIsRolling(true);
+      setOrientations((prevO) => [
+        spinTowardFace(prevO[0], faceOrientations[d1]),
+        spinTowardFace(prevO[1], faceOrientations[d2]),
+      ]);
+      return;
+    }
+  }, [dice]);
+
+  const handleRollEnd = (event: TransitionEvent<HTMLDivElement>) => {
+    if (event.propertyName !== 'transform' || !isRolling || !dice) return;
+    prevDiceRef.current = { d1: dice.d1, d2: dice.d2 };
+    setIsRolling(false);
+  };
+
+  return (
+    <div className="flex min-h-[2.75rem] shrink-0 items-center justify-end">
+      {showRollButton && !dice && (
+        <button
+          type="button"
+          onClick={onRoll}
+          className="rounded-lg bg-amber-600 px-4 py-2 font-semibold text-slate-950 hover:bg-amber-500"
+        >
+          Roll dice
+        </button>
+      )}
+      {dice && (
+        <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1.5 [--dice-size:2.1rem]">
+          <Dice
+            orientation={orientations[0]}
+            rolling={isRolling}
+            disabled
+            size="2.1rem"
+            onTransitionEnd={handleRollEnd}
+          />
+          <Dice orientation={orientations[1]} rolling={isRolling} disabled size="2.1rem" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProps) {
   const s = state as SettlerState;
   const myIndex = s.players.findIndex((p) => p.id === myId);
   const myPlayer = myIndex >= 0 ? s.players[myIndex] : null;
 
   const [buildTap, setBuildTap] = useState<BuildTapMode>('none');
-  const [discardPick, setDiscardPick] = useState<Partial<Record<Resource, number>>>({});
+  const [discardSlotSelection, setDiscardSlotSelection] = useState<
+    Partial<Record<Resource, Set<number>>>
+  >({});
   const [tradeGive, setTradeGive] = useState<Resource>('wood');
   const [tradeReceive, setTradeReceive] = useState<Resource>('brick');
-  const [yopA, setYopA] = useState<Resource>('wood');
-  const [yopB, setYopB] = useState<Resource>('brick');
-  const [monopolyResource, setMonopolyResource] = useState<Resource>('wheat');
-  const handContainerRef = useRef<HTMLDivElement>(null);
+  const [tradePopupOpen, setTradePopupOpen] = useState(false);
   const actionLogRef = useRef<HTMLDivElement>(null);
-  const [handWidth, setHandWidth] = useState(360);
+  const roadBtnRef = useRef<HTMLButtonElement>(null);
+  const settlementBtnRef = useRef<HTMLButtonElement>(null);
+  const cityBtnRef = useRef<HTMLButtonElement>(null);
+  const devCardBtnRef = useRef<HTMLButtonElement>(null);
+  const [buildCostTip, setBuildCostTip] = useState<{
+    x: number;
+    y: number;
+    cards: Resource[];
+  } | null>(null);
 
   const viewBox = useMemo(() => boardViewBox(graph, 72), []);
 
   useEffect(() => {
-    const element = handContainerRef.current;
-    if (!element) return;
-
-    const updateSize = () => setHandWidth(element.clientWidth);
-    updateSize();
-
-    const observer = new ResizeObserver(() => updateSize());
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
+    if (s.phase !== 'main-build') {
+      setTradePopupOpen(false);
+    }
+  }, [s.phase]);
 
   const isMyTurn = useMemo(() => {
     if (s.phase === 'discard') return s.discardQueue[0] === myId;
@@ -109,6 +306,12 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
     }
     return myIndex >= 0 && s.currentPlayerIndex === myIndex;
   }, [s, myId, myIndex]);
+
+  useEffect(() => {
+    if (s.phase !== 'main-build' || !isMyTurn) {
+      setBuildCostTip(null);
+    }
+  }, [s.phase, isMyTurn]);
 
   const legalSettlements = useMemo(() => {
     if (!myPlayer || !isMyTurn) return [];
@@ -161,27 +364,7 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
     myPlayer && RESOURCE_LIST.some((r) => myPlayer.hand[r] >= 4)
   );
   const canBuyDev = Boolean(
-    myPlayer &&
-      s.devDeck.length > 0 &&
-      canAfford(myPlayer.hand, { sheep: 1, wheat: 1, ore: 1 })
-  );
-  const canPlayKnight = Boolean(
-    myPlayer && myPlayer.devCards.knight - myPlayer.newDevCards.knight > 0 && !s.playedDevCardThisTurn
-  );
-  const canPlayRoadBuilding = Boolean(
-    myPlayer &&
-      myPlayer.devCards['road-building'] - myPlayer.newDevCards['road-building'] > 0 &&
-      !s.playedDevCardThisTurn
-  );
-  const canPlayYop = Boolean(
-    myPlayer &&
-      myPlayer.devCards['year-of-plenty'] - myPlayer.newDevCards['year-of-plenty'] > 0 &&
-      !s.playedDevCardThisTurn
-  );
-  const canPlayMonopoly = Boolean(
-    myPlayer &&
-      myPlayer.devCards.monopoly - myPlayer.newDevCards.monopoly > 0 &&
-      !s.playedDevCardThisTurn
+    myPlayer && s.devDeck.length > 0 && canAfford(myPlayer.hand, DEV_CARD_COST)
   );
   const noMainActions =
     s.phase === 'main-build' &&
@@ -191,11 +374,7 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
     !canBuySettlement &&
     !canBuyCity &&
     !canMaritimeTrade &&
-    !canBuyDev &&
-    !canPlayKnight &&
-    !canPlayRoadBuilding &&
-    !canPlayYop &&
-    !canPlayMonopoly;
+    !canBuyDev;
 
   const onVertexClick = useCallback(
     (vid: number) => {
@@ -245,96 +424,164 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
     [s.phase, s.robberHexIndex, isMyTurn, onAction]
   );
 
-  const discardNeed = s.phase === 'discard' && s.discardQueue[0] === myId ? s.discardRequired[myId] ?? 0 : 0;
-  const discardTotal = RESOURCE_LIST.reduce((acc, r) => acc + (discardPick[r] ?? 0), 0);
+  const showBuildCostTip = useCallback(
+    (ref: RefObject<HTMLButtonElement | null>, cards: Resource[]) => {
+      const el = ref.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setBuildCostTip({ x: r.left + r.width / 2, y: r.top, cards });
+    },
+    []
+  );
 
-  const phaseLabel = (() => {
+  const hideBuildCostTip = useCallback(() => {
+    setBuildCostTip(null);
+  }, []);
+
+  const buildCostTipAffordableFlags = useMemo(() => {
+    if (!buildCostTip) return null;
+    const hand = myPlayer?.hand ?? emptyHand();
+    return costPreviewAffordableFlags(buildCostTip.cards, hand);
+  }, [buildCostTip, myPlayer]);
+
+  const discardNeed = s.phase === 'discard' && s.discardQueue[0] === myId ? s.discardRequired[myId] ?? 0 : 0;
+  const discardTotal = useMemo(
+    () => RESOURCE_LIST.reduce((acc, r) => acc + (discardSlotSelection[r]?.size ?? 0), 0),
+    [discardSlotSelection],
+  );
+  const discardCardsPayload = useMemo(() => {
+    const cards: Partial<Record<Resource, number>> = {};
+    for (const r of RESOURCE_LIST) {
+      const n = discardSlotSelection[r]?.size ?? 0;
+      if (n > 0) cards[r] = n;
+    }
+    return cards;
+  }, [discardSlotSelection]);
+
+  const isDiscardSelectingHand = s.phase === 'discard' && s.discardQueue[0] === myId;
+
+  const myHandSig = useMemo(
+    () => (myPlayer ? RESOURCE_LIST.map((r) => myPlayer.hand[r]).join(',') : ''),
+    [myPlayer],
+  );
+
+  useEffect(() => {
+    if (!isDiscardSelectingHand) {
+      setDiscardSlotSelection({});
+    }
+  }, [isDiscardSelectingHand]);
+
+  useEffect(() => {
+    if (!isDiscardSelectingHand || !myPlayer) return;
+    setDiscardSlotSelection((prev) => {
+      let changed = false;
+      const next: Partial<Record<Resource, Set<number>>> = {};
+      for (const r of RESOURCE_LIST) {
+        const max = myPlayer.hand[r];
+        const old = prev[r];
+        if (!old || old.size === 0) continue;
+        const filtered = new Set<number>();
+        for (const i of old) {
+          if (i < max) filtered.add(i);
+          else changed = true;
+        }
+        if (filtered.size > 0) next[r] = filtered;
+        else if (old.size > 0) changed = true;
+      }
+      return changed ? next : prev;
+    });
+    // myHandSig tracks hand counts; myPlayer is read from the latest render when this runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- myPlayer omitted; stable hand counts are in myHandSig
+  }, [isDiscardSelectingHand, myHandSig]);
+
+  const toggleDiscardSlot = useCallback((resource: Resource, index: number) => {
+    setDiscardSlotSelection((prev) => {
+      const cur = prev[resource] ?? new Set<number>();
+      const nextCur = new Set(cur);
+      if (nextCur.has(index)) {
+        nextCur.delete(index);
+      } else {
+        const total = RESOURCE_LIST.reduce((acc, r) => acc + (prev[r]?.size ?? 0), 0);
+        if (total >= discardNeed) return prev;
+        nextCur.add(index);
+      }
+      if (nextCur.size === 0) {
+        const rest = { ...prev };
+        delete rest[resource];
+        return rest;
+      }
+      return { ...prev, [resource]: nextCur };
+    });
+  }, [discardNeed]);
+
+  const actorIdForHud = s.phase === 'discard' ? s.discardQueue[0] : s.players[s.currentPlayerIndex]?.id;
+  const actorForHud = actorIdForHud ? s.players.find((p) => p.id === actorIdForHud) : null;
+  const boardPhaseCaption = useMemo(() => {
+    const name = actorForHud?.name ?? 'Player';
     switch (s.phase) {
       case 'setup-settlement':
-        return `Setup: place settlement (round ${s.setupRound})`;
+        return isMyTurn ? `Place a settlement (round ${s.setupRound})` : `${name} is placing a settlement`;
       case 'setup-road':
-        return 'Setup: place road from your new settlement';
+        return isMyTurn ? 'Place a road' : `${name} is placing a road`;
       case 'pre-roll':
-        return 'Roll the dice';
+        return isMyTurn ? 'Roll the dice' : `${name} is rolling the dice`;
       case 'discard':
-        return 'Discard half your hand (7 rolled)';
+        return isMyTurn ? 'Discard half your hand (7 rolled)' : `${name} must discard`;
       case 'robber-move':
-        return 'Move the robber';
+        return isMyTurn ? 'Move the robber' : `${name} is moving the robber`;
       case 'robber-steal':
-        return 'Steal one resource';
+        return isMyTurn ? 'Steal one resource' : `${name} can steal a resource`;
       case 'main-build':
-        return 'Build or end turn';
+        return isMyTurn ? 'Your turn' : `${name}'s turn`;
       case 'finished':
         return 'Game over';
       default:
         return '';
     }
-  })();
-
-  const setupActorName = s.players[setupCurrentPlayerSlot(s)]?.name ?? '';
-  const actorIdForHud = s.phase === 'discard' ? s.discardQueue[0] : s.players[s.currentPlayerIndex]?.id;
-  const actorForHud = actorIdForHud ? s.players.find((p) => p.id === actorIdForHud) : null;
-  const turnText = useMemo(() => {
-    if (!actorForHud) return null;
-    switch (s.phase) {
-      case 'setup-settlement':
-        return `${actorForHud.name} is placing a settlement`;
-      case 'setup-road':
-        return `${actorForHud.name} is placing a road`;
-      case 'pre-roll':
-        return `${actorForHud.name}'s turn to roll`;
-      case 'discard':
-        return `${actorForHud.name} must discard`;
-      case 'robber-move':
-        return `${actorForHud.name} is moving the robber`;
-      case 'robber-steal':
-        return `${actorForHud.name} can steal a resource`;
-      case 'main-build':
-        return `${actorForHud.name}'s build phase`;
-      default:
-        return null;
-    }
-  }, [actorForHud, s.phase]);
+  }, [actorForHud, isMyTurn, s.phase, s.setupRound]);
   const actionLog = s.actionLog ?? [];
   useEffect(() => {
     const element = actionLogRef.current;
     if (!element) return;
     element.scrollTop = element.scrollHeight;
   }, [actionLog.length]);
-  const expandedHand = useMemo(() => {
-    if (!myPlayer) return [] as Resource[];
-    const cards: Resource[] = [];
-    for (const r of RESOURCE_LIST) {
-      for (let i = 0; i < myPlayer.hand[r]; i += 1) cards.push(r);
-    }
-    return cards;
+  const resourceHands = useMemo(() => {
+    return RESOURCE_LIST.map((resource) => {
+      const count = myPlayer?.hand[resource] ?? 0;
+      return {
+        resource,
+        count,
+        cards: Array.from({ length: count }, () => resource),
+      } satisfies ResourceHandGroup;
+    });
   }, [myPlayer]);
-  const handLayout = useMemo(() => {
-    const cardCount = expandedHand.length;
-    const available = Math.max(handWidth - 8, 220);
-    const cardWidth = Math.max(62, Math.min(available * 0.16, available < 420 ? 76 : 86));
-    const cardHeight = Math.round(cardWidth * 1.45);
-    const defaultStep = Math.round(cardWidth * 0.6);
-    const fitStep = cardCount > 1 ? (available - cardWidth) / (cardCount - 1) : defaultStep;
-    const step = cardCount > 1 ? Math.max(10, Math.min(defaultStep, fitStep)) : defaultStep;
-    const spreadWidth = cardCount > 1 ? cardWidth + step * (cardCount - 1) : cardWidth;
-
-    return {
-      cardWidth,
-      cardHeight,
-      step,
-      spreadWidth,
-      selectedLift: 12,
-    };
-  }, [expandedHand.length, handWidth]);
+  const totalHandCount = useMemo(
+    () => resourceHands.reduce((total, hand) => total + hand.count, 0),
+    [resourceHands],
+  );
+  const visibleResourceHands = useMemo(
+    () => resourceHands.filter((hand) => hand.count > 0),
+    [resourceHands],
+  );
+  const miniHands = useMemo(() => {
+    const columnCount = Math.max(1, visibleResourceHands.length);
+    const slotWidth = Math.max(
+      44,
+      (SETTLER_HAND_LAYOUT_WIDTH - RESOURCE_HAND_GAP * (columnCount - 1)) / columnCount,
+    );
+    return visibleResourceHands.map((hand) => ({
+      ...hand,
+      layout: getResourceHandLayout(hand.count, slotWidth),
+    }));
+  }, [visibleResourceHands]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-gradient-to-b from-sky-900 via-sky-800 to-sky-700 text-white">
       <div className="flex-1 min-h-0 p-2 lg:p-3 flex flex-col gap-2">
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="min-h-0 flex flex-col gap-2">
-            <div className="flex-1 min-h-0 rounded-2xl border border-white/15 bg-sky-950/45 shadow-2xl overflow-hidden">
-              <div className="h-full min-h-[320px] lg:min-h-0 flex items-center justify-center overflow-auto p-2">
+            <div className="relative flex-1 min-h-0 overflow-hidden rounded-2xl border border-white/15 bg-sky-950/45 shadow-2xl">
+              <div className="flex h-full min-h-[320px] items-center justify-center overflow-auto p-2 lg:min-h-0">
               <motion.svg
                 className="max-w-full max-h-full w-full h-full drop-shadow-2xl"
                 viewBox={viewBox}
@@ -387,6 +634,7 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
               const isRobber = hi === s.robberHexIndex;
               const producing = s.lastProductionHexIndices.includes(hi);
               const canRob = s.phase === 'robber-move' && isMyTurn && hi !== s.robberHexIndex;
+              const tokenDy = graph.hexSize * 0.32;
 
               return (
                 <g key={hi}>
@@ -416,19 +664,17 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
                     x={cell.cx}
                     y={cell.cy - graph.hexSize * 0.38}
                     textAnchor="middle"
-                    fontSize={10}
-                    fontWeight={700}
-                    fill="rgba(15, 23, 42, 0.68)"
-                    style={{ letterSpacing: '0.08em' }}
+                    dominantBaseline="middle"
+                    fontSize={graph.hexSize * 0.58}
                     pointerEvents="none"
                   >
-                    {st.label.toUpperCase()}
+                    {TERRAIN_EMOJI[hex.terrain]}
                   </text>
                   {token != null && (
                     <g filter="url(#settlerTokenShadow)">
                       <circle
                         cx={cell.cx}
-                        cy={cell.cy}
+                        cy={cell.cy + tokenDy}
                         r={18}
                         fill="url(#settlerTokenPaper)"
                         stroke="#78350f"
@@ -436,7 +682,7 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
                       />
                       <text
                         x={cell.cx}
-                        y={cell.cy + 6}
+                        y={cell.cy + tokenDy + 6}
                         textAnchor="middle"
                         className="font-bold"
                         style={{
@@ -453,7 +699,7 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
                           <circle
                             key={`pip-${hi}-${idx}`}
                             cx={start + idx * gap}
-                            cy={cell.cy + 12}
+                            cy={cell.cy + tokenDy + 12}
                             r={1.05}
                             fill={token === 6 || token === 8 ? '#991b1b' : '#334155'}
                           />
@@ -619,25 +865,352 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
             })}
               </motion.svg>
               </div>
+              <p
+                className="pointer-events-none absolute bottom-3 right-3 z-10 max-w-xs text-right text-sm font-semibold text-white drop-shadow-md"
+                aria-live="polite"
+              >
+                {boardPhaseCaption}
+              </p>
             </div>
 
-            <div className="shrink-0 rounded-xl border border-white/10 bg-slate-900/80 px-3 py-2" aria-live="polite">
-              <p className="text-xs text-amber-200/80 uppercase tracking-wider">Settler</p>
-              <p className="text-sm font-semibold text-white">{phaseLabel}</p>
-              {(s.phase === 'setup-settlement' || s.phase === 'setup-road') && (
-                <p className="text-xs text-slate-300 mt-0.5">Current: {setupActorName}</p>
-              )}
-              <p className="text-xs text-slate-300 mt-2">{turnText ?? '\u00a0'}</p>
-              {turnText && actorForHud && (
-                <p className="text-xs text-slate-400">
-                  Turn: <span style={{ color: getPlayerHudTextColor(actorForHud.color) }}>{actorForHud.name}</span>
-                </p>
-              )}
+            <div className="relative z-0 min-w-0 w-full shrink-0 rounded-2xl border border-white/15 bg-slate-950/80 px-3 py-2">
+                {tradePopupOpen && (
+                  <button
+                    type="button"
+                    aria-label="Close menu"
+                    className="fixed inset-0 z-[60] bg-black/40"
+                    onClick={() => {
+                      setTradePopupOpen(false);
+                    }}
+                  />
+                )}
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-3">
+                  {myPlayer && (
+                    <div className="flex min-h-0 w-[min(100%,22rem)] shrink-0 items-center rounded-2xl border border-white/15 bg-slate-950/80 px-3 py-1">
+                      <div className="settler-hand settler-hand--compact w-full min-w-0">
+                        {totalHandCount === 0 ? (
+                          <p className="text-xs text-slate-500">No resources</p>
+                        ) : (
+                          <div className="settler-handRow" style={{ gap: `${RESOURCE_HAND_GAP}px` }}>
+                            {miniHands.map((hand) => (
+                              <div key={hand.resource} className="settler-handGroup">
+                                <div
+                                  className="settler-handSpread"
+                                  style={{
+                                    width: `${hand.layout.spreadWidth}px`,
+                                    height: `${hand.layout.cardHeight + hand.layout.selectedLift}px`,
+                                    transition: 'width 0.16s ease',
+                                  }}
+                                >
+                                  {hand.cards.map((resource, i) => {
+                                    const isLast = i === hand.cards.length - 1;
+                                    const hitboxWidth = isLast ? hand.layout.cardWidth : hand.layout.step;
+                                    const selected =
+                                      isDiscardSelectingHand &&
+                                      (discardSlotSelection[resource]?.has(i) ?? false);
+                                    const wrapClassName = [
+                                      'settler-handCardWrap',
+                                      'settler-handCardWrap--active',
+                                      selected ? 'settler-handCardWrap--discardSelected' : '',
+                                    ]
+                                      .filter(Boolean)
+                                      .join(' ');
+                                    const slotStyle = {
+                                      left: `${i * hand.layout.step}px`,
+                                      width: `${hitboxWidth}px`,
+                                      height: `${hand.layout.cardHeight + hand.layout.selectedLift}px`,
+                                      zIndex: i + 1,
+                                    };
+                                    const wrapStyle = {
+                                      width: `${hand.layout.cardWidth}px`,
+                                      height: `${hand.layout.cardHeight}px`,
+                                      transform: 'translateY(0px)',
+                                    };
+                                    const cardClass = `settler-resourceCard settler-resourceCard--${resource}`;
+                                    const cardFace = (
+                                      <span
+                                        className={wrapClassName}
+                                        style={wrapStyle}
+                                        aria-hidden={isDiscardSelectingHand}
+                                      >
+                                        <span
+                                          className={cardClass}
+                                          aria-label={
+                                            isDiscardSelectingHand ? undefined : resourceLabel(resource)
+                                          }
+                                        >
+                                          {isLast && (
+                                            <span className="settler-resourceCardCount" aria-hidden>
+                                              {hand.count}
+                                            </span>
+                                          )}
+                                          <span className="settler-resourceCardSymbol" aria-hidden>
+                                            {RESOURCE_EMOJI[resource]}
+                                          </span>
+                                        </span>
+                                      </span>
+                                    );
+                                    if (isDiscardSelectingHand) {
+                                      return (
+                                        <motion.button
+                                          key={`${resource}-${i}`}
+                                          type="button"
+                                          className="settler-handCardSlot cursor-pointer"
+                                          initial={{ y: 40, opacity: 0 }}
+                                          animate={{ y: 0, opacity: 1 }}
+                                          transition={{ delay: i * 0.015 }}
+                                          style={slotStyle}
+                                          aria-pressed={selected}
+                                          aria-label={`${resourceLabel(resource)} ${i + 1} of ${hand.count}, ${selected ? 'selected to discard' : 'tap to select for discard'}`}
+                                          onClick={() => toggleDiscardSlot(resource, i)}
+                                        >
+                                          {cardFace}
+                                        </motion.button>
+                                      );
+                                    }
+                                    return (
+                                      <motion.div
+                                        key={`${resource}-${i}`}
+                                        className="settler-handCardSlot"
+                                        initial={{ y: 40, opacity: 0 }}
+                                        animate={{ y: 0, opacity: 1 }}
+                                        transition={{ delay: i * 0.015 }}
+                                        style={slotStyle}
+                                      >
+                                        {cardFace}
+                                      </motion.div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex min-w-0 flex-1 flex-col justify-center gap-2 sm:min-h-0 sm:min-w-0">
+                    <div className="relative z-[70] min-w-0 w-full shrink-0">
+                    {s.phase === 'main-build' && isMyTurn && myPlayer && (
+                      <div className="flex min-w-0 flex-col gap-1.5">
+                        <div className="flex min-w-0 w-full justify-end overflow-x-auto">
+                        <div className="flex shrink-0 flex-nowrap items-center gap-2">
+                        <div
+                          className="relative inline-flex"
+                          onMouseEnter={() => showBuildCostTip(roadBtnRef, ROAD_COST_CARDS)}
+                          onMouseLeave={hideBuildCostTip}
+                        >
+                          <button
+                            ref={roadBtnRef}
+                            type="button"
+                            title="Road (1 wood, 1 brick)"
+                            aria-label="Road, costs 1 wood and 1 brick"
+                            className={`flex size-12 shrink-0 items-center justify-center rounded-lg border text-2xl leading-none ${buildTap === 'road' ? 'border-amber-400 bg-amber-500/20' : 'border-white/10 bg-slate-800'}`}
+                            disabled={!canBuyRoad || s.roadBuildingRemaining > 0}
+                            onClick={() => setBuildTap((m) => (m === 'road' ? 'none' : 'road'))}
+                          >
+                            🚦
+                          </button>
+                        </div>
+                        <div
+                          className="relative inline-flex"
+                          onMouseEnter={() => showBuildCostTip(settlementBtnRef, SETTLEMENT_COST_CARDS)}
+                          onMouseLeave={hideBuildCostTip}
+                        >
+                          <button
+                            ref={settlementBtnRef}
+                            type="button"
+                            title="Settlement (1 wood, 1 brick, 1 sheep, 1 wheat)"
+                            aria-label="Settlement, costs 1 wood, 1 brick, 1 sheep, and 1 wheat"
+                            className={`flex size-12 shrink-0 items-center justify-center rounded-lg border text-2xl leading-none ${buildTap === 'settlement' ? 'border-amber-400 bg-amber-500/20' : 'border-white/10 bg-slate-800'}`}
+                            disabled={!canBuySettlement || s.roadBuildingRemaining > 0}
+                            onClick={() => setBuildTap((m) => (m === 'settlement' ? 'none' : 'settlement'))}
+                          >
+                            🏠
+                          </button>
+                        </div>
+                        <div
+                          className="relative inline-flex"
+                          onMouseEnter={() => showBuildCostTip(cityBtnRef, CITY_COST_CARDS)}
+                          onMouseLeave={hideBuildCostTip}
+                        >
+                          <button
+                            ref={cityBtnRef}
+                            type="button"
+                            title="City (3 ore, 2 wheat)"
+                            aria-label="City, costs 3 ore and 2 wheat"
+                            className={`flex size-12 shrink-0 items-center justify-center rounded-lg border text-2xl leading-none ${buildTap === 'city' ? 'border-amber-400 bg-amber-500/20' : 'border-white/10 bg-slate-800'}`}
+                            disabled={!canBuyCity || s.roadBuildingRemaining > 0}
+                            onClick={() => setBuildTap((m) => (m === 'city' ? 'none' : 'city'))}
+                          >
+                            🏘️
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          title="Trade"
+                          aria-label="Trade"
+                          className={`flex size-12 shrink-0 items-center justify-center rounded-lg border text-2xl leading-none ${tradePopupOpen ? 'border-amber-400 bg-amber-500/20' : 'border-white/10 bg-slate-800'}`}
+                          disabled={!canMaritimeTrade || s.roadBuildingRemaining > 0}
+                          onClick={() => {
+                            setTradePopupOpen((o) => !o);
+                          }}
+                        >
+                          ⚖️
+                        </button>
+                        <div
+                          className="relative inline-flex"
+                          onMouseEnter={() => showBuildCostTip(devCardBtnRef, DEV_CARD_COST_CARDS)}
+                          onMouseLeave={hideBuildCostTip}
+                        >
+                          <button
+                            ref={devCardBtnRef}
+                            type="button"
+                            title="Buy development card (1 sheep, 1 wheat, 1 ore)"
+                            aria-label="Buy development card, costs 1 sheep, 1 wheat, and 1 ore"
+                            disabled={!canBuyDev || s.roadBuildingRemaining > 0}
+                            onClick={() => onAction({ type: 'buy-dev-card' })}
+                            className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-slate-800 text-2xl leading-none disabled:opacity-40"
+                          >
+                            🔨
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          title="End turn"
+                          aria-label="End turn"
+                          onClick={() => onAction({ type: 'end-turn' })}
+                          disabled={s.roadBuildingRemaining > 0}
+                          className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-slate-700 text-2xl leading-none hover:bg-slate-600 disabled:opacity-40"
+                        >
+                          ⏩
+                        </button>
+                        </div>
+                        </div>
+                        {s.roadBuildingRemaining > 0 && (
+                          <button
+                            type="button"
+                            className="w-full shrink-0 rounded-lg bg-cyan-800/70 px-2 py-1.5 text-center text-xs hover:bg-cyan-700"
+                            onClick={() => onAction({ type: 'skip-free-road' })}
+                          >
+                            Skip free road ({s.roadBuildingRemaining})
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    </div>
+                  </div>
+                </div>
+                {tradePopupOpen && s.phase === 'main-build' && isMyTurn && myPlayer && (
+                  <div className="relative z-[70] mt-2 rounded-lg border border-white/15 bg-slate-900 p-3 shadow-xl space-y-2">
+                    <p className="text-xs text-slate-300">Maritime trade (4:1)</p>
+                    <div className="flex gap-2">
+                      <select
+                        value={tradeGive}
+                        onChange={(e) => setTradeGive(e.target.value as Resource)}
+                        className="flex-1 rounded bg-slate-800 border border-white/10 text-xs p-1"
+                      >
+                        {RESOURCE_LIST.map((r) => (
+                          <option key={`give-${r}`} value={r}>
+                            Give {r}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={tradeReceive}
+                        onChange={(e) => setTradeReceive(e.target.value as Resource)}
+                        className="flex-1 rounded bg-slate-800 border border-white/10 text-xs p-1"
+                      >
+                        {RESOURCE_LIST.map((r) => (
+                          <option key={`take-${r}`} value={r}>
+                            Get {r}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={
+                        !canMaritimeTrade ||
+                        tradeGive === tradeReceive ||
+                        myPlayer.hand[tradeGive] < 4 ||
+                        s.roadBuildingRemaining > 0
+                      }
+                      onClick={() => {
+                        onAction({ type: 'maritime-trade', give: tradeGive, receive: tradeReceive });
+                        setTradePopupOpen(false);
+                      }}
+                      className="w-full py-1.5 rounded bg-slate-700 border border-white/10 text-xs disabled:opacity-40"
+                    >
+                      Trade 4 {tradeGive} for 1 {tradeReceive}
+                    </button>
+                  </div>
+                )}
+                {s.phase === 'main-build' && isMyTurn && myPlayer && noMainActions && (
+                  <p className="relative z-[70] mt-2 text-xs text-amber-200/90">
+                    No legal build, trade, or dev actions right now. You can safely end your turn.
+                  </p>
+                )}
+                {s.phase === 'main-build' && isMyTurn && myPlayer && s.playedDevCardThisTurn && (
+                  <p className="relative z-[70] mt-1 text-[11px] text-slate-400">
+                    You can only play one development card per turn.
+                  </p>
+                )}
+                {s.phase === 'finished' && s.winnerIds && (
+                  <div className="relative z-[70] mt-2 rounded-lg bg-amber-500/15 border border-amber-500/30 p-3 text-sm">
+                    <p className="font-semibold text-amber-200">Winner</p>
+                    <p className="text-white">
+                      {s.winnerIds
+                        .map((id) => s.players.find((p) => p.id === id)?.name ?? id)
+                        .join(', ')}
+                    </p>
+                  </div>
+                )}
+                {s.phase === 'discard' && s.discardQueue[0] === myId && (
+                  <div className="relative z-[70] mt-2 rounded-lg border border-amber-500/40 bg-amber-950/40 p-2 space-y-2">
+                    <p className="text-sm text-amber-100">
+                      Discard {discardNeed} cards ({discardTotal} selected). Click cards in your hand.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={discardTotal !== discardNeed}
+                      onClick={() => {
+                        onAction({ type: 'discard', cards: discardCardsPayload });
+                        setDiscardSlotSelection({});
+                      }}
+                      className="w-full py-2 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-sm font-medium"
+                    >
+                      Confirm discard
+                    </button>
+                  </div>
+                )}
+                {s.phase === 'robber-steal' && isMyTurn && (
+                  <div className="relative z-[70] mt-2 space-y-2">
+                    <p className="text-sm text-slate-300">Choose a player to steal from:</p>
+                    {s.robberStealTargets.map((tid) => {
+                      const p = s.players.find((x) => x.id === tid);
+                      if (!p) return null;
+                      return (
+                        <button
+                          key={tid}
+                          type="button"
+                          className="w-full py-2 rounded-lg bg-slate-800 border border-white/10 hover:border-amber-400/50 text-left px-3"
+                          onClick={() => onAction({ type: 'steal-from', victimId: tid })}
+                        >
+                          <span style={{ color: PLAYER_COLOR_HEX[p.color as PlayerColor] }}>{p.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {s.phase === 'robber-move' && isMyTurn && (
+                  <p className="relative z-[70] mt-2 text-sm text-amber-200/90">Click a land hex to move the robber.</p>
+                )}
             </div>
           </div>
 
-          <div className="min-h-0 rounded-2xl border border-white/15 bg-slate-950/75 p-2 flex flex-col gap-2 overflow-hidden">
-            <div className="rounded-xl border border-white/10 bg-slate-900/80 px-3 py-2 min-h-28 flex flex-col">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/15 bg-slate-950/75 p-2 lg:h-full lg:min-h-0">
+            <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-white/10 bg-slate-900/80 px-3 py-2">
               <p className="text-sm text-amber-200/80 uppercase tracking-wider">Action log</p>
               <div ref={actionLogRef} className="mt-2 flex-1 min-h-0 overflow-y-auto pr-1 space-y-2" aria-live="polite">
                 {actionLog.length === 0 ? (
@@ -658,278 +1231,78 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
                 )}
               </div>
             </div>
-
             {myPlayer && (
-              <div className="rounded-xl border border-white/10 bg-slate-900/80 px-3 py-2">
-                <p className="text-xs text-slate-400 mb-1.5">Resources</p>
-                <div className="grid grid-cols-6 gap-1.5">
-                  <span className="rounded bg-slate-800/80 px-1.5 py-1 text-center text-[11px] border border-white/10">🏠</span>
-                  <span className="rounded bg-emerald-600/80 px-1.5 py-1 text-center text-[11px] font-semibold">{myPlayer.hand.wood}</span>
-                  <span className="rounded bg-red-700/80 px-1.5 py-1 text-center text-[11px] font-semibold">{myPlayer.hand.brick}</span>
-                  <span className="rounded bg-lime-600/80 px-1.5 py-1 text-center text-[11px] font-semibold">{myPlayer.hand.sheep}</span>
-                  <span className="rounded bg-amber-500/90 px-1.5 py-1 text-center text-[11px] font-semibold text-amber-950">{myPlayer.hand.wheat}</span>
-                  <span className="rounded bg-slate-500/90 px-1.5 py-1 text-center text-[11px] font-semibold">{myPlayer.hand.ore}</span>
-                </div>
-              </div>
-            )}
-
-            <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-2">
-            {s.phase === 'finished' && s.winnerIds && (
-              <div className="rounded-lg bg-amber-500/15 border border-amber-500/30 p-3 text-sm">
-                <p className="font-semibold text-amber-200">Winner</p>
-                <p className="text-white">
-                  {s.winnerIds
-                    .map((id) => s.players.find((p) => p.id === id)?.name ?? id)
-                    .join(', ')}
-                </p>
-              </div>
-            )}
-
-            {myPlayer && (
-              <div>
-                <p className="text-xs text-slate-400 mb-1">Development cards</p>
-                <div className="flex flex-wrap gap-1 text-[11px]">
-                  <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-white/10">
-                    Knight ×{myPlayer.devCards.knight}
-                  </span>
-                  <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-white/10">
-                    VP ×{myPlayer.devCards['victory-point']}
-                  </span>
-                  <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-white/10">
-                    Road ×{myPlayer.devCards['road-building']}
-                  </span>
-                  <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-white/10">
-                    Plenty ×{myPlayer.devCards['year-of-plenty']}
-                  </span>
-                  <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-white/10">
-                    Monopoly ×{myPlayer.devCards.monopoly}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {s.phase === 'discard' && s.discardQueue[0] === myId && (
-              <div className="rounded-lg border border-amber-500/40 bg-amber-950/40 p-2 space-y-2">
-                <p className="text-sm text-amber-100">Discard {discardNeed} cards ({discardTotal} selected)</p>
-                <div className="flex flex-wrap gap-2">
-                  {RESOURCE_LIST.map((r) => {
-                    const maxTake = myPlayer?.hand[r] ?? 0;
-                    const cur = discardPick[r] ?? 0;
-                    return (
-                      <div key={r} className="flex items-center gap-1 text-xs">
-                        <span className="w-14">{r}</span>
-                        <button
-                          type="button"
-                          className="px-2 py-0.5 rounded bg-slate-700 disabled:opacity-30"
-                          disabled={cur <= 0}
-                          onClick={() =>
-                            setDiscardPick((d) => ({ ...d, [r]: Math.max(0, (d[r] ?? 0) - 1) }))
-                          }
-                        >
-                          −
-                        </button>
-                        <span className="w-4 text-center">{cur}</span>
-                        <button
-                          type="button"
-                          className="px-2 py-0.5 rounded bg-slate-700 disabled:opacity-30"
-                          disabled={cur >= maxTake || discardTotal >= discardNeed}
-                          onClick={() =>
-                            setDiscardPick((d) => ({ ...d, [r]: Math.min(maxTake, (d[r] ?? 0) + 1) }))
-                          }
-                        >
-                          +
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-                <button
-                  type="button"
-                  disabled={discardTotal !== discardNeed}
-                  onClick={() => {
-                    onAction({ type: 'discard', cards: discardPick });
-                    setDiscardPick({});
-                  }}
-                  className="w-full py-2 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-sm font-medium"
-                >
-                  Confirm discard
-                </button>
-              </div>
-            )}
-
-            {s.phase === 'robber-steal' && isMyTurn && (
-              <div className="space-y-2">
-                <p className="text-sm text-slate-300">Choose a player to steal from:</p>
-                {s.robberStealTargets.map((tid) => {
-                  const p = s.players.find((x) => x.id === tid);
-                  if (!p) return null;
-                  return (
-                    <button
-                      key={tid}
-                      type="button"
-                      className="w-full py-2 rounded-lg bg-slate-800 border border-white/10 hover:border-amber-400/50 text-left px-3"
-                      onClick={() => onAction({ type: 'steal-from', victimId: tid })}
-                    >
-                      <span style={{ color: PLAYER_COLOR_HEX[p.color as PlayerColor] }}>{p.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {s.phase === 'main-build' && isMyTurn && myPlayer && (
-              <div className="space-y-2">
-                <p className="text-xs text-slate-400">Secondary actions</p>
-                {noMainActions && (
-                  <p className="text-xs text-amber-200/90">
-                    No legal build/trade/dev actions right now. You can safely end your turn.
-                  </p>
-                )}
-
-                <div className="rounded-lg border border-white/10 p-2 space-y-2">
-                  <p className="text-xs text-slate-300">Maritime trade (4:1)</p>
-                  <div className="flex gap-2">
-                    <select
-                      value={tradeGive}
-                      onChange={(e) => setTradeGive(e.target.value as Resource)}
-                      className="flex-1 rounded bg-slate-800 border border-white/10 text-xs p-1"
-                    >
-                      {RESOURCE_LIST.map((r) => (
-                        <option key={`give-${r}`} value={r}>
-                          Give {r}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      value={tradeReceive}
-                      onChange={(e) => setTradeReceive(e.target.value as Resource)}
-                      className="flex-1 rounded bg-slate-800 border border-white/10 text-xs p-1"
-                    >
-                      {RESOURCE_LIST.map((r) => (
-                        <option key={`take-${r}`} value={r}>
-                          Get {r}
-                        </option>
-                      ))}
-                    </select>
+              <div className="mt-2 shrink-0 space-y-2 rounded-xl border border-white/10 bg-slate-900/80 px-3 py-2">
+                <div>
+                  <p className="text-xs text-slate-400 mb-1.5">Resources</p>
+                  <div className="grid grid-cols-6 gap-1.5">
+                    <span className="rounded bg-slate-800/80 px-1.5 py-1 text-center text-[11px] border border-white/10">🏠</span>
+                    <span className="rounded bg-emerald-600/80 px-1.5 py-1 text-center text-[11px] font-semibold">{myPlayer.hand.wood}</span>
+                    <span className="rounded bg-red-700/80 px-1.5 py-1 text-center text-[11px] font-semibold">{myPlayer.hand.brick}</span>
+                    <span className="rounded bg-lime-600/80 px-1.5 py-1 text-center text-[11px] font-semibold">{myPlayer.hand.sheep}</span>
+                    <span className="rounded bg-amber-500/90 px-1.5 py-1 text-center text-[11px] font-semibold text-amber-950">{myPlayer.hand.wheat}</span>
+                    <span className="rounded bg-slate-500/90 px-1.5 py-1 text-center text-[11px] font-semibold">{myPlayer.hand.ore}</span>
                   </div>
-                  <button
-                    type="button"
-                    disabled={!canMaritimeTrade || tradeGive === tradeReceive || myPlayer.hand[tradeGive] < 4 || s.roadBuildingRemaining > 0}
-                    onClick={() => onAction({ type: 'maritime-trade', give: tradeGive, receive: tradeReceive })}
-                    className="w-full py-1.5 rounded bg-slate-700 border border-white/10 text-xs disabled:opacity-40"
-                  >
-                    Trade 4 {tradeGive} for 1 {tradeReceive}
-                  </button>
                 </div>
-
-                <div className="rounded-lg border border-white/10 p-2 space-y-2">
-                  <p className="text-xs text-slate-300">Development cards</p>
-                  <button
-                    type="button"
-                    disabled={!canBuyDev || s.roadBuildingRemaining > 0}
-                    onClick={() => onAction({ type: 'buy-dev-card' })}
-                    className="w-full py-1.5 rounded bg-slate-700 border border-white/10 text-xs disabled:opacity-40"
-                  >
-                    Buy dev card (1 sheep, 1 wheat, 1 ore)
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canPlayKnight || s.roadBuildingRemaining > 0}
-                    onClick={() => onAction({ type: 'play-knight' })}
-                    className="w-full py-1.5 rounded bg-slate-700 border border-white/10 text-xs disabled:opacity-40"
-                  >
-                    Play Knight
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canPlayRoadBuilding || s.roadBuildingRemaining > 0}
-                    onClick={() => onAction({ type: 'play-road-building' })}
-                    className="w-full py-1.5 rounded bg-slate-700 border border-white/10 text-xs disabled:opacity-40"
-                  >
-                    Play Road Building
-                  </button>
-                  <div className="flex gap-2">
-                    <select
-                      value={yopA}
-                      onChange={(e) => setYopA(e.target.value as Resource)}
-                      className="flex-1 rounded bg-slate-800 border border-white/10 text-xs p-1"
-                    >
-                      {RESOURCE_LIST.map((r) => (
-                        <option key={`yop-a-${r}`} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      value={yopB}
-                      onChange={(e) => setYopB(e.target.value as Resource)}
-                      className="flex-1 rounded bg-slate-800 border border-white/10 text-xs p-1"
-                    >
-                      {RESOURCE_LIST.map((r) => (
-                        <option key={`yop-b-${r}`} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Development cards</p>
+                  <div className="flex flex-wrap gap-1 text-[11px]">
+                    <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-white/10">
+                      Knight ×{myPlayer.devCards.knight}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-white/10">
+                      VP ×{myPlayer.devCards['victory-point']}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-white/10">
+                      Road ×{myPlayer.devCards['road-building']}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-white/10">
+                      Plenty ×{myPlayer.devCards['year-of-plenty']}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-slate-800 border border-white/10">
+                      Monopoly ×{myPlayer.devCards.monopoly}
+                    </span>
                   </div>
-                  <button
-                    type="button"
-                    disabled={!canPlayYop || s.roadBuildingRemaining > 0}
-                    onClick={() => onAction({ type: 'play-year-of-plenty', resourceA: yopA, resourceB: yopB })}
-                    className="w-full py-1.5 rounded bg-slate-700 border border-white/10 text-xs disabled:opacity-40"
-                  >
-                    Play Year of Plenty
-                  </button>
-                  <div className="flex gap-2">
-                    <select
-                      value={monopolyResource}
-                      onChange={(e) => setMonopolyResource(e.target.value as Resource)}
-                      className="flex-1 rounded bg-slate-800 border border-white/10 text-xs p-1"
-                    >
-                      {RESOURCE_LIST.map((r) => (
-                        <option key={`mono-${r}`} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={!canPlayMonopoly || s.roadBuildingRemaining > 0}
-                      onClick={() => onAction({ type: 'play-monopoly', resource: monopolyResource })}
-                      className="flex-1 py-1.5 rounded bg-slate-700 border border-white/10 text-xs disabled:opacity-40"
-                    >
-                      Play Monopoly
-                    </button>
-                  </div>
-                  {s.playedDevCardThisTurn && (
-                    <p className="text-[11px] text-slate-400">You can only play one development card per turn.</p>
-                  )}
                 </div>
               </div>
             )}
-
-            {s.phase === 'robber-move' && isMyTurn && (
-              <p className="text-sm text-amber-200/90">Click a land hex to move the robber.</p>
-            )}
-            </div>
-
-            <div className="space-y-1 pt-1 border-t border-white/10">
+            <div className="mt-2 shrink-0 space-y-1 border-t border-white/10 pt-2">
               {s.players.map((p) => {
                 const isActive = p.id === s.players[s.currentPlayerIndex]?.id && s.phase !== 'discard';
+                const currentId = s.players[s.currentPlayerIndex]?.id;
+                const isCurrentTurnPlayer = p.id === currentId;
                 return (
                   <div
                     key={p.id}
-                    className={`rounded-lg px-3 py-2 border text-xs ${
+                    className={`rounded-lg border px-3 py-2 text-xs ${
                       isActive ? 'border-amber-400/60 bg-amber-500/20' : 'border-white/10 bg-white/5'
                     }`}
                   >
-                    <p className="text-base font-semibold leading-none" style={{ color: PLAYER_COLOR_HEX[p.color as PlayerColor] }}>
-                      {p.name}
-                    </p>
-                    <div className="mt-1 flex items-center gap-2 text-slate-200">
-                      <span>VP {victoryPoints(s, p.id)}/{VP_TO_WIN}</span>
-                      {s.longestRoadHolderId === p.id && <span className="text-cyan-300">Road</span>}
-                      {s.largestArmyHolderId === p.id && <span className="text-violet-300">Army</span>}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className="text-base font-semibold leading-none"
+                          style={{ color: PLAYER_COLOR_HEX[p.color as PlayerColor] }}
+                        >
+                          {p.name}
+                        </p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-slate-200">
+                          <span>
+                            VP {victoryPoints(s, p.id)}
+                            {'/'}
+                            {VP_TO_WIN}
+                          </span>
+                          {s.longestRoadHolderId === p.id && <span className="text-cyan-300">Road</span>}
+                          {s.largestArmyHolderId === p.id && <span className="text-violet-300">Army</span>}
+                        </div>
+                      </div>
+                      {isCurrentTurnPlayer && (
+                        <SettlerTurnDiceSlot
+                          dice={s.dice}
+                          showRollButton={s.phase === 'pre-roll' && isMyTurn}
+                          onRoll={() => onAction({ type: 'roll' })}
+                        />
+                      )}
                     </div>
                   </div>
                 );
@@ -937,139 +1310,34 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
             </div>
           </div>
         </div>
-
-        <div className="shrink-0 rounded-2xl border border-white/15 bg-slate-950/80 px-3 py-2">
-          <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              {s.dice && (
-                <div className="rounded-lg bg-slate-900/80 border border-white/10 px-2 py-1.5 flex items-center gap-2">
-                  <Dice orientation={faceOrientations[s.dice.d1 as DiceValue]} size="2.1rem" disabled />
-                  <Dice orientation={faceOrientations[s.dice.d2 as DiceValue]} size="2.1rem" disabled />
-                  <span className="text-sm font-bold text-amber-200">= {s.dice.d1 + s.dice.d2}</span>
-                </div>
-              )}
-              <p className="text-sm text-white/90 min-h-6">{turnText ?? phaseLabel}</p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {s.phase === 'pre-roll' && isMyTurn && (
-                <button
-                  type="button"
-                  onClick={() => onAction({ type: 'roll' })}
-                  className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 font-semibold text-slate-950"
-                >
-                  Roll dice
-                </button>
-              )}
-              {s.phase === 'main-build' && isMyTurn && (
-                <>
-                  <button
-                    type="button"
-                    className={`px-3 py-2 rounded-lg text-sm border ${buildTap === 'road' ? 'border-amber-400 bg-amber-500/20' : 'border-white/10 bg-slate-800'}`}
-                    disabled={!canBuyRoad || s.roadBuildingRemaining > 0}
-                    onClick={() => setBuildTap((m) => (m === 'road' ? 'none' : 'road'))}
-                  >
-                    Road
-                  </button>
-                  <button
-                    type="button"
-                    className={`px-3 py-2 rounded-lg text-sm border ${buildTap === 'settlement' ? 'border-amber-400 bg-amber-500/20' : 'border-white/10 bg-slate-800'}`}
-                    disabled={!canBuySettlement || s.roadBuildingRemaining > 0}
-                    onClick={() => setBuildTap((m) => (m === 'settlement' ? 'none' : 'settlement'))}
-                  >
-                    Settlement
-                  </button>
-                  <button
-                    type="button"
-                    className={`px-3 py-2 rounded-lg text-sm border ${buildTap === 'city' ? 'border-amber-400 bg-amber-500/20' : 'border-white/10 bg-slate-800'}`}
-                    disabled={!canBuyCity || s.roadBuildingRemaining > 0}
-                    onClick={() => setBuildTap((m) => (m === 'city' ? 'none' : 'city'))}
-                  >
-                    City
-                  </button>
-                  {s.roadBuildingRemaining > 0 && (
-                    <button
-                      type="button"
-                      className="px-3 py-2 rounded-lg bg-cyan-800/70 hover:bg-cyan-700 text-sm"
-                      onClick={() => onAction({ type: 'skip-free-road' })}
-                    >
-                      Skip free road ({s.roadBuildingRemaining})
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => onAction({ type: 'end-turn' })}
-                    disabled={s.roadBuildingRemaining > 0}
-                    className="px-4 py-2 rounded-lg bg-slate-700 border border-white/10 hover:bg-slate-600 disabled:opacity-40 text-sm font-medium"
-                  >
-                    End turn
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {myPlayer && (
-          <div className="shrink-0 rounded-2xl border border-white/15 bg-slate-950/80 px-3 py-2">
-            <p className="text-xs text-slate-400 mb-1 text-center">Your hand ({expandedHand.length})</p>
-            <div className="mx-auto w-full max-w-[540px]">
-              <div ref={handContainerRef} className="settler-hand">
-                {expandedHand.length === 0 ? (
-                  <p className="text-xs text-slate-500">No resources</p>
-                ) : (
-                  <div
-                    className="settler-handSpread"
-                    style={{
-                      width: `${handLayout.spreadWidth}px`,
-                      height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
-                      transition: 'width 0.16s ease',
-                    }}
-                  >
-                    {expandedHand.map((resource, i) => {
-                      const isLast = i === expandedHand.length - 1;
-                      const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
-                      return (
-                        <motion.div
-                          key={`${resource}-${i}`}
-                          className="settler-handCardSlot"
-                          initial={{ y: 40, opacity: 0 }}
-                          animate={{ y: 0, opacity: 1 }}
-                          transition={{ delay: i * 0.015 }}
-                          style={{
-                            left: `${i * handLayout.step}px`,
-                            width: `${hitboxWidth}px`,
-                            height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
-                            zIndex: i + 1,
-                          }}
-                        >
-                          <span
-                            className="settler-handCardWrap settler-handCardWrap--active"
-                            style={{
-                              width: `${handLayout.cardWidth}px`,
-                              height: `${handLayout.cardHeight}px`,
-                              transform: 'translateY(0px)',
-                            }}
-                          >
-                            <span
-                              className={`settler-resourceCard settler-resourceCard--${resource}`}
-                              aria-label={resourceLabel(resource)}
-                            >
-                              <span className="settler-resourceCardSymbol" aria-hidden>
-                                {RESOURCE_EMOJI[resource]}
-                              </span>
-                            </span>
-                          </span>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+      {buildCostTip != null &&
+        createPortal(
+          <div
+            role="tooltip"
+            className="pointer-events-none fixed z-[200] flex gap-0.5"
+            style={{
+              left: buildCostTip.x,
+              top: buildCostTip.y,
+              transform: 'translate(-50%, calc(-100% - 4px))',
+            }}
+          >
+            {buildCostTip.cards.map((r, i) => (
+              <span
+                key={`${r}-${i}`}
+                className={`settler-resourceCard settler-resourceCard--costPreview settler-resourceCard--${r}${
+                  buildCostTipAffordableFlags && !buildCostTipAffordableFlags[i]
+                    ? ' settler-resourceCard--costPreviewUnaffordable'
+                    : ''
+                }`}
+                aria-hidden
+              >
+                <span className="settler-resourceCardSymbol">{RESOURCE_EMOJI[r]}</span>
+              </span>
+            ))}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

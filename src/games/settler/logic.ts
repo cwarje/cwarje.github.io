@@ -12,6 +12,7 @@ import type {
 } from './types';
 import {
   COSTS,
+  DEV_CARD_COST,
   DEV_DECK,
   emptyHand,
   emptyDevHand,
@@ -809,15 +810,14 @@ export function processSettlerAction(
     case 'buy-dev-card': {
       if (state.phase !== 'main-build' || state.roadBuildingRemaining > 0) return state;
       if (state.devDeck.length === 0) return state;
-      const cost: Partial<Record<Resource, number>> = { sheep: 1, wheat: 1, ore: 1 };
-      if (!canAfford(actor.hand, cost)) return state;
+      if (!canAfford(actor.hand, DEV_CARD_COST)) return state;
       const card = state.devDeck[0]!;
       const nextDeck = state.devDeck.slice(1);
       const players = state.players.map((p) => {
         if (p.id !== playerId) return p;
         return {
           ...p,
-          hand: pay(p.hand, cost),
+          hand: pay(p.hand, DEV_CARD_COST),
           devCards: addDevCard(p.devCards, card, 1),
           newDevCards: addDevCard(p.newDevCards, card, 1),
         };
@@ -1136,7 +1136,7 @@ export function runSettlerBotTurn(state: unknown, random: () => number = Math.ra
         return processSettlerAction(s, { type: 'build-road', edgeId: e }, pid, random);
       }
     }
-    if (canAfford(pl.hand, { sheep: 1, wheat: 1, ore: 1 }) && s.devDeck.length > 0) {
+    if (canAfford(pl.hand, DEV_CARD_COST) && s.devDeck.length > 0) {
       return processSettlerAction(s, { type: 'buy-dev-card' }, pid, random);
     }
     if (!s.playedDevCardThisTurn && canPlayDevCard(pl, 'monopoly')) {
