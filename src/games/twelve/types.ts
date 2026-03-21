@@ -29,11 +29,24 @@ export interface TwelvePlayer {
 export type TwelvePhase = 'playing' | 'announcement' | 'flipping' | 'round-end' | 'game-over';
 export type PlaySource = 'hand' | 'pile-top' | 'pile-bottom';
 
-export interface TwelveAnnouncement {
-  kind: 'set-trump' | 'call-tjog';
-  playerId: string;
-  suit: Suit;
-}
+export type TwelveManBid = { kind: 'half' | 'full'; playerId: string };
+export type TwelveManOutcomeKind = 'half-success' | 'half-fail-streak' | 'half-fail-points' | 'full-success' | 'full-fail';
+
+export type TwelveAnnouncement =
+  | {
+      kind: 'set-trump' | 'call-tjog';
+      playerId: string;
+      suit: Suit;
+    }
+  | {
+      kind: 'call-half-man' | 'call-full-man';
+      playerId: string;
+    }
+  | {
+      kind: 'man-outcome';
+      playerId: string;
+      outcome: TwelveManOutcomeKind;
+    };
 
 export interface TrickPlay {
   playerId: string;
@@ -63,13 +76,18 @@ export interface TwelveState {
   roundSummary: string;
   gameOver: boolean;
   winners: string[];
+  manBid: TwelveManBid | null;
+  postAnnouncement: 'end-round' | null;
 }
 
 export type TwelveAction =
   | { type: 'play-hand-card'; card: Card }
   | { type: 'play-pile-card'; pileIndex: number }
+  | { type: 'dev-give-best-cards' }
   | { type: 'set-trump'; suit: Suit }
   | { type: 'call-tjog'; suit: Suit }
+  | { type: 'call-half-man' }
+  | { type: 'call-full-man' }
   | { type: 'finish-announcement' }
   | { type: 'resolve-trick' }
   | { type: 'flip-exposed' }

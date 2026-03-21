@@ -25,7 +25,7 @@ export interface Player {
 export type ClientMessage =
   | { type: 'join'; playerName: string; playerColor: PlayerColor; deviceId: string }
   | { type: 'update-profile'; playerName: string; playerColor: PlayerColor; deviceId: string }
-  | { type: 'action'; payload: unknown }
+  | { type: 'action'; payload: unknown; deviceId: string }
   | { type: 'leave' }
   | { type: 'ready' };
 

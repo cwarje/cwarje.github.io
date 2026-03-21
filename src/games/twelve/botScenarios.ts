@@ -62,6 +62,8 @@ function makeState(players: TwelvePlayer[], currentPlayerIndex: number): TwelveS
     roundSummary: '',
     gameOver: false,
     winners: [],
+    manBid: null,
+    postAnnouncement: null,
   };
 }
 

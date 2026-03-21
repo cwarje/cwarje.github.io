@@ -313,8 +313,16 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         }
         case 'action': {
           if (currentRoom.phase === 'playing' && currentRoom.gameType) {
-            const senderDeviceId = peerDeviceMapRef.current.get(conn.peer);
+            const mappedDeviceId = peerDeviceMapRef.current.get(conn.peer);
+            const claimedDeviceId = typeof msg.deviceId === 'string' ? msg.deviceId : null;
+            const senderDeviceId = mappedDeviceId ?? claimedDeviceId;
             if (!senderDeviceId) return;
+            if (mappedDeviceId && claimedDeviceId && mappedDeviceId !== claimedDeviceId) return;
+            if (!mappedDeviceId) {
+              const isKnownPlayer = currentRoom.players.some(player => player.id === senderDeviceId);
+              if (!isKnownPlayer) return;
+              peerDeviceMapRef.current.set(conn.peer, senderDeviceId);
+            }
             if (
               currentRoom.gameType === 'poker'
               && isPokerHostControlAction(msg.payload)
@@ -883,9 +891,10 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } else {
+      if (!myId) return;
       connectionsRef.current.forEach((conn) => {
         if (conn.open) {
-          conn.send({ type: 'action', payload } as ClientMessage);
+          conn.send({ type: 'action', payload, deviceId: myId } as ClientMessage);
         }
       });
     }

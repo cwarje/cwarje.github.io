@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Card, Suit, TwelvePlayer, TwelveState } from './types';
-import { getPilePlayableCard, isLegalPlay, rankDisplay, suitsWithRoyalPair } from './rules';
+import { cardPointValue, getPilePlayableCard, isLegalPlay, rankDisplay, suitsWithRoyalPair } from './rules';
 import { getTeamRoundCardPoints } from './logic';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 
@@ -284,10 +284,82 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
           </>
         );
       }
+      if (state.announcement.kind === 'call-tjog') {
+        return (
+          <>
+            <span style={{ color: getPlayerHudTextColor(player.color) }}>{player.name}</span>
+            {` called tjog in ${state.announcement.suit}`}
+          </>
+        );
+      }
+      if (state.announcement.kind === 'call-half-man') {
+        return (
+          <>
+            <span style={{ color: getPlayerHudTextColor(player.color) }}>{player.name}</span>
+            {' called Half man'}
+          </>
+        );
+      }
+      if (state.announcement.kind === 'call-full-man') {
+        return (
+          <>
+            <span style={{ color: getPlayerHudTextColor(player.color) }}>{player.name}</span>
+            {' called Full man'}
+          </>
+        );
+      }
+      if (state.announcement.kind !== 'man-outcome') return null;
+      const declarerIndex = state.players.findIndex(p => p.id === player.id);
+      const declarerPoints = player.capturedCards.reduce((sum, card) => sum + cardPointValue(card), 0);
+      const awardedGroupText = (bonus: 3 | 6): string => {
+        if (declarerIndex < 0) return `Opponents +${bonus}`;
+        if (state.players.length === 4) {
+          const opponents = state.players.filter((_, idx) => idx % 2 !== declarerIndex % 2);
+          if (opponents.length >= 2) return `${opponents[0].name} & ${opponents[1].name} team +${bonus}`;
+          return `Opposing team +${bonus}`;
+        }
+        const opponents = state.players.filter((_, idx) => idx !== declarerIndex);
+        if (opponents.length === 0) return `Opponents +${bonus}`;
+        if (opponents.length === 1) return `${opponents[0].name} +${bonus}`;
+        const names = opponents.map(p => p.name).join(', ');
+        return `${names} +${bonus} each`;
+      };
+      if (state.announcement.outcome === 'half-success') {
+        return (
+          <>
+            <span style={{ color: getPlayerHudTextColor(player.color) }}>{player.name}</span>
+            {` got 6 points for Half man (${declarerPoints} pts)`}
+          </>
+        );
+      }
+      if (state.announcement.outcome === 'half-fail-streak') {
+        return (
+          <>
+            <span style={{ color: getPlayerHudTextColor(player.color) }}>{player.name}</span>
+            {` failed Half man (${declarerPoints} pts). ${awardedGroupText(3)}.`}
+          </>
+        );
+      }
+      if (state.announcement.outcome === 'half-fail-points') {
+        return (
+          <>
+            <span style={{ color: getPlayerHudTextColor(player.color) }}>{player.name}</span>
+            {` failed Half man (${declarerPoints} pts). ${awardedGroupText(3)}.`}
+          </>
+        );
+      }
+      if (state.announcement.outcome === 'full-success') {
+        return (
+          <>
+            <span style={{ color: getPlayerHudTextColor(player.color) }}>{player.name}</span>
+            {` got 12 points for Full man (${declarerPoints} pts)`}
+          </>
+        );
+      }
       return (
         <>
           <span style={{ color: getPlayerHudTextColor(player.color) }}>{player.name}</span>
-          {` called tjog in ${state.announcement.suit}`}
+          {` failed Full man (${declarerPoints} pts). ${awardedGroupText(6)}.`}
         </>
       );
     }
@@ -372,6 +444,31 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
   const canCallTjog = canAnnounceTrumpOrTjog && state.trumpSuit !== null && !!myPlayer && myPlayer.totalScore < 11;
   const showSetTrumpActions = canSetTrump && myRoyalSuits.length > 0;
   const showCallTjogActions = canCallTjog && myTjogSuits.length > 0;
+  const totalTricksInRound = useMemo(() => {
+    const playerCount = state.players.length;
+    if (playerCount <= 0) return 0;
+    const cardsForPiles = playerCount * state.pileCount * 2;
+    const cardsForHands = 36 - cardsForPiles;
+    const handCardsEach = Math.floor(cardsForHands / playerCount);
+    return handCardsEach + state.pileCount * 2;
+  }, [state.players.length, state.pileCount]);
+  const canDeclareMan =
+    !!myPlayer
+    && canUseActionButtons
+    && state.currentTrick.length === 0
+    && state.lastTrickWinnerId === myPlayer.id
+    && state.trickNumber === 2
+    && state.manBid === null;
+  const canCallHalfMan = canDeclareMan && totalTricksInRound >= 6;
+  const canCallFullMan = canDeclareMan;
+  const showDevBestCardsButton =
+    import.meta.env.DEV
+    && myIndex >= 0
+    && state.phase === 'playing'
+    && state.trickNumber === 1
+    && state.currentTrick.length === 0
+    && state.trickWinner === null
+    && !state.gameOver;
 
   const renderCardFace = (card: Card, disabled = false, compact = false) => (
     <div className={`river-card ${disabled ? 'river-card--disabled' : ''} ${compact ? 'river-card--compact' : ''}`}>
@@ -406,6 +503,23 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
   const callTjog = (suit: Suit) => {
     if (!canCallTjog) return;
     onAction({ type: 'call-tjog', suit });
+  };
+
+  const callHalfMan = () => {
+    if (myIndex < 0 || !myPlayer) return;
+    if (!canCallHalfMan) return;
+    onAction({ type: 'call-half-man' });
+  };
+
+  const callFullMan = () => {
+    if (myIndex < 0 || !myPlayer) return;
+    if (!canCallFullMan) return;
+    onAction({ type: 'call-full-man' });
+  };
+
+  const devGiveBestCards = () => {
+    if (!showDevBestCardsButton) return;
+    onAction({ type: 'dev-give-best-cards' });
   };
 
   if (state.phase === 'game-over') {
@@ -506,7 +620,16 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
   };
 
   return (
-    <div className={`river-board river-board--players-${state.players.length} space-y-3 sm:space-y-4`}>
+    <div className={`river-board river-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
+      {showDevBestCardsButton && (
+        <button
+          type="button"
+          onClick={devGiveBestCards}
+          className="absolute right-3 top-3 z-20 rounded-md border border-amber-300/60 bg-amber-500/20 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/30 cursor-pointer"
+        >
+          Dev: best cards
+        </button>
+      )}
       <div ref={tableRef} className={`river-table river-table--players-${state.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
@@ -653,6 +776,34 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
                         <span className={SUIT_COLORS[suit]}>{SUIT_SYMBOLS[suit]}</span>
                       </button>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {(canCallHalfMan || canCallFullMan) && (
+                <div className="twelve-actionGroup">
+                  <span className="twelve-actionLabel">Man</span>
+                  <div className="twelve-actionButtons">
+                    {canCallHalfMan && (
+                      <button
+                        type="button"
+                        disabled={!canCallHalfMan}
+                        onClick={callHalfMan}
+                        className="twelve-actionButton"
+                      >
+                        6
+                      </button>
+                    )}
+                    {canCallFullMan && (
+                      <button
+                        type="button"
+                        disabled={!canCallFullMan}
+                        onClick={callFullMan}
+                        className="twelve-actionButton"
+                      >
+                        12
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

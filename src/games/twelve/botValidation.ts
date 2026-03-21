@@ -156,6 +156,11 @@ export function runTwelveBotValidation(gameCount = 40): TwelveBotValidationMetri
     while (!state.gameOver && safety < 30000) {
       safety++;
 
+      if (state.phase === 'announcement') {
+        state = processTwelveAction(state, { type: 'finish-announcement' }, state.players[0]?.id ?? '') as TwelveState;
+        continue;
+      }
+
       if (state.phase === 'playing' && state.trickWinner) {
         state = processTwelveAction(state, { type: 'resolve-trick' }, state.players[0]?.id ?? '') as TwelveState;
         continue;

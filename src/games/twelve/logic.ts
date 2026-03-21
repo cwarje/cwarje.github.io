@@ -5,6 +5,7 @@ import { cardEquals, cardPointValue, getPilePlayableCard, getTrickWinnerPlayerId
 const SUITS: Suit[] = ['clubs', 'diamonds', 'spades', 'hearts'];
 const RANKS: Rank[] = [6, 7, 8, 9, 10, 11, 12, 13, 14];
 const ALL_PILE_COUNTS: TwelvePileCount[] = [3, 4, 5, 6];
+const SUIT_SORT_ORDER: Record<Suit, number> = { clubs: 0, diamonds: 1, spades: 2, hearts: 3 };
 
 function createDeck(): Card[] {
   const deck: Card[] = [];
@@ -26,11 +27,94 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 function sortHand(hand: Card[]): Card[] {
-  const suitOrder: Record<Suit, number> = { clubs: 0, diamonds: 1, spades: 2, hearts: 3 };
   return [...hand].sort((a, b) => {
-    if (suitOrder[a.suit] !== suitOrder[b.suit]) return suitOrder[a.suit] - suitOrder[b.suit];
+    if (SUIT_SORT_ORDER[a.suit] !== SUIT_SORT_ORDER[b.suit]) return SUIT_SORT_ORDER[a.suit] - SUIT_SORT_ORDER[b.suit];
     return rankStrength(a.rank) - rankStrength(b.rank);
   });
+}
+
+function devCanGiveBestCards(state: TwelveState): boolean {
+  if (!import.meta.env.DEV) return false;
+  if (state.gameOver) return false;
+  if (state.phase !== 'playing') return false;
+  if (state.trickNumber !== 1) return false;
+  if (state.currentTrick.length !== 0) return false;
+  if (state.trickWinner !== null) return false;
+  return true;
+}
+
+function sortCardsStrongestFirst(cards: Card[]): Card[] {
+  return [...cards].sort((a, b) => {
+    const rankDelta = rankStrength(b.rank) - rankStrength(a.rank);
+    if (rankDelta !== 0) return rankDelta;
+    return SUIT_SORT_ORDER[a.suit] - SUIT_SORT_ORDER[b.suit];
+  });
+}
+
+function devGiveBestCards(state: TwelveState, playerId: string): TwelvePlayer[] | null {
+  if (!devCanGiveBestCards(state)) return null;
+  const targetPlayerIndex = state.players.findIndex((player) => player.id === playerId);
+  if (targetPlayerIndex === -1) return null;
+
+  const allCards: Card[] = [];
+  for (const player of state.players) {
+    allCards.push(...player.hand);
+    for (const pile of player.frontPiles) {
+      if (pile.topCard) allCards.push(pile.topCard);
+      if (pile.bottomCard) allCards.push(pile.bottomCard);
+    }
+  }
+
+  const strongestRemaining = sortCardsStrongestFirst(allCards);
+  const updatedPlayers = state.players.map((player) => ({
+    ...player,
+    hand: player.hand.map(() => null as Card | null),
+    frontPiles: player.frontPiles.map((pile): FrontPile => ({
+      ...pile,
+      topCard: null as Card | null,
+      bottomCard: null as Card | null,
+    })),
+  }));
+
+  const assignToPlayerSlots = (playerIndex: number, takeStrongest: boolean) => {
+    const originalPlayer = state.players[playerIndex];
+    const targetPlayer = updatedPlayers[playerIndex];
+
+    for (let i = 0; i < originalPlayer.hand.length; i++) {
+      const card = takeStrongest ? strongestRemaining.shift() : strongestRemaining.pop();
+      if (!card) return false;
+      targetPlayer.hand[i] = card;
+    }
+
+    for (let pileIndex = 0; pileIndex < originalPlayer.frontPiles.length; pileIndex++) {
+      const originalPile = originalPlayer.frontPiles[pileIndex];
+      const targetPile = targetPlayer.frontPiles[pileIndex];
+      if (originalPile.topCard) {
+        const card = takeStrongest ? strongestRemaining.shift() : strongestRemaining.pop();
+        if (!card) return false;
+        targetPile.topCard = card;
+      }
+      if (originalPile.bottomCard) {
+        const card = takeStrongest ? strongestRemaining.shift() : strongestRemaining.pop();
+        if (!card) return false;
+        targetPile.bottomCard = card;
+      }
+    }
+    return true;
+  };
+
+  if (!assignToPlayerSlots(targetPlayerIndex, true)) return null;
+
+  for (let i = 0; i < state.players.length; i++) {
+    if (i === targetPlayerIndex) continue;
+    if (!assignToPlayerSlots(i, false)) return null;
+  }
+
+  return updatedPlayers.map((player) => ({
+    ...player,
+    hand: sortHand(player.hand.filter((card): card is Card => card !== null)),
+    frontPiles: player.frontPiles,
+  }));
 }
 
 function allCardsPlayed(players: TwelvePlayer[]): boolean {
@@ -153,6 +237,33 @@ function resolvePileCount(requested: TwelvePileCount, playerCount: number): Twel
   return allowed[allowed.length - 1];
 }
 
+function totalTricksPerRound(playerCount: number, pileCount: number): number {
+  const cardsForPiles = playerCount * pileCount * 2;
+  const cardsForHands = 36 - cardsForPiles;
+  const handCardsEach = Math.floor(cardsForHands / playerCount);
+  return handCardsEach + pileCount * 2;
+}
+
+function applyGamePointsToSide(players: TwelvePlayer[], playerId: string, delta: number): TwelvePlayer[] {
+  const idx = players.findIndex(player => player.id === playerId);
+  if (idx === -1 || delta === 0) return players;
+  if (players.length !== 4) {
+    return players.map((player) => (player.id === playerId ? { ...player, totalScore: player.totalScore + delta } : player));
+  }
+  const side = idx % 2;
+  return players.map((player, i) => (i % 2 === side ? { ...player, totalScore: player.totalScore + delta } : player));
+}
+
+function applyGamePointsToOpponents(players: TwelvePlayer[], declarerId: string, delta: number): TwelvePlayer[] {
+  const idx = players.findIndex(player => player.id === declarerId);
+  if (idx === -1 || delta === 0) return players;
+  if (players.length !== 4) {
+    return players.map((player) => (player.id !== declarerId ? { ...player, totalScore: player.totalScore + delta } : player));
+  }
+  const side = idx % 2;
+  return players.map((player, i) => (i % 2 !== side ? { ...player, totalScore: player.totalScore + delta } : player));
+}
+
 function startRound(
   players: TwelvePlayer[],
   pileCount: TwelvePileCount,
@@ -212,6 +323,8 @@ function startRound(
     roundSummary: '',
     gameOver: false,
     winners: [],
+    manBid: null,
+    postAnnouncement: null,
   };
 }
 
@@ -274,6 +387,8 @@ function endRound(state: TwelveState): TwelveState {
     trickWinner: null,
     currentTrick: [],
     pendingFlip: [],
+    manBid: null,
+    postAnnouncement: null,
   };
 }
 
@@ -293,6 +408,22 @@ function canCallTjog(state: TwelveState, player: TwelvePlayer, suit: Suit): bool
   if (player.tjogSuitsCalled.includes(suit)) return false;
   if (state.trumpSetterId === player.id && suit === state.trumpSuit) return false;
   return suitsWithRoyalPair(player).includes(suit);
+}
+
+function canCallHalfMan(state: TwelveState, player: TwelvePlayer): boolean {
+  if (state.currentTrick.length !== 0) return false;
+  if (state.lastTrickWinnerId !== player.id) return false;
+  if (state.trickNumber !== 2) return false;
+  if (state.manBid !== null) return false;
+  return totalTricksPerRound(state.players.length, state.pileCount) >= 6;
+}
+
+function canCallFullMan(state: TwelveState, player: TwelvePlayer): boolean {
+  if (state.currentTrick.length !== 0) return false;
+  if (state.lastTrickWinnerId !== player.id) return false;
+  if (state.trickNumber !== 2) return false;
+  if (state.manBid !== null) return false;
+  return true;
 }
 
 export function createTwelveState(players: Player[], options?: { pileCount?: TwelvePileCount }): TwelveState {
@@ -319,6 +450,15 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
   if (s.gameOver && a.type !== 'show-final-results') return state;
 
   switch (a.type) {
+    case 'dev-give-best-cards': {
+      const updatedPlayers = devGiveBestCards(s, playerId);
+      if (!updatedPlayers) return state;
+      return {
+        ...s,
+        players: updatedPlayers,
+      };
+    }
+
     case 'set-trump': {
       if (s.phase !== 'playing' || s.trickWinner) return state;
       const playerIndex = s.players.findIndex(player => player.id === playerId);
@@ -380,11 +520,53 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
       };
     }
 
-    case 'finish-announcement': {
-      if (s.phase !== 'announcement') return state;
+    case 'call-half-man': {
+      if (s.phase !== 'playing' || s.trickWinner) return state;
+      const playerIndex = s.players.findIndex(player => player.id === playerId);
+      if (playerIndex === -1 || playerIndex !== s.currentPlayerIndex) return state;
+      const player = s.players[playerIndex];
+      if (!canCallHalfMan(s, player)) return state;
       return {
         ...s,
-        phase: 'playing',
+        phase: 'announcement',
+        announcement: {
+          kind: 'call-half-man',
+          playerId: player.id,
+        },
+        manBid: { kind: 'half', playerId: player.id },
+      };
+    }
+
+    case 'call-full-man': {
+      if (s.phase !== 'playing' || s.trickWinner) return state;
+      const playerIndex = s.players.findIndex(player => player.id === playerId);
+      if (playerIndex === -1 || playerIndex !== s.currentPlayerIndex) return state;
+      const player = s.players[playerIndex];
+      if (!canCallFullMan(s, player)) return state;
+      return {
+        ...s,
+        phase: 'announcement',
+        announcement: {
+          kind: 'call-full-man',
+          playerId: player.id,
+        },
+        manBid: { kind: 'full', playerId: player.id },
+      };
+    }
+
+    case 'finish-announcement': {
+      if (s.phase !== 'announcement') return state;
+      if (s.postAnnouncement === 'end-round') {
+        return endRound({
+          ...s,
+          phase: 'playing',
+          announcement: null,
+          postAnnouncement: null,
+        });
+      }
+      return {
+        ...s,
+        phase: s.pendingFlip.length > 0 ? 'flipping' : 'playing',
         announcement: null,
       };
     }
@@ -495,15 +677,7 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
         capturedCards: [...winner.capturedCards, ...s.currentTrick.map(entry => entry.card)],
       };
 
-      if (allCardsPlayed(updatedPlayers)) {
-        return endRound({
-          ...s,
-          players: updatedPlayers,
-          lastTrickWinnerId: s.trickWinner,
-        });
-      }
-
-      return {
+      const nextAfterTrick = {
         ...s,
         players: updatedPlayers,
         currentTrick: [],
@@ -512,8 +686,81 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
         leaderIndex: winnerIndex,
         currentPlayerIndex: winnerIndex,
         lastTrickWinnerId: s.trickWinner,
-        phase: s.pendingFlip.length > 0 ? 'flipping' : 'playing',
+        phase: s.pendingFlip.length > 0 ? 'flipping' : 'playing' as const,
       };
+      const roundIsOver = allCardsPlayed(updatedPlayers);
+
+      if (s.manBid) {
+        const declarerId = s.manBid.playerId;
+        const winnerId = s.trickWinner;
+        if (s.manBid.kind === 'half') {
+          if (winnerId !== declarerId) {
+            return {
+              ...nextAfterTrick,
+              players: applyGamePointsToOpponents(updatedPlayers, declarerId, 3),
+              phase: 'announcement',
+              announcement: { kind: 'man-outcome', playerId: declarerId, outcome: 'half-fail-streak' },
+              manBid: null,
+              postAnnouncement: roundIsOver ? 'end-round' : null,
+            };
+          }
+          if (s.trickNumber === 6) {
+            const sixTrickPoints = updatedPlayers[winnerIndex].capturedCards.reduce((sum, card) => sum + cardPointValue(card), 0);
+            if (sixTrickPoints >= 61) {
+              return {
+                ...nextAfterTrick,
+                players: applyGamePointsToSide(updatedPlayers, declarerId, 6),
+                phase: 'announcement',
+                announcement: { kind: 'man-outcome', playerId: declarerId, outcome: 'half-success' },
+                manBid: null,
+                postAnnouncement: roundIsOver ? 'end-round' : null,
+              };
+            }
+            return {
+              ...nextAfterTrick,
+              players: applyGamePointsToOpponents(updatedPlayers, declarerId, 3),
+              phase: 'announcement',
+              announcement: { kind: 'man-outcome', playerId: declarerId, outcome: 'half-fail-points' },
+              manBid: null,
+              postAnnouncement: roundIsOver ? 'end-round' : null,
+            };
+          }
+        } else {
+          if (winnerId !== declarerId) {
+            return {
+              ...nextAfterTrick,
+              players: applyGamePointsToOpponents(updatedPlayers, declarerId, 6),
+              phase: 'announcement',
+              announcement: { kind: 'man-outcome', playerId: declarerId, outcome: 'full-fail' },
+              manBid: null,
+              postAnnouncement: roundIsOver ? 'end-round' : null,
+            };
+          }
+          if (roundIsOver) {
+            return {
+              ...s,
+              players: applyGamePointsToSide(updatedPlayers, declarerId, 12),
+              currentTrick: [],
+              trickWinner: null,
+              lastTrickWinnerId: s.trickWinner,
+              phase: 'announcement',
+              announcement: { kind: 'man-outcome', playerId: declarerId, outcome: 'full-success' },
+              manBid: null,
+              postAnnouncement: 'end-round',
+            };
+          }
+        }
+      }
+
+      if (roundIsOver) {
+        return endRound({
+          ...s,
+          players: updatedPlayers,
+          lastTrickWinnerId: s.trickWinner,
+        });
+      }
+
+      return nextAfterTrick;
     }
 
     case 'flip-exposed': {

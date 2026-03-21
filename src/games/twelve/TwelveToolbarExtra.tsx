@@ -6,7 +6,10 @@ const suitColors: Record<Suit, string> = { hearts: 'text-red-400', diamonds: 'te
 
 export default function TwelveToolbarExtra({ state, isHandZoomed }: GameHudProps) {
   const s = state as TwelveState;
-  const displaySuit = s.phase === 'announcement' && s.announcement ? s.announcement.suit : s.trumpSuit;
+  const displaySuit =
+    s.phase === 'announcement' && s.announcement && 'suit' in s.announcement
+      ? s.announcement.suit
+      : s.trumpSuit;
   if (!displaySuit) return null;
   return (
     <div className={`river-hudTrumpCard ${isHandZoomed ? 'river-hudTrumpCard--zoom' : ''}`}>
