@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Dice5, Heart, Ship, Crosshair, Club, ArrowUpDown, Crown, LayoutGrid } from 'lucide-react';
+import { Dice5, Heart, Ship, Crosshair, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon } from 'lucide-react';
 import type { GameType, Player, GameStartOptions } from '../networking/types';
 
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
@@ -10,6 +10,13 @@ import { createLiarsDiceState, processLiarsDiceAction, isLiarsDiceOver, runLiars
 import { createPokerState, processPokerAction, isPokerOver, runPokerBotTurn, getPokerWinners } from './poker/logic';
 import { createUpRiverState, processUpRiverAction, isUpRiverOver, runUpRiverBotTurn, getUpRiverWinners } from './up-and-down-the-river/logic';
 import { createTwelveState, processTwelveAction, isTwelveOver, runTwelveBotTurn, getTwelveWinners } from './twelve/logic';
+import {
+  createSettlerStateFromPlayers,
+  processSettlerActionUnknown,
+  isSettlerOverUnknown,
+  runSettlerBotTurnUnknown,
+  getSettlerWinnersUnknown,
+} from './settler/logic';
 import { createCrossCribState, processCrossCribAction, isCrossCribOver, runCrossCribBotTurn, getCrossCribWinners } from './cross-crib/logic';
 
 import YahtzeeBoard from './yahtzee/YahtzeeBoard';
@@ -20,6 +27,7 @@ import LiarsDiceBoard from './liars-dice/LiarsDiceBoard';
 import PokerBoard from './poker/PokerBoard';
 import UpAndDownTheRiverBoard from './up-and-down-the-river/UpAndDownTheRiverBoard';
 import TwelveBoard from './twelve/TwelveBoard';
+import SettlerBoard from './settler/SettlerBoard';
 import CrossCribBoard from './cross-crib/CrossCribBoard';
 
 import HeartsOptions from './hearts/HeartsOptions';
@@ -491,6 +499,49 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     production: true,
   },
 
+  settler: {
+    title: 'Settler',
+    shortDescription: 'Settle the island, grow your road network, and race to 10 victory points.',
+    playersLabel: '3-4 Players',
+    minPlayers: 3,
+    maxPlayers: 4,
+    info: {
+      goal: 'Reach 10 victory points first by building settlements/cities, developing roads, and using development cards.',
+      rules: [
+        'The game starts with two setup rounds: each player places one settlement and one connected road per round.',
+        'On your turn, roll dice to produce resources from matching number tokens, unless a 7 is rolled.',
+        'If a 7 is rolled, players with more than 7 resource cards discard half, then the active player moves the robber.',
+        'Build roads, settlements, and cities by paying resources; cities upgrade your own settlements.',
+        'You can buy and play development cards (one per turn), use maritime trade at 4:1, and compete for Longest Road/Largest Army.',
+      ],
+      howToPlay: [
+        'In setup, click highlighted vertices to place settlements and highlighted edges for roads.',
+        'During your turn, roll dice, then click build buttons and place pieces on highlighted legal spots.',
+        'Use the bottom action bar for core turn actions and the right panel for trade/development tools.',
+        'Watch VP totals in the player strip; first to 10 wins.',
+      ],
+    },
+    icon: Hexagon,
+    theme: {
+      gradient: 'from-amber-500/20 to-yellow-600/20',
+      cardBorder: 'border-amber-500/20',
+      hoverBorder: 'hover:border-amber-500/30',
+      playersTag: 'bg-amber-500/25 text-amber-200 border border-amber-500/30',
+      iconColor: 'text-amber-300',
+      buttonColors: 'bg-amber-600 hover:bg-amber-500',
+      panelBg: 'bg-amber-950',
+      labelColor: 'text-amber-200',
+    },
+    createState: createSettlerStateFromPlayers,
+    processAction: processSettlerActionUnknown,
+    isOver: isSettlerOverUnknown,
+    runBotTurn: runSettlerBotTurnUnknown,
+    getWinners: getSettlerWinnersUnknown,
+    Board: SettlerBoard,
+    fullBoard: true,
+    production: false,
+  },
+
   'cross-crib': {
     title: 'Cross Crib',
     shortDescription: 'Score points by forming cribbage hands in a 5×5 grid. Rows vs columns over 4 rounds.',
@@ -546,6 +597,7 @@ export const ALL_GAME_TYPES: GameType[] = [
   'yahtzee',
   'hearts',
   'twelve',
+  'settler',
   'up-and-down-the-river',
   'farkle',
   'cross-crib',

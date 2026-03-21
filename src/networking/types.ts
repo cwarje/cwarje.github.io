@@ -1,4 +1,14 @@
-export type GameType = 'yahtzee' | 'farkle' | 'hearts' | 'battleship' | 'liars-dice' | 'poker' | 'up-and-down-the-river' | 'twelve' | 'cross-crib';
+export type GameType =
+  | 'yahtzee'
+  | 'farkle'
+  | 'hearts'
+  | 'battleship'
+  | 'liars-dice'
+  | 'poker'
+  | 'up-and-down-the-river'
+  | 'twelve'
+  | 'settler'
+  | 'cross-crib';
 export type PlayerColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet' | 'dark-purple';
 export type HeartsTargetScore = 50 | 100;
 export type FarkleTargetScore = 3000 | 5000 | 10000;

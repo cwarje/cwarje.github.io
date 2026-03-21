@@ -569,6 +569,89 @@
   }
 }
 
+.settler-hand {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  min-height: 132px;
+  padding: 2px 0 4px;
+}
+
+.settler-handSpread {
+  position: relative;
+}
+
+.settler-handCardSlot {
+  position: absolute;
+  top: 0;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  overflow: visible;
+  transition: left 0.16s ease, width 0.16s ease;
+}
+
+.settler-handCardWrap {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  transition: transform 0.16s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .settler-handCardWrap--active:hover {
+    transform: translateY(-8px) !important;
+  }
+}
+
+.settler-resourceCard {
+  width: 100%;
+  height: 100%;
+  border: 3px solid #0f172a;
+  border-radius: 12px;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.32);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  line-height: 1;
+  color: #f8fafc;
+}
+
+.settler-resourceCard--wood {
+  background: linear-gradient(140deg, #166534 0%, #052e16 100%);
+}
+
+.settler-resourceCard--brick {
+  background: linear-gradient(140deg, #b91c1c 0%, #7f1d1d 100%);
+}
+
+.settler-resourceCard--sheep {
+  background: linear-gradient(140deg, #4ade80 0%, #15803d 100%);
+}
+
+.settler-resourceCard--wheat {
+  background: linear-gradient(140deg, #facc15 0%, #ca8a04 100%);
+  color: #422006;
+}
+
+.settler-resourceCard--ore {
+  background: linear-gradient(140deg, #64748b 0%, #1e293b 100%);
+}
+
+.settler-resourceCardSymbol {
+  font-size: 1.5rem;
+}
+
+.settler-resourceCardLabel {
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .hearts-actionButton {
   border: 3px solid #111827;
   background: #111827;

@@ -15,6 +15,7 @@ import type { YahtzeeState } from '../games/yahtzee/types';
 import type { FarkleState } from '../games/farkle/types';
 import type { UpRiverState } from '../games/up-and-down-the-river/types';
 import type { TwelveState } from '../games/twelve/types';
+import type { SettlerState } from '../games/settler/types';
 import type { CrossCribState } from '../games/cross-crib/types';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 import { shouldBotBank } from '../games/farkle/logic';
@@ -139,6 +140,17 @@ function applyProfileToGameState(
     }
     case 'twelve': {
       const current = state as TwelveState;
+      let changed = false;
+      const players = current.players.map((player) => {
+        if (player.id !== playerId) return player;
+        if (player.name === playerName && player.color === playerColor) return player;
+        changed = true;
+        return { ...player, name: playerName, color: playerColor };
+      });
+      return changed ? { ...current, players } : current;
+    }
+    case 'settler': {
+      const current = state as SettlerState;
       let changed = false;
       const players = current.players.map((player) => {
         if (player.id !== playerId) return player;
@@ -966,6 +978,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const TWELVE_FINAL_RESULTS_DELAY = 6000; // ms to hold final round summary before end screen
   const CROSS_CRIB_ROUND_END_DELAY = 7000; // ms to show round summary before next round
   const CROSS_CRIB_BOT_DELAY = 900; // ms between bot card placements
+  const SETTLER_BOT_DELAY = 900; // ms between bot actions in Settler
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -1468,6 +1481,57 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
           }
         }, delay);
+      }
+    }
+
+    // ── Settler bot scheduling ──
+    if (room.gameType === 'settler') {
+      const cs = gameState as SettlerState;
+      if (cs.phase === 'finished') return;
+
+      // Discard uses queue order instead of currentPlayerIndex.
+      if (cs.phase === 'discard') {
+        const discarderId = cs.discardQueue[0];
+        const discarder = discarderId ? cs.players.find((p) => p.id === discarderId) : null;
+        if (discarder?.isBot) {
+          botTimerRef.current = setTimeout(() => {
+            const currentGs = gameStateRef.current;
+            const currentRoom = roomRef.current;
+            if (!currentGs || !currentRoom) return;
+
+            const next = runSingleBotTurn('settler', currentGs);
+            if (next !== currentGs) {
+              setGameState(next);
+              broadcastGameState(next);
+              if (checkGameOver('settler', next)) {
+                const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+                setRoom(finishedRoom);
+                broadcastRoomState(finishedRoom);
+              }
+            }
+          }, SETTLER_BOT_DELAY);
+        }
+        return;
+      }
+
+      const currentPlayer = cs.players[cs.currentPlayerIndex];
+      if (currentPlayer?.isBot) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom) return;
+
+          const next = runSingleBotTurn('settler', currentGs);
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('settler', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, SETTLER_BOT_DELAY);
       }
     }
   }, [gameState, isHost, room, broadcastGameState, broadcastRoomState]);

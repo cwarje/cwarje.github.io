@@ -138,7 +138,7 @@ export default function GamePage() {
         </div>
       )}
 
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className={`flex-1 min-h-0 ${gameDef?.fullBoard ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         {/* Game Board */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
