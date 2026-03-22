@@ -1,5 +1,6 @@
 import type { Player } from '../../networking/types';
 import { DEFAULT_BOARD_GRAPH, type BoardGraph } from './layout';
+import { harborKindAtVertex, portsFromState, randomPortKindsByCoastalEdgeId } from './ports';
 import type {
   SettlerAction,
   SettlerPlayer,
@@ -17,6 +18,9 @@ import {
   emptyHand,
   emptyDevHand,
   handTotal,
+  MAX_CITIES_PER_PLAYER,
+  MAX_ROADS_PER_PLAYER,
+  MAX_SETTLEMENTS_PER_PLAYER,
   NUMBER_DECK,
   RESOURCE_LIST,
   RESOURCE_EMOJI,
@@ -24,8 +28,16 @@ import {
   VP_TO_WIN,
   addResource,
   removeResource,
+  depositToBank,
+  withdrawFromBank,
+  initialBank,
 } from './types';
 
+/**
+ * Settlers rules engine: `processSettlerAction` applies one move and returns the next `SettlerState`.
+ * The board imports exported legality helpers and `victoryPoints`; everything else here is internal
+ * (graph checks, production, robber, dev cards, bots, player removal).
+ */
 const graph: BoardGraph = DEFAULT_BOARD_GRAPH;
 const MAX_ACTION_LOG_ENTRIES = 100;
 
@@ -100,6 +112,8 @@ function productionActionLogEntries(
   return out;
 }
 
+// --- Setup phase: snake order and current player slot ---
+
 export function setupCurrentPlayerSlot(s: SettlerState): number {
   const n = s.players.length;
   if (s.setupRound === 1) return s.setupOrderIndex;
@@ -109,6 +123,8 @@ export function setupCurrentPlayerSlot(s: SettlerState): number {
 function syncCurrentPlayerForSetup(s: SettlerState): SettlerState {
   return { ...s, currentPlayerIndex: setupCurrentPlayerSlot(s) };
 }
+
+// --- Board graph: adjacency, connectivity, and placement rules (internal) ---
 
 function neighborSettlementsExist(s: SettlerState, vertexId: number): boolean {
   const neigh = graph.vertexNeighbors.get(vertexId) ?? [];
@@ -152,6 +168,61 @@ function pay(h: ResourceHand, cost: Partial<Record<Resource, number>>): Resource
     next = { ...next, [r]: next[r] - c };
   }
   return next;
+}
+
+function canAffordPartial(h: ResourceHand, cost: Partial<Record<Resource, number>>): boolean {
+  for (const r of RESOURCE_LIST) {
+    const c = cost[r] ?? 0;
+    if (c < 0) return false;
+    if (h[r] < c) return false;
+  }
+  return true;
+}
+
+function payPartial(h: ResourceHand, cost: Partial<Record<Resource, number>>): ResourceHand {
+  let next = { ...h };
+  for (const r of RESOURCE_LIST) {
+    const c = cost[r] ?? 0;
+    if (c > 0) next = removeResource(next, r, c);
+  }
+  return next;
+}
+
+function addPartial(h: ResourceHand, add: Partial<Record<Resource, number>>): ResourceHand {
+  let next = { ...h };
+  for (const r of RESOURCE_LIST) {
+    const c = add[r] ?? 0;
+    if (c > 0) next = addResource(next, r, c);
+  }
+  return next;
+}
+
+function partialHandTotal(p: Partial<Record<Resource, number>>): number {
+  let n = 0;
+  for (const r of RESOURCE_LIST) {
+    const c = p[r] ?? 0;
+    if (c < 0) return -1;
+    n += c;
+  }
+  return n;
+}
+
+function depositCostToBank(bank: ResourceHand, cost: Partial<Record<Resource, number>>): ResourceHand {
+  let b = bank;
+  for (const r of RESOURCE_LIST) {
+    const c = cost[r] ?? 0;
+    if (c > 0) b = depositToBank(b, r, c);
+  }
+  return b;
+}
+
+function depositHandToBank(bank: ResourceHand, hand: ResourceHand): ResourceHand {
+  let b = bank;
+  for (const r of RESOURCE_LIST) {
+    const n = hand[r];
+    if (n > 0) b = depositToBank(b, r, n);
+  }
+  return b;
 }
 
 function addDevCard(h: DevCardHand, card: DevCard, n: number): DevCardHand {
@@ -225,6 +296,8 @@ function longestRoadForPlayer(s: SettlerState, playerId: string): number {
   return best;
 }
 
+// --- Longest road, largest army, and VP (used after builds and player changes) ---
+
 function recomputeAwards(s: SettlerState): SettlerState {
   const roadLengths = new Map<string, number>();
   for (const p of s.players) {
@@ -256,30 +329,59 @@ function recomputeAwards(s: SettlerState): SettlerState {
   return { ...s, longestRoadHolderId, largestArmyHolderId };
 }
 
-export function victoryPoints(s: SettlerState, playerId: string): number {
+/** VP from board + special cards only (excludes hidden victory-point dev cards). */
+export function visibleVictoryPoints(s: SettlerState, playerId: string): number {
   let vp = 0;
   for (const piece of Object.values(s.settlements)) {
     if (piece.playerId !== playerId) continue;
     vp += piece.kind === 'city' ? 2 : 1;
-  }
-  const player = s.players.find((p) => p.id === playerId);
-  if (player) {
-    vp += player.devCards['victory-point'];
   }
   if (s.longestRoadHolderId === playerId) vp += 2;
   if (s.largestArmyHolderId === playerId) vp += 2;
   return vp;
 }
 
-function checkWin(s: SettlerState): SettlerState {
-  const withVp = s.players.map((p) => ({ id: p.id, vp: victoryPoints(s, p.id) }));
-  const maxVp = Math.max(0, ...withVp.map((x) => x.vp));
-  if (maxVp >= VP_TO_WIN) {
-    const winnerIds = withVp.filter((x) => x.vp === maxVp).map((x) => x.id);
-    return { ...s, phase: 'finished', winnerIds };
+export function victoryPoints(s: SettlerState, playerId: string): number {
+  const player = s.players.find((p) => p.id === playerId);
+  const hiddenVp = player?.devCards['victory-point'] ?? 0;
+  return visibleVictoryPoints(s, playerId) + hiddenVp;
+}
+
+/**
+ * Win only on the active player's turn when they reach `VP_TO_WIN` (base-game timing).
+ */
+function checkWin(s: SettlerState, actorId: string): SettlerState {
+  if (!actorId) return s;
+  const cur = s.players[s.currentPlayerIndex]?.id;
+  if (actorId !== cur) return s;
+  if (victoryPoints(s, actorId) >= VP_TO_WIN) {
+    return { ...s, phase: 'finished', winnerIds: [actorId] };
   }
   return s;
 }
+
+/** Ratios the active player may use when trading `give` to the bank (always 4:1; 3:1 with generic port; 2:1 with matching special). */
+export function legalMaritimeRatiosForGive(
+  s: SettlerState,
+  playerId: string,
+  give: Resource
+): (2 | 3 | 4)[] {
+  let hasGeneric = false;
+  let hasSpecialForGive = false;
+  for (const [vidStr, piece] of Object.entries(s.settlements)) {
+    if (piece.playerId !== playerId) continue;
+    const harbor = harborKindAtVertex(Number(vidStr), graph, portsFromState(s));
+    if (!harbor) continue;
+    if (harbor.kind === 'generic-3') hasGeneric = true;
+    else if (harbor.resource === give) hasSpecialForGive = true;
+  }
+  const ratios = new Set<2 | 3 | 4>([4]);
+  if (hasGeneric) ratios.add(3);
+  if (hasSpecialForGive) ratios.add(2);
+  return [...ratios].sort((a, b) => a - b);
+}
+
+// --- Bank / hands: second settlement bonus, production vs 7, discard queue before robber ---
 
 function grantSecondSettlementResources(s: SettlerState, vertexId: number): SettlerState {
   const vid = vertexId;
@@ -288,6 +390,7 @@ function grantSecondSettlementResources(s: SettlerState, vertexId: number): Sett
   const pid = s.settlements[vid]?.playerId;
   if (!pid) return s;
 
+  let bank = { ...s.bank };
   let players = s.players.map((pl) => {
     if (pl.id !== pid) return pl;
     let hand = { ...pl.hand };
@@ -295,19 +398,23 @@ function grantSecondSettlementResources(s: SettlerState, vertexId: number): Sett
       const hex = s.hexes[hi];
       if (!hex) continue;
       const res = terrainToResource(hex.terrain);
-      if (res) hand = addResource(hand, res, 1);
+      if (!res) continue;
+      const w = withdrawFromBank(bank, res, 1);
+      bank = w.bank;
+      if (w.taken > 0) hand = addResource(hand, res, w.taken);
     }
     return { ...pl, hand };
   });
-  return { ...s, players };
+  return { ...s, players, bank };
 }
 
-function applyProduction(s: SettlerState, sum: number): SettlerState {
-  if (sum === 7) return { ...s, lastProductionHexIndices: [], lastProductionSummary: [] };
-
-  const produced: number[] = [];
-  const producedByPlayer = new Map<string, Partial<Record<Resource, number>>>();
-  let players = s.players.map((p) => ({ ...p, hand: { ...p.hand } }));
+/**
+ * Total cards needed from the bank per resource this production roll. If demand[r] > bank[r],
+ * standard rules: nobody receives resource `r` this roll (no partial payouts).
+ */
+function productionDemandForRoll(s: SettlerState, sum: number): { producedHexIndices: number[]; demand: ResourceHand } {
+  const demand: ResourceHand = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+  const producedHexIndices: number[] = [];
 
   for (let hi = 0; hi < s.hexes.length; hi++) {
     const hex = s.hexes[hi];
@@ -315,7 +422,7 @@ function applyProduction(s: SettlerState, sum: number): SettlerState {
     if (hi === s.robberHexIndex) continue;
     if (hex.numberToken !== sum) continue;
 
-    produced.push(hi);
+    producedHexIndices.push(hi);
     const res = terrainToResource(hex.terrain);
     if (!res) continue;
 
@@ -324,16 +431,55 @@ function applyProduction(s: SettlerState, sum: number): SettlerState {
     for (const vid of cell.cornerVertexIds) {
       const piece = s.settlements[vid];
       if (!piece) continue;
-      const amt = piece.kind === 'city' ? 2 : 1;
+      demand[res] += piece.kind === 'city' ? 2 : 1;
+    }
+  }
+
+  return { producedHexIndices, demand };
+}
+
+function applyProduction(s: SettlerState, sum: number): SettlerState {
+  if (sum === 7) return { ...s, lastProductionHexIndices: [], lastProductionSummary: [] };
+
+  const { producedHexIndices, demand } = productionDemandForRoll(s, sum);
+  const blocked = new Set<Resource>();
+  for (const r of RESOURCE_LIST) {
+    if (demand[r] > s.bank[r]) blocked.add(r);
+  }
+
+  const producedByPlayer = new Map<string, Partial<Record<Resource, number>>>();
+  let bank = { ...s.bank };
+  let players = s.players.map((p) => ({ ...p, hand: { ...p.hand } }));
+
+  for (const hi of producedHexIndices) {
+    const hex = s.hexes[hi];
+    if (!hex) continue;
+    const res = terrainToResource(hex.terrain);
+    if (!res || blocked.has(res)) continue;
+
+    const cell = graph.hexes[hi];
+    if (!cell) continue;
+    for (const vid of cell.cornerVertexIds) {
+      const piece = s.settlements[vid];
+      if (!piece) continue;
+      const want = piece.kind === 'city' ? 2 : 1;
       const pi = players.findIndex((x) => x.id === piece.playerId);
-      if (pi >= 0) {
-        const pl = players[pi]!;
-        players[pi] = { ...pl, hand: addResource(pl.hand, res, amt) };
+      if (pi < 0) continue;
+      const pl = players[pi]!;
+      let gained = 0;
+      for (let u = 0; u < want; u++) {
+        const w = withdrawFromBank(bank, res, 1);
+        bank = w.bank;
+        gained += w.taken;
+      }
+      if (gained > 0) {
+        players[pi] = { ...pl, hand: addResource(pl.hand, res, gained) };
         const prev = producedByPlayer.get(piece.playerId) ?? {};
-        producedByPlayer.set(piece.playerId, { ...prev, [res]: (prev[res] ?? 0) + amt });
+        producedByPlayer.set(piece.playerId, { ...prev, [res]: (prev[res] ?? 0) + gained });
       }
     }
   }
+
   const lastProductionSummary: SettlerState['lastProductionSummary'] = [];
   for (const p of s.players) {
     const bag = producedByPlayer.get(p.id);
@@ -346,24 +492,27 @@ function applyProduction(s: SettlerState, sum: number): SettlerState {
     }
   }
 
-  return { ...s, players, lastProductionHexIndices: produced, lastProductionSummary };
+  return { ...s, players, bank, lastProductionHexIndices: producedHexIndices, lastProductionSummary };
 }
 
 function buildDiscardState(s: SettlerState): SettlerState {
-  const queue: string[] = [];
   const required: Record<string, number> = {};
-  for (const p of s.players) {
+  const rollerIdx = s.currentPlayerIndex;
+  const n = s.players.length;
+  const queue: string[] = [];
+  for (let k = 0; k < n; k++) {
+    const pid = s.players[(rollerIdx + k) % n]!.id;
+    const p = s.players.find((x) => x.id === pid);
+    if (!p) continue;
     const t = handTotal(p.hand);
     if (t > 7) {
-      queue.push(p.id);
-      required[p.id] = Math.floor(t / 2);
+      queue.push(pid);
+      required[pid] = Math.floor(t / 2);
     }
   }
   if (queue.length === 0) {
     return { ...s, phase: 'robber-move' };
   }
-  // Stable order by player order
-  queue.sort((a, b) => s.players.findIndex((x) => x.id === a) - s.players.findIndex((x) => x.id === b));
   return { ...s, phase: 'discard', discardQueue: queue, discardRequired: required };
 }
 
@@ -404,6 +553,8 @@ function robberVictims(s: SettlerState, hexIndex: number, rollerId: string): str
   return [...victims];
 }
 
+// --- New game: shuffle board, bank, dev deck, start in setup ---
+
 export function createSettlerState(playersIn: Player[], random: () => number = Math.random): SettlerState {
   const n = playersIn.length;
   if (n < 3 || n > 4) {
@@ -437,6 +588,7 @@ export function createSettlerState(playersIn: Player[], random: () => number = M
     robberHexIndex: robberHexIndex >= 0 ? robberHexIndex : 0,
     settlements: {},
     roads: {},
+    bank: initialBank(),
     currentPlayerIndex: 0,
     phase: 'setup-settlement',
     setupRound: 1,
@@ -456,9 +608,40 @@ export function createSettlerState(playersIn: Player[], random: () => number = M
     actionLog: [],
     lastEvent: null,
     winnerIds: null,
+    pendingDomesticTrade: null,
+    portKindsByCoastalEdgeId: randomPortKindsByCoastalEdgeId(graph, random),
+    turnDeadlineAt: null,
   };
   return syncCurrentPlayerForSetup(s);
 }
+
+// --- Piece supply (base game) ---
+
+export function countPlayerRoads(s: SettlerState, playerId: string): number {
+  let n = 0;
+  for (const owner of Object.values(s.roads)) {
+    if (owner === playerId) n++;
+  }
+  return n;
+}
+
+export function countPlayerSettlements(s: SettlerState, playerId: string): number {
+  let n = 0;
+  for (const piece of Object.values(s.settlements)) {
+    if (piece.playerId === playerId && piece.kind === 'settlement') n++;
+  }
+  return n;
+}
+
+export function countPlayerCities(s: SettlerState, playerId: string): number {
+  let n = 0;
+  for (const piece of Object.values(s.settlements)) {
+    if (piece.playerId === playerId && piece.kind === 'city') n++;
+  }
+  return n;
+}
+
+// --- Exported legality (SettlerBoard highlights and button disabled states) ---
 
 export function getLegalSettlementVertices(
   s: SettlerState,
@@ -478,6 +661,9 @@ export function getLegalRoadEdgesForPlayer(
 }
 
 function legalSettlementVertices(s: SettlerState, playerId: string, setup: boolean): number[] {
+  if (!setup && countPlayerSettlements(s, playerId) >= MAX_SETTLEMENTS_PER_PLAYER) {
+    return [];
+  }
   const out: number[] = [];
   for (const v of graph.vertices) {
     if (s.settlements[v.id] !== undefined) continue;
@@ -498,6 +684,9 @@ function legalRoadEdges(
   setup: boolean,
   fromVertex: number | null
 ): string[] {
+  if (countPlayerRoads(s, playerId) >= MAX_ROADS_PER_PLAYER) {
+    return [];
+  }
   const out: string[] = [];
   for (const e of graph.edges) {
     if (s.roads[e.id] !== undefined) continue;
@@ -516,6 +705,10 @@ function legalRoadEdges(
   return [...new Set(out)].sort();
 }
 
+/**
+ * Single reducer step: validates phase, actor, and action, then returns immutably updated state.
+ * Discard is handled first (actor is discardQueue[0]); all other actions require currentPlayerIndex.
+ */
 export function processSettlerAction(
   state: SettlerState,
   action: SettlerAction,
@@ -523,6 +716,62 @@ export function processSettlerAction(
   random: () => number = Math.random
 ): SettlerState {
   if (state.phase === 'finished') return state;
+
+  if (action.type === 'respond-domestic-trade') {
+    const pending = state.pendingDomesticTrade;
+    if (!pending || pending.targetId !== playerId) return state;
+    if (!action.accept) {
+      return {
+        ...state,
+        pendingDomesticTrade: null,
+        ...appendActionLog(state, playerId, 'declined trade'),
+      };
+    }
+    const proposer = state.players.find((p) => p.id === pending.proposerId);
+    const targetPl = state.players.find((p) => p.id === pending.targetId);
+    if (!proposer || !targetPl) {
+      return { ...state, pendingDomesticTrade: null };
+    }
+    if (!canAffordPartial(proposer.hand, pending.give) || !canAffordPartial(targetPl.hand, pending.want)) {
+      return {
+        ...state,
+        pendingDomesticTrade: null,
+        ...appendActionLog(state, playerId, 'trade failed (resources changed)'),
+      };
+    }
+    const players = state.players.map((p) => {
+      if (p.id === pending.proposerId) {
+        const hand = addPartial(payPartial(p.hand, pending.give), pending.want);
+        return { ...p, hand };
+      }
+      if (p.id === pending.targetId) {
+        const hand = addPartial(payPartial(p.hand, pending.want), pending.give);
+        return { ...p, hand };
+      }
+      return p;
+    });
+    return {
+      ...state,
+      players,
+      pendingDomesticTrade: null,
+      ...appendActionLog(
+        state,
+        pending.proposerId,
+        `traded with ${playerNameById(state, pending.targetId)}`
+      ),
+    };
+  }
+
+  if (action.type === 'cancel-domestic-trade') {
+    const pending = state.pendingDomesticTrade;
+    if (!pending || pending.proposerId !== playerId) return state;
+    if (state.players[state.currentPlayerIndex]?.id !== playerId) return state;
+    return {
+      ...state,
+      pendingDomesticTrade: null,
+      ...appendActionLog(state, playerId, 'cancelled trade offer'),
+    };
+  }
 
   if (state.phase === 'discard') {
     if (action.type !== 'discard') return state;
@@ -539,10 +788,12 @@ export function processSettlerAction(
     const pl = state.players.find((p) => p.id === playerId);
     if (!pl) return state;
     let hand = { ...pl.hand };
+    let bank = { ...state.bank };
     for (const r of RESOURCE_LIST) {
       const d = cards[r] ?? 0;
       if (hand[r] < d) return state;
       hand = removeResource(hand, r, d);
+      if (d > 0) bank = depositToBank(bank, r, d);
     }
 
     let players = state.players.map((p) => (p.id === playerId ? { ...p, hand } : p));
@@ -553,6 +804,7 @@ export function processSettlerAction(
     let next: SettlerState = {
       ...state,
       players,
+      bank,
       discardQueue,
       discardRequired,
       ...appendActionLog(state, playerId, `discarded ${need} cards`),
@@ -571,6 +823,7 @@ export function processSettlerAction(
   switch (action.type) {
     case 'place-settlement': {
       if (state.phase !== 'setup-settlement') return state;
+      if (countPlayerSettlements(state, playerId) >= MAX_SETTLEMENTS_PER_PLAYER) return state;
       const vid = action.vertexId;
       if (!graph.vertices[vid]) return state;
       if (state.settlements[vid] !== undefined) return state;
@@ -587,10 +840,11 @@ export function processSettlerAction(
       if (state.setupRound === 2) {
         next = grantSecondSettlementResources(next, vid);
       }
-      return checkWin(next);
+      return checkWin(next, playerId);
     }
     case 'place-road': {
       if (state.phase !== 'setup-road') return state;
+      if (countPlayerRoads(state, playerId) >= MAX_ROADS_PER_PLAYER) return state;
       const fv = state.pendingRoadFromVertex;
       if (fv === null) return state;
       const eid = action.edgeId;
@@ -611,7 +865,7 @@ export function processSettlerAction(
       if (state.setupRound === 1 && state.setupOrderIndex === n - 1) {
         next = { ...next, setupRound: 2, setupOrderIndex: 0 };
         next = syncCurrentPlayerForSetup(next);
-        return checkWin(next);
+        return checkWin(next, playerId);
       } else if (state.setupRound === 2 && state.setupOrderIndex === n - 1) {
         next = {
           ...next,
@@ -621,11 +875,11 @@ export function processSettlerAction(
           currentPlayerIndex: 0,
           pendingRoadFromVertex: null,
         };
-        return checkWin(next);
+        return checkWin(next, playerId);
       }
       next = { ...next, setupOrderIndex: state.setupOrderIndex + 1 };
       next = syncCurrentPlayerForSetup(next);
-      return checkWin(next);
+      return checkWin(next, playerId);
     }
     case 'roll': {
       if (state.phase !== 'pre-roll') return state;
@@ -660,7 +914,7 @@ export function processSettlerAction(
           roadBuildingRemaining: 0,
           ...appendActionLogChain(next, logEntries, `${playerNameById(next, playerId)} ${rollText}`),
         };
-        next = checkWin(next);
+        next = checkWin(next, playerId);
       }
       return next;
     }
@@ -694,7 +948,7 @@ export function processSettlerAction(
       } else {
         next = { ...next, phase: 'robber-steal' };
       }
-      return checkWin(next);
+      return checkWin(next, playerId);
     }
     case 'steal-from': {
       if (state.phase !== 'robber-steal') return state;
@@ -708,7 +962,7 @@ export function processSettlerAction(
         players: stealRandomResource(state.players, victim, rollerId, random),
         ...appendActionLog(state, playerId, `stole from ${playerNameById(state, victim)}`),
       };
-      return checkWin(next);
+      return checkWin(next, playerId);
     }
     case 'build-road': {
       if (state.phase !== 'main-build') return state;
@@ -724,9 +978,10 @@ export function processSettlerAction(
         players: state.players.map((p) =>
           p.id === playerId ? { ...p, hand: pay(p.hand, COSTS.road) } : p
         ),
+        bank: depositCostToBank(state.bank, COSTS.road),
         ...appendActionLog(state, playerId, 'built a road'),
       });
-      return checkWin(next);
+      return checkWin(next, playerId);
     }
     case 'place-free-road': {
       if (state.phase !== 'main-build' || state.roadBuildingRemaining <= 0) return state;
@@ -739,7 +994,7 @@ export function processSettlerAction(
         roadBuildingRemaining: state.roadBuildingRemaining - 1,
         ...appendActionLog(state, playerId, 'placed a free road'),
       });
-      return checkWin(next);
+      return checkWin(next, playerId);
     }
     case 'skip-free-road': {
       if (state.phase !== 'main-build' || state.roadBuildingRemaining <= 0) return state;
@@ -763,13 +1018,15 @@ export function processSettlerAction(
         players: state.players.map((p) =>
           p.id === playerId ? { ...p, hand: pay(p.hand, COSTS.settlement) } : p
         ),
+        bank: depositCostToBank(state.bank, COSTS.settlement),
         ...appendActionLog(state, playerId, 'built a settlement'),
       };
-      return checkWin(next);
+      return checkWin(next, playerId);
     }
     case 'build-city': {
       if (state.phase !== 'main-build') return state;
       if (state.roadBuildingRemaining > 0) return state;
+      if (countPlayerCities(state, playerId) >= MAX_CITIES_PER_PLAYER) return state;
       const vid = action.vertexId;
       const piece = state.settlements[vid];
       if (!piece || piece.playerId !== playerId || piece.kind !== 'settlement') return state;
@@ -784,28 +1041,64 @@ export function processSettlerAction(
         players: state.players.map((p) =>
           p.id === playerId ? { ...p, hand: pay(p.hand, COSTS.city) } : p
         ),
+        bank: depositCostToBank(state.bank, COSTS.city),
         ...appendActionLog(state, playerId, 'built a city'),
       };
-      return checkWin(next);
+      return checkWin(next, playerId);
     }
     case 'maritime-trade': {
       if (state.phase !== 'main-build' || state.roadBuildingRemaining > 0) return state;
-      if (action.give === action.receive) return state;
-      if (actor.hand[action.give] < 4) return state;
+      const { give, receive, ratio } = action;
+      if (give === receive) return state;
+      const legal = legalMaritimeRatiosForGive(state, playerId, give);
+      if (!legal.includes(ratio)) return state;
+      if (actor.hand[give] < ratio) return state;
+      if (state.bank[receive] < 1) return state;
+      let bank = depositToBank(state.bank, give, ratio);
+      const w = withdrawFromBank(bank, receive, 1);
+      bank = w.bank;
+      if (w.taken < 1) return state;
       const players = state.players.map((p) => {
         if (p.id !== playerId) return p;
-        const hand = addResource(removeResource(p.hand, action.give, 4), action.receive, 1);
+        const hand = addResource(removeResource(p.hand, give, ratio), receive, 1);
         return { ...p, hand };
       });
       return {
         ...state,
         players,
+        bank,
         ...appendActionLog(
           state,
           playerId,
-          `traded 4 ${RESOURCE_EMOJI[action.give]} for 1 ${RESOURCE_EMOJI[action.receive]}`
+          `traded ${ratio} ${RESOURCE_EMOJI[give]} for 1 ${RESOURCE_EMOJI[receive]}`
         ),
       };
+    }
+    case 'propose-domestic-trade': {
+      if (state.phase !== 'main-build' || state.roadBuildingRemaining > 0) return state;
+      const { targetId, give, want } = action;
+      if (targetId === playerId) return state;
+      if (!state.players.some((p) => p.id === targetId)) return state;
+      if (partialHandTotal(give) <= 0 || partialHandTotal(want) <= 0) return state;
+      if (!canAffordPartial(actor.hand, give)) return state;
+      let next: SettlerState = {
+        ...state,
+        pendingDomesticTrade: { proposerId: playerId, targetId, give, want },
+        ...appendActionLog(
+          state,
+          playerId,
+          `offered trade to ${playerNameById(state, targetId)}`
+        ),
+      };
+      const targetPlayer = state.players.find((p) => p.id === targetId);
+      if (targetPlayer?.isBot) {
+        next = {
+          ...next,
+          pendingDomesticTrade: null,
+          ...appendActionLog(next, targetId, 'declined trade'),
+        };
+      }
+      return next;
     }
     case 'buy-dev-card': {
       if (state.phase !== 'main-build' || state.roadBuildingRemaining > 0) return state;
@@ -822,12 +1115,14 @@ export function processSettlerAction(
           newDevCards: addDevCard(p.newDevCards, card, 1),
         };
       });
-      return checkWin({
+      const bought: SettlerState = {
         ...state,
         players,
+        bank: depositCostToBank(state.bank, DEV_CARD_COST),
         devDeck: nextDeck,
         ...appendActionLog(state, playerId, 'bought a development card'),
-      });
+      };
+      return checkWin(bought, playerId);
     }
     case 'play-knight': {
       if (state.phase !== 'main-build' || state.roadBuildingRemaining > 0) return state;
@@ -842,14 +1137,17 @@ export function processSettlerAction(
             }
           : p
       );
-      return recomputeAwards({
-        ...state,
-        players,
-        phase: 'robber-move',
-        robberStealTargets: [],
-        playedDevCardThisTurn: true,
-        ...appendActionLog(state, playerId, 'played Knight'),
-      });
+      return checkWin(
+        recomputeAwards({
+          ...state,
+          players,
+          phase: 'robber-move',
+          robberStealTargets: [],
+          playedDevCardThisTurn: true,
+          ...appendActionLog(state, playerId, 'played Knight'),
+        }),
+        playerId
+      );
     }
     case 'play-road-building': {
       if (state.phase !== 'main-build') return state;
@@ -873,9 +1171,21 @@ export function processSettlerAction(
       if (state.phase !== 'main-build' || state.roadBuildingRemaining > 0) return state;
       if (state.playedDevCardThisTurn) return state;
       if (!canPlayDevCard(actor, 'year-of-plenty')) return state;
+      let bank = { ...state.bank };
+      let gainedA = 0;
+      let gainedB = 0;
+      const w1 = withdrawFromBank(bank, action.resourceA, 1);
+      bank = w1.bank;
+      gainedA = w1.taken;
+      const w2 = withdrawFromBank(bank, action.resourceB, 1);
+      bank = w2.bank;
+      gainedB = w2.taken;
+      if (gainedA + gainedB < 1) return state;
       const players = state.players.map((p) => {
         if (p.id !== playerId) return p;
-        const hand = addResource(addResource(p.hand, action.resourceA, 1), action.resourceB, 1);
+        let hand = p.hand;
+        if (gainedA > 0) hand = addResource(hand, action.resourceA, gainedA);
+        if (gainedB > 0) hand = addResource(hand, action.resourceB, gainedB);
         return {
           ...p,
           hand,
@@ -885,6 +1195,7 @@ export function processSettlerAction(
       return {
         ...state,
         players,
+        bank,
         playedDevCardThisTurn: true,
         ...appendActionLog(state, playerId, 'played Year of Plenty'),
       };
@@ -917,6 +1228,8 @@ export function processSettlerAction(
     case 'end-turn': {
       if (state.phase !== 'main-build') return state;
       if (state.roadBuildingRemaining > 0) return state;
+      const winFirst = checkWin(state, playerId);
+      if (winFirst.phase === 'finished') return winFirst;
       const n = state.players.length;
       const nextPlayer = (state.currentPlayerIndex + 1) % n;
       const next: SettlerState = {
@@ -927,6 +1240,7 @@ export function processSettlerAction(
         lastProductionHexIndices: [],
         lastProductionSummary: [],
         playedDevCardThisTurn: false,
+        pendingDomesticTrade: null,
         players: state.players.map((p) =>
           p.id === playerId ? { ...p, newDevCards: emptyDevHand() } : p
         ),
@@ -938,6 +1252,8 @@ export function processSettlerAction(
       return state;
   }
 }
+
+// --- Match status (host / lobby wrappers use the `Unknown` variants below) ---
 
 export function isSettlerOver(state: unknown): boolean {
   const s = state as SettlerState;
@@ -952,11 +1268,15 @@ export function getSettlerWinners(state: unknown): string[] {
   return s.players.filter((p) => victoryPoints(s, p.id) === max).map((p) => p.id);
 }
 
+// --- Remove a player mid-game: return pieces to bank, fix indices, recompute awards ---
+
 export function removeSettlerPlayer(state: SettlerState, playerId: string): SettlerState {
   if (!state.players.some((p) => p.id === playerId)) return state;
+  const removedPl = state.players.find((p) => p.id === playerId);
+  const bankAfterRemove = removedPl ? depositHandToBank(state.bank, removedPl.hand) : state.bank;
   const players = state.players.filter((p) => p.id !== playerId);
   if (players.length === 0) {
-    return { ...state, players: [], phase: 'finished', winnerIds: [] };
+    return { ...state, players: [], phase: 'finished', winnerIds: [], bank: bankAfterRemove };
   }
 
   const settlements = Object.fromEntries(
@@ -969,6 +1289,14 @@ export function removeSettlerPlayer(state: SettlerState, playerId: string): Sett
   const discardRequired = { ...state.discardRequired };
   delete discardRequired[playerId];
   const robberStealTargets = state.robberStealTargets.filter((id) => id !== playerId);
+
+  let pendingDomesticTrade = state.pendingDomesticTrade;
+  if (
+    pendingDomesticTrade &&
+    (pendingDomesticTrade.proposerId === playerId || pendingDomesticTrade.targetId === playerId)
+  ) {
+    pendingDomesticTrade = null;
+  }
 
   let currentPlayerIndex = state.currentPlayerIndex;
   const currentId = state.players[state.currentPlayerIndex]?.id;
@@ -985,6 +1313,7 @@ export function removeSettlerPlayer(state: SettlerState, playerId: string): Sett
     players,
     settlements,
     roads,
+    bank: bankAfterRemove,
     discardQueue,
     discardRequired,
     robberStealTargets,
@@ -993,17 +1322,181 @@ export function removeSettlerPlayer(state: SettlerState, playerId: string): Sett
     winnerIds: state.winnerIds ? state.winnerIds.filter((id) => id !== playerId) : null,
     largestArmyHolderId: state.largestArmyHolderId === playerId ? null : state.largestArmyHolderId,
     longestRoadHolderId: state.longestRoadHolderId === playerId ? null : state.longestRoadHolderId,
+    pendingDomesticTrade,
   };
   next = recomputeAwards(next);
   if (next.players.length === 1) {
     return { ...next, phase: 'finished', winnerIds: [next.players[0]!.id] };
   }
-  return checkWin(next);
+  const curId = next.players[next.currentPlayerIndex]?.id ?? '';
+  return checkWin(next, curId);
 }
 
 export function removeSettlerPlayerUnknown(state: unknown, playerId: string): unknown {
   return removeSettlerPlayer(state as SettlerState, playerId);
 }
+
+/** Wall-clock turn budget for human idle resolution after dice are rolled (ms). */
+export const SETTLER_TURN_LIMIT_MS = 120_000;
+
+/** Short window for the current player to roll before an automatic roll (ms). */
+export const SETTLER_PRE_ROLL_LIMIT_MS = 10_000;
+
+/** Default deadline duration for the current phase (10s pre-roll, 2min elsewhere). */
+export function settlerDeadlineLimitMs(state: SettlerState): number {
+  return state.phase === 'pre-roll' ? SETTLER_PRE_ROLL_LIMIT_MS : SETTLER_TURN_LIMIT_MS;
+}
+
+/** Player who must act for the turn timer: trade target, discard head, or current player. */
+export function getSettlerIdleActorId(s: SettlerState): string | null {
+  if (s.phase === 'finished') return null;
+  const pending = s.pendingDomesticTrade;
+  if (pending) return pending.targetId;
+  if (s.phase === 'discard') return s.discardQueue[0] ?? null;
+  return s.players[s.currentPlayerIndex]?.id ?? null;
+}
+
+export function assignSettlerTurnDeadline(
+  state: SettlerState,
+  nowMs: number,
+  limitMs?: number
+): SettlerState {
+  if (state.phase === 'finished') {
+    return { ...state, turnDeadlineAt: null };
+  }
+  const pid = getSettlerIdleActorId(state);
+  if (!pid) return { ...state, turnDeadlineAt: null };
+  const pl = state.players.find((p) => p.id === pid);
+  if (!pl || pl.isBot) return { ...state, turnDeadlineAt: null };
+  const lim = limitMs ?? settlerDeadlineLimitMs(state);
+  return { ...state, turnDeadlineAt: nowMs + lim };
+}
+
+function pickRobberMoveHex(s: SettlerState, rollerId: string): number {
+  let bestHex = -1;
+  let bestScore = -1;
+  for (let hi = 0; hi < s.hexes.length; hi++) {
+    if (hi === s.robberHexIndex) continue;
+    if (s.hexes[hi]?.terrain === 'desert') continue;
+    const cell = graph.hexes[hi];
+    if (!cell) continue;
+    let score = 0;
+    for (const vid of cell.cornerVertexIds) {
+      const piece = s.settlements[vid];
+      if (!piece || piece.playerId === rollerId) continue;
+      score += piece.kind === 'city' ? 2 : 1;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestHex = hi;
+    }
+  }
+  if (bestHex < 0) {
+    for (let hi = 0; hi < s.hexes.length; hi++) {
+      if (hi !== s.robberHexIndex) {
+        return hi;
+      }
+    }
+  }
+  return bestHex;
+}
+
+/**
+ * Host-only: apply one forced action for an idle human. Pre-roll auto-rolls without an `is asleep`
+ * log; other phases log `is asleep` first (skip/end-turn / unblock path).
+ */
+export function applySettlerIdleTimeout(
+  state: SettlerState,
+  random: () => number = Math.random
+): SettlerState {
+  if (state.phase === 'finished') return state;
+
+  const pid = getSettlerIdleActorId(state);
+  if (!pid) return state;
+  const actorPl = state.players.find((p) => p.id === pid);
+  if (!actorPl || actorPl.isBot) return state;
+
+  if (state.phase === 'pre-roll') {
+    return processSettlerAction(state, { type: 'roll' }, pid, random);
+  }
+
+  const pending = state.pendingDomesticTrade;
+  if (pending && pid === pending.targetId) {
+    return {
+      ...state,
+      pendingDomesticTrade: null,
+      ...appendActionLog(state, pid, 'is asleep (declined the trade)'),
+    };
+  }
+
+  let forced: SettlerAction | null = null;
+  switch (state.phase) {
+    case 'setup-settlement': {
+      const verts = legalSettlementVertices(state, pid, true);
+      const v = verts[0];
+      if (v !== undefined) forced = { type: 'place-settlement', vertexId: v };
+      break;
+    }
+    case 'setup-road': {
+      const fv = state.pendingRoadFromVertex;
+      const edges = legalRoadEdges(state, pid, true, fv);
+      const e = edges[0];
+      if (e !== undefined) forced = { type: 'place-road', edgeId: e };
+      break;
+    }
+    case 'discard': {
+      if (state.discardQueue[0] !== pid) break;
+      const need = state.discardRequired[pid] ?? 0;
+      const pl = state.players.find((p) => p.id === pid);
+      if (!pl) break;
+      const cards: Partial<Record<Resource, number>> = {};
+      let left = need;
+      for (const r of RESOURCE_LIST) {
+        if (left <= 0) break;
+        const take = Math.min(left, pl.hand[r]);
+        if (take > 0) {
+          cards[r] = take;
+          left -= take;
+        }
+      }
+      if (left <= 0) forced = { type: 'discard', cards };
+      break;
+    }
+    case 'robber-move': {
+      const hi = pickRobberMoveHex(state, pid);
+      if (hi >= 0) forced = { type: 'move-robber', hexIndex: hi };
+      break;
+    }
+    case 'robber-steal': {
+      const t = state.robberStealTargets[0];
+      if (t !== undefined) forced = { type: 'steal-from', victimId: t };
+      break;
+    }
+    case 'main-build':
+      forced =
+        state.roadBuildingRemaining > 0
+          ? { type: 'skip-free-road' }
+          : { type: 'end-turn' };
+      break;
+    default:
+      break;
+  }
+
+  if (forced === null) return state;
+
+  const withSleep: SettlerState = { ...state, ...appendActionLog(state, pid, 'is asleep') };
+  return processSettlerAction(withSleep, forced, pid, random);
+}
+
+function pickYearOfPlentyPair(bank: ResourceHand): { resourceA: Resource; resourceB: Resource } | null {
+  const stocked = RESOURCE_LIST.filter((r) => bank[r] > 0);
+  if (stocked.length === 0) return null;
+  const resourceA = stocked[0]!;
+  const resourceB = stocked.length >= 2 ? stocked[1]! : stocked[0]!;
+  return { resourceA, resourceB };
+}
+
+// --- Bot: one greedy action for the current actor (or discard-queue head) ---
 
 export function runSettlerBotTurn(state: unknown, random: () => number = Math.random): unknown {
   const s = state as SettlerState;
@@ -1053,32 +1546,7 @@ export function runSettlerBotTurn(state: unknown, random: () => number = Math.ra
     return processSettlerAction(s, { type: 'discard', cards }, pid, random);
   }
   if (s.phase === 'robber-move') {
-    let bestHex = -1;
-    let bestScore = -1;
-    for (let hi = 0; hi < s.hexes.length; hi++) {
-      if (hi === s.robberHexIndex) continue;
-      if (s.hexes[hi]?.terrain === 'desert') continue;
-      const cell = graph.hexes[hi];
-      if (!cell) continue;
-      let score = 0;
-      for (const vid of cell.cornerVertexIds) {
-        const piece = s.settlements[vid];
-        if (!piece || piece.playerId === pid) continue;
-        score += piece.kind === 'city' ? 2 : 1;
-      }
-      if (score > bestScore) {
-        bestScore = score;
-        bestHex = hi;
-      }
-    }
-    if (bestHex < 0) {
-      for (let hi = 0; hi < s.hexes.length; hi++) {
-        if (hi !== s.robberHexIndex) {
-          bestHex = hi;
-          break;
-        }
-      }
-    }
+    const bestHex = pickRobberMoveHex(s, pid);
     if (bestHex < 0) return s;
     return processSettlerAction(s, { type: 'move-robber', hexIndex: bestHex }, pid, random);
   }
@@ -1099,12 +1567,10 @@ export function runSettlerBotTurn(state: unknown, random: () => number = Math.ra
       return processSettlerAction(s, { type: 'skip-free-road' }, pid, random);
     }
     if (!s.playedDevCardThisTurn && canPlayDevCard(pl, 'year-of-plenty')) {
-      return processSettlerAction(
-        s,
-        { type: 'play-year-of-plenty', resourceA: 'wheat', resourceB: 'ore' },
-        pid,
-        random
-      );
+      const pair = pickYearOfPlentyPair(s.bank);
+      if (pair) {
+        return processSettlerAction(s, { type: 'play-year-of-plenty', ...pair }, pid, random);
+      }
     }
     if (!s.playedDevCardThisTurn && canPlayDevCard(pl, 'road-building')) {
       return processSettlerAction(s, { type: 'play-road-building' }, pid, random);
@@ -1143,9 +1609,18 @@ export function runSettlerBotTurn(state: unknown, random: () => number = Math.ra
       return processSettlerAction(s, { type: 'play-monopoly', resource: 'wheat' }, pid, random);
     }
     for (const give of RESOURCE_LIST) {
-      if (pl.hand[give] < 4) continue;
-      const receive = RESOURCE_LIST.find((r) => r !== give);
-      if (receive) return processSettlerAction(s, { type: 'maritime-trade', give, receive }, pid, random);
+      const legal = legalMaritimeRatiosForGive(s, pid, give);
+      const ratio = legal[0];
+      if (ratio === undefined || pl.hand[give] < ratio) continue;
+      const receive = RESOURCE_LIST.find((r) => r !== give && s.bank[r] > 0);
+      if (receive) {
+        return processSettlerAction(
+          s,
+          { type: 'maritime-trade', give, receive, ratio },
+          pid,
+          random
+        );
+      }
     }
     return processSettlerAction(s, { type: 'end-turn' }, pid, random);
   }

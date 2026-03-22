@@ -2,16 +2,37 @@ import type { Player } from '../../networking/types';
 import { runSingleBotTurn } from '../gameEngine';
 import { DEFAULT_BOARD_GRAPH } from './layout';
 import {
+  applySettlerIdleTimeout,
+  assignSettlerTurnDeadline,
   createSettlerState,
+  countPlayerRoads,
   getLegalRoadEdgesForPlayer,
   getLegalSettlementVertices,
+  getSettlerIdleActorId,
+  legalMaritimeRatiosForGive,
   processSettlerAction,
   removeSettlerPlayer,
+  SETTLER_PRE_ROLL_LIMIT_MS,
+  SETTLER_TURN_LIMIT_MS,
   victoryPoints,
+  visibleVictoryPoints,
   setupCurrentPlayerSlot,
 } from './logic';
-import { VP_TO_WIN } from './types';
-import type { SettlerState } from './types';
+import { portsFromState } from './ports';
+import { VP_TO_WIN, RESOURCE_LIST, withdrawFromBank, emptyHand, emptyDevHand } from './types';
+import type { Resource, SettlerState } from './types';
+
+/** Endpoints of a 3:1 port edge for the given game state. */
+function genericPortEndpoints(s: SettlerState): { a: number; b: number } {
+  const ports = portsFromState(s);
+  for (const [eid, k] of Object.entries(ports)) {
+    if (k.kind === 'generic-3') {
+      const e = DEFAULT_BOARD_GRAPH.edgeById.get(eid)!;
+      return { a: e.a, b: e.b };
+    }
+  }
+  throw new Error('no generic port');
+}
 
 function makePlayers(n: number): Player[] {
   return Array.from({ length: n }, (_, i) => ({
@@ -31,6 +52,9 @@ describe('settler logic', () => {
     expect(s.hexes).toHaveLength(19);
     expect(s.phase).toBe('setup-settlement');
     expect(s.hexes[s.robberHexIndex]?.terrain).toBe('desert');
+    for (const r of RESOURCE_LIST) {
+      expect(s.bank[r]).toBe(19);
+    }
   });
 
   it('rejects invalid player count', () => {
@@ -171,17 +195,25 @@ describe('settler logic', () => {
   it('supports maritime trade and dev card buy', () => {
     const s0 = createSettlerState(makePlayers(3), () => 0);
     const pid = s0.players[0]!.id;
+    let bank = s0.bank;
+    bank = withdrawFromBank(bank, 'wood', 4).bank;
+    bank = withdrawFromBank(bank, 'sheep', 1).bank;
+    bank = withdrawFromBank(bank, 'wheat', 1).bank;
+    bank = withdrawFromBank(bank, 'ore', 1).bank;
     let s: SettlerState = {
       ...s0,
+      bank,
       phase: 'main-build',
       currentPlayerIndex: 0,
       players: s0.players.map((p, i) =>
         i === 0 ? { ...p, hand: { ...p.hand, wood: 4, sheep: 1, wheat: 1, ore: 1 } } : p
       ),
     };
-    s = processSettlerAction(s, { type: 'maritime-trade', give: 'wood', receive: 'brick' }, pid);
+    s = processSettlerAction(s, { type: 'maritime-trade', give: 'wood', receive: 'brick', ratio: 4 }, pid);
     expect(s.players[0]!.hand.wood).toBe(0);
     expect(s.players[0]!.hand.brick).toBe(1);
+    expect(s.bank.wood).toBe(19);
+    expect(s.bank.brick).toBe(18);
     const next = processSettlerAction(s, { type: 'buy-dev-card' }, pid);
     expect(next.devDeck.length).toBe(s.devDeck.length - 1);
     expect(
@@ -191,6 +223,140 @@ describe('settler logic', () => {
         next.players[0]!.devCards['year-of-plenty'] +
         next.players[0]!.devCards.monopoly
     ).toBe(1);
+  });
+
+  it('allows 3:1 maritime trade when player has a generic port settlement', () => {
+    const s0 = createSettlerState(makePlayers(3), () => 0);
+    const pid = s0.players[0]!.id;
+    const { a: portVertex } = genericPortEndpoints(s0);
+    const s: SettlerState = {
+      ...s0,
+      settlements: { [portVertex]: { playerId: pid, kind: 'settlement' } },
+      phase: 'main-build',
+      currentPlayerIndex: 0,
+      players: s0.players.map((p, i) =>
+        i === 0 ? { ...p, hand: { ...emptyHand(), wood: 3 } } : p
+      ),
+    };
+    expect(legalMaritimeRatiosForGive(s, pid, 'wood')).toContain(3);
+    const next = processSettlerAction(
+      s,
+      { type: 'maritime-trade', give: 'wood', receive: 'brick', ratio: 3 },
+      pid
+    );
+    expect(next.players[0]!.hand.wood).toBe(0);
+    expect(next.players[0]!.hand.brick).toBe(1);
+  });
+
+  it('allows 3:1 maritime trade when settlement is on the port dock partner vertex', () => {
+    const s0 = createSettlerState(makePlayers(3), () => 0);
+    const pid = s0.players[0]!.id;
+    const { a: v0, b: partner } = genericPortEndpoints(s0);
+    expect(partner).not.toBe(v0);
+    const s: SettlerState = {
+      ...s0,
+      settlements: { [partner]: { playerId: pid, kind: 'settlement' } },
+      phase: 'main-build',
+      currentPlayerIndex: 0,
+      players: s0.players.map((p, i) =>
+        i === 0 ? { ...p, hand: { ...emptyHand(), wood: 3 } } : p
+      ),
+    };
+    expect(legalMaritimeRatiosForGive(s, pid, 'wood')).toContain(3);
+    const next = processSettlerAction(
+      s,
+      { type: 'maritime-trade', give: 'wood', receive: 'brick', ratio: 3 },
+      pid
+    );
+    expect(next.players[0]!.hand.wood).toBe(0);
+    expect(next.players[0]!.hand.brick).toBe(1);
+  });
+
+  it('rejects maritime trade when the bank has none of the requested resource', () => {
+    const s0 = createSettlerState(makePlayers(3), () => 0);
+    const pid = s0.players[0]!.id;
+    let bank = withdrawFromBank(s0.bank, 'brick', 19).bank;
+    bank = withdrawFromBank(bank, 'wood', 4).bank;
+    const s: SettlerState = {
+      ...s0,
+      bank,
+      phase: 'main-build',
+      currentPlayerIndex: 0,
+      players: s0.players.map((p, i) => {
+        if (i === 0) return { ...p, hand: { ...emptyHand(), wood: 4 } };
+        if (i === 1) return { ...p, hand: { ...emptyHand(), brick: 19 } };
+        return p;
+      }),
+    };
+    const next = processSettlerAction(s, { type: 'maritime-trade', give: 'wood', receive: 'brick', ratio: 4 }, pid);
+    expect(next).toBe(s);
+    expect(next.players[0]!.hand.wood).toBe(4);
+  });
+
+  it('blocks a resource for all players when total demand exceeds bank (no partial payout)', () => {
+    const s0 = createSettlerState(makePlayers(3), () => 0.5);
+    const p0 = s0.players[0]!.id;
+    const p1 = s0.players[1]!.id;
+    const hi = s0.hexes.findIndex((h) => h.terrain === 'wood' && h.numberToken !== null);
+    expect(hi).toBeGreaterThanOrEqual(0);
+    const cell = DEFAULT_BOARD_GRAPH.hexes[hi];
+    expect(cell).toBeDefined();
+    const [v0, v1] = cell!.cornerVertexIds;
+    expect(v0).toBeDefined();
+    expect(v1).toBeDefined();
+    const hexes = s0.hexes.map((h, i) => (i === hi ? { ...h, numberToken: 8 } : h));
+    const bank = { ...s0.bank, wood: 1 };
+    const s: SettlerState = {
+      ...s0,
+      hexes,
+      bank,
+      phase: 'pre-roll',
+      currentPlayerIndex: 0,
+      settlements: {
+        [v0!]: { playerId: p0, kind: 'settlement' },
+        [v1!]: { playerId: p1, kind: 'settlement' },
+      },
+    };
+    let die = 0;
+    const rngEight = () => {
+      die++;
+      return die <= 2 ? 0.55 : 0;
+    };
+    const rolled = processSettlerAction(s, { type: 'roll' }, p0, rngEight);
+    expect(rolled.players[0]!.hand.wood).toBe(0);
+    expect(rolled.players[1]!.hand.wood).toBe(0);
+    expect(rolled.bank.wood).toBe(1);
+  });
+
+  it('caps production when the bank runs out of a resource', () => {
+    const s0 = createSettlerState(makePlayers(3), () => 0.5);
+    const pid = s0.players[0]!.id;
+    const hi = s0.hexes.findIndex((h) => h.terrain !== 'desert');
+    expect(hi).toBeGreaterThanOrEqual(0);
+    const cell = DEFAULT_BOARD_GRAPH.hexes[hi];
+    expect(cell).toBeDefined();
+    const vid = cell!.cornerVertexIds[0]!;
+    const token = 8;
+    const hexes = s0.hexes.map((h, i) => (i === hi ? { ...h, numberToken: token } : h));
+    const terrain = hexes[hi]!.terrain;
+    if (terrain === 'desert') throw new Error('expected resource hex');
+    let bank = { ...s0.bank, [terrain]: 0 };
+    const s: SettlerState = {
+      ...s0,
+      hexes,
+      bank,
+      phase: 'pre-roll',
+      currentPlayerIndex: 0,
+      settlements: { [vid]: { playerId: pid, kind: 'settlement' } },
+    };
+    let die = 0;
+    const rngEight = () => {
+      die++;
+      return die <= 2 ? 0.55 : 0;
+    };
+    const rolled = processSettlerAction(s, { type: 'roll' }, pid, rngEight);
+    expect(rolled.players[0]!.hand[terrain as Resource]).toBe(0);
+    expect(rolled.lastProductionSummary.filter((e) => e.playerId === pid)).toHaveLength(0);
   });
 
   it('awards longest road and largest army points', () => {
@@ -226,10 +392,158 @@ describe('settler logic', () => {
       discardRequired: { [removeId]: 3 },
       robberStealTargets: [removeId],
       currentPlayerIndex: 1,
+      pendingDomesticTrade: null,
     };
     const next = removeSettlerPlayer(s, removeId);
     expect(next.players.some((p) => p.id === removeId)).toBe(false);
     expect(Object.values(next.settlements).some((piece) => piece.playerId === removeId)).toBe(false);
     expect(Object.values(next.roads).some((owner) => owner === removeId)).toBe(false);
+  });
+
+  it('excludes hidden VP dev cards from visibleVictoryPoints', () => {
+    const s0 = createSettlerState(makePlayers(3));
+    const pid = s0.players[0]!.id;
+    const s: SettlerState = {
+      ...s0,
+      phase: 'main-build',
+      settlements: { 0: { playerId: pid, kind: 'settlement' } },
+      players: s0.players.map((p, i) =>
+        i === 0 ? { ...p, devCards: { ...emptyDevHand(), 'victory-point': 2 } } : p
+      ),
+    };
+    expect(visibleVictoryPoints(s, pid)).toBe(1);
+    expect(victoryPoints(s, pid)).toBe(3);
+  });
+
+  it('allows no further road placement at the 15-road supply cap', () => {
+    const s0 = createSettlerState(makePlayers(3));
+    const pid = s0.players[0]!.id;
+    const fifteen = Object.fromEntries(DEFAULT_BOARD_GRAPH.edges.slice(0, 15).map((e) => [e.id, pid]));
+    const s: SettlerState = {
+      ...s0,
+      phase: 'main-build',
+      currentPlayerIndex: 0,
+      roads: fifteen,
+      players: s0.players.map((p, i) =>
+        i === 0 ? { ...p, hand: { ...emptyHand(), wood: 4, brick: 4 } } : p
+      ),
+    };
+    expect(countPlayerRoads(s, pid)).toBe(15);
+    expect(getLegalRoadEdgesForPlayer(s, pid, false, null)).toEqual([]);
+  });
+
+  it('assignSettlerTurnDeadline sets deadline for human idle actor', () => {
+    const s0 = createSettlerState(makePlayers(3));
+    const s: SettlerState = {
+      ...s0,
+      phase: 'main-build',
+      currentPlayerIndex: 0,
+      dice: { d1: 3, d2: 3 },
+    };
+    const now = 1_000_000;
+    const next = assignSettlerTurnDeadline(s, now);
+    expect(next.turnDeadlineAt).toBe(now + SETTLER_TURN_LIMIT_MS);
+  });
+
+  it('assignSettlerTurnDeadline uses 10s limit in pre-roll for human roller', () => {
+    const s0 = createSettlerState(makePlayers(3));
+    const s: SettlerState = {
+      ...s0,
+      phase: 'pre-roll',
+      currentPlayerIndex: 0,
+      dice: null,
+    };
+    const now = 2_000_000;
+    const next = assignSettlerTurnDeadline(s, now);
+    expect(next.turnDeadlineAt).toBe(now + SETTLER_PRE_ROLL_LIMIT_MS);
+  });
+
+  it('assignSettlerTurnDeadline clears deadline when idle actor is a bot', () => {
+    const players = makePlayers(3).map((p, i) => ({ ...p, isBot: i === 0 }));
+    const s0 = createSettlerState(players);
+    const s: SettlerState = {
+      ...s0,
+      phase: 'main-build',
+      currentPlayerIndex: 0,
+      dice: { d1: 3, d2: 3 },
+      turnDeadlineAt: 999,
+    };
+    const next = assignSettlerTurnDeadline(s, 1_000_000);
+    expect(next.turnDeadlineAt).toBeNull();
+  });
+
+  it('getSettlerIdleActorId returns trade target when offer is pending', () => {
+    const s0 = createSettlerState(makePlayers(3));
+    const p0 = s0.players[0]!.id;
+    const p1 = s0.players[1]!.id;
+    const s: SettlerState = {
+      ...s0,
+      phase: 'main-build',
+      currentPlayerIndex: 0,
+      pendingDomesticTrade: {
+        proposerId: p0,
+        targetId: p1,
+        give: { wood: 1 },
+        want: { brick: 1 },
+      },
+    };
+    expect(getSettlerIdleActorId(s)).toBe(p1);
+  });
+
+  it('applySettlerIdleTimeout in pre-roll auto-rolls without is asleep log', () => {
+    const s0 = createSettlerState(makePlayers(3));
+    const pid = s0.players[0]!.id;
+    const s: SettlerState = {
+      ...s0,
+      phase: 'pre-roll',
+      currentPlayerIndex: 0,
+      dice: null,
+    };
+    const rng = () => 0.5;
+    const next = applySettlerIdleTimeout(s, rng);
+    expect(next.phase).not.toBe('pre-roll');
+    expect(next.dice).not.toBeNull();
+    expect(next.actionLog.some((e) => e.text === 'is asleep')).toBe(false);
+    expect(next.actionLog.some((e) => e.playerId === pid && e.text.startsWith('rolled '))).toBe(true);
+  });
+
+  it('applySettlerIdleTimeout logs is asleep and ends turn from main-build', () => {
+    const s0 = createSettlerState(makePlayers(3));
+    const pid = s0.players[0]!.id;
+    const s: SettlerState = {
+      ...s0,
+      phase: 'main-build',
+      currentPlayerIndex: 0,
+      dice: { d1: 3, d2: 3 },
+      roadBuildingRemaining: 0,
+    };
+    const next = applySettlerIdleTimeout(s);
+    expect(next.phase).toBe('pre-roll');
+    expect(next.currentPlayerIndex).toBe(1);
+    expect(next.actionLog.some((e) => e.playerId === pid && e.text === 'is asleep')).toBe(true);
+    expect(next.actionLog.some((e) => e.playerId === pid && e.text === 'ended their turn')).toBe(true);
+  });
+
+  it('applySettlerIdleTimeout clears pending trade with asleep decline message', () => {
+    const s0 = createSettlerState(makePlayers(3));
+    const p0 = s0.players[0]!.id;
+    const p1 = s0.players[1]!.id;
+    const s: SettlerState = {
+      ...s0,
+      phase: 'main-build',
+      currentPlayerIndex: 0,
+      pendingDomesticTrade: {
+        proposerId: p0,
+        targetId: p1,
+        give: { wood: 1 },
+        want: { brick: 1 },
+      },
+    };
+    const next = applySettlerIdleTimeout(s);
+    expect(next.pendingDomesticTrade).toBeNull();
+    expect(next.actionLog.at(-1)).toEqual({
+      playerId: p1,
+      text: 'is asleep (declined the trade)',
+    });
   });
 });

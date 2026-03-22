@@ -3,7 +3,15 @@ import type { PlayerColor } from '../../networking/types';
 export type Terrain = 'wood' | 'brick' | 'sheep' | 'wheat' | 'ore' | 'desert';
 export type Resource = Exclude<Terrain, 'desert'>;
 
+/** Harbor tile on a coastal vertex (standard 4× 3:1 + 5× 2:1). */
+export type HarborKind =
+  | { kind: 'generic-3' }
+  | { kind: 'special-2'; resource: Resource };
+
 export const RESOURCE_LIST: Resource[] = ['wood', 'brick', 'sheep', 'wheat', 'ore'];
+
+/** Standard Catan supply: 19 cards per resource type in the bank at game start (95 total). */
+export const BANK_CARDS_PER_RESOURCE = 19;
 
 export const RESOURCE_EMOJI: Record<Resource, string> = {
   wood: '🌲',
@@ -69,8 +77,41 @@ export function emptyHand(): ResourceHand {
   return { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
 }
 
+export function initialBank(): ResourceHand {
+  return {
+    wood: BANK_CARDS_PER_RESOURCE,
+    brick: BANK_CARDS_PER_RESOURCE,
+    sheep: BANK_CARDS_PER_RESOURCE,
+    wheat: BANK_CARDS_PER_RESOURCE,
+    ore: BANK_CARDS_PER_RESOURCE,
+  };
+}
+
+export function depositToBank(bank: ResourceHand, r: Resource, n: number): ResourceHand {
+  return { ...bank, [r]: bank[r] + n };
+}
+
+export function withdrawFromBank(
+  bank: ResourceHand,
+  r: Resource,
+  n: number
+): { bank: ResourceHand; taken: number } {
+  const taken = Math.min(n, bank[r]);
+  return { bank: { ...bank, [r]: bank[r] - taken }, taken };
+}
+
 export function handTotal(h: ResourceHand): number {
   return h.wood + h.brick + h.sheep + h.wheat + h.ore;
+}
+
+export function totalDevCardCount(h: DevCardHand): number {
+  return (
+    h.knight +
+    h['victory-point'] +
+    h['road-building'] +
+    h['year-of-plenty'] +
+    h.monopoly
+  );
 }
 
 export function addResource(h: ResourceHand, r: Resource, n: number): ResourceHand {
@@ -112,6 +153,11 @@ export interface SettlerActionLogEntry {
   text: string;
 }
 
+/**
+ * High-level turn flow: initial **setup-settlement** / **setup-road** (snake order), then repeating
+ * **pre-roll** → (on 7: **discard** queue then **robber-move** → **robber-steal**; else **main-build**)
+ * until **finished**. SettlerBoard picks overlays, captions, and board affordances from `phase`.
+ */
 export type Phase =
   | 'setup-settlement'
   | 'setup-road'
@@ -130,6 +176,8 @@ export interface SettlerState {
   settlements: Record<number, { playerId: string; kind: 'settlement' | 'city' }>;
   /** edge id -> owner */
   roads: Record<string, string>;
+  /** Resource cards remaining in the supply (not in any player's hand). */
+  bank: ResourceHand;
   currentPlayerIndex: number;
   phase: Phase;
   /** Setup: 1 then 2 */
@@ -159,8 +207,29 @@ export interface SettlerState {
   /** Heads-up message shown by the board. */
   lastEvent: string | null;
   winnerIds: string[] | null;
+  /** Active player offered a trade; target may accept or decline. */
+  pendingDomesticTrade: PendingDomesticTrade | null;
+  /**
+   * Harbor kinds keyed by coastal edge id (`EdgeLayout.id`, one land hex). Random per game.
+   * Omitted in legacy persisted state.
+   */
+  portKindsByCoastalEdgeId?: Record<string, HarborKind>;
+  /** Host-set Unix ms when the current idle human must act; null if no timer (bots, finished). */
+  turnDeadlineAt?: number | null;
 }
 
+export interface PendingDomesticTrade {
+  proposerId: string;
+  targetId: string;
+  give: Partial<Record<Resource, number>>;
+  want: Partial<Record<Resource, number>>;
+}
+
+/**
+ * Every mutation the UI requests goes through `onAction` as one of these shapes — toolbar buttons,
+ * hex/edge/vertex clicks, and sidebar dice roll. The host calls `processSettlerAction` with the
+ * authenticated player id.
+ */
 export type SettlerAction =
   | { type: 'place-settlement'; vertexId: number }
   | { type: 'place-road'; edgeId: string }
@@ -173,7 +242,15 @@ export type SettlerAction =
   | { type: 'skip-free-road' }
   | { type: 'build-settlement'; vertexId: number }
   | { type: 'build-city'; vertexId: number }
-  | { type: 'maritime-trade'; give: Resource; receive: Resource }
+  | { type: 'maritime-trade'; give: Resource; receive: Resource; ratio: 2 | 3 | 4 }
+  | {
+      type: 'propose-domestic-trade';
+      targetId: string;
+      give: Partial<Record<Resource, number>>;
+      want: Partial<Record<Resource, number>>;
+    }
+  | { type: 'respond-domestic-trade'; accept: boolean }
+  | { type: 'cancel-domestic-trade' }
   | { type: 'buy-dev-card' }
   | { type: 'play-knight' }
   | { type: 'play-road-building' }
@@ -182,6 +259,11 @@ export type SettlerAction =
   | { type: 'end-turn' };
 
 export const VP_TO_WIN = 10;
+
+/** Base-game piece supply per player */
+export const MAX_ROADS_PER_PLAYER = 15;
+export const MAX_SETTLEMENTS_PER_PLAYER = 5;
+export const MAX_CITIES_PER_PLAYER = 4;
 
 export const COSTS: Record<BuildKind, Partial<Record<Resource, number>>> = {
   road: { wood: 1, brick: 1 },

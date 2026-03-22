@@ -227,4 +227,135 @@ export function flatTopHexPath(cx: number, cy: number, size: number): string {
   return pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + ' Z';
 }
 
+function boardCentroid(graph: BoardGraph): { x: number; y: number } {
+  let sx = 0;
+  let sy = 0;
+  for (const h of graph.hexes) {
+    sx += h.cx;
+    sy += h.cy;
+  }
+  const n = graph.hexes.length;
+  return { x: sx / n, y: sy / n };
+}
+
+/** Edges incident to `vertexId` with exactly one land hex — ocean-facing coastline. */
+export function coastalIncidentEdges(graph: BoardGraph, vertexId: number): EdgeLayout[] {
+  const out: EdgeLayout[] = [];
+  for (const e of graph.edges) {
+    if (e.a !== vertexId && e.b !== vertexId) continue;
+    if (e.hexIndices.length === 1) out.push(e);
+  }
+  return out;
+}
+
+/**
+ * All ocean-facing hex sides in cyclic order around the island (each edge has exactly one land hex).
+ * Consecutive entries share one vertex — the boundary is a single closed walk.
+ */
+export function orderedCoastalEdges(graph: BoardGraph): EdgeLayout[] {
+  const coastal = graph.edges.filter((e) => e.hexIndices.length === 1);
+  if (coastal.length === 0) return [];
+
+  const byVertex = new Map<number, EdgeLayout[]>();
+  for (const v of graph.vertices) {
+    byVertex.set(v.id, []);
+  }
+  for (const e of coastal) {
+    byVertex.get(e.a)!.push(e);
+    byVertex.get(e.b)!.push(e);
+  }
+
+  const start = coastal[0]!;
+  const ordered: EdgeLayout[] = [start];
+  let currEdge = start;
+  let currVertex = start.b;
+
+  for (;;) {
+    const options = byVertex.get(currVertex)!.filter((e) => e.id !== currEdge.id);
+    if (options.length !== 1) {
+      throw new Error(
+        `orderedCoastalEdges: expected 1 coastal continuation at vertex ${currVertex}, got ${options.length}`,
+      );
+    }
+    const next = options[0]!;
+    if (next.id === start.id) break;
+    ordered.push(next);
+    currVertex = next.a === currVertex ? next.b : next.a;
+    currEdge = next;
+  }
+
+  if (ordered.length !== coastal.length) {
+    throw new Error(
+      `orderedCoastalEdges: closed walk length ${ordered.length} !== coastal edge count ${coastal.length}`,
+    );
+  }
+  return ordered;
+}
+
+/**
+ * Coastal edge to use for harbor art at a port vertex. If two coastal edges meet (two hexes at a
+ * coast corner), picks the one whose midpoint is farther from the island centroid.
+ */
+export function pickPortCoastalEdge(graph: BoardGraph, vertexId: number): EdgeLayout | null {
+  const coastal = coastalIncidentEdges(graph, vertexId);
+  if (coastal.length === 0) return null;
+  if (coastal.length === 1) return coastal[0]!;
+  const c = boardCentroid(graph);
+  let best = coastal[0]!;
+  let bestD = -1;
+  for (const e of coastal) {
+    const va = graph.vertices[e.a];
+    const vb = graph.vertices[e.b];
+    const mx = (va.x + vb.x) / 2;
+    const my = (va.y + vb.y) / 2;
+    const dx = mx - c.x;
+    const dy = my - c.y;
+    const d = dx * dx + dy * dy;
+    if (d > bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
+}
+
+/** The other endpoint of the dock edge for harbor art / port adjacency (paired with `portVertexId`). */
+export function portDockPartnerVertex(graph: BoardGraph, portVertexId: number): number | null {
+  const e = pickPortCoastalEdge(graph, portVertexId);
+  if (!e) return null;
+  return e.a === portVertexId ? e.b : e.a;
+}
+
+/** Gap from coastal edge midpoint into the ocean, scaled slightly with hex size. */
+export function defaultPortDockGap(graph: BoardGraph): number {
+  return graph.hexSize * 0.22 + 4;
+}
+
+/**
+ * Point in the ocean for harbor/dock UI: edge midpoint, pushed outward from the sole land hex
+ * center past the coastline.
+ */
+export function portDockAnchor(
+  graph: BoardGraph,
+  edge: EdgeLayout,
+  gap: number,
+): { x: number; y: number } {
+  const hi = edge.hexIndices[0];
+  if (hi === undefined) return { x: 0, y: 0 };
+  const hex = graph.hexes[hi];
+  const va = graph.vertices[edge.a];
+  const vb = graph.vertices[edge.b];
+  const mx = (va.x + vb.x) / 2;
+  const my = (va.y + vb.y) / 2;
+  const hx = hex.cx;
+  const hy = hex.cy;
+  let dx = mx - hx;
+  let dy = my - hy;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-9) return { x: mx, y: my };
+  dx /= len;
+  dy /= len;
+  return { x: mx + dx * gap, y: my + dy * gap };
+}
+
 export const DEFAULT_BOARD_GRAPH = buildBoardGraph(52);

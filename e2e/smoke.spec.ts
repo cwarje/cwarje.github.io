@@ -14,6 +14,7 @@ test.describe('site smoke checks', () => {
 
     await expect(page.getByRole('heading', { name: 'Yahtzee' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Hearts' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Settler' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Poker' })).toBeVisible();
   });
 });

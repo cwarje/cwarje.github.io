@@ -539,7 +539,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     getWinners: getSettlerWinnersUnknown,
     Board: SettlerBoard,
     fullBoard: true,
-    production: false,
+    production: true,
   },
 
   'cross-crib': {
@@ -611,6 +611,7 @@ export const PRODUCTION_GAME_TYPES: GameType[] = [
   'yahtzee',
   'hearts',
   'twelve',
+  'settler',
   'up-and-down-the-river',
   'farkle',
   'cross-crib',

@@ -16,6 +16,11 @@ import type { FarkleState } from '../games/farkle/types';
 import type { UpRiverState } from '../games/up-and-down-the-river/types';
 import type { TwelveState } from '../games/twelve/types';
 import type { SettlerState } from '../games/settler/types';
+import {
+  applySettlerIdleTimeout,
+  assignSettlerTurnDeadline,
+  getSettlerIdleActorId,
+} from '../games/settler/logic';
 import type { CrossCribState } from '../games/cross-crib/types';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 import { shouldBotBank } from '../games/farkle/logic';
@@ -980,12 +985,17 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const CROSS_CRIB_BOT_DELAY = 900; // ms between bot card placements
   const SETTLER_BOT_DELAY = 900; // ms between bot actions in Settler
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settlerIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     // Clear any pending timer when state changes
     if (botTimerRef.current) {
       clearTimeout(botTimerRef.current);
       botTimerRef.current = null;
+    }
+    if (settlerIdleTimerRef.current) {
+      clearTimeout(settlerIdleTimerRef.current);
+      settlerIdleTimerRef.current = null;
     }
 
     if (!isHost || !room || room.phase !== 'playing' || !gameState) return;
@@ -1489,6 +1499,32 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       const cs = gameState as SettlerState;
       if (cs.phase === 'finished') return;
 
+      const idlePid = getSettlerIdleActorId(cs);
+      const idlePl = idlePid ? cs.players.find((p) => p.id === idlePid) : null;
+      if (idlePl && !idlePl.isBot && cs.turnDeadlineAt != null) {
+        const expectedDeadline = cs.turnDeadlineAt;
+        const delay = Math.max(0, expectedDeadline - Date.now());
+        settlerIdleTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as SettlerState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentRoom.gameType !== 'settler') return;
+          if (currentGs.phase === 'finished') return;
+          if (currentGs.turnDeadlineAt !== expectedDeadline) return;
+          if (getSettlerIdleActorId(currentGs) !== idlePid) return;
+
+          const nextRaw = applySettlerIdleTimeout(currentGs);
+          if (nextRaw === currentGs) return;
+          const next = assignSettlerTurnDeadline(nextRaw, Date.now());
+          setGameState(next);
+          broadcastGameState(next);
+          if (checkGameOver('settler', next)) {
+            const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+            setRoom(finishedRoom);
+            broadcastRoomState(finishedRoom);
+          }
+        }, delay);
+      }
+
       // Discard uses queue order instead of currentPlayerIndex.
       if (cs.phase === 'discard') {
         const discarderId = cs.discardQueue[0];
@@ -1543,6 +1579,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     const disconnectTimers = disconnectTimersRef.current;
     return () => {
       if (botTimerRef.current) clearTimeout(botTimerRef.current);
+      if (settlerIdleTimerRef.current) clearTimeout(settlerIdleTimerRef.current);
       disconnectTimers.forEach(timer => clearTimeout(timer));
       disconnectTimers.clear();
       reconnectingRef.current = false;
