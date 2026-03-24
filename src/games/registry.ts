@@ -544,20 +544,22 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
 
   'cross-crib': {
     title: 'Cross Crib',
-    shortDescription: 'Score points by forming cribbage hands in a 5×5 grid. Rows vs columns over 4 rounds.',
+    shortDescription:
+      'Score points by forming cribbage hands in a 5×5 grid. Rows vs columns over 4 rounds; the dealer’s crib also scores as a 5-card hand with the starter.',
     playersLabel: '2 or 4 Players',
     minPlayers: 2,
     maxPlayers: 4,
     allowedPlayerCounts: [2, 4],
     info: {
-      goal: 'Score the most points by forming cribbage hands in rows and columns over 4 rounds.',
+      goal:
+        'Score the most points from cribbage hands in rows and columns and from the dealer’s crib (with the starter) over 4 rounds.',
       rules: [
         '2-player or 4-player (teams of 2, partners sit across). Standard 52-card deck.',
         '5×5 grid with one card dealt face-up to the center as the starter (used in both its row and column).',
         '2 players: 14 cards each (then choose 2 for the crib). 4 players: 7 cards each (then choose 1 for the crib).',
         'The crib is four cards face down under the dealer’s name (2p) or dealer team (4p). After the grid is full, crib cards flip one at a time; the crib scores as a 5-card cribbage hand with the starter, and those points go to the dealer’s side.',
         'Players take turns placing one card into any empty space. Card fades in from your seat direction.',
-        'Each row and column is scored as a 5-card cribbage hand: 15s (2 pts each), pairs (2/6/12), runs, flush (5 pts), knobs (Jack matching starter suit).',
+        'Each row, each column, and the dealer’s crib are scored as 5-card cribbage hands with the starter: 15s (2 pts each), pairs (2/6/12), runs, flush (5 pts), knobs (Jack matching starter suit).',
         'You count points in the column direction (the columns in front of you). Your opponents count the rows. In 4-player, your team counts columns; the other team counts rows.',
         '4 rounds. Highest total wins.',
       ],
