@@ -1,6 +1,7 @@
 import type { Player } from '../../networking/types';
 import type { Card, CrossCribPlayer, CrossCribState, Suit } from './types';
-import { scoreCribbageHand } from './rules';
+import { cribCardsToSelect } from './types';
+import { cardEquals, scoreCribbageHand } from './rules';
 
 const SUITS: ('hearts' | 'diamonds' | 'clubs' | 'spades')[] = ['clubs', 'diamonds', 'spades', 'hearts'];
 const RANKS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] as const;
@@ -75,20 +76,47 @@ function recomputeScores(state: CrossCribState): { rowScores: number[]; columnSc
   return { rowScores, columnScores };
 }
 
-function buildRoundSummary(state: CrossCribState): string {
+function computeCribScore(state: CrossCribState): number {
+  const starter = state.starterCard;
+  const crib = state.cribCards.filter((c): c is Card => c !== null);
+  if (!starter || crib.length !== 4) return 0;
+  const five = [...crib, starter];
+  return scoreCribbageHand(five, starter.suit);
+}
+
+/** Full crib hand score (starter + four crib cards). */
+export function getCribHandScore(state: CrossCribState): number {
+  return computeCribScore(state);
+}
+
+/** Dealer (2p) or dealer team names (4p), for HUD / round summary. */
+export function cribOwnerLabel(state: CrossCribState): string {
+  const dealer = state.players[state.dealerIndex];
+  if (!dealer) return '';
+  if (state.players.length === 2) return dealer.name;
+  const partnerIdx = (state.dealerIndex + 2) % 4;
+  const partner = state.players[partnerIdx];
+  if (!partner) return dealer.name;
+  const a = Math.min(state.dealerIndex, partnerIdx);
+  const b = Math.max(state.dealerIndex, partnerIdx);
+  return `${state.players[a].name} & ${state.players[b].name}`;
+}
+
+function buildRoundSummary(state: CrossCribState, cribScore: number): string {
   const { rowScores, columnScores } = recomputeScores(state);
   const rowTotal = rowScores.reduce((a, b) => a + b, 0);
   const colTotal = columnScores.reduce((a, b) => a + b, 0);
+  const cribLine = ` · Crib ${cribScore} (${cribOwnerLabel(state)})`;
 
   if (state.players.length === 2) {
     const p0 = state.players[0];
     const p1 = state.players[1];
-    return `${p0.name}: ${rowTotal} · ${p1.name}: ${colTotal}`;
+    return `${p0.name}: ${rowTotal} · ${p1.name}: ${colTotal}${cribLine}`;
   }
 
   const team0 = `${state.players[0].name} & ${state.players[2].name}`;
   const team1 = `${state.players[1].name} & ${state.players[3].name}`;
-  return `${team0}: ${rowTotal} · ${team1}: ${colTotal}`;
+  return `${team0}: ${rowTotal} · ${team1}: ${colTotal}${cribLine}`;
 }
 
 function countFilledCells(grid: CrossCribState['grid']): number {
@@ -101,13 +129,49 @@ function countFilledCells(grid: CrossCribState['grid']): number {
   return n;
 }
 
+/** First index where `need` consecutive slots are null (left-packed crib in confirmation order). */
+function firstConsecutiveNullRun(crib: (Card | null)[], need: number): number {
+  if (need <= 0 || need > 4) return -1;
+  for (let start = 0; start <= 4 - need; start++) {
+    let ok = true;
+    for (let j = 0; j < need; j++) {
+      if (crib[start + j] !== null) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) return start;
+  }
+  return -1;
+}
+
+function selectionIsValidSubset(hand: Card[], cards: Card[]): boolean {
+  if (cards.length === 0) return true;
+  const used = hand.map(() => false);
+  for (const c of cards) {
+    const idx = hand.findIndex((h, i) => !used[i] && cardEquals(h, c));
+    if (idx === -1) return false;
+    used[idx] = true;
+  }
+  return true;
+}
+
+function cardsArePairwiseDistinct(cards: Card[]): boolean {
+  for (let i = 0; i < cards.length; i++) {
+    for (let j = i + 1; j < cards.length; j++) {
+      if (cardEquals(cards[i], cards[j])) return false;
+    }
+  }
+  return true;
+}
+
 function startRound(
   players: CrossCribPlayer[],
   roundNumber: number,
   dealerIndex: number
 ): CrossCribState {
   const playerCount = players.length;
-  const cardsPerPlayer = playerCount === 2 ? 12 : 6;
+  const cardsPerPlayer = playerCount === 2 ? 14 : 7;
   const deck = shuffle(createDeck());
   let cursor = 0;
 
@@ -126,7 +190,7 @@ function startRound(
 
   return {
     players: dealtPlayers,
-    phase: 'playing',
+    phase: 'crib-discard',
     roundNumber,
     dealerIndex,
     currentPlayerIndex: firstToPlay,
@@ -137,6 +201,10 @@ function startRound(
     roundSummary: '',
     gameOver: false,
     winners: [],
+    cribCards: [null, null, null, null],
+    cribSelections: {},
+    cribConfirmed: {},
+    cribRevealCount: 0,
   };
 }
 
@@ -144,14 +212,18 @@ function endRound(state: CrossCribState): CrossCribState {
   const { rowScores, columnScores } = recomputeScores(state);
   const rowTotal = rowScores.reduce((a, b) => a + b, 0);
   const colTotal = columnScores.reduce((a, b) => a + b, 0);
+  const cribScore = computeCribScore(state);
+  const dealerParity = state.dealerIndex % 2;
 
   const playerCount = state.players.length;
   const updatedPlayers = state.players.map((p, i) => {
     let add = 0;
     if (playerCount === 2) {
       add = i === 0 ? rowTotal : colTotal;
+      if (i === state.dealerIndex) add += cribScore;
     } else {
       add = i % 2 === 0 ? rowTotal : colTotal;
+      if (i % 2 === dealerParity) add += cribScore;
     }
     return { ...p, totalScore: p.totalScore + add };
   });
@@ -177,7 +249,8 @@ function endRound(state: CrossCribState): CrossCribState {
     phase: 'round-end',
     rowScores,
     columnScores,
-    roundSummary: buildRoundSummary({ ...state, players: updatedPlayers, rowScores, columnScores }),
+    cribRevealCount: 4,
+    roundSummary: buildRoundSummary({ ...state, players: updatedPlayers, rowScores, columnScores }, cribScore),
     gameOver: isLastRound,
     winners,
   };
@@ -205,12 +278,99 @@ export function processCrossCribAction(
   playerId: string
 ): unknown {
   const s = state as CrossCribState;
-  const a = action as { type: string; card?: Card; row?: number; col?: number };
+  const a = action as {
+    type: string;
+    card?: Card;
+    row?: number;
+    col?: number;
+    cards?: Card[];
+  };
 
   if (s.phase === 'game-over' && a.type !== 'show-final-results') return state;
   if (s.gameOver && a.type !== 'start-next-round' && a.type !== 'show-final-results') return state;
 
   switch (a.type) {
+    case 'select-crib-discard': {
+      if (s.phase !== 'crib-discard') return state;
+      const need = cribCardsToSelect(s.players.length);
+      const cards = a.cards;
+      if (!cards || cards.length > need || !cardsArePairwiseDistinct(cards)) return state;
+
+      const pIndex = s.players.findIndex(p => p.id === playerId);
+      if (pIndex === -1) return state;
+      if (s.cribConfirmed[playerId]) return state;
+
+      const player = s.players[pIndex];
+      if (!selectionIsValidSubset(player.hand, cards)) return state;
+
+      return {
+        ...s,
+        cribSelections: { ...s.cribSelections, [playerId]: cards },
+      };
+    }
+
+    case 'confirm-crib-discard': {
+      if (s.phase !== 'crib-discard') return state;
+      const pIndex = s.players.findIndex(p => p.id === playerId);
+      if (pIndex === -1) return state;
+      const need = cribCardsToSelect(s.players.length);
+      const sel = s.cribSelections[playerId];
+      if (!sel || sel.length !== need) return state;
+      if (s.cribConfirmed[playerId]) return state;
+
+      const cribBase: (Card | null)[] =
+        s.cribCards.length === 4 ? [...s.cribCards] : [null, null, null, null];
+      const start = firstConsecutiveNullRun(cribBase, need);
+      if (start < 0) return state;
+      for (let j = 0; j < need; j++) {
+        cribBase[start + j] = sel[j]!;
+      }
+
+      const player = s.players[pIndex];
+      const newHand = sortHand(
+        player.hand.filter(c => !sel.some(g => cardEquals(g, c)))
+      );
+      const newPlayers = s.players.map((p, i) => (i === pIndex ? { ...p, hand: newHand } : p));
+
+      const newConfirmed = { ...s.cribConfirmed, [playerId]: true };
+      const cribSelectionsRest = { ...s.cribSelections };
+      delete cribSelectionsRest[playerId];
+
+      const allConfirmed = s.players.every(p => newConfirmed[p.id]);
+      if (!allConfirmed) {
+        return {
+          ...s,
+          players: newPlayers,
+          cribCards: cribBase,
+          cribConfirmed: newConfirmed,
+          cribSelections: cribSelectionsRest,
+        };
+      }
+
+      if (!cribBase.every((c): c is Card => c !== null)) return state;
+
+      const firstToPlay = (s.dealerIndex + 1) % s.players.length;
+
+      return {
+        ...s,
+        players: newPlayers,
+        phase: 'playing' as const,
+        cribCards: cribBase,
+        cribSelections: {},
+        cribConfirmed: {},
+        currentPlayerIndex: firstToPlay,
+        cribRevealCount: 0,
+      };
+    }
+
+    case 'advance-crib-reveal': {
+      if (s.phase !== 'crib-reveal') return state;
+      if (s.cribRevealCount < 4) {
+        return { ...s, cribRevealCount: s.cribRevealCount + 1 };
+      }
+      return endRound(s);
+    }
+
     case 'place-card': {
       if (s.phase !== 'playing') return state;
       const playerIndex = s.players.findIndex(p => p.id === playerId);
@@ -220,7 +380,7 @@ export function processCrossCribAction(
       const row = a.row;
       const col = a.col;
       if (row < 0 || row > 4 || col < 0 || col > 4) return state;
-      if (row === 2 && col === 2) return state; // center is starter
+      if (row === 2 && col === 2) return state;
 
       if (s.grid[row][col]) return state;
 
@@ -254,7 +414,11 @@ export function processCrossCribAction(
 
       const filled = countFilledCells(newGrid);
       if (filled >= 25) {
-        return endRound(nextState);
+        return {
+          ...nextState,
+          phase: 'crib-reveal' as const,
+          cribRevealCount: 0,
+        };
       }
 
       return nextState;
@@ -283,8 +447,42 @@ export function getCrossCribWinners(state: unknown): string[] {
   return (state as CrossCribState).winners ?? [];
 }
 
+function chooseCribDiscardCards(state: CrossCribState, playerIndex: number): Card[] {
+  const need = cribCardsToSelect(state.players.length);
+  const player = state.players[playerIndex];
+  const sorted = [...player.hand].sort((a, b) => a.rank - b.rank);
+  return sorted.slice(0, need);
+}
+
 export function runCrossCribBotTurn(state: unknown): unknown {
   const s = state as CrossCribState;
+
+  if (s.phase === 'crib-discard') {
+    let current = s;
+    let changed = false;
+    for (let i = 0; i < current.players.length; i++) {
+      const bot = current.players[i];
+      if (!bot.isBot) continue;
+      if (current.cribConfirmed[bot.id]) continue;
+      const need = cribCardsToSelect(current.players.length);
+      if (!current.cribSelections[bot.id] || current.cribSelections[bot.id].length !== need) {
+        const picked = chooseCribDiscardCards(current, i);
+        current = processCrossCribAction(current, { type: 'select-crib-discard', cards: picked }, bot.id) as CrossCribState;
+        changed = true;
+      }
+    }
+    for (const bot of current.players) {
+      if (!bot.isBot) continue;
+      if (current.cribConfirmed[bot.id]) continue;
+      const need = cribCardsToSelect(current.players.length);
+      if (current.cribSelections[bot.id]?.length === need) {
+        current = processCrossCribAction(current, { type: 'confirm-crib-discard' }, bot.id) as CrossCribState;
+        changed = true;
+      }
+    }
+    return changed ? current : state;
+  }
+
   if (s.phase !== 'playing') return state;
 
   const currentPlayer = s.players[s.currentPlayerIndex];
@@ -342,7 +540,6 @@ export function runCrossCribBotTurn(state: unknown): unknown {
     );
   }
 
-  // Fallback: first card, first empty cell (should not happen with valid state)
   const card = currentPlayer.hand[0];
   for (let i = 0; i < 5; i++) {
     for (let j = 0; j < 5; j++) {

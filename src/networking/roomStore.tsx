@@ -22,6 +22,7 @@ import {
   getSettlerIdleActorId,
 } from '../games/settler/logic';
 import type { CrossCribState } from '../games/cross-crib/types';
+import { cribCardsToSelect } from '../games/cross-crib/types';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 import { shouldBotBank } from '../games/farkle/logic';
 import { GAME_REGISTRY } from '../games/registry';
@@ -981,8 +982,9 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const TWELVE_ANNOUNCEMENT_DELAY = 4000; // ms to show trump/tjog announcement
   const TWELVE_ROUND_END_DELAY = 6500; // ms to show round summary before next round
   const TWELVE_FINAL_RESULTS_DELAY = 6000; // ms to hold final round summary before end screen
-  const CROSS_CRIB_ROUND_END_DELAY = 7000; // ms to show round summary before next round
+  const CROSS_CRIB_ROUND_END_DELAY = 10000; // ms to show round summary before next round
   const CROSS_CRIB_BOT_DELAY = 900; // ms between bot card placements
+  const CROSS_CRIB_CRIB_REVEAL_STEP_MS = 750; // ms between each crib card flip
   const SETTLER_BOT_DELAY = 900; // ms between bot actions in Settler
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settlerIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1261,6 +1263,50 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
           }
         }, CROSS_CRIB_ROUND_END_DELAY);
+        return;
+      }
+
+      if (ccs.phase === 'crib-reveal') {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as CrossCribState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'crib-reveal') return;
+
+          const next = processGameAction('cross-crib', currentGs, { type: 'advance-crib-reveal' }, '');
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('cross-crib', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, CROSS_CRIB_CRIB_REVEAL_STEP_MS);
+        return;
+      }
+
+      if (ccs.phase === 'crib-discard') {
+        const need = cribCardsToSelect(ccs.players.length);
+        const botsNeedToAct = ccs.players.some((p) => {
+          if (!p.isBot) return false;
+          const sel = ccs.cribSelections[p.id];
+          if (!sel || sel.length !== need) return true;
+          return !ccs.cribConfirmed[p.id];
+        });
+        if (botsNeedToAct) {
+          botTimerRef.current = setTimeout(() => {
+            const currentGs = gameStateRef.current;
+            const currentRoom = roomRef.current;
+            if (!currentGs || !currentRoom) return;
+
+            const next = runSingleBotTurn('cross-crib', currentGs);
+            if (next !== currentGs) {
+              setGameState(next);
+              broadcastGameState(next);
+            }
+          }, 100);
+        }
         return;
       }
 

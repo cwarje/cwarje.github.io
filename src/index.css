@@ -1587,6 +1587,65 @@
   box-shadow: 0 0 0 3px rgba(253, 230, 138, 0.8);
 }
 
+.river-headsUpText.crosscrib-headsUpText--withAction {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* Cross Crib — crib strip in title HUD (matches grid card scale) */
+.crosscrib-cribHudSpread {
+  display: flex;
+  align-items: flex-end;
+  height: 62px;
+  padding-top: 2px;
+}
+
+.crosscrib-cribHudSlot {
+  position: relative;
+  margin-left: -14px;
+}
+
+.crosscrib-cribHudSlot:first-child {
+  margin-left: 0;
+}
+
+.crosscrib-cribHudCard {
+  width: 40px;
+  height: 56px;
+  min-width: 40px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+  display: flex;
+  align-items: stretch;
+}
+
+.crosscrib-cribHudCard .river-cardCorner {
+  padding: 4px 5px;
+}
+
+.crosscrib-cribHudCard--back {
+  background: #800000;
+  border: 3px solid #111827;
+  padding: 0;
+}
+
+.crosscrib-cribHudFlip .poker-cardFlipFront {
+  padding: 3px 4px 3px 0;
+}
+
+.crosscrib-cribHudFlip .poker-cardCorner {
+  gap: 0;
+  width: 1.2em;
+}
+
+.crosscrib-cribHudFlip .poker-cardRank,
+.crosscrib-cribHudFlip .poker-cardSuit {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
 @media (max-width: 639px) {
   .crosscrib-center {
     --crosscrib-slot-w: 44px;

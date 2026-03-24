@@ -2,7 +2,10 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Card, CrossCribPlayer, CrossCribState, Suit } from './types';
-import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX } from '../../networking/playerColors';
+import { cribCardsToSelect } from './types';
+import { cardEquals } from './rules';
+import { getCribHandScore } from './logic';
+import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
   hearts: '\u2665',
@@ -50,9 +53,9 @@ function rankDisplay(rank: number): string {
 }
 
 function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
-  if (playerCount === 2) return { seatRadiusX: 30, seatRadiusY: 29 };
-  if (playerCount === 4) return { seatRadiusX: 35, seatRadiusY: 27 };
-  return { seatRadiusX: 34, seatRadiusY: 30 };
+  if (playerCount === 2) return { seatRadiusX: 30, seatRadiusY: 35 };
+  if (playerCount === 4) return { seatRadiusX: 35, seatRadiusY: 33 };
+  return { seatRadiusX: 34, seatRadiusY: 36 };
 }
 
 export default function CrossCribBoard({
@@ -66,6 +69,8 @@ export default function CrossCribBoard({
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const myPlayer = myIndex >= 0 ? s.players[myIndex] : null;
   const isMyTurn = myIndex >= 0 && s.currentPlayerIndex === myIndex;
+  const selectedCrib = myIndex >= 0 ? (s.cribSelections[myId] ?? []) : [];
+  const myCribConfirmed = myIndex >= 0 && !!s.cribConfirmed[myId];
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
@@ -76,6 +81,7 @@ export default function CrossCribBoard({
   const [seatPillSize, setSeatPillSize] = useState<ElementSize>({ width: 0, height: 0 });
 
   const playerCount = s.players.length;
+  const cribNeed = cribCardsToSelect(playerCount);
   const isTeam = playerCount === 4;
   const shouldRotate = myIndex >= 0 && myIndex % 2 === 0;
 
@@ -98,7 +104,7 @@ export default function CrossCribBoard({
           const usableHalfHeight = tableSize.height / 2 - seatPillSize.height / 2 - RIVER_SEAT_EDGE_GAP_PX;
           return {
             seatRadiusX: Math.max(0, Math.min(50, (usableHalfWidth / tableSize.width) * 100)),
-            seatRadiusY: Math.max(0, Math.min(50, ((usableHalfHeight / tableSize.height) * 100) * 0.9)),
+            seatRadiusY: Math.max(0, Math.min(50, ((usableHalfHeight / tableSize.height) * 100) * 0.97)),
           };
         })()
       : fallbackRadii;
@@ -216,6 +222,25 @@ export default function CrossCribBoard({
     </div>
   );
 
+  const toggleCribCard = (card: Card) => {
+    if (s.phase !== 'crib-discard' || myCribConfirmed || myIndex < 0) return;
+    const isSel = selectedCrib.some(c => cardEquals(c, card));
+    let next: Card[];
+    if (isSel) {
+      next = selectedCrib.filter(c => !cardEquals(c, card));
+    } else {
+      if (selectedCrib.length >= cribNeed) return;
+      next = [...selectedCrib, card];
+    }
+    onAction({ type: 'select-crib-discard', cards: next });
+  };
+
+  const confirmCrib = () => {
+    if (selectedCrib.length === cribNeed && !myCribConfirmed) {
+      onAction({ type: 'confirm-crib-discard' });
+    }
+  };
+
   const placeCard = (row: number, col: number) => {
     if (s.phase !== 'playing' || !isMyTurn || !selectedCard || myIndex < 0) return;
     if (row === 2 && col === 2) return;
@@ -230,7 +255,8 @@ export default function CrossCribBoard({
 
   const renderSeatPill = (layout: SeatLayout, shouldMeasure = false) => {
     const player = layout.player;
-    const isCurrentTurn = s.players[s.currentPlayerIndex]?.id === player.id;
+    const isCurrentTurn =
+      s.phase === 'playing' && s.players[s.currentPlayerIndex]?.id === player.id;
     const isMe = player.id === myId;
     const seatPillStateClass = isCurrentTurn
       ? isMe
@@ -271,6 +297,50 @@ export default function CrossCribBoard({
     if (s.phase === 'round-end') {
       return s.roundSummary;
     }
+    if (s.phase === 'crib-reveal') {
+      if (s.cribRevealCount >= 4) {
+        const pts = getCribHandScore(s);
+        return `Crib: ${pts} pts — tallying round…`;
+      }
+      return `Revealing crib (${s.cribRevealCount}/4)`;
+    }
+    if (s.phase === 'crib-discard') {
+      if (myCribConfirmed) {
+        const waitingOn = s.players.filter(p => !p.isBot && !s.cribConfirmed[p.id]);
+        if (waitingOn.length > 0) {
+          return (
+            <>
+              {'Waiting on '}
+              {waitingOn.map((p, i) => (
+                <span key={p.id}>
+                  {i > 0 && ', '}
+                  <span style={{ color: getPlayerHudTextColor(p.color) }}>{p.name}</span>
+                </span>
+              ))}
+              …
+            </>
+          );
+        }
+        return 'Starting round…';
+      }
+      const chooseLine = `Choose ${cribNeed} card${cribNeed > 1 ? 's' : ''} for the crib · Selected ${selectedCrib.length}/${cribNeed}`;
+      if (myIndex >= 0) {
+        return (
+          <span className="inline-flex items-center justify-center gap-2 flex-wrap max-w-full">
+            <span>{chooseLine}</span>
+            <button
+              type="button"
+              onClick={confirmCrib}
+              disabled={selectedCrib.length !== cribNeed}
+              className="shrink-0 py-1.5 px-3 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors disabled:bg-zinc-600 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:bg-zinc-600"
+            >
+              Confirm
+            </button>
+          </span>
+        );
+      }
+      return chooseLine;
+    }
     if (s.phase === 'playing') {
       const current = s.players[s.currentPlayerIndex];
       if (!current) return '\u00a0';
@@ -278,7 +348,20 @@ export default function CrossCribBoard({
       return isMe ? 'Your turn' : `${current.name}'s turn`;
     }
     return '\u00a0';
-  }, [s.phase, s.currentPlayerIndex, s.players, s.roundSummary, myId]);
+  }, [
+    s.phase,
+    s.cribRevealCount,
+    s.cribConfirmed,
+    s.players,
+    s.roundSummary,
+    s.currentPlayerIndex,
+    myId,
+    myCribConfirmed,
+    selectedCrib.length,
+    cribNeed,
+    myIndex,
+    confirmCrib,
+  ]);
 
   if (s.phase === 'game-over') {
     const ranked = [...s.players].sort((a, b) => b.totalScore - a.totalScore);
@@ -427,9 +510,12 @@ export default function CrossCribBoard({
       </div>
 
       <div className="river-headsUp" aria-live="polite">
-        <p className={`river-headsUpText ${s.phase === 'round-end' ? 'river-headsUpText--roundEnd' : ''}`}>
+        <div
+          role="status"
+          className={`river-headsUpText ${s.phase === 'round-end' || s.phase === 'crib-reveal' ? 'river-headsUpText--roundEnd' : ''} ${s.phase === 'crib-discard' && !myCribConfirmed && myIndex >= 0 ? 'crosscrib-headsUpText--withAction' : ''}`}
+        >
           {headsUpContent ?? '\u00a0'}
-        </p>
+        </div>
       </div>
 
       {myPlayer && (
@@ -444,10 +530,13 @@ export default function CrossCribBoard({
               }}
             >
               {myPlayer.hand.map((card, i) => {
-                const isSelected =
+                const isPlayingPick =
                   selectedCard?.suit === card.suit && selectedCard?.rank === card.rank;
-                const canSelect =
-                  s.phase === 'playing' && isMyTurn;
+                const isCribPick = selectedCrib.some(c => cardEquals(c, card));
+                const canSelectPlay = s.phase === 'playing' && isMyTurn;
+                const canSelectCrib = s.phase === 'crib-discard' && !myCribConfirmed;
+                const canSelect = canSelectPlay || canSelectCrib;
+                const isSelected = canSelectPlay ? isPlayingPick : isCribPick;
                 const isLast = i === myPlayer.hand.length - 1;
                 const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
 
@@ -459,8 +548,12 @@ export default function CrossCribBoard({
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: i * 0.02 }}
                     onClick={() => {
-                      if (!canSelect) return;
-                      setSelectedCard(isSelected ? null : card);
+                      if (canSelectCrib) {
+                        toggleCribCard(card);
+                        return;
+                      }
+                      if (!canSelectPlay) return;
+                      setSelectedCard(isPlayingPick ? null : card);
                     }}
                     disabled={!canSelect}
                     className="river-handHitbox"
