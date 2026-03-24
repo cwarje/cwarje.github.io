@@ -91,6 +91,11 @@ function appendActionLogChain(
   };
 }
 
+function repeatResourceEmoji(resource: Resource, amount: number): string {
+  const emoji = RESOURCE_EMOJI[resource];
+  return Array.from({ length: amount }, () => emoji).join(' ');
+}
+
 /** One log row per player who received production this roll (text after "Name: "). */
 function productionActionLogEntries(
   s: SettlerState,
@@ -99,8 +104,7 @@ function productionActionLogEntries(
   if (summary.length === 0) return [];
   const grouped = new Map<string, string[]>();
   for (const entry of summary) {
-    const emoji = RESOURCE_EMOJI[entry.resource];
-    const resourceText = Array.from({ length: entry.amount }, () => emoji).join(' ');
+    const resourceText = repeatResourceEmoji(entry.resource, entry.amount);
     grouped.set(entry.playerId, [...(grouped.get(entry.playerId) ?? []), resourceText]);
   }
   const out: { playerId: string; text: string }[] = [];
@@ -1070,7 +1074,7 @@ export function processSettlerAction(
         ...appendActionLog(
           state,
           playerId,
-          `traded ${ratio} ${RESOURCE_EMOJI[give]} for 1 ${RESOURCE_EMOJI[receive]}`
+          `traded ${repeatResourceEmoji(give, ratio)} for ${RESOURCE_EMOJI[receive]}`
         ),
       };
     }
