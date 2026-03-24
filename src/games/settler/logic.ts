@@ -1607,6 +1607,42 @@ export function assignSettlerTurnDeadline(
   return { ...state, turnDeadlineAt: nowMs + lim };
 }
 
+export function reconcileSettlerTurnDeadlineAfterAction(
+  prev: SettlerState,
+  next: SettlerState,
+  nowMs: number
+): SettlerState {
+  if (next.phase === 'finished') {
+    return assignSettlerTurnDeadline(next, nowMs);
+  }
+  const idleNext = getSettlerIdleActorId(next);
+  if (!idleNext) {
+    return { ...next, turnDeadlineAt: null };
+  }
+  const plNext = next.players.find((p) => p.id === idleNext);
+  if (!plNext || plNext.isBot) {
+    return { ...next, turnDeadlineAt: null };
+  }
+
+  const idlePrev = getSettlerIdleActorId(prev);
+  if (idlePrev !== idleNext) {
+    return assignSettlerTurnDeadline(next, nowMs);
+  }
+
+  const prevShort = prev.phase === 'pre-roll' || prev.phase === 'setup-order-roll';
+  const nextShort = next.phase === 'pre-roll' || next.phase === 'setup-order-roll';
+  if (prevShort && !nextShort) {
+    return assignSettlerTurnDeadline(next, nowMs);
+  }
+
+  const prevDeadline = prev.turnDeadlineAt;
+  if (prevDeadline == null || prevDeadline <= nowMs) {
+    return assignSettlerTurnDeadline(next, nowMs);
+  }
+
+  return { ...next, turnDeadlineAt: prevDeadline };
+}
+
 function pickRobberMoveHex(s: SettlerState, rollerId: string): number {
   let bestHex = -1;
   let bestScore = -1;

@@ -18,7 +18,7 @@ import type { TwelveState } from '../games/twelve/types';
 import type { SettlerState } from '../games/settler/types';
 import {
   applySettlerIdleTimeout,
-  assignSettlerTurnDeadline,
+  reconcileSettlerTurnDeadlineAfterAction,
   getSettlerIdleActorId,
 } from '../games/settler/logic';
 import type { CrossCribState } from '../games/cross-crib/types';
@@ -1560,7 +1560,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
           const nextRaw = applySettlerIdleTimeout(currentGs);
           if (nextRaw === currentGs) return;
-          const next = assignSettlerTurnDeadline(nextRaw, Date.now());
+          const next = reconcileSettlerTurnDeadlineAfterAction(currentGs, nextRaw, Date.now());
           setGameState(next);
           broadcastGameState(next);
           if (checkGameOver('settler', next)) {

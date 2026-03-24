@@ -663,7 +663,7 @@
 }
 
 .settler-resourceCard--wood {
-  --settler-resource-count-bg: #22c55e;
+  --settler-resource-count-bg: #15803d;
   background: linear-gradient(140deg, #166534 0%, #052e16 100%);
   border-color: var(--settler-resource-count-bg);
 }
@@ -682,7 +682,6 @@
 
 .settler-resourceCard--wheat {
   --settler-resource-count-bg: #ca8a04;
-  --settler-resource-count-fg: #422006;
   background: linear-gradient(140deg, #facc15 0%, #ca8a04 100%);
   border-color: var(--settler-resource-count-bg);
   color: #422006;

@@ -1,6 +1,6 @@
 import type { GameType, Player, GameStartOptions } from '../networking/types';
 import type { SettlerState } from './settler/types';
-import { assignSettlerTurnDeadline } from './settler/logic';
+import { assignSettlerTurnDeadline, reconcileSettlerTurnDeadlineAfterAction } from './settler/logic';
 import { GAME_REGISTRY } from './registry';
 
 export function createInitialGameState(gameType: GameType, players: Player[], options?: GameStartOptions): unknown {
@@ -14,7 +14,11 @@ export function createInitialGameState(gameType: GameType, players: Player[], op
 export function processGameAction(gameType: GameType, state: unknown, action: unknown, playerId: string): unknown {
   const next = GAME_REGISTRY[gameType].processAction(state, action, playerId);
   if (gameType === 'settler' && next !== state) {
-    return assignSettlerTurnDeadline(next as SettlerState, Date.now());
+    return reconcileSettlerTurnDeadlineAfterAction(
+      state as SettlerState,
+      next as SettlerState,
+      Date.now()
+    );
   }
   return next;
 }
@@ -27,7 +31,11 @@ export function runSingleBotTurn(gameType: GameType, state: unknown): unknown {
   if (checkGameOver(gameType, state)) return state;
   let next = GAME_REGISTRY[gameType].runBotTurn(state);
   if (gameType === 'settler' && next !== state) {
-    next = assignSettlerTurnDeadline(next as SettlerState, Date.now());
+    next = reconcileSettlerTurnDeadlineAfterAction(
+      state as SettlerState,
+      next as SettlerState,
+      Date.now()
+    );
   }
   return next;
 }

@@ -11,6 +11,7 @@ import {
   getSettlerIdleActorId,
   legalMaritimeRatiosForGive,
   processSettlerAction,
+  reconcileSettlerTurnDeadlineAfterAction,
   removeSettlerPlayer,
   SETTLER_PRE_ROLL_LIMIT_MS,
   SETTLER_TURN_LIMIT_MS,
@@ -498,6 +499,70 @@ describe('settler logic', () => {
     };
     const next = assignSettlerTurnDeadline(s, 1_000_000);
     expect(next.turnDeadlineAt).toBeNull();
+  });
+
+  it('reconcileSettlerTurnDeadlineAfterAction preserves deadline for same human in main-build', () => {
+    const s0 = createSettlerState(makePlayers(3));
+    const deadline = 9_000_000;
+    const prev: SettlerState = {
+      ...s0,
+      phase: 'main-build',
+      currentPlayerIndex: 0,
+      dice: { d1: 3, d2: 3 },
+      turnDeadlineAt: deadline,
+    };
+    const next: SettlerState = {
+      ...prev,
+      playedDevCardThisTurn: true,
+    };
+    const now = 1_000_000;
+    const out = reconcileSettlerTurnDeadlineAfterAction(prev, next, now);
+    expect(out.turnDeadlineAt).toBe(deadline);
+  });
+
+  it('reconcileSettlerTurnDeadlineAfterAction refreshes when idle actor changes', () => {
+    const s0 = createSettlerState(makePlayers(3));
+    const p0 = s0.players[0]!.id;
+    const p1 = s0.players[1]!.id;
+    const prev: SettlerState = {
+      ...s0,
+      phase: 'main-build',
+      currentPlayerIndex: 0,
+      dice: { d1: 3, d2: 3 },
+      turnDeadlineAt: 9_000_000,
+      pendingDomesticTrade: {
+        proposerId: p0,
+        targetId: p1,
+        give: { wood: 1 },
+        want: { brick: 1 },
+      },
+    };
+    const next: SettlerState = {
+      ...prev,
+      pendingDomesticTrade: null,
+    };
+    const now = 5_000_000;
+    const out = reconcileSettlerTurnDeadlineAfterAction(prev, next, now);
+    expect(out.turnDeadlineAt).toBe(now + SETTLER_TURN_LIMIT_MS);
+  });
+
+  it('reconcileSettlerTurnDeadlineAfterAction assigns full turn limit after leaving pre-roll', () => {
+    const s0 = createSettlerState(makePlayers(3));
+    const prev: SettlerState = {
+      ...s0,
+      phase: 'pre-roll',
+      currentPlayerIndex: 0,
+      dice: null,
+      turnDeadlineAt: 5_000_000,
+    };
+    const next: SettlerState = {
+      ...prev,
+      phase: 'main-build',
+      dice: { d1: 3, d2: 3 },
+    };
+    const now = 4_000_000;
+    const out = reconcileSettlerTurnDeadlineAfterAction(prev, next, now);
+    expect(out.turnDeadlineAt).toBe(now + SETTLER_TURN_LIMIT_MS);
   });
 
   it('getSettlerIdleActorId returns trade target when offer is pending', () => {
