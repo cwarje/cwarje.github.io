@@ -728,6 +728,25 @@
   font-size: 1rem;
 }
 
+/* Sidebar bank supply: same card look as hand, fixed mini size for two-digit counts */
+.settler-resourceCard--bankSupply {
+  width: 40px;
+  height: 56px;
+  flex-shrink: 0;
+  box-shadow: 0 5px 14px rgba(15, 23, 42, 0.34);
+  --settler-resource-card-radius: 7px;
+}
+
+.settler-resourceCard--bankSupply .settler-resourceCardSymbol {
+  font-size: 1.32rem;
+}
+
+.settler-resourceCard--bankSupply .settler-resourceCardCount {
+  padding: 0.12rem 0.22rem 0.2rem 0.28rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
 .settler-resourceCard--costPreview.settler-resourceCard--costPreviewUnaffordable::after {
   content: '';
   position: absolute;

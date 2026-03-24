@@ -5,6 +5,7 @@ import type {
   SettlerAction,
   SettlerPlayer,
   SettlerState,
+  SetupOrderRollState,
   DevCard,
   DevCardHand,
   HexTile,
@@ -120,8 +121,159 @@ function productionActionLogEntries(
 
 export function setupCurrentPlayerSlot(s: SettlerState): number {
   const n = s.players.length;
-  if (s.setupRound === 1) return s.setupOrderIndex;
-  return n - 1 - s.setupOrderIndex;
+  const slot = s.setupRound === 1 ? s.setupOrderIndex : n - 1 - s.setupOrderIndex;
+  const order = s.setupTurnOrder;
+  if (order === undefined || order[slot] === undefined) return slot;
+  return order[slot]!;
+}
+
+function sortIdsByScoreThenSeat(ids: string[], scores: Record<string, number>, players: SettlerPlayer[]): string[] {
+  return [...ids].sort((a, b) => {
+    const sa = scores[a] ?? 0;
+    const sb = scores[b] ?? 0;
+    if (sb !== sa) return sb - sa;
+    return players.findIndex((p) => p.id === a) - players.findIndex((p) => p.id === b);
+  });
+}
+
+function findFirstTieRange(
+  orderedIds: string[],
+  rankScores: Record<string, number>
+): { start: number; end: number } | null {
+  for (let i = 0; i < orderedIds.length - 1; i++) {
+    const sa = rankScores[orderedIds[i]!] ?? 0;
+    const sb = rankScores[orderedIds[i + 1]!] ?? 0;
+    if (sa === sb) {
+      let end = i + 1;
+      const t = sa;
+      while (end + 1 < orderedIds.length && (rankScores[orderedIds[end + 1]!] ?? 0) === t) {
+        end++;
+      }
+      return { start: i, end };
+    }
+  }
+  return null;
+}
+
+function idsInSeatOrder(ids: string[], players: SettlerPlayer[]): string[] {
+  return [...ids].sort(
+    (a, b) => players.findIndex((p) => p.id === a) - players.findIndex((p) => p.id === b)
+  );
+}
+
+function firstTieSubsetInWaveSorted(sortedIds: string[], waveScores: Record<string, number>): string[] | null {
+  for (let i = 0; i < sortedIds.length - 1; i++) {
+    if ((waveScores[sortedIds[i]!] ?? 0) === (waveScores[sortedIds[i + 1]!] ?? 0)) {
+      const t = waveScores[sortedIds[i]!] ?? 0;
+      let j = i;
+      while (j + 1 < sortedIds.length && (waveScores[sortedIds[j + 1]!] ?? 0) === t) {
+        j++;
+      }
+      return sortedIds.slice(i, j + 1);
+    }
+  }
+  return null;
+}
+
+function finalizeSetupOrderRoll(s: SettlerState, orderedIds: string[]): SettlerState {
+  const setupTurnOrder = orderedIds.map((id) => s.players.findIndex((p) => p.id === id));
+  const orderText = orderedIds.map((id) => playerNameById(s, id)).join(', ');
+  const logPid = orderedIds[0] ?? s.players[0]!.id;
+  let next: SettlerState = {
+    ...s,
+    phase: 'setup-settlement',
+    setupTurnOrder,
+    setupOrderRoll: undefined,
+    setupRound: 1,
+    setupOrderIndex: 0,
+    ...appendActionLog(s, logPid, `turn order: ${orderText}`),
+  };
+  return syncCurrentPlayerForSetup(next);
+}
+
+/** After a wave of setup-order rolls completes (`remainingIds` already empty, `waveScores` filled). */
+function completeSetupOrderRollWave(state: SettlerState): SettlerState {
+  const ord = state.setupOrderRoll;
+  if (!ord) return state;
+  const { players } = state;
+  const waveScores = ord.waveScores;
+  const allIds = players.map((p) => p.id);
+
+  if (ord.orderedIds.length === 0) {
+    const orderedIds = sortIdsByScoreThenSeat(allIds, waveScores, players);
+    const rankScores = { ...waveScores };
+    const base: SetupOrderRollState = {
+      remainingIds: [],
+      waveScores: {},
+      orderedIds,
+      rankScores,
+    };
+    const tie = findFirstTieRange(orderedIds, rankScores);
+    if (!tie) {
+      return finalizeSetupOrderRoll({ ...state, setupOrderRoll: base }, orderedIds);
+    }
+    const remainingIds = idsInSeatOrder(orderedIds.slice(tie.start, tie.end + 1), players);
+    return {
+      ...state,
+      setupOrderRoll: {
+        ...base,
+        remainingIds,
+        tieResolveRange: tie,
+      },
+      currentPlayerIndex: players.findIndex((p) => p.id === remainingIds[0]),
+    };
+  }
+
+  const range = ord.tieResolveRange;
+  if (!range) return state;
+  const { start, end } = range;
+  const rolledIds = Object.keys(waveScores);
+  const sortedByWave = sortIdsByScoreThenSeat(rolledIds, waveScores, players);
+  const tieAgain = firstTieSubsetInWaveSorted(sortedByWave, waveScores);
+  if (tieAgain) {
+    const remainingIds = idsInSeatOrder(tieAgain, players);
+    return {
+      ...state,
+      setupOrderRoll: {
+        ...ord,
+        remainingIds,
+        waveScores: {},
+        tieResolveRange: range,
+      },
+      currentPlayerIndex: players.findIndex((p) => p.id === remainingIds[0]),
+    };
+  }
+
+  const merged = [...ord.orderedIds.slice(0, start), ...sortedByWave, ...ord.orderedIds.slice(end + 1)];
+  const rankScores = { ...ord.rankScores };
+  for (const id of sortedByWave) {
+    const prev = rankScores[id] ?? 0;
+    const w = waveScores[id] ?? 0;
+    rankScores[id] = prev * 100 + w;
+  }
+
+  const nextBase: SetupOrderRollState = {
+    remainingIds: [],
+    waveScores: {},
+    orderedIds: merged,
+    rankScores,
+  };
+
+  const tie2 = findFirstTieRange(merged, rankScores);
+  if (!tie2) {
+    return finalizeSetupOrderRoll({ ...state, setupOrderRoll: nextBase }, merged);
+  }
+
+  const remainingIds = idsInSeatOrder(merged.slice(tie2.start, tie2.end + 1), players);
+  return {
+    ...state,
+    setupOrderRoll: {
+      ...nextBase,
+      remainingIds,
+      tieResolveRange: tie2,
+    },
+    currentPlayerIndex: players.findIndex((p) => p.id === remainingIds[0]),
+  };
 }
 
 function syncCurrentPlayerForSetup(s: SettlerState): SettlerState {
@@ -237,7 +389,7 @@ function removeDevCard(h: DevCardHand, card: DevCard, n: number): DevCardHand {
   return { ...h, [card]: Math.max(0, h[card] - n) };
 }
 
-function canPlayDevCard(pl: SettlerPlayer, card: Exclude<DevCard, 'victory-point'>): boolean {
+export function canPlayDevCard(pl: SettlerPlayer, card: Exclude<DevCard, 'victory-point'>): boolean {
   return pl.devCards[card] - pl.newDevCards[card] > 0;
 }
 
@@ -586,6 +738,13 @@ export function createSettlerState(playersIn: Player[], random: () => number = M
     playedKnights: 0,
   }));
 
+  const setupOrderRoll: SetupOrderRollState = {
+    remainingIds: players.map((p) => p.id),
+    waveScores: {},
+    orderedIds: [],
+    rankScores: {},
+  };
+
   const s: SettlerState = {
     players,
     hexes,
@@ -594,7 +753,7 @@ export function createSettlerState(playersIn: Player[], random: () => number = M
     roads: {},
     bank: initialBank(),
     currentPlayerIndex: 0,
-    phase: 'setup-settlement',
+    phase: 'setup-order-roll',
     setupRound: 1,
     setupOrderIndex: 0,
     pendingRoadFromVertex: null,
@@ -615,8 +774,10 @@ export function createSettlerState(playersIn: Player[], random: () => number = M
     pendingDomesticTrade: null,
     portKindsByCoastalEdgeId: randomPortKindsByCoastalEdgeId(graph, random),
     turnDeadlineAt: null,
+    setupOrderRoll,
+    setupOrderDisplayRollerId: null,
   };
-  return syncCurrentPlayerForSetup(s);
+  return s;
 }
 
 // --- Piece supply (base game) ---
@@ -825,6 +986,36 @@ export function processSettlerAction(
   if (!actor) return state;
 
   switch (action.type) {
+    case 'roll-setup-order': {
+      if (state.phase !== 'setup-order-roll') return state;
+      const ord = state.setupOrderRoll;
+      if (!ord || ord.remainingIds[0] !== playerId) return state;
+      const d1 = 1 + Math.floor(random() * 6);
+      const d2 = 1 + Math.floor(random() * 6);
+      const sum = d1 + d2;
+      const rollText = `${diceRollActionLogText(d1, d2)} for turn order (${sum})`;
+      const newWaveScores = { ...ord.waveScores, [playerId]: sum };
+      const newRemaining = ord.remainingIds.slice(1);
+      let next: SettlerState = {
+        ...state,
+        dice: { d1, d2 },
+        setupOrderDisplayRollerId: playerId,
+        setupOrderRoll: {
+          ...ord,
+          waveScores: newWaveScores,
+          remainingIds: newRemaining,
+        },
+        ...appendActionLog(state, playerId, rollText),
+      };
+      if (newRemaining.length > 0) {
+        const nextPid = newRemaining[0]!;
+        return {
+          ...next,
+          currentPlayerIndex: state.players.findIndex((p) => p.id === nextPid),
+        };
+      }
+      return completeSetupOrderRollWave(next);
+    }
     case 'place-settlement': {
       if (state.phase !== 'setup-settlement') return state;
       if (countPlayerSettlements(state, playerId) >= MAX_SETTLEMENTS_PER_PLAYER) return state;
@@ -837,6 +1028,8 @@ export function processSettlerAction(
         ...state,
         settlements: { ...state.settlements, [vid]: { playerId, kind: 'settlement' } },
         phase: 'setup-road',
+        setupOrderDisplayRollerId: null,
+        dice: null,
         pendingRoadFromVertex: vid,
         ...appendActionLog(state, playerId, 'placed a settlement'),
       };
@@ -871,12 +1064,14 @@ export function processSettlerAction(
         next = syncCurrentPlayerForSetup(next);
         return checkWin(next, playerId);
       } else if (state.setupRound === 2 && state.setupOrderIndex === n - 1) {
+        const firstIdx = state.setupTurnOrder?.[0] ?? 0;
         next = {
           ...next,
           phase: 'pre-roll',
+          setupOrderDisplayRollerId: null,
           setupRound: 1,
           setupOrderIndex: 0,
-          currentPlayerIndex: 0,
+          currentPlayerIndex: firstIdx,
           pendingRoadFromVertex: null,
         };
         return checkWin(next, playerId);
@@ -1240,6 +1435,7 @@ export function processSettlerAction(
         ...state,
         currentPlayerIndex: nextPlayer,
         phase: 'pre-roll',
+        setupOrderDisplayRollerId: null,
         dice: null,
         lastProductionHexIndices: [],
         lastProductionSummary: [],
@@ -1332,8 +1528,41 @@ export function removeSettlerPlayer(state: SettlerState, playerId: string): Sett
   if (next.players.length === 1) {
     return { ...next, phase: 'finished', winnerIds: [next.players[0]!.id] };
   }
-  const curId = next.players[next.currentPlayerIndex]?.id ?? '';
-  return checkWin(next, curId);
+  let withOrder = next;
+  if (withOrder.phase === 'setup-order-roll') {
+    const ids = withOrder.players.map((p) => p.id);
+    withOrder = {
+      ...withOrder,
+      setupOrderRoll: {
+        remainingIds: [...ids],
+        waveScores: {},
+        orderedIds: [],
+        rankScores: {},
+      },
+      setupOrderDisplayRollerId: null,
+      setupTurnOrder: undefined,
+      currentPlayerIndex: 0,
+    };
+  } else if (withOrder.setupOrderDisplayRollerId != null) {
+    withOrder = { ...withOrder, setupOrderDisplayRollerId: null };
+  } else if (withOrder.setupTurnOrder) {
+    const remapped = withOrder.setupTurnOrder
+      .map((idx) => {
+        const id = state.players[idx]?.id;
+        if (!id || id === playerId) return -1;
+        return withOrder.players.findIndex((p) => p.id === id);
+      })
+      .filter((i) => i >= 0);
+    const n = withOrder.players.length;
+    if (remapped.length === n) {
+      withOrder = { ...withOrder, setupTurnOrder: remapped };
+    } else {
+      withOrder = { ...withOrder, setupTurnOrder: withOrder.players.map((_, i) => i) };
+    }
+  }
+
+  const curId = withOrder.players[withOrder.currentPlayerIndex]?.id ?? '';
+  return checkWin(withOrder, curId);
 }
 
 export function removeSettlerPlayerUnknown(state: unknown, playerId: string): unknown {
@@ -1348,7 +1577,9 @@ export const SETTLER_PRE_ROLL_LIMIT_MS = 10_000;
 
 /** Default deadline duration for the current phase (10s pre-roll, 2min elsewhere). */
 export function settlerDeadlineLimitMs(state: SettlerState): number {
-  return state.phase === 'pre-roll' ? SETTLER_PRE_ROLL_LIMIT_MS : SETTLER_TURN_LIMIT_MS;
+  return state.phase === 'pre-roll' || state.phase === 'setup-order-roll'
+    ? SETTLER_PRE_ROLL_LIMIT_MS
+    : SETTLER_TURN_LIMIT_MS;
 }
 
 /** Player who must act for the turn timer: trade target, discard head, or current player. */
@@ -1422,6 +1653,9 @@ export function applySettlerIdleTimeout(
 
   if (state.phase === 'pre-roll') {
     return processSettlerAction(state, { type: 'roll' }, pid, random);
+  }
+  if (state.phase === 'setup-order-roll') {
+    return processSettlerAction(state, { type: 'roll-setup-order' }, pid, random);
   }
 
   const pending = state.pendingDomesticTrade;
@@ -1514,6 +1748,9 @@ export function runSettlerBotTurn(state: unknown, random: () => number = Math.ra
   const pid = actor?.id;
   if (!pid || !actor?.isBot) return s;
 
+  if (s.phase === 'setup-order-roll') {
+    return processSettlerAction(s, { type: 'roll-setup-order' }, pid, random);
+  }
   if (s.phase === 'setup-settlement') {
     const verts = legalSettlementVertices(s, pid, true);
     const v = verts[0];

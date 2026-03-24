@@ -546,7 +546,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     title: 'Cross Crib',
     shortDescription:
       'Score points by forming cribbage hands in a 5×5 grid. Rows vs columns over 4 rounds; the dealer’s crib also scores as a 5-card hand with the starter.',
-    playersLabel: '2 or 4 Players',
+    playersLabel: '2 / 4 Players',
     minPlayers: 2,
     maxPlayers: 4,
     allowedPlayerCounts: [2, 4],

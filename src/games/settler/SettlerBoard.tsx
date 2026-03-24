@@ -20,7 +20,7 @@ import {
   type EdgeLayout,
 } from './layout';
 import { portDockVertexIdSet as computePortDockVertexSet, portsFromState } from './ports';
-import type { DevCard, SettlerState, Resource, Terrain } from './types';
+import type { SettlerState, Resource, Terrain } from './types';
 import {
   COSTS,
   DEV_CARD_COST,
@@ -34,6 +34,7 @@ import {
   type ResourceHand,
 } from './types';
 import {
+  canPlayDevCard,
   countPlayerCities,
   getLegalRoadEdgesForPlayer,
   getLegalSettlementVertices,
@@ -73,14 +74,8 @@ function sumResourceHand(h: ResourceHand): number {
   return n;
 }
 
-/** Sidebar dev-card chips: stable label order for skimming hands at a glance. */
-const DEV_CARD_TAG_ORDER: { key: DevCard; label: string }[] = [
-  { key: 'knight', label: 'Knight' },
-  { key: 'victory-point', label: 'VP' },
-  { key: 'road-building', label: 'Road' },
-  { key: 'year-of-plenty', label: 'Plenty' },
-  { key: 'monopoly', label: 'Monopoly' },
-];
+/** Sidebar dev-card chips: passive VP only (playable cards use the main-build toolbar). */
+const DEV_CARD_SIDEBAR_TAGS = [{ key: 'victory-point' as const, label: 'VP' }];
 
 /** Unicode die faces U+2680–U+2685 (same glyphs as action log rolls in logic). */
 const ACTION_LOG_DIE_FACE = /[\u2680-\u2685]/;
@@ -238,11 +233,17 @@ function SettlerTurnDiceSlot({
   dice,
   showRollButton,
   onRoll,
+  forceAnimateOnFirstDice,
+  allowRollWithVisibleDice,
   onRollAnimationSettled,
 }: {
   dice: { d1: number; d2: number } | null;
   showRollButton: boolean;
   onRoll: () => void;
+  /** When true, first non-null dice value uses the spin animation instead of snap-to-face. */
+  forceAnimateOnFirstDice?: boolean;
+  /** Allow setup-order players to roll while the previous roller's dice are still visible. */
+  allowRollWithVisibleDice?: boolean;
   /** Fires after the spin finishes, or immediately when faces snap without a CSS transition. */
   onRollAnimationSettled?: () => void;
 }) {
@@ -266,7 +267,7 @@ function SettlerTurnDiceSlot({
     const d2 = dice.d2 as DiceValue;
     const prev = prevDiceRef.current;
 
-    if (isFirstDiceEffect.current) {
+    if (isFirstDiceEffect.current && !forceAnimateOnFirstDice) {
       isFirstDiceEffect.current = false;
       setIsRolling(false);
       setOrientations([{ ...faceOrientations[d1] }, { ...faceOrientations[d2] }]);
@@ -278,6 +279,7 @@ function SettlerTurnDiceSlot({
     }
 
     if (prev === null) {
+      if (isFirstDiceEffect.current) isFirstDiceEffect.current = false;
       setIsRolling(true);
       setOrientations((prevO) => [
         spinTowardFace(prevO[0], faceOrientations[d1]),
@@ -305,19 +307,22 @@ function SettlerTurnDiceSlot({
 
   const diceSize = '1.9rem';
 
+  const canShowRollButton = showRollButton && (!dice || allowRollWithVisibleDice);
+
   return (
     <div className="flex h-full min-h-0 shrink-0 items-center justify-end">
-      {showRollButton && !dice && (
+      {canShowRollButton && (
         <button
           type="button"
           onClick={onRoll}
-          className="rounded-lg bg-amber-600 px-3 py-1 text-sm font-semibold text-slate-950 hover:bg-amber-500"
+          disabled={isRolling}
+          className="rounded-lg bg-amber-600 px-3 py-1 text-sm font-semibold text-slate-950 transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Roll dice
         </button>
       )}
       {dice && (
-        <div className="flex items-center gap-1 rounded-md border border-white/10 bg-slate-900/80 px-1 py-0.5">
+        <div className="flex items-center gap-1">
           <Dice
             orientation={orientations[0]}
             rolling={isRolling}
@@ -350,6 +355,8 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
   const [domesticTargetId, setDomesticTargetId] = useState<string>('');
   const [domesticGive, setDomesticGive] = useState<ResourceHand>(() => emptyHand());
   const [domesticWant, setDomesticWant] = useState<ResourceHand>(() => emptyHand());
+  const [devResourcePicker, setDevResourcePicker] = useState<null | 'monopoly' | 'year-plenty'>(null);
+  const [yearPlentyFirst, setYearPlentyFirst] = useState<Resource | null>(null);
   const actionLogRef = useRef<HTMLDivElement>(null);
   /** Hide action-log lines from this index until the dice spin ends (full `actionLog` stays in state). */
   const [rollLogHiddenFromIndex, setRollLogHiddenFromIndex] = useState<number | null>(null);
@@ -379,8 +386,17 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
     if (s.phase !== 'main-build') {
       setTradePopupOpen(false);
       setDomesticOpen(false);
+      setDevResourcePicker(null);
+      setYearPlentyFirst(null);
     }
   }, [s.phase]);
+
+  useEffect(() => {
+    if (s.roadBuildingRemaining > 0) {
+      setDevResourcePicker(null);
+      setYearPlentyFirst(null);
+    }
+  }, [s.roadBuildingRemaining]);
 
   const legalMaritimeRatios = useMemo((): (2 | 3 | 4)[] => {
     if (!myPlayer) return [4];
@@ -398,7 +414,11 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
   const isMyTurn = useMemo(() => {
     if (s.phase === 'discard') return s.discardQueue[0] === myId;
     if (s.phase === 'robber-steal') return s.players[s.currentPlayerIndex]?.id === myId;
-    if (s.phase === 'setup-settlement' || s.phase === 'setup-road') {
+    if (
+      s.phase === 'setup-order-roll' ||
+      s.phase === 'setup-settlement' ||
+      s.phase === 'setup-road'
+    ) {
       return s.players[s.currentPlayerIndex]?.id === myId;
     }
     return myIndex >= 0 && s.currentPlayerIndex === myIndex;
@@ -513,6 +533,14 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
   const canBuyDev = Boolean(
     myPlayer && s.devDeck.length > 0 && canAfford(myPlayer.hand, DEV_CARD_COST)
   );
+  const canUseDevPlayActions = Boolean(
+    myPlayer &&
+      s.phase === 'main-build' &&
+      isMyTurn &&
+      s.roadBuildingRemaining === 0 &&
+      !s.playedDevCardThisTurn
+  );
+  const devPickerBlocksOtherDevBtns = devResourcePicker !== null;
   /**
    * Maritime panel claims the bottom-left stack so it is not covered by other phase panels; other
    * overlays use `!stackOverlayOpen` so only one stacked panel is interactive at a time.
@@ -769,6 +797,8 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
   const boardPhaseCaption = useMemo(() => {
     const name = actorForHud?.name ?? 'Player';
     switch (s.phase) {
+      case 'setup-order-roll':
+        return isMyTurn ? 'Roll for turn order' : `${name} is rolling for turn order`;
       case 'setup-settlement':
         return isMyTurn ? `Place a settlement (round ${s.setupRound})` : `${name} is placing a settlement`;
       case 'setup-road':
@@ -802,10 +832,12 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
   const turnTimerTotalSec = Math.floor(turnTimerRemainingMs / 1000);
   const turnTimerLabel = `${Math.floor(turnTimerTotalSec / 60)}:${(turnTimerTotalSec % 60).toString().padStart(2, '0')}`;
   const turnTimerAriaLabel =
-    s.phase === 'pre-roll'
+    s.phase === 'pre-roll' || s.phase === 'setup-order-roll'
       ? `Time to roll ${turnTimerLabel}`
       : `Turn time remaining ${turnTimerLabel}`;
 
+  const isSetupOrderRollPhase = s.phase === 'setup-order-roll';
+  const showSetupOrderDisplayDice = s.setupOrderDisplayRollerId != null && s.dice != null;
   const actionLog = s.actionLog ?? [];
   const visibleActionLog =
     rollLogHiddenFromIndex === null ? actionLog : actionLog.slice(0, rollLogHiddenFromIndex);
@@ -940,6 +972,9 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
               const producing = s.lastProductionHexIndices.includes(hi);
               const canRob = s.phase === 'robber-move' && isMyTurn && hi !== s.robberHexIndex;
               const tokenDy = graph.hexSize * 0.32;
+              const tokenChipCx = cell.cx;
+              const tokenChipCy = cell.cy + tokenDy;
+              const tokenChipR = 18;
 
               return (
                 <g key={hi}>
@@ -978,16 +1013,16 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
                   {token != null && (
                     <g filter="url(#settlerTokenShadow)">
                       <circle
-                        cx={cell.cx}
-                        cy={cell.cy + tokenDy}
-                        r={18}
+                        cx={tokenChipCx}
+                        cy={tokenChipCy}
+                        r={tokenChipR}
                         fill="url(#settlerTokenPaper)"
                         stroke="#78350f"
                         strokeWidth={2}
                       />
                       <text
-                        x={cell.cx}
-                        y={cell.cy + tokenDy + 6}
+                        x={tokenChipCx}
+                        y={tokenChipCy + 6}
                         textAnchor="middle"
                         className="font-bold"
                         style={{
@@ -999,12 +1034,12 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
                       </text>
                       {Array.from({ length: tokenPipCount(token) }).map((_, idx) => {
                         const gap = 3.8;
-                        const start = cell.cx - ((tokenPipCount(token) - 1) * gap) / 2;
+                        const start = tokenChipCx - ((tokenPipCount(token) - 1) * gap) / 2;
                         return (
                           <circle
                             key={`pip-${hi}-${idx}`}
                             cx={start + idx * gap}
-                            cy={cell.cy + tokenDy + 12}
+                            cy={tokenChipCy + 12}
                             r={1.05}
                             fill={token === 6 || token === 8 ? '#991b1b' : '#334155'}
                           />
@@ -1014,8 +1049,19 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
                   )}
                   {isRobber && (
                     <g pointerEvents="none">
-                      <circle cx={cell.cx} cy={cell.cy + graph.hexSize * 0.55 - 9} r={15} fill="rgba(15,23,42,0.58)" />
-                      <text x={cell.cx} y={cell.cy + graph.hexSize * 0.55} textAnchor="middle" fontSize={22}>
+                      <circle
+                        cx={tokenChipCx}
+                        cy={tokenChipCy}
+                        r={tokenChipR + 1}
+                        fill="rgba(15,23,42,0.58)"
+                      />
+                      <text
+                        x={tokenChipCx}
+                        y={tokenChipCy}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fontSize={24}
+                      >
                         🏴‍☠️
                       </text>
                     </g>
@@ -1580,7 +1626,7 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
             <div className="relative z-0 min-w-0 w-full shrink-0 rounded-2xl border border-white/15 bg-slate-950/80 px-3 py-2">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-3">
                   {myPlayer && (
-                    <div className="flex min-h-0 w-[min(100%,22rem)] shrink-0 items-center rounded-2xl border border-white/15 bg-slate-950/80 px-3 py-1">
+                    <div className="flex min-h-0 w-[min(100%,22rem)] shrink-0 items-center">
                       {/* Per-resource columns; in discard phase each card is a button (slot index = which copy) */}
                       <div className="settler-hand settler-hand--compact w-full min-w-0">
                         {totalHandCount === 0 ? (
@@ -1687,9 +1733,99 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
                   <div className="flex min-w-0 flex-1 flex-col justify-center gap-2 sm:min-h-0 sm:min-w-0">
                     {s.phase === 'main-build' && isMyTurn && myPlayer && (
                       <div className="flex min-w-0 flex-col gap-1.5">
-                        {/* Build toggles then click board; 🔨 buys a dev card (play is handled in logic/bots elsewhere) */}
+                        {/* Build toggles then click board; playable dev cards sit left of build actions; 🔨 buys a card */}
                         <div className="flex min-w-0 w-full justify-end overflow-x-auto">
                         <div className="flex shrink-0 flex-nowrap items-center gap-2">
+                        {myPlayer.devCards.knight > 0 && (
+                          <button
+                            type="button"
+                            title="Play Knight (move robber)"
+                            aria-label="Play Knight card"
+                            disabled={
+                              !canUseDevPlayActions ||
+                              !canPlayDevCard(myPlayer, 'knight') ||
+                              devPickerBlocksOtherDevBtns
+                            }
+                            onClick={() => onAction({ type: 'play-knight' })}
+                            className="relative flex size-12 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-slate-800 text-2xl leading-none enabled:hover:border-amber-400/40 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            ⚔️
+                            {myPlayer.devCards.knight > 1 && (
+                              <span className="absolute -right-1 -top-1 min-w-[1.1rem] rounded bg-slate-700 px-0.5 text-center text-[10px] leading-tight text-slate-200">
+                                ×{myPlayer.devCards.knight}
+                              </span>
+                            )}
+                          </button>
+                        )}
+                        {myPlayer.devCards['road-building'] > 0 && (
+                          <button
+                            type="button"
+                            title="Play Road Building (place 2 free roads)"
+                            aria-label="Play Road Building card"
+                            disabled={
+                              !canUseDevPlayActions ||
+                              !canPlayDevCard(myPlayer, 'road-building') ||
+                              devPickerBlocksOtherDevBtns
+                            }
+                            onClick={() => onAction({ type: 'play-road-building' })}
+                            className="relative flex size-12 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-slate-800 text-2xl leading-none enabled:hover:border-amber-400/40 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            🛣️
+                            {myPlayer.devCards['road-building'] > 1 && (
+                              <span className="absolute -right-1 -top-1 min-w-[1.1rem] rounded bg-slate-700 px-0.5 text-center text-[10px] leading-tight text-slate-200">
+                                ×{myPlayer.devCards['road-building']}
+                              </span>
+                            )}
+                          </button>
+                        )}
+                        {myPlayer.devCards['year-of-plenty'] > 0 && (
+                          <button
+                            type="button"
+                            title="Play Year of Plenty (take 2 resources from bank)"
+                            aria-label="Play Year of Plenty card"
+                            disabled={
+                              !canUseDevPlayActions ||
+                              !canPlayDevCard(myPlayer, 'year-of-plenty') ||
+                              (devPickerBlocksOtherDevBtns && devResourcePicker !== 'year-plenty')
+                            }
+                            onClick={() => {
+                              setDevResourcePicker('year-plenty');
+                              setYearPlentyFirst(null);
+                            }}
+                            className={`relative flex size-12 shrink-0 items-center justify-center rounded-lg border text-2xl leading-none disabled:cursor-not-allowed disabled:opacity-40 ${devResourcePicker === 'year-plenty' ? 'border-amber-400 bg-amber-500/20' : 'border-white/10 bg-slate-800 enabled:hover:border-amber-400/40'}`}
+                          >
+                            🎁
+                            {myPlayer.devCards['year-of-plenty'] > 1 && (
+                              <span className="absolute -right-1 -top-1 min-w-[1.1rem] rounded bg-slate-700 px-0.5 text-center text-[10px] leading-tight text-slate-200">
+                                ×{myPlayer.devCards['year-of-plenty']}
+                              </span>
+                            )}
+                          </button>
+                        )}
+                        {myPlayer.devCards.monopoly > 0 && (
+                          <button
+                            type="button"
+                            title="Play Monopoly (take all of one resource from opponents)"
+                            aria-label="Play Monopoly card"
+                            disabled={
+                              !canUseDevPlayActions ||
+                              !canPlayDevCard(myPlayer, 'monopoly') ||
+                              (devPickerBlocksOtherDevBtns && devResourcePicker !== 'monopoly')
+                            }
+                            onClick={() => {
+                              setYearPlentyFirst(null);
+                              setDevResourcePicker('monopoly');
+                            }}
+                            className={`relative flex size-12 shrink-0 items-center justify-center rounded-lg border text-2xl leading-none disabled:cursor-not-allowed disabled:opacity-40 ${devResourcePicker === 'monopoly' ? 'border-amber-400 bg-amber-500/20' : 'border-white/10 bg-slate-800 enabled:hover:border-amber-400/40'}`}
+                          >
+                            🎯
+                            {myPlayer.devCards.monopoly > 1 && (
+                              <span className="absolute -right-1 -top-1 min-w-[1.1rem] rounded bg-slate-700 px-0.5 text-center text-[10px] leading-tight text-slate-200">
+                                ×{myPlayer.devCards.monopoly}
+                              </span>
+                            )}
+                          </button>
+                        )}
                         <div
                           className="relative inline-flex"
                           onMouseEnter={() => showBuildCostTip(roadBtnRef, ROAD_COST_CARDS)}
@@ -1821,7 +1957,7 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
                             aria-label="Buy development card, costs 1 sheep, 1 wheat, and 1 ore"
                             disabled={!canBuyDev || s.roadBuildingRemaining > 0}
                             onClick={() => onAction({ type: 'buy-dev-card' })}
-                            className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-slate-800 text-2xl leading-none disabled:opacity-40"
+                            className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-slate-800 text-2xl leading-none disabled:cursor-not-allowed"
                           >
                             🔨
                           </button>
@@ -1838,6 +1974,88 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
                         </button>
                         </div>
                         </div>
+                        {devResourcePicker === 'monopoly' && (
+                          <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-lg border border-amber-500/30 bg-slate-900/90 px-2 py-1.5">
+                            <span className="text-[11px] text-slate-300">Monopoly — take all of:</span>
+                            <div className="flex flex-wrap gap-1">
+                              {RESOURCE_LIST.map((r) => (
+                                <button
+                                  key={`monopoly-pick-${r}`}
+                                  type="button"
+                                  title={resourceLabel(r)}
+                                  aria-label={`Take all ${resourceLabel(r)}`}
+                                  className="flex size-9 items-center justify-center rounded-md border border-white/15 bg-slate-800 text-lg leading-none hover:border-amber-400/50"
+                                  onClick={() => {
+                                    onAction({ type: 'play-monopoly', resource: r });
+                                    setDevResourcePicker(null);
+                                  }}
+                                >
+                                  {RESOURCE_EMOJI[r]}
+                                </button>
+                              ))}
+                            </div>
+                            <button
+                              type="button"
+                              className="ml-auto shrink-0 rounded px-2 py-0.5 text-[11px] text-slate-400 hover:bg-white/10 hover:text-slate-200"
+                              onClick={() => setDevResourcePicker(null)}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+                        {devResourcePicker === 'year-plenty' && (
+                          <div className="flex min-w-0 flex-col gap-1.5 rounded-lg border border-amber-500/30 bg-slate-900/90 px-2 py-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-[11px] text-slate-300">
+                                {yearPlentyFirst === null
+                                  ? 'Year of Plenty — pick first resource from bank'
+                                  : 'Pick second resource'}
+                              </span>
+                              <button
+                                type="button"
+                                className="ml-auto shrink-0 rounded px-2 py-0.5 text-[11px] text-slate-400 hover:bg-white/10 hover:text-slate-200"
+                                onClick={() => {
+                                  setDevResourcePicker(null);
+                                  setYearPlentyFirst(null);
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {RESOURCE_LIST.map((r) => (
+                                <button
+                                  key={`yop-pick-${r}`}
+                                  type="button"
+                                  title={resourceLabel(r)}
+                                  aria-label={
+                                    yearPlentyFirst === null
+                                      ? `First choice: ${resourceLabel(r)}`
+                                      : `Second choice: ${resourceLabel(r)}`
+                                  }
+                                  disabled={s.bank[r] < 1 && yearPlentyFirst === null}
+                                  className="flex size-9 items-center justify-center rounded-md border border-white/15 bg-slate-800 text-lg leading-none hover:border-amber-400/50 disabled:cursor-not-allowed disabled:opacity-35"
+                                  onClick={() => {
+                                    if (yearPlentyFirst === null) {
+                                      if (s.bank[r] < 1) return;
+                                      setYearPlentyFirst(r);
+                                      return;
+                                    }
+                                    onAction({
+                                      type: 'play-year-of-plenty',
+                                      resourceA: yearPlentyFirst,
+                                      resourceB: r,
+                                    });
+                                    setDevResourcePicker(null);
+                                    setYearPlentyFirst(null);
+                                  }}
+                                >
+                                  {RESOURCE_EMOJI[r]}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         {/* Road Building card: optional skip if fewer legal edges than remaining placements */}
                         {s.roadBuildingRemaining > 0 && (
                           <button
@@ -1881,13 +2099,24 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
             <div className="mt-2 shrink-0 space-y-2 rounded-xl border border-white/10 bg-slate-900/80 px-3 py-2">
                 <div>
                   <p className="text-xs text-slate-400 mb-1.5">Bank</p>
-                  <div className="grid grid-cols-6 gap-1.5">
-                    <span className="rounded bg-slate-800/80 px-1.5 py-1 text-center text-[11px] border border-white/10">🏦</span>
-                    <span className="rounded bg-emerald-600/80 px-1.5 py-1 text-center text-[11px] font-semibold">{s.bank.wood}</span>
-                    <span className="rounded bg-red-700/80 px-1.5 py-1 text-center text-[11px] font-semibold">{s.bank.brick}</span>
-                    <span className="rounded bg-lime-600/80 px-1.5 py-1 text-center text-[11px] font-semibold">{s.bank.sheep}</span>
-                    <span className="rounded bg-amber-500/90 px-1.5 py-1 text-center text-[11px] font-semibold text-amber-950">{s.bank.wheat}</span>
-                    <span className="rounded bg-slate-500/90 px-1.5 py-1 text-center text-[11px] font-semibold">{s.bank.ore}</span>
+                  <div className="grid min-w-0 grid-cols-6 items-center gap-1.5">
+                    <div className="flex min-h-[56px] items-center justify-center pr-1.5" aria-hidden>
+                      <span className="text-4xl leading-none">🏦</span>
+                    </div>
+                    {RESOURCE_LIST.map((r) => (
+                      <span
+                        key={r}
+                        className={`settler-resourceCard settler-resourceCard--bankSupply settler-resourceCard--${r}`}
+                        aria-label={`${resourceLabel(r)}, ${s.bank[r]} in bank`}
+                      >
+                        <span className="settler-resourceCardCount" aria-hidden>
+                          {s.bank[r]}
+                        </span>
+                        <span className="settler-resourceCardSymbol" aria-hidden>
+                          {RESOURCE_EMOJI[r]}
+                        </span>
+                      </span>
+                    ))}
                   </div>
                 </div>
             </div>
@@ -1928,7 +2157,7 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
                           {s.longestRoadHolderId === p.id && <span className="text-cyan-300">Road</span>}
                           {s.largestArmyHolderId === p.id && <span className="text-violet-300">Army</span>}
                           {p.id === myId &&
-                            DEV_CARD_TAG_ORDER.map(({ key, label }) => {
+                            DEV_CARD_SIDEBAR_TAGS.map(({ key, label }) => {
                               const n = p.devCards[key];
                               if (n <= 0) return null;
                               return (
@@ -1943,11 +2172,26 @@ export default function SettlerBoard({ state, myId, onAction }: SettlerBoardProp
                         </div>
                       </div>
                       <div className="flex min-h-[2.75rem] min-w-[11rem] shrink-0 items-center justify-end">
-                        {isCurrentTurnPlayer && (
+                        {(isCurrentTurnPlayer ||
+                          (showSetupOrderDisplayDice && s.setupOrderDisplayRollerId === p.id)) && (
                           <SettlerTurnDiceSlot
-                            dice={s.dice}
-                            showRollButton={s.phase === 'pre-roll' && isMyTurn}
-                            onRoll={() => onAction({ type: 'roll' })}
+                            dice={
+                              showSetupOrderDisplayDice
+                                ? s.setupOrderDisplayRollerId === p.id
+                                  ? s.dice
+                                  : null
+                                : s.dice
+                            }
+                            showRollButton={(s.phase === 'pre-roll' || isSetupOrderRollPhase) && isMyTurn}
+                            onRoll={() =>
+                              onAction(
+                                isSetupOrderRollPhase
+                                  ? { type: 'roll-setup-order' }
+                                  : { type: 'roll' }
+                              )
+                            }
+                            forceAnimateOnFirstDice={isSetupOrderRollPhase}
+                            allowRollWithVisibleDice={isSetupOrderRollPhase}
                             onRollAnimationSettled={handleRollAnimationSettled}
                           />
                         )}

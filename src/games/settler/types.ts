@@ -153,12 +153,31 @@ export interface SettlerActionLogEntry {
   text: string;
 }
 
+/** Only present while `phase === 'setup-order-roll'`. */
+export interface SetupOrderRollState {
+  /** Player ids still to roll in the current wave (seat / join order). */
+  remainingIds: string[];
+  /** Sums from the current wave only (cleared when starting a new wave). */
+  waveScores: Record<string, number>;
+  /**
+   * Working turn order (player ids, highest roll first). Empty until the first wave completes.
+   */
+  orderedIds: string[];
+  /**
+   * Ordering key (see logic): starts as initial 2d6 sum; after each resolved tie-break,
+   * `key = key * 100 + waveSum` so tie-break values are not compared directly to outsiders.
+   */
+  rankScores: Record<string, number>;
+  /** Inclusive range in `orderedIds` for the tie-break currently in progress. */
+  tieResolveRange?: { start: number; end: number };
+}
+
 /**
- * High-level turn flow: initial **setup-settlement** / **setup-road** (snake order), then repeating
- * **pre-roll** → (on 7: **discard** queue then **robber-move** → **robber-steal**; else **main-build**)
- * until **finished**. SettlerBoard picks overlays, captions, and board affordances from `phase`.
+ * High-level turn flow: **setup-order-roll**, then **setup-settlement** / **setup-road** (snake order),
+ * then repeating **pre-roll** → (on 7: **discard** …) until **finished**.
  */
 export type Phase =
+  | 'setup-order-roll'
   | 'setup-settlement'
   | 'setup-road'
   | 'pre-roll'
@@ -216,6 +235,18 @@ export interface SettlerState {
   portKindsByCoastalEdgeId?: Record<string, HarborKind>;
   /** Host-set Unix ms when the current idle human must act; null if no timer (bots, finished). */
   turnDeadlineAt?: number | null;
+  /**
+   * Permutation of indices 0..n-1: setup snake step k acts as `players[setupTurnOrder[k]]`.
+   * Omitted in legacy state (treated as identity).
+   */
+  setupTurnOrder?: number[];
+  /** Dice contest for setup order; only while `phase === 'setup-order-roll'`. */
+  setupOrderRoll?: SetupOrderRollState;
+  /**
+   * Player id whose setup-order roll is currently being shown in the sidebar dice slot.
+   * Cleared when setup-order rolling is not active.
+   */
+  setupOrderDisplayRollerId?: string | null;
 }
 
 export interface PendingDomesticTrade {
@@ -233,6 +264,7 @@ export interface PendingDomesticTrade {
 export type SettlerAction =
   | { type: 'place-settlement'; vertexId: number }
   | { type: 'place-road'; edgeId: string }
+  | { type: 'roll-setup-order' }
   | { type: 'roll' }
   | { type: 'discard'; cards: Partial<Record<Resource, number>> }
   | { type: 'move-robber'; hexIndex: number }

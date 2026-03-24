@@ -45,12 +45,33 @@ function makePlayers(n: number): Player[] {
   }));
 }
 
+/** Consumes `vals` in order as `Math.random` would (each in [0,1)). */
+function rngFromSequence(vals: number[]): () => number {
+  let i = 0;
+  return () => vals[i++] ?? 0.5;
+}
+
+/** Resolves `setup-order-roll` with the given RNG (throws if it does not finish). */
+function finishSetupOrderRolls(s: SettlerState, rng: () => number): SettlerState {
+  let cur = s;
+  for (let guard = 0; guard < 200 && cur.phase === 'setup-order-roll'; guard++) {
+    const pid = cur.players[cur.currentPlayerIndex]?.id;
+    if (!pid) throw new Error('finishSetupOrderRolls: no current player');
+    cur = processSettlerAction(cur, { type: 'roll-setup-order' }, pid, rng);
+  }
+  if (cur.phase === 'setup-order-roll') {
+    throw new Error('finishSetupOrderRolls: stuck in setup-order-roll (check RNG / ties)');
+  }
+  return cur;
+}
+
 describe('settler logic', () => {
   it('creates state for 3 players', () => {
     const s = createSettlerState(makePlayers(3), () => 0.5);
     expect(s.players).toHaveLength(3);
     expect(s.hexes).toHaveLength(19);
-    expect(s.phase).toBe('setup-settlement');
+    expect(s.phase).toBe('setup-order-roll');
+    expect(s.setupOrderRoll?.remainingIds).toHaveLength(3);
     expect(s.hexes[s.robberHexIndex]?.terrain).toBe('desert');
     for (const r of RESOURCE_LIST) {
       expect(s.bank[r]).toBe(19);
@@ -70,6 +91,7 @@ describe('settler logic', () => {
   it('blocks settlements one edge apart in setup', () => {
     const rng = () => 0.99;
     let s = createSettlerState(makePlayers(3), rng);
+    s = finishSetupOrderRolls(s, rngFromSequence([0.99, 0.99, 0.65, 0.65, 0.1, 0.1]));
     const p0 = s.players[0]!.id;
     expect(s.currentPlayerIndex).toBe(setupCurrentPlayerSlot(s));
 
@@ -93,9 +115,8 @@ describe('settler logic', () => {
   it('appends action log entries for successful actions', () => {
     const rng = () => 0.99;
     let s = createSettlerState(makePlayers(3), rng);
+    s = finishSetupOrderRolls(s, rngFromSequence([0.99, 0.99, 0.65, 0.65, 0.1, 0.1]));
     const p0 = s.players[0]!.id;
-    expect(s.actionLog).toEqual([]);
-
     const startCount = s.actionLog.length;
     const verts = getLegalSettlementVertices(s, p0, true);
     const v0 = verts[0]!;
@@ -458,6 +479,13 @@ describe('settler logic', () => {
     expect(next.turnDeadlineAt).toBe(now + SETTLER_PRE_ROLL_LIMIT_MS);
   });
 
+  it('assignSettlerTurnDeadline uses 10s limit in setup-order-roll for human roller', () => {
+    const s0 = createSettlerState(makePlayers(3));
+    const now = 3_000_000;
+    const next = assignSettlerTurnDeadline(s0, now);
+    expect(next.turnDeadlineAt).toBe(now + SETTLER_PRE_ROLL_LIMIT_MS);
+  });
+
   it('assignSettlerTurnDeadline clears deadline when idle actor is a bot', () => {
     const players = makePlayers(3).map((p, i) => ({ ...p, isBot: i === 0 }));
     const s0 = createSettlerState(players);
@@ -488,6 +516,20 @@ describe('settler logic', () => {
       },
     };
     expect(getSettlerIdleActorId(s)).toBe(p1);
+  });
+
+  it('applySettlerIdleTimeout in setup-order-roll auto-rolls without is asleep log', () => {
+    const s0 = createSettlerState(makePlayers(3));
+    const seq = [0.99, 0.99, 0.65, 0.65, 0.1, 0.1];
+    let i = 0;
+    const rng = () => seq[i++] ?? 0.5;
+    let cur = s0;
+    while (cur.phase === 'setup-order-roll') {
+      cur = applySettlerIdleTimeout(cur, rng);
+    }
+    expect(cur.phase).toBe('setup-settlement');
+    expect(cur.setupTurnOrder).toEqual([0, 1, 2]);
+    expect(cur.actionLog.some((e) => e.text === 'is asleep')).toBe(false);
   });
 
   it('applySettlerIdleTimeout in pre-roll auto-rolls without is asleep log', () => {
@@ -545,5 +587,60 @@ describe('settler logic', () => {
       playerId: p1,
       text: 'is asleep (declined the trade)',
     });
+  });
+
+  it('tracks setup-order dice display roller while current turn advances', () => {
+    const s0 = createSettlerState(makePlayers(3), () => 0.5);
+    const p0 = s0.players[0]!.id;
+    const p1 = s0.players[1]!.id;
+    const p2 = s0.players[2]!.id;
+    const rng = rngFromSequence([0.99, 0.99, 0.65, 0.65, 0.1, 0.1]);
+
+    const afterP0 = processSettlerAction(s0, { type: 'roll-setup-order' }, p0, rng);
+    expect(afterP0.phase).toBe('setup-order-roll');
+    expect(afterP0.currentPlayerIndex).toBe(1);
+    expect(afterP0.setupOrderDisplayRollerId).toBe(p0);
+    expect(afterP0.dice).toEqual({ d1: 6, d2: 6 });
+
+    const afterP1 = processSettlerAction(afterP0, { type: 'roll-setup-order' }, p1, rng);
+    expect(afterP1.phase).toBe('setup-order-roll');
+    expect(afterP1.currentPlayerIndex).toBe(2);
+    expect(afterP1.setupOrderDisplayRollerId).toBe(p1);
+    expect(afterP1.dice).toEqual({ d1: 4, d2: 4 });
+
+    const afterP2 = processSettlerAction(afterP1, { type: 'roll-setup-order' }, p2, rng);
+    expect(afterP2.phase).toBe('setup-settlement');
+    expect(afterP2.setupOrderDisplayRollerId).toBe(p2);
+    expect(afterP2.dice).toEqual({ d1: 1, d2: 1 });
+  });
+
+  it('setup-order-roll yields descending setupTurnOrder without ties', () => {
+    const s0 = createSettlerState(makePlayers(3), () => 0.99);
+    const s = finishSetupOrderRolls(s0, rngFromSequence([0.99, 0.99, 0.65, 0.65, 0.1, 0.1]));
+    expect(s.phase).toBe('setup-settlement');
+    expect(s.setupTurnOrder).toEqual([0, 1, 2]);
+    expect(setupCurrentPlayerSlot(s)).toBe(0);
+  });
+
+  it('setup-order-roll breaks a two-player tie with a second wave', () => {
+    const s0 = createSettlerState(makePlayers(3), () => 0.99);
+    const seq = [
+      0.5, 0.5, 0.5, 0.5, 0.1, 0.1, 0.99, 0.99, 0.1, 0.1,
+    ];
+    const s = finishSetupOrderRolls(s0, rngFromSequence(seq));
+    expect(s.phase).toBe('setup-settlement');
+    expect(s.setupTurnOrder).toEqual([0, 1, 2]);
+  });
+
+  it('setup-order-roll resolves two separate tie groups for four players', () => {
+    const s0 = createSettlerState(makePlayers(4), () => 0.99);
+    const seq = [
+      0.55, 0.95, 0.55, 0.95, 0.1, 0.45, 0.1, 0.45,
+      0.99, 0.99, 0.1, 0.1,
+      0.99, 0.99, 0.1, 0.1,
+    ];
+    const s = finishSetupOrderRolls(s0, rngFromSequence(seq));
+    expect(s.phase).toBe('setup-settlement');
+    expect(s.setupTurnOrder).toEqual([0, 1, 2, 3]);
   });
 });
