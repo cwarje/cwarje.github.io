@@ -37,8 +37,8 @@ const LOWER_CATEGORIES: { key: ScoreCategory; label: string }[] = [
   { key: 'threeOfAKind', label: '3 of a Kind' },
   { key: 'fourOfAKind', label: '4 of a Kind' },
   { key: 'fullHouse', label: 'Full House' },
-  { key: 'smallStraight', label: 'Sm. Straight' },
-  { key: 'largeStraight', label: 'Lg. Straight' },
+  { key: 'smallStraight', label: 'Small Straight' },
+  { key: 'largeStraight', label: 'Large Straight' },
   { key: 'yahtzee', label: 'Yahtzee' },
   { key: 'chance', label: 'Chance' },
 ];
@@ -334,7 +334,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
 
             {/* Upper Bonus */}
             <tr className="border-b border-white/10 bg-white/[0.03]">
-              <td className="py-1.5 px-2 text-white font-medium max-w-[300px]">Bonus</td>
+              <td className="py-1.5 px-2 text-white font-medium max-w-[300px]">Bonus (35)</td>
               {viewOrderPlayers.map((player) => {
                 const earned = hasUpperBonus(player.scorecard);
                 const upperTotal = getUpperTotal(player.scorecard);
