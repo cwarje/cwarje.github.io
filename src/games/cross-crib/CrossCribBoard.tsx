@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Card, CrossCribPlayer, CrossCribState, Suit } from './types';
 import { cribCardsToSelect } from './types';
@@ -43,6 +43,7 @@ interface ElementSize {
 
 const RIVER_SEAT_EDGE_GAP_PX = 8;
 const CARD_ENTRY_DISTANCE_PX = 80;
+const NO_CRIB_SELECTION: Card[] = [];
 
 function rankDisplay(rank: number): string {
   if (rank === 11) return 'J';
@@ -69,7 +70,10 @@ export default function CrossCribBoard({
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const myPlayer = myIndex >= 0 ? s.players[myIndex] : null;
   const isMyTurn = myIndex >= 0 && s.currentPlayerIndex === myIndex;
-  const selectedCrib = myIndex >= 0 ? (s.cribSelections[myId] ?? []) : [];
+  const selectedCrib = useMemo(() => {
+    if (myIndex < 0) return NO_CRIB_SELECTION;
+    return s.cribSelections[myId] ?? NO_CRIB_SELECTION;
+  }, [myIndex, myId, s.cribSelections]);
   const myCribConfirmed = myIndex >= 0 && !!s.cribConfirmed[myId];
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
@@ -165,7 +169,6 @@ export default function CrossCribBoard({
 
   useEffect(() => {
     if (s.phase !== 'playing' || !isMyTurn) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear selection when turn/phase changes
       setSelectedCard(null);
     }
   }, [s.phase, isMyTurn]);
@@ -235,11 +238,11 @@ export default function CrossCribBoard({
     onAction({ type: 'select-crib-discard', cards: next });
   };
 
-  const confirmCrib = () => {
+  const confirmCrib = useCallback(() => {
     if (selectedCrib.length === cribNeed && !myCribConfirmed) {
       onAction({ type: 'confirm-crib-discard' });
     }
-  };
+  }, [selectedCrib, cribNeed, myCribConfirmed, onAction]);
 
   const placeCard = (row: number, col: number) => {
     if (s.phase !== 'playing' || !isMyTurn || !selectedCard || myIndex < 0) return;
@@ -348,20 +351,7 @@ export default function CrossCribBoard({
       return isMe ? 'Your turn' : `${current.name}'s turn`;
     }
     return '\u00a0';
-  }, [
-    s.phase,
-    s.cribRevealCount,
-    s.cribConfirmed,
-    s.players,
-    s.roundSummary,
-    s.currentPlayerIndex,
-    myId,
-    myCribConfirmed,
-    selectedCrib.length,
-    cribNeed,
-    myIndex,
-    confirmCrib,
-  ]);
+  }, [s, myId, myCribConfirmed, selectedCrib.length, cribNeed, myIndex, confirmCrib]);
 
   if (s.phase === 'game-over') {
     const ranked = [...s.players].sort((a, b) => b.totalScore - a.totalScore);

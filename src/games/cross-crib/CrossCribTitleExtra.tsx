@@ -106,7 +106,9 @@ export default function CrossCribTitleExtra({ state }: GameHudProps) {
                   </div>
                 ) : null
               )
-            : s.cribCards.map((card, i) => {
+            : // prevCribCards is previous commit's crib (ref synced in useLayoutEffect); ref read is intentional here.
+              // eslint-disable-next-line react-hooks/refs -- previous-render snapshot for entrance animation
+              s.cribCards.map((card, i) => {
                 const showFace =
                   s.phase === 'round-end' ||
                   (s.phase === 'crib-reveal' && i < s.cribRevealCount);

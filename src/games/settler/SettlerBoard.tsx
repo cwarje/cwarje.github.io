@@ -296,7 +296,7 @@ function SettlerTurnDiceSlot({
       ]);
       return;
     }
-  }, [dice, onRollAnimationSettled]);
+  }, [dice, forceAnimateOnFirstDice, onRollAnimationSettled]);
 
   const handleRollEnd = (event: TransitionEvent<HTMLDivElement>) => {
     if (event.propertyName !== 'transform' || !isRolling || !dice) return;
