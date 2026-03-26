@@ -572,7 +572,7 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
 
                 return (
                   <motion.button
-                    key={`${card.suit}-${card.rank}-${i}`}
+                    key={`${card.suit}-${card.rank}`}
                     type="button"
                     initial={{ y: 50, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
@@ -607,17 +607,17 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
           </div>
           <div className="river-actionRow">
             {state.phase === 'solitaire' && isMyTurn ? (
-              <div className="mobilization-solitaireActions">
-                {myLegalSolitaire.length === 0 ? (
+              myLegalSolitaire.length === 0 ? (
+                <div className="mobilization-solitaireActions">
                   <button type="button" onClick={solitairePass} className="mobilization-passBtn">
                     Pass (take the pig)
                   </button>
-                ) : (
-                  <p className="text-cyan-100 text-sm text-center w-full">
-                    Tap a card, then a highlighted cell. Same card with only one placement plays immediately.
-                  </p>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="river-actionSpacer" aria-hidden="true">
+                  &nbsp;
+                </div>
+              )
             ) : (
               <div className="river-actionSpacer" aria-hidden="true">
                 &nbsp;
