@@ -9,7 +9,8 @@ export type GameType =
   | 'twelve'
   | 'settler'
   | 'cross-crib'
-  | 'mobilization';
+  | 'mobilization'
+  | 'byggkasino';
 export type PlayerColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet' | 'dark-purple';
 export type HeartsTargetScore = 50 | 100;
 export type FarkleTargetScore = 3000 | 5000 | 10000;
@@ -20,6 +21,7 @@ export interface GameStartOptions {
   farkleTargetScore?: FarkleTargetScore;
   upRiverStartMode?: UpRiverStartMode;
   pileCount?: TwelvePileCount;
+  byggkasinoTargetScore?: number;
   botCount?: number;
 }
 

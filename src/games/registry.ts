@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Dice5, Heart, Ship, Crosshair, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon } from 'lucide-react';
+import { Dice5, Heart, Ship, Crosshair, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers } from 'lucide-react';
 import type { GameType, Player, GameStartOptions } from '../networking/types';
 
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
@@ -25,6 +25,7 @@ import {
   getSettlerWinnersUnknown,
 } from './settler/logic';
 import { createCrossCribState, processCrossCribAction, isCrossCribOver, runCrossCribBotTurn, getCrossCribWinners } from './cross-crib/logic';
+import { createByggkasinoState, processByggkasinoAction, isByggkasinoOver, runByggkasinoBotTurn, getByggkasinoWinners } from './byggkasino/logic';
 
 import YahtzeeBoard from './yahtzee/YahtzeeBoard';
 import FarkleBoard from './farkle/FarkleBoard';
@@ -37,6 +38,7 @@ import MobilizationBoard from './mobilization/MobilizationBoard';
 import TwelveBoard from './twelve/TwelveBoard';
 import SettlerBoard from './settler/SettlerBoard';
 import CrossCribBoard from './cross-crib/CrossCribBoard';
+import ByggkasinoBoard from './byggkasino/ByggkasinoBoard';
 
 import HeartsOptions from './hearts/HeartsOptions';
 import FarkleOptions from './farkle/FarkleOptions';
@@ -46,6 +48,7 @@ import TwelveOptions from './twelve/TwelveOptions';
 import HeartsTitleExtra from './hearts/HeartsTitleExtra';
 import PokerTitleExtra from './poker/PokerTitleExtra';
 import CrossCribTitleExtra from './cross-crib/CrossCribTitleExtra';
+import ByggkasinoTitleExtra from './byggkasino/ByggkasinoTitleExtra';
 import UpRiverToolbarExtra from './up-and-down-the-river/UpRiverToolbarExtra';
 import TwelveToolbarExtra from './twelve/TwelveToolbarExtra';
 import MobilizationTitleExtra from './mobilization/MobilizationTitleExtra';
@@ -656,11 +659,65 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     hudTitleLines: ['Cross Crib'],
     TitleExtra: CrossCribTitleExtra,
   },
+
+  byggkasino: {
+    title: 'Byggkasino',
+    shortDescription:
+      'Capture cards from the table by matching, summing, or building. Score points for key cards and sweeps. First to 21 wins.',
+    playersLabel: '2-4 Players',
+    minPlayers: 2,
+    maxPlayers: 4,
+    info: {
+      goal: 'Score points by capturing cards and earning bonuses. First player or team to reach 21 points wins.',
+      rules: [
+        'Standard 52-card deck. Ace = 1, 2-10 = face value, J/Q/K = rank only (no numerical value for sums). 4 players play in teams of 2 (partners sit opposite). 2 or 3 players play individually.',
+        'Deal 4 cards to each player and 4 face-up to the table. When all hands are empty, deal 4 more cards to each player (no new table cards) until the deck is exhausted.',
+        'On your turn, play one card and either Capture, Build, or Trail.',
+        'Capture: take table cards that match your card by rank, or groups of numeric cards (A-10) that sum to your card\'s value. Face cards only capture by matching rank.',
+        'Build: combine a hand card with table cards to form a build with a declared total value (2-10). You must hold a card that can capture the build later.',
+        'Extend Build: add a card from your hand to an existing build, increasing its declared value. Any player may extend or capture any build.',
+        'Trail: place a card face-up on the table if you cannot or choose not to capture or build. You cannot trail if you own a build on the table.',
+        'Sweep: capturing all cards from the table scores 1 bonus point. After the last play, remaining table cards go to the last player who captured.',
+        'Ties: if two or more players/teams tie for most cards or most spades, no one receives those points.',
+      ],
+      howToPlay: [
+        'Click a card in your hand to select it, then click table cards to select what to capture or build with.',
+        'Use the action buttons (Capture, Build, Trail) that appear based on your selection.',
+        'Building groups table cards with your played card into a combined unit — capture it later with a matching-value card.',
+        'Score points at round end: most cards (3), most spades (1), 10 of diamonds (2), 2 of spades (1), each Ace (1), each sweep (1).',
+      ],
+    },
+    icon: Layers,
+    theme: {
+      gradient: 'from-lime-500/20 to-green-600/20',
+      cardBorder: 'border-lime-500/20',
+      hoverBorder: 'hover:border-lime-500/30',
+      playersTag: 'bg-lime-500/25 text-lime-200 border border-lime-500/30',
+      iconColor: 'text-lime-400',
+      buttonColors: 'bg-lime-600 hover:bg-lime-500',
+      panelBg: 'bg-lime-950',
+      labelColor: 'text-lime-200',
+    },
+    createState: (players, options) =>
+      createByggkasinoState(players, { targetScore: options?.byggkasinoTargetScore }),
+    processAction: processByggkasinoAction,
+    isOver: isByggkasinoOver,
+    runBotTurn: runByggkasinoBotTurn,
+    getWinners: getByggkasinoWinners,
+    Board: ByggkasinoBoard,
+    TitleExtra: ByggkasinoTitleExtra,
+    fullBoard: true,
+    hasHandZoom: true,
+    production: true,
+    showNewBadge: true,
+    hudTitleLines: ['Byggkasino'],
+  },
 };
 
 /** All registered game types */
 export const ALL_GAME_TYPES: GameType[] = [
   'mobilization',
+  'byggkasino',
   'yahtzee',
   'hearts',
   'twelve',
@@ -676,6 +733,7 @@ export const ALL_GAME_TYPES: GameType[] = [
 /** Game types shown in production (homepage order) */
 export const PRODUCTION_GAME_TYPES: GameType[] = [
   'mobilization',
+  'byggkasino',
   'yahtzee',
   'hearts',
   'twelve',

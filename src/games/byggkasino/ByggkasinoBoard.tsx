@@ -1,0 +1,748 @@
+import type { ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import type { Card, Suit, ByggkasinoState, TableItem } from './types';
+import { cardEquals, rankDisplay, canParticipateInBuildOrSum } from './types';
+import {
+  findPossibleCaptures,
+  resolveBuildDeclaredValue,
+  resolveExtendBuildDeclaredValue,
+} from './rules';
+import {
+  DARK_PLAYER_COLORS,
+  DEFAULT_PLAYER_COLOR,
+  PLAYER_COLOR_HEX,
+  getPlayerHudTextColor,
+} from '../../networking/playerColors';
+
+const SUIT_SYMBOLS: Record<Suit, string> = {
+  hearts: '\u2665',
+  diamonds: '\u2666',
+  clubs: '\u2663',
+  spades: '\u2660',
+};
+
+const SUIT_COLORS: Record<Suit, string> = {
+  hearts: 'text-red-400',
+  diamonds: 'text-red-400',
+  clubs: 'text-gray-800',
+  spades: 'text-gray-800',
+};
+
+interface ByggkasinoBoardProps {
+  state: unknown;
+  myId: string;
+  onAction: (action: unknown) => void;
+  isHandZoomed?: boolean;
+}
+
+interface ByggSeatLayout {
+  relativeIndex: number;
+  playerIndex: number;
+  player: ByggkasinoState['players'][number];
+  seatLeft: number;
+  seatTop: number;
+}
+
+interface ElementSize {
+  width: number;
+  height: number;
+}
+
+const BYGG_SEAT_EDGE_GAP_PX = 8;
+
+const BYGG_TABLE_ITEM_TRANSITION = {
+  layout: { type: 'tween' as const, duration: 0.28, ease: 'easeOut' as const },
+  opacity: { duration: 0.18 },
+  scale: { duration: 0.18 },
+};
+
+function getByggLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
+  if (playerCount === 4) return { seatRadiusX: 39, seatRadiusY: 36 };
+  if (playerCount === 3) return { seatRadiusX: 36, seatRadiusY: 34 };
+  return { seatRadiusX: 32, seatRadiusY: 33 };
+}
+
+function cardDisplayText(card: Card): string {
+  return `${rankDisplay(card.rank)}${SUIT_SYMBOLS[card.suit]}`;
+}
+
+function CardFace({ card, small = false }: { card: Card; small?: boolean }) {
+  const symbol = SUIT_SYMBOLS[card.suit];
+  const colorClass = SUIT_COLORS[card.suit];
+  const label = rankDisplay(card.rank);
+  return (
+    <div className={`byggkasino-cardFace ${small ? 'byggkasino-cardFace--small' : ''}`}>
+      <span className={`byggkasino-cardRank ${colorClass}`}>{label}</span>
+      <span className={`byggkasino-cardSuit ${colorClass}`}>{symbol}</span>
+    </div>
+  );
+}
+
+function TableCard({
+  card,
+  selected,
+  onClick,
+  disabled,
+}: {
+  card: Card;
+  selected: boolean;
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <motion.button
+      layout="position"
+      transition={BYGG_TABLE_ITEM_TRANSITION}
+      initial={{ scale: 0.92, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.92, opacity: 0 }}
+      whileHover={!disabled ? { y: -4 } : undefined}
+      onClick={onClick}
+      disabled={disabled}
+      className={`byggkasino-tableCard ${selected ? 'byggkasino-tableCard--selected' : ''} ${disabled ? 'byggkasino-tableCard--disabled' : ''}`}
+    >
+      <div className="byggkasino-card">
+        <CardFace card={card} />
+      </div>
+    </motion.button>
+  );
+}
+
+function BuildPile({
+  build,
+  selected,
+  onClick,
+  disabled,
+}: {
+  build: TableItem & { kind: 'build' };
+  selected: boolean;
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <motion.button
+      layout="position"
+      transition={BYGG_TABLE_ITEM_TRANSITION}
+      initial={{ scale: 0.92, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.92, opacity: 0 }}
+      whileHover={!disabled ? { y: -4 } : undefined}
+      onClick={onClick}
+      disabled={disabled}
+      className={`byggkasino-buildPile ${selected ? 'byggkasino-buildPile--selected' : ''} ${disabled ? 'byggkasino-buildPile--disabled' : ''}`}
+    >
+      <span className="byggkasino-buildPileValue">{build.build.value}</span>
+      <span className="byggkasino-buildPileLabel">BUILD</span>
+      <span className="text-[9px] text-amber-300/50">{build.build.cards.length} cards</span>
+    </motion.button>
+  );
+}
+
+export default function ByggkasinoBoard({
+  state,
+  myId,
+  onAction,
+  isHandZoomed = false,
+}: ByggkasinoBoardProps) {
+  const s = state as ByggkasinoState;
+  const myIndex = s.players.findIndex(p => p.id === myId);
+  const myPlayer = myIndex >= 0 ? s.players[myIndex] : null;
+  const anchorIndex = myIndex >= 0 ? myIndex : 0;
+  const isMyTurn = myIndex >= 0 && s.currentPlayerIndex === myIndex && s.phase === 'playing';
+  const tableRef = useRef<HTMLDivElement>(null);
+  const handContainerRef = useRef<HTMLDivElement>(null);
+  const [tableSize, setTableSize] = useState<ElementSize>({ width: 0, height: 0 });
+  const [seatPillElement, setSeatPillElement] = useState<HTMLDivElement | null>(null);
+  const [seatPillSize, setSeatPillSize] = useState<ElementSize>({ width: 0, height: 0 });
+  const [handWidth, setHandWidth] = useState(360);
+
+  const [selectedHandCard, setSelectedHandCard] = useState<Card | null>(null);
+  const [selectedTableIndices, setSelectedTableIndices] = useState<number[]>([]);
+
+  const resetSelection = useCallback(() => {
+    setSelectedHandCard(null);
+    setSelectedTableIndices([]);
+  }, []);
+
+  const handleHandCardClick = useCallback((card: Card) => {
+    if (!isMyTurn) return;
+    setSelectedHandCard(prev => {
+      if (prev && cardEquals(prev, card)) {
+        setSelectedTableIndices([]);
+        return null;
+      }
+      setSelectedTableIndices([]);
+      return card;
+    });
+  }, [isMyTurn]);
+
+  const handleTableItemClick = useCallback((index: number) => {
+    if (!isMyTurn || !selectedHandCard) return;
+    setSelectedTableIndices(prev => {
+      if (prev.includes(index)) return prev.filter(i => i !== index);
+      return [...prev, index];
+    });
+  }, [isMyTurn, selectedHandCard]);
+
+  const possibleCaptures = useMemo(() => {
+    if (!selectedHandCard || !isMyTurn) return [];
+    return findPossibleCaptures(selectedHandCard, s.tableItems);
+  }, [selectedHandCard, isMyTurn, s.tableItems]);
+
+  const canCapture = useMemo(() => {
+    if (!selectedHandCard || selectedTableIndices.length === 0) return false;
+    return possibleCaptures.some(group => {
+      const sortedGroup = [...group].sort();
+      const sortedSelected = [...selectedTableIndices].sort();
+      if (sortedGroup.length !== sortedSelected.length) return false;
+      return sortedGroup.every((v, i) => v === sortedSelected[i]);
+    });
+  }, [selectedHandCard, selectedTableIndices, possibleCaptures]);
+
+  const canAutoCapture = useMemo(() => {
+    if (!selectedHandCard) return false;
+    return possibleCaptures.length === 1;
+  }, [selectedHandCard, possibleCaptures]);
+
+  const selectedTableCardsForBuild = useMemo((): Card[] => {
+    if (selectedTableIndices.length === 0) return [];
+    return selectedTableIndices
+      .map(i => {
+        const item = s.tableItems[i];
+        return item?.kind === 'card' ? item.card : null;
+      })
+      .filter((c): c is Card => c != null);
+  }, [selectedTableIndices, s.tableItems]);
+
+  const canBuild = useMemo(() => {
+    if (!selectedHandCard || !canParticipateInBuildOrSum(selectedHandCard)) return false;
+    if (selectedTableIndices.length === 0) return false;
+    if (selectedTableCardsForBuild.length !== selectedTableIndices.length) return false;
+    const d = resolveBuildDeclaredValue(
+      selectedHandCard,
+      selectedTableCardsForBuild,
+      myPlayer?.hand ?? [],
+      selectedHandCard
+    );
+    return d > 0;
+  }, [selectedHandCard, selectedTableIndices, selectedTableCardsForBuild, myPlayer]);
+
+  const computedBuildValue = useMemo(() => {
+    if (!selectedHandCard || selectedTableCardsForBuild.length === 0) return 0;
+    return resolveBuildDeclaredValue(
+      selectedHandCard,
+      selectedTableCardsForBuild,
+      myPlayer?.hand ?? [],
+      selectedHandCard
+    );
+  }, [selectedHandCard, selectedTableCardsForBuild, myPlayer]);
+
+  const canExtendBuild = useMemo(() => {
+    if (!selectedHandCard || !canParticipateInBuildOrSum(selectedHandCard)) return false;
+    if (selectedTableIndices.length !== 1) return false;
+    const item = s.tableItems[selectedTableIndices[0]];
+    if (!item || item.kind !== 'build') return false;
+    const newVal = resolveExtendBuildDeclaredValue(
+      selectedHandCard,
+      item.build.value,
+      myPlayer?.hand ?? [],
+      selectedHandCard
+    );
+    return newVal > 0;
+  }, [selectedHandCard, selectedTableIndices, s.tableItems, myPlayer]);
+
+  const canTrail = useMemo(() => {
+    if (!selectedHandCard) return false;
+    const hasOwnBuild = s.tableItems.some(
+      it => it.kind === 'build' && it.build.ownerId === myId
+    );
+    return !hasOwnBuild;
+  }, [selectedHandCard, s.tableItems, myId]);
+
+  const handleCapture = useCallback(() => {
+    if (!selectedHandCard) return;
+    let indices = selectedTableIndices;
+    if (indices.length === 0 && canAutoCapture && possibleCaptures.length === 1) {
+      indices = possibleCaptures[0];
+    }
+    onAction({
+      type: 'capture',
+      playedCard: selectedHandCard,
+      capturedItemIndices: indices,
+    });
+    resetSelection();
+  }, [selectedHandCard, selectedTableIndices, canAutoCapture, possibleCaptures, onAction, resetSelection]);
+
+  const handleBuild = useCallback(() => {
+    if (!selectedHandCard) return;
+    onAction({
+      type: 'build',
+      playedCard: selectedHandCard,
+      tableCardIndices: selectedTableIndices,
+      declaredValue: computedBuildValue,
+    });
+    resetSelection();
+  }, [selectedHandCard, selectedTableIndices, computedBuildValue, onAction, resetSelection]);
+
+  const handleExtendBuild = useCallback(() => {
+    if (!selectedHandCard || selectedTableIndices.length !== 1) return;
+    const item = s.tableItems[selectedTableIndices[0]];
+    if (!item || item.kind !== 'build') return;
+    const newVal = resolveExtendBuildDeclaredValue(
+      selectedHandCard,
+      item.build.value,
+      myPlayer?.hand ?? [],
+      selectedHandCard
+    );
+    if (newVal <= 0) return;
+    onAction({
+      type: 'extend-build',
+      playedCard: selectedHandCard,
+      buildIndex: selectedTableIndices[0],
+      declaredValue: newVal,
+    });
+    resetSelection();
+  }, [selectedHandCard, selectedTableIndices, s.tableItems, myPlayer, onAction, resetSelection]);
+
+  const handleTrail = useCallback(() => {
+    if (!selectedHandCard) return;
+    onAction({ type: 'trail', playedCard: selectedHandCard });
+    resetSelection();
+  }, [selectedHandCard, onAction, resetSelection]);
+
+  const handleStartNextRound = useCallback(() => {
+    onAction({ type: 'start-next-round' });
+  }, [onAction]);
+
+  useEffect(() => {
+    const element = tableRef.current;
+    if (!element) return;
+    const updateSize = () => setTableSize({ width: element.clientWidth, height: element.clientHeight });
+    updateSize();
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(element);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!seatPillElement) return;
+    const updateSize = () => setSeatPillSize({ width: seatPillElement.clientWidth, height: seatPillElement.clientHeight });
+    updateSize();
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(seatPillElement);
+    return () => resizeObserver.disconnect();
+  }, [seatPillElement]);
+
+  useEffect(() => {
+    const element = handContainerRef.current;
+    if (!element) return;
+    const updateSize = () => setHandWidth(element.clientWidth);
+    updateSize();
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(element);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const seatLayouts = useMemo<ByggSeatLayout[]>(() => {
+    const playerCount = s.players.length;
+    if (playerCount === 0) return [];
+    const fallbackRadii = getByggLayoutRadii(playerCount);
+    const canUseMeasuredRadii =
+      tableSize.width > 0 &&
+      tableSize.height > 0 &&
+      seatPillSize.width > 0 &&
+      seatPillSize.height > 0;
+    const radii = canUseMeasuredRadii
+      ? (() => {
+          const usableHalfWidth = tableSize.width / 2 - seatPillSize.width / 2 - BYGG_SEAT_EDGE_GAP_PX;
+          const usableHalfHeight = tableSize.height / 2 - seatPillSize.height / 2 - BYGG_SEAT_EDGE_GAP_PX;
+          return {
+            seatRadiusX: Math.max(0, Math.min(50, (usableHalfWidth / tableSize.width) * 100)),
+            seatRadiusY: Math.max(0, Math.min(50, (usableHalfHeight / tableSize.height) * 100)),
+          };
+        })()
+      : fallbackRadii;
+
+    return Array.from({ length: playerCount }, (_, relativeIndex) => {
+      const playerIndex = (anchorIndex + relativeIndex) % playerCount;
+      const player = s.players[playerIndex];
+      const angle = 90 + (360 * relativeIndex) / playerCount;
+      const angleInRadians = (angle * Math.PI) / 180;
+      return {
+        relativeIndex,
+        playerIndex,
+        player,
+        seatLeft: 50 + radii.seatRadiusX * Math.cos(angleInRadians),
+        seatTop: 50 + radii.seatRadiusY * Math.sin(angleInRadians),
+      };
+    }).filter(layout => !!layout.player);
+  }, [s.players, anchorIndex, tableSize.width, tableSize.height, seatPillSize.width, seatPillSize.height]);
+
+  const handLayout = useMemo(() => {
+    const cardCount = myPlayer?.hand.length ?? 0;
+    const available = Math.max(handWidth - 8, 220);
+    const maxCardWidth = 84;
+    const cardWidth = Math.max(58, Math.min(available * 0.2, maxCardWidth));
+    const cardHeight = Math.round(cardWidth * 1.45);
+    const defaultStep = Math.round(cardWidth * 0.58);
+    const fitStep = cardCount > 1 ? (available - cardWidth) / (cardCount - 1) : defaultStep;
+    const step = cardCount > 1 ? Math.max(8, Math.min(defaultStep, fitStep)) : defaultStep;
+    const spreadWidth = cardCount > 1 ? cardWidth + step * (cardCount - 1) : cardWidth;
+    return {
+      cardWidth,
+      cardHeight,
+      step,
+      spreadWidth,
+      selectedLift: 14,
+    };
+  }, [handWidth, myPlayer?.hand.length]);
+
+  const currentPlayer = s.players[s.currentPlayerIndex];
+
+  const headsUpContent = useMemo((): ReactNode => {
+    if (s.phase === 'announcement' && s.actionAnnouncement) {
+      const ann = s.actionAnnouncement;
+      const actor = s.players.find(p => p.id === ann.playerId);
+      if (!actor) return null;
+      const displayName = actor.id === myId ? 'You' : actor.name;
+      const nameEl = <span style={{ color: getPlayerHudTextColor(actor.color) }}>{displayName}</span>;
+
+      if (ann.kind === 'capture') {
+        let suffix = '';
+        if (ann.sweep) suffix += ' (sweep)';
+        if (ann.capturedBuild) suffix += ' · including a build';
+        const cardsText = ann.capturedCards.map(cardDisplayText).join(', ');
+        return (
+          <>
+            {nameEl}
+            {` captured ${cardsText}`}
+            {suffix}
+          </>
+        );
+      }
+      if (ann.kind === 'build') {
+        const tbl =
+          ann.tableCardCount === 1
+            ? ' from 1 table card'
+            : ann.tableCardCount > 1
+              ? ` from ${ann.tableCardCount} table cards`
+              : '';
+        return (
+          <>
+            {nameEl}
+            {` built ${ann.declaredValue}`}
+            {tbl}
+          </>
+        );
+      }
+      if (ann.kind === 'extend-build') {
+        return (
+          <>
+            {nameEl}
+            {` extended a build to ${ann.declaredValue}`}
+          </>
+        );
+      }
+      if (ann.kind === 'trail') {
+        return (
+          <>
+            {nameEl}
+            {` trailed ${cardDisplayText(ann.playedCard)}`}
+          </>
+        );
+      }
+      return null;
+    }
+
+    if (!currentPlayer) return null;
+    if (isMyTurn) {
+      if (selectedHandCard) {
+        return `Your turn · ${cardDisplayText(selectedHandCard)} selected`;
+      }
+      return 'Your turn · Select a card';
+    }
+    return (
+      <>
+        <span style={{ color: getPlayerHudTextColor(currentPlayer.color) }}>{currentPlayer.name}</span>
+        {"'s turn"}
+      </>
+    );
+  }, [s.phase, s.actionAnnouncement, s.players, myId, currentPlayer, isMyTurn, selectedHandCard]);
+
+  const renderSeatPill = (layout: ByggSeatLayout, shouldMeasure = false) => {
+    const player = layout.player;
+    const isCurrentTurn = s.phase === 'playing' && s.players[s.currentPlayerIndex]?.id === player.id;
+    const isMe = player.id === myId;
+    const activeClass = isCurrentTurn
+      ? isMe
+        ? 'byggkasino-seatPill--activeSelf'
+        : 'byggkasino-seatPill--activeOther'
+      : '';
+    const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+    const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
+    return (
+      <div
+        ref={shouldMeasure ? setSeatPillElement : undefined}
+        className={`byggkasino-seatPill ${activeClass} ${isMe ? 'byggkasino-seatPill--me' : ''}`}
+      >
+        <div className="byggkasino-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
+          <span className="byggkasino-seatPillName">{isMe ? 'You' : player.name}</span>
+        </div>
+        <div className="byggkasino-seatPillScore">{s.scores[player.id] ?? 0}</div>
+      </div>
+    );
+  };
+
+  if (s.phase === 'game-over') {
+    const winnerNames = s.winners
+      .map(id => s.players.find(p => p.id === id)?.name ?? id)
+      .join(', ');
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-6 p-4">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-center"
+        >
+          <h2 className="text-3xl font-bold text-yellow-400 mb-2">Game Over!</h2>
+          <p className="text-xl text-white/90 mb-4">
+            {s.winners.includes(myId) ? 'You win!' : `${winnerNames} wins!`}
+          </p>
+          <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-2 mb-4">
+            <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-2">Final Scores</h3>
+            {s.players.map(p => {
+              const isSelf = p.id === myId;
+              return (
+                <div key={p.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                  <span className="text-sm font-medium" style={{ color: getPlayerHudTextColor(p.color) }}>
+                    {p.name}{isSelf ? ' (You)' : ''}
+                  </span>
+                  <span className="font-bold text-white tabular-nums">{s.scores[p.id] ?? 0}</span>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (s.phase === 'round-end') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-6 p-4">
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="text-center max-w-sm w-full"
+        >
+          <h2 className="text-2xl font-bold text-white mb-1">Round {s.roundNumber} Complete</h2>
+          <p className="text-white/50 text-sm mb-4">Target: {s.targetScore} points</p>
+
+          <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-3 mb-4">
+            {s.players.map(p => {
+              const roundScore = s.lastRoundScores[p.id];
+              return (
+                <div key={p.id} className="text-left">
+                  <div className="flex items-center justify-between mb-1">
+                    <span
+                      className="font-medium text-sm"
+                      style={{ color: getPlayerHudTextColor(p.color) }}
+                    >
+                      {p.name}{p.id === myId ? ' (You)' : ''}
+                    </span>
+                    <span className="font-bold text-white tabular-nums">{s.scores[p.id] ?? 0}</span>
+                  </div>
+                  {roundScore && (
+                    <div className="text-xs text-white/40 flex flex-wrap gap-x-3">
+                      {roundScore.mostCards > 0 && <span>Cards +{roundScore.mostCards}</span>}
+                      {roundScore.mostSpades > 0 && <span>Spades +{roundScore.mostSpades}</span>}
+                      {roundScore.bigCasino > 0 && <span>10{SUIT_SYMBOLS.diamonds} +{roundScore.bigCasino}</span>}
+                      {roundScore.littleCasino > 0 && <span>2{SUIT_SYMBOLS.spades} +{roundScore.littleCasino}</span>}
+                      {roundScore.aces > 0 && <span>Aces +{roundScore.aces}</span>}
+                      {roundScore.sweeps > 0 && <span>Sweeps +{roundScore.sweeps}</span>}
+                      {roundScore.total === 0 && <span>No points</span>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={handleStartNextRound}
+            className="px-6 py-2 bg-lime-600 hover:bg-lime-500 text-white rounded-lg font-medium transition-colors"
+          >
+            Next Round
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`byggkasino-board byggkasino-board--players-${s.players.length} space-y-3 sm:space-y-4`}>
+      <div ref={tableRef} className={`byggkasino-table byggkasino-table--players-${s.players.length}`}>
+        {seatLayouts.map((layout) => (
+          <div
+            key={`seat-${layout.player.id}`}
+            className={`byggkasino-seat ${layout.relativeIndex === 0 ? 'byggkasino-seat--self' : ''}`}
+            style={{ left: `${layout.seatLeft}%`, top: `${layout.seatTop}%` }}
+          >
+            {renderSeatPill(layout, layout.relativeIndex === 0)}
+          </div>
+        ))}
+
+        <div className={`byggkasino-center ${isHandZoomed ? 'byggkasino-center--zoom' : ''}`}>
+          <div className="byggkasino-tableLabel">Table</div>
+          <div className="byggkasino-tableItems">
+            <AnimatePresence mode="popLayout">
+              {s.tableItems.length === 0 && (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="byggkasino-tableEmpty"
+                >
+                  Table is empty
+                </motion.div>
+              )}
+              {s.tableItems.map((item, i) => {
+                const isSelected = selectedTableIndices.includes(i);
+                if (item.kind === 'card') {
+                  return (
+                    <TableCard
+                      key={`table-card-${item.card.suit}-${item.card.rank}`}
+                      card={item.card}
+                      selected={isSelected}
+                      onClick={() => handleTableItemClick(i)}
+                      disabled={!isMyTurn || !selectedHandCard}
+                    />
+                  );
+                }
+                return (
+                  <BuildPile
+                    key={`table-build-${item.build.ownerId}`}
+                    build={item}
+                    selected={isSelected}
+                    onClick={() => handleTableItemClick(i)}
+                    disabled={!isMyTurn || !selectedHandCard}
+                  />
+                );
+              })}
+            </AnimatePresence>
+          </div>
+          <div className="byggkasino-tableMeta">
+            Deck: {s.deck.length} &middot; Captured: {myPlayer?.capturedCards.length ?? 0} &middot; R{s.roundNumber} / {s.targetScore}
+          </div>
+        </div>
+      </div>
+
+      <div className="byggkasino-headsUp" aria-live="polite">
+        <p className="byggkasino-headsUpText">{headsUpContent ?? '\u00a0'}</p>
+      </div>
+
+      {myPlayer && (
+        <div>
+          <div ref={handContainerRef} className={`byggkasino-hand ${isHandZoomed ? 'byggkasino-hand--zoom' : ''}`}>
+            <div
+              className="byggkasino-handSpread"
+              style={{
+                width: `${handLayout.spreadWidth}px`,
+                height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
+                transition: 'width 0.16s ease',
+              }}
+            >
+              {myPlayer.hand.map((card, i) => {
+                const isSelected = selectedHandCard !== null && cardEquals(selectedHandCard, card);
+                const isLast = i === myPlayer.hand.length - 1;
+                const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
+                return (
+                  <motion.button
+                    key={`${card.suit}-${card.rank}`}
+                    initial={{ y: 50, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: i * 0.02 }}
+                    onClick={() => handleHandCardClick(card)}
+                    disabled={!isMyTurn}
+                    className="byggkasino-handHitbox"
+                    style={{
+                      left: `${i * handLayout.step}px`,
+                      width: `${hitboxWidth}px`,
+                      height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
+                      zIndex: i + 1,
+                    }}
+                  >
+                    <span
+                      className={`byggkasino-handCardWrap ${isMyTurn ? 'byggkasino-handCardWrap--active' : ''}`}
+                      style={{
+                        width: `${handLayout.cardWidth}px`,
+                        height: `${handLayout.cardHeight}px`,
+                        transform: isSelected ? `translateY(-${handLayout.selectedLift}px)` : 'translateY(0px)',
+                      }}
+                    >
+                      <div className={`byggkasino-card ${!isMyTurn ? 'byggkasino-card--disabled' : ''} ${isSelected ? 'byggkasino-card--selected' : ''}`}>
+                        <CardFace card={card} small={!isHandZoomed} />
+                      </div>
+                    </span>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </div>
+
+          {myPlayer.hand.length === 0 && (
+            <div className="byggkasino-emptyHand">
+              {s.deck.length > 0 ? 'Waiting for new cards...' : 'No cards remaining'}
+            </div>
+          )}
+
+          <div className="byggkasino-actionRow">
+            {isMyTurn ? (
+              selectedHandCard ? (
+                <>
+                  {(canCapture || canAutoCapture) && (
+                    <button
+                      type="button"
+                      onClick={handleCapture}
+                      className="byggkasino-actionButton byggkasino-actionButton--capture"
+                    >
+                      Capture
+                    </button>
+                  )}
+                  {canBuild && (
+                    <button type="button" onClick={handleBuild} className="byggkasino-actionButton byggkasino-actionButton--build">
+                      Build ({computedBuildValue})
+                    </button>
+                  )}
+                  {canExtendBuild && (
+                    <button
+                      type="button"
+                      onClick={handleExtendBuild}
+                      className="byggkasino-actionButton byggkasino-actionButton--extend"
+                    >
+                      Extend Build
+                    </button>
+                  )}
+                  {canTrail && selectedTableIndices.length === 0 && (
+                    <button type="button" onClick={handleTrail} className="byggkasino-actionButton byggkasino-actionButton--trail">
+                      Trail
+                    </button>
+                  )}
+                  {!canCapture && !canAutoCapture && !canBuild && !canExtendBuild && !(canTrail && selectedTableIndices.length === 0) && (
+                    <span className="byggkasino-actionHint">Select table cards to capture or build.</span>
+                  )}
+                </>
+              ) : (
+                <span className="byggkasino-actionHint">Select a card from your hand.</span>
+              )
+            ) : (
+              <span className="byggkasino-actionHint">Waiting for your turn.</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
