@@ -1,4 +1,4 @@
-import type { ByggkasinoState } from './types';
+import { countOccupiedTableSlots, type ByggkasinoState } from './types';
 import type { GameHudProps } from '../registry';
 
 export default function ByggkasinoTitleExtra({ state }: GameHudProps) {
@@ -10,8 +10,15 @@ export default function ByggkasinoTitleExtra({ state }: GameHudProps) {
         Round {s.roundNumber} &middot; Target {s.targetScore}
       </p>
       <p className="text-xs text-white/50">
-        {s.deck.length} cards in deck &middot; {s.tableItems.length} on table
+        {s.deck.length} cards in deck &middot; {countOccupiedTableSlots(s.tableSlots)} on table
       </p>
+      <div className="text-xs text-white/50 space-y-0.5">
+        {s.players.map(p => (
+          <p key={p.id}>
+            {p.name} captured: {p.capturedCards.length}
+          </p>
+        ))}
+      </div>
     </div>
   );
 }

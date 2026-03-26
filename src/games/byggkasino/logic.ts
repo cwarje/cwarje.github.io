@@ -8,16 +8,19 @@ import type {
   ByggkasinoAction,
   ByggkasinoActionAnnouncement,
   TableItem,
+  TableSlot,
 } from './types';
-import { cardEquals, minCardValueForSum } from './types';
+import { BYGG_TABLE_COLUMNS, cardEquals, minCardValueForSum } from './types';
 import {
   isValidCapture,
   isValidBuild,
   isValidBuildExtension,
+  isValidTableGroup,
   playerCanCaptureBuildValue,
   scoreRound,
   findPossibleCaptures,
   achievableSumsForCards,
+  resolveTableGroupDeclaredValue,
 } from './rules';
 
 const SUITS: Suit[] = ['clubs', 'diamonds', 'spades', 'hearts'];
@@ -51,6 +54,37 @@ function sortHand(hand: Card[]): Card[] {
   });
 }
 
+function occupiedTableEntries(tableSlots: TableSlot[]): Array<{ slotIndex: number; item: TableItem }> {
+  const entries: Array<{ slotIndex: number; item: TableItem }> = [];
+  for (let i = 0; i < tableSlots.length; i++) {
+    const item = tableSlots[i];
+    if (!item) continue;
+    entries.push({ slotIndex: i, item });
+  }
+  return entries;
+}
+
+function ensureSlotCapacity(tableSlots: TableSlot[], tableRows: number, requiredSlotIndex: number): {
+  tableSlots: TableSlot[];
+  tableRows: number;
+} {
+  if (requiredSlotIndex < tableSlots.length) {
+    return { tableSlots, tableRows };
+  }
+  const requiredRows = Math.floor(requiredSlotIndex / BYGG_TABLE_COLUMNS) + 1;
+  if (requiredRows <= tableRows) {
+    return { tableSlots, tableRows };
+  }
+  return {
+    tableRows: requiredRows,
+    tableSlots: [...tableSlots, ...Array((requiredRows - tableRows) * BYGG_TABLE_COLUMNS).fill(null)],
+  };
+}
+
+function firstEmptySlotIndex(tableSlots: TableSlot[]): number {
+  return tableSlots.findIndex(slot => slot == null);
+}
+
 function dealCards(state: ByggkasinoState): ByggkasinoState {
   const cardsPerPlayer = 4;
   let deck = [...state.deck];
@@ -59,7 +93,7 @@ function dealCards(state: ByggkasinoState): ByggkasinoState {
     deck = deck.slice(cardsPerPlayer);
     return { ...p, hand };
   });
-  return { ...state, players, deck, actionAnnouncement: null };
+  return { ...state, players, deck, actionAnnouncement: null, pendingCapturePreview: null };
 }
 
 function startRound(
@@ -89,7 +123,8 @@ function startRound(
   return {
     players: dealtPlayers,
     deck: deck.slice(cursor),
-    tableItems: tableCards,
+    tableRows: 1,
+    tableSlots: tableCards,
     currentPlayerIndex: firstToPlay,
     dealerIndex,
     phase: 'playing',
@@ -101,6 +136,7 @@ function startRound(
     gameOver: false,
     winners: [],
     actionAnnouncement: null,
+    pendingCapturePreview: null,
   };
 }
 
@@ -158,6 +194,7 @@ function finishPlayWithOptionalAnnouncement(
     currentPlayerIndex: nextIndex,
     phase: 'announcement',
     actionAnnouncement: announcement,
+    pendingCapturePreview: null,
   };
 }
 
@@ -165,10 +202,11 @@ function endRound(state: ByggkasinoState): ByggkasinoState {
   let players = [...state.players];
 
   if (state.lastCapturerIndex >= 0) {
-    const remainingCards = state.tableItems
+    const tableItems = occupiedTableEntries(state.tableSlots).map(entry => entry.item);
+    const remainingCards = tableItems
       .filter((it): it is { kind: 'card'; card: Card } => it.kind === 'card')
       .map(it => it.card);
-    const remainingBuildCards = state.tableItems
+    const remainingBuildCards = tableItems
       .filter((it): it is { kind: 'build'; build: { cards: Card[]; value: number; ownerId: string } } => it.kind === 'build')
       .flatMap(it => it.build.cards);
 
@@ -197,13 +235,15 @@ function endRound(state: ByggkasinoState): ByggkasinoState {
   return {
     ...state,
     players,
-    tableItems: [],
+    tableRows: 1,
+    tableSlots: [],
     scores: newScores,
     lastRoundScores: roundScores,
     phase: isGameOver ? 'game-over' : 'round-end',
     gameOver: isGameOver,
     winners,
     actionAnnouncement: null,
+    pendingCapturePreview: null,
   };
 }
 
@@ -239,85 +279,139 @@ export function processByggkasinoAction(
 
   if (a.type === 'finish-action-announcement') {
     if (s.phase !== 'announcement') return state;
-    return { ...s, phase: 'playing', actionAnnouncement: null };
+    return { ...s, phase: 'playing', actionAnnouncement: null, pendingCapturePreview: null };
+  }
+
+  if (a.type === 'finalize-capture') {
+    if (!s.pendingCapturePreview) return state;
+    if (s.phase !== 'playing' || s.gameOver) return state;
+    const { playedCard, capturedSlotIndices, playerId: capturePlayerId } = s.pendingCapturePreview;
+    const playerIndex = s.players.findIndex(p => p.id === capturePlayerId);
+    if (playerIndex === -1) return { ...s, pendingCapturePreview: null };
+    const player = s.players[playerIndex];
+    if (!player.hand.some(c => cardEquals(c, playedCard))) return { ...s, pendingCapturePreview: null };
+    if (!isValidCapture(playedCard, s.tableSlots, capturedSlotIndices)) return { ...s, pendingCapturePreview: null };
+
+    const capturedCards: Card[] = [playedCard];
+    const newTableSlots = [...s.tableSlots];
+    for (const idx of capturedSlotIndices) {
+      const item = newTableSlots[idx];
+      if (!item) continue;
+      if (item.kind === 'card') {
+        capturedCards.push(item.card);
+      } else {
+        capturedCards.push(...item.build.cards);
+      }
+      newTableSlots[idx] = null;
+    }
+    const isSweep = newTableSlots.every(slot => slot == null);
+    const updatedPlayer = {
+      ...removeCardFromHand(player, playedCard),
+      capturedCards: [...player.capturedCards, ...capturedCards],
+      sweepCount: player.sweepCount + (isSweep ? 1 : 0),
+    };
+    const newPlayers = s.players.map((p, i) => (i === playerIndex ? updatedPlayer : p));
+    const capturedBuild = capturedSlotIndices.some(i => s.tableSlots[i]?.kind === 'build');
+    return finishPlayWithOptionalAnnouncement(
+      {
+        ...s,
+        players: newPlayers,
+        tableSlots: newTableSlots,
+        lastCapturerIndex: playerIndex,
+      },
+      {
+        kind: 'capture',
+        playerId: player.id,
+        capturedCards,
+        sweep: isSweep,
+        capturedBuild,
+      }
+    );
   }
 
   if (s.phase !== 'playing') return state;
   if (s.gameOver) return state;
+  if (s.pendingCapturePreview) return state;
 
   const playerIndex = s.players.findIndex(p => p.id === playerId);
   if (playerIndex === -1 || playerIndex !== s.currentPlayerIndex) return state;
   const player = s.players[playerIndex];
 
   switch (a.type) {
-    case 'capture': {
-      const { playedCard, capturedItemIndices } = a;
+    case 'capture-preview': {
+      const { playedCard, capturedSlotIndices } = a;
       if (!player.hand.some(c => cardEquals(c, playedCard))) return state;
-      if (!isValidCapture(playedCard, s.tableItems, capturedItemIndices)) return state;
-
-      const capturedCards: Card[] = [playedCard];
-      for (const idx of capturedItemIndices) {
-        const item = s.tableItems[idx];
-        if (item.kind === 'card') {
-          capturedCards.push(item.card);
-        } else {
-          capturedCards.push(...item.build.cards);
-        }
-      }
-
-      const newTableItems = s.tableItems.filter((_, i) => !capturedItemIndices.includes(i));
-      const isSweep = newTableItems.length === 0;
-
-      const updatedPlayer = {
-        ...removeCardFromHand(player, playedCard),
-        capturedCards: [...player.capturedCards, ...capturedCards],
-        sweepCount: player.sweepCount + (isSweep ? 1 : 0),
-      };
-
-      const newPlayers = s.players.map((p, i) => (i === playerIndex ? updatedPlayer : p));
-
-      const capturedBuild = capturedItemIndices.some(i => s.tableItems[i]?.kind === 'build');
-      return finishPlayWithOptionalAnnouncement(
-        {
-          ...s,
-          players: newPlayers,
-          tableItems: newTableItems,
-          lastCapturerIndex: playerIndex,
-        },
-        {
-          kind: 'capture',
+      if (!isValidCapture(playedCard, s.tableSlots, capturedSlotIndices)) return state;
+      return {
+        ...s,
+        pendingCapturePreview: {
           playerId: player.id,
-          capturedCards,
-          sweep: isSweep,
-          capturedBuild,
-        }
+          playedCard,
+          capturedSlotIndices,
+        },
+      };
+    }
+
+    case 'group-table': {
+      const { tableCardIndices, declaredValue } = a;
+      const hasOwnBuild = s.tableSlots.some(
+        it => it?.kind === 'build' && it.build.ownerId === playerId
       );
+      if (hasOwnBuild) return state;
+
+      const unique = [...new Set(tableCardIndices)];
+      if (unique.length < 2) return state;
+      const sortedIdx = [...unique].sort((x, y) => x - y);
+      const tableCards: Card[] = [];
+      for (const idx of sortedIdx) {
+        const item = s.tableSlots[idx];
+        if (!item || item.kind !== 'card') return state;
+        tableCards.push(item.card);
+      }
+      if (!isValidTableGroup(tableCards, declaredValue)) return state;
+      if (!playerCanCaptureBuildValue(player.hand, declaredValue)) return state;
+
+      const newTableSlots = [...s.tableSlots];
+      for (const i of sortedIdx) {
+        newTableSlots[i] = null;
+      }
+      const targetSlotIndex = sortedIdx[0];
+      newTableSlots[targetSlotIndex] = {
+        kind: 'build',
+        build: { cards: tableCards, value: declaredValue, ownerId: playerId },
+      };
+      return { ...s, tableSlots: newTableSlots };
     }
 
     case 'build': {
       const { playedCard, tableCardIndices, declaredValue } = a;
       if (!player.hand.some(c => cardEquals(c, playedCard))) return state;
-      if (!isValidBuild(playedCard, tableCardIndices, s.tableItems, declaredValue)) return state;
+      if (!isValidBuild(playedCard, tableCardIndices, s.tableSlots, declaredValue)) return state;
       if (!playerCanCaptureBuildValue(player.hand, declaredValue, playedCard)) return state;
 
       const buildCards: Card[] = [playedCard];
       for (const idx of tableCardIndices) {
-        const item = s.tableItems[idx];
-        if (item.kind === 'card') buildCards.push(item.card);
+        const item = s.tableSlots[idx];
+        if (item?.kind === 'card') buildCards.push(item.card);
       }
 
-      const newTableItems = s.tableItems.filter((_, i) => !tableCardIndices.includes(i));
+      const newTableSlots = [...s.tableSlots];
+      for (const i of tableCardIndices) {
+        newTableSlots[i] = null;
+      }
       const newBuild: TableItem = {
         kind: 'build',
         build: { cards: buildCards, value: declaredValue, ownerId: playerId },
       };
-      newTableItems.push(newBuild);
+      let targetSlotIndex = tableCardIndices[0];
+      if (targetSlotIndex == null || targetSlotIndex < 0) return state;
+      newTableSlots[targetSlotIndex] = newBuild;
 
       const updatedPlayer = removeCardFromHand(player, playedCard);
       const newPlayers = s.players.map((p, i) => (i === playerIndex ? updatedPlayer : p));
 
       return finishPlayWithOptionalAnnouncement(
-        { ...s, players: newPlayers, tableItems: newTableItems },
+        { ...s, players: newPlayers, tableSlots: newTableSlots },
         {
           kind: 'build',
           playerId: player.id,
@@ -332,7 +426,7 @@ export function processByggkasinoAction(
       const { playedCard, buildIndex, declaredValue } = a;
       if (!player.hand.some(c => cardEquals(c, playedCard))) return state;
 
-      const buildItem = s.tableItems[buildIndex];
+      const buildItem = s.tableSlots[buildIndex];
       if (!buildItem || buildItem.kind !== 'build') return state;
       if (!isValidBuildExtension(playedCard, buildItem.build, declaredValue)) return state;
       if (!playerCanCaptureBuildValue(player.hand, declaredValue, playedCard)) return state;
@@ -346,12 +440,13 @@ export function processByggkasinoAction(
         },
       };
 
-      const newTableItems = s.tableItems.map((item, i) => (i === buildIndex ? extendedBuild : item));
+      const newTableSlots = [...s.tableSlots];
+      newTableSlots[buildIndex] = extendedBuild;
       const updatedPlayer = removeCardFromHand(player, playedCard);
       const newPlayers = s.players.map((p, i) => (i === playerIndex ? updatedPlayer : p));
 
       return finishPlayWithOptionalAnnouncement(
-        { ...s, players: newPlayers, tableItems: newTableItems },
+        { ...s, players: newPlayers, tableSlots: newTableSlots },
         {
           kind: 'extend-build',
           playerId: player.id,
@@ -362,20 +457,23 @@ export function processByggkasinoAction(
     }
 
     case 'trail': {
-      const { playedCard } = a;
+      const { playedCard, targetSlotIndex } = a;
       if (!player.hand.some(c => cardEquals(c, playedCard))) return state;
 
-      const hasOwnBuild = s.tableItems.some(
-        it => it.kind === 'build' && it.build.ownerId === playerId
+      const hasOwnBuild = s.tableSlots.some(
+        it => it?.kind === 'build' && it.build.ownerId === playerId
       );
       if (hasOwnBuild) return state;
-
-      const newTableItems: TableItem[] = [...s.tableItems, { kind: 'card', card: playedCard }];
+      if (targetSlotIndex < 0) return state;
+      const expanded = ensureSlotCapacity(s.tableSlots, s.tableRows, targetSlotIndex);
+      const newTableSlots = [...expanded.tableSlots];
+      if (newTableSlots[targetSlotIndex] != null) return state;
+      newTableSlots[targetSlotIndex] = { kind: 'card', card: playedCard };
       const updatedPlayer = removeCardFromHand(player, playedCard);
       const newPlayers = s.players.map((p, i) => (i === playerIndex ? updatedPlayer : p));
 
       return finishPlayWithOptionalAnnouncement(
-        { ...s, players: newPlayers, tableItems: newTableItems },
+        { ...s, players: newPlayers, tableSlots: newTableSlots, tableRows: expanded.tableRows },
         { kind: 'trail', playerId: player.id, playedCard }
       );
     }
@@ -393,6 +491,42 @@ export function getByggkasinoWinners(state: unknown): string[] {
   return (state as ByggkasinoState).winners;
 }
 
+function tryLegalGroupTable(
+  s: ByggkasinoState,
+  hand: Card[]
+): { tableCardIndices: number[]; declaredValue: number } | null {
+  const loose: number[] = [];
+  for (let i = 0; i < s.tableSlots.length; i++) {
+    if (s.tableSlots[i]?.kind === 'card') loose.push(i);
+  }
+  const n = loose.length;
+  for (let k = 2; k <= n; k++) {
+    let found: { tableCardIndices: number[]; declaredValue: number } | null = null;
+    const combo: number[] = [];
+    function bt(start: number): boolean {
+      if (combo.length === k) {
+        const sortedIdx = [...combo].sort((a, b) => a - b);
+        const tableCards = sortedIdx.map(i => (s.tableSlots[i] as { kind: 'card'; card: Card }).card);
+        const d = resolveTableGroupDeclaredValue(tableCards, hand);
+        if (d > 0) {
+          found = { tableCardIndices: sortedIdx, declaredValue: d };
+          return true;
+        }
+        return false;
+      }
+      for (let i = start; i < n; i++) {
+        combo.push(loose[i]);
+        if (bt(i + 1)) return true;
+        combo.pop();
+      }
+      return false;
+    }
+    bt(0);
+    if (found) return found;
+  }
+  return null;
+}
+
 export function runByggkasinoBotTurn(state: unknown): unknown {
   const s = state as ByggkasinoState;
   if (s.phase === 'round-end') {
@@ -400,32 +534,43 @@ export function runByggkasinoBotTurn(state: unknown): unknown {
   }
   if (s.phase === 'announcement') return state;
   if (s.phase !== 'playing' || s.gameOver) return state;
+  if (s.pendingCapturePreview) return state;
 
   const player = s.players[s.currentPlayerIndex];
   if (!player.isBot) return state;
 
   for (const card of player.hand) {
-    const captures = findPossibleCaptures(card, s.tableItems);
+    const captures = findPossibleCaptures(card, s.tableSlots);
     if (captures.length > 0) {
       const bestCapture = captures.reduce((best, curr) => (curr.length > best.length ? curr : best), captures[0]);
       const result = processByggkasinoAction(
         s,
-        { type: 'capture', playedCard: card, capturedItemIndices: bestCapture },
+        { type: 'capture-preview', playedCard: card, capturedSlotIndices: bestCapture },
         player.id
       );
       if (result !== state) return result;
     }
   }
 
+  const groupMove = tryLegalGroupTable(s, player.hand);
+  if (groupMove) {
+    const result = processByggkasinoAction(
+      s,
+      { type: 'group-table', tableCardIndices: groupMove.tableCardIndices, declaredValue: groupMove.declaredValue },
+      player.id
+    );
+    if (result !== state) return result;
+  }
+
+  const occupied = occupiedTableEntries(s.tableSlots);
   for (const card of player.hand) {
-    for (let i = 0; i < s.tableItems.length; i++) {
-      const item = s.tableItems[i];
+    for (const { slotIndex: i, item } of occupied) {
       if (item.kind !== 'card') continue;
       const sums = achievableSumsForCards([card, item.card]);
       for (const declaredValue of sums) {
         if (declaredValue < 1) continue;
         if (!playerCanCaptureBuildValue(player.hand, declaredValue, card)) continue;
-        if (!isValidBuild(card, [i], s.tableItems, declaredValue)) continue;
+        if (!isValidBuild(card, [i], s.tableSlots, declaredValue)) continue;
         const result = processByggkasinoAction(
           s,
           { type: 'build', playedCard: card, tableCardIndices: [i], declaredValue },
@@ -436,18 +581,18 @@ export function runByggkasinoBotTurn(state: unknown): unknown {
     }
   }
 
-  const hasOwnBuild = s.tableItems.some(
-    it => it.kind === 'build' && it.build.ownerId === player.id
+  const hasOwnBuild = s.tableSlots.some(
+    it => it?.kind === 'build' && it.build.ownerId === player.id
   );
   if (hasOwnBuild) {
     const lowestCard = [...player.hand].sort((a, b) => minCardValueForSum(a) - minCardValueForSum(b))[0];
     if (lowestCard) {
       for (const card of player.hand) {
-        const captures = findPossibleCaptures(card, s.tableItems);
+        const captures = findPossibleCaptures(card, s.tableSlots);
         if (captures.length > 0) {
           const result = processByggkasinoAction(
             s,
-            { type: 'capture', playedCard: card, capturedItemIndices: captures[0] },
+            { type: 'capture-preview', playedCard: card, capturedSlotIndices: captures[0] },
             player.id
           );
           if (result !== state) return result;
@@ -462,13 +607,27 @@ export function runByggkasinoBotTurn(state: unknown): unknown {
     return a.rank - b.rank;
   })[0];
 
+  const fallbackTrailTarget = (() => {
+    const open = firstEmptySlotIndex(s.tableSlots);
+    if (open >= 0) return open;
+    return s.tableRows * BYGG_TABLE_COLUMNS;
+  })();
+
   if (trailCard) {
-    const result = processByggkasinoAction(s, { type: 'trail', playedCard: trailCard }, player.id);
+    const result = processByggkasinoAction(
+      s,
+      { type: 'trail', playedCard: trailCard, targetSlotIndex: fallbackTrailTarget },
+      player.id
+    );
     if (result !== state) return result;
   }
 
   if (player.hand.length > 0) {
-    return processByggkasinoAction(s, { type: 'trail', playedCard: player.hand[0] }, player.id);
+    return processByggkasinoAction(
+      s,
+      { type: 'trail', playedCard: player.hand[0], targetSlotIndex: fallbackTrailTarget },
+      player.id
+    );
   }
 
   return state;

@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { Card, Suit, ByggkasinoState, TableItem } from './types';
+import { BYGG_TABLE_COLUMNS, type Card, type Suit, type ByggkasinoState, type TableItem } from './types';
 import { cardEquals, rankDisplay, canParticipateInBuildOrSum } from './types';
 import {
   findPossibleCaptures,
   resolveBuildDeclaredValue,
   resolveExtendBuildDeclaredValue,
+  resolveTableGroupDeclaredValue,
 } from './rules';
 import {
   DARK_PLAYER_COLORS,
@@ -51,12 +52,6 @@ interface ElementSize {
 
 const BYGG_SEAT_EDGE_GAP_PX = 8;
 
-const BYGG_TABLE_ITEM_TRANSITION = {
-  layout: { type: 'tween' as const, duration: 0.28, ease: 'easeOut' as const },
-  opacity: { duration: 0.18 },
-  scale: { duration: 0.18 },
-};
-
 function getByggLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
   if (playerCount === 4) return { seatRadiusX: 39, seatRadiusY: 36 };
   if (playerCount === 3) return { seatRadiusX: 36, seatRadiusY: 34 };
@@ -84,16 +79,16 @@ function TableCard({
   selected,
   onClick,
   disabled,
+  previewCard,
 }: {
   card: Card;
   selected: boolean;
   onClick: () => void;
   disabled: boolean;
+  previewCard: Card | null;
 }) {
   return (
     <motion.button
-      layout="position"
-      transition={BYGG_TABLE_ITEM_TRANSITION}
       initial={{ scale: 0.92, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       exit={{ scale: 0.92, opacity: 0 }}
@@ -105,6 +100,13 @@ function TableCard({
       <div className="byggkasino-card">
         <CardFace card={card} />
       </div>
+      {previewCard && (
+        <div className="byggkasino-capturePreviewCard">
+          <div className="byggkasino-card">
+            <CardFace card={previewCard} />
+          </div>
+        </div>
+      )}
     </motion.button>
   );
 }
@@ -114,16 +116,17 @@ function BuildPile({
   selected,
   onClick,
   disabled,
+  previewCard,
 }: {
   build: TableItem & { kind: 'build' };
   selected: boolean;
   onClick: () => void;
   disabled: boolean;
+  previewCard: Card | null;
 }) {
+  const topCards = build.build.cards.slice(-3);
   return (
     <motion.button
-      layout="position"
-      transition={BYGG_TABLE_ITEM_TRANSITION}
       initial={{ scale: 0.92, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       exit={{ scale: 0.92, opacity: 0 }}
@@ -132,9 +135,27 @@ function BuildPile({
       disabled={disabled}
       className={`byggkasino-buildPile ${selected ? 'byggkasino-buildPile--selected' : ''} ${disabled ? 'byggkasino-buildPile--disabled' : ''}`}
     >
-      <span className="byggkasino-buildPileValue">{build.build.value}</span>
-      <span className="byggkasino-buildPileLabel">BUILD</span>
-      <span className="text-[9px] text-amber-300/50">{build.build.cards.length} cards</span>
+      <div className="byggkasino-buildPileStack">
+        {topCards.map((card, i) => (
+          <div
+            key={`${card.suit}-${card.rank}-${i}`}
+            className="byggkasino-buildPileLayer"
+            style={{ transform: `translate(${i * 4}px, ${-i * 3}px)` }}
+          >
+            <div className="byggkasino-card">
+              <CardFace card={card} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <span className="byggkasino-buildPileValueBadge">{build.build.value}</span>
+      {previewCard && (
+        <div className="byggkasino-capturePreviewCard">
+          <div className="byggkasino-card">
+            <CardFace card={previewCard} />
+          </div>
+        </div>
+      )}
     </motion.button>
   );
 }
@@ -177,18 +198,30 @@ export default function ByggkasinoBoard({
     });
   }, [isMyTurn]);
 
-  const handleTableItemClick = useCallback((index: number) => {
-    if (!isMyTurn || !selectedHandCard) return;
-    setSelectedTableIndices(prev => {
-      if (prev.includes(index)) return prev.filter(i => i !== index);
-      return [...prev, index];
-    });
-  }, [isMyTurn, selectedHandCard]);
+  const handleTableItemClick = useCallback(
+    (index: number) => {
+      if (!isMyTurn || s.pendingCapturePreview) return;
+      const item = s.tableSlots[index];
+      if (selectedHandCard) {
+        setSelectedTableIndices(prev => {
+          if (prev.includes(index)) return prev.filter(i => i !== index);
+          return [...prev, index];
+        });
+        return;
+      }
+      if (!item || item.kind !== 'card') return;
+      setSelectedTableIndices(prev => {
+        if (prev.includes(index)) return prev.filter(i => i !== index);
+        return [...prev, index];
+      });
+    },
+    [isMyTurn, selectedHandCard, s.pendingCapturePreview, s.tableSlots]
+  );
 
   const possibleCaptures = useMemo(() => {
     if (!selectedHandCard || !isMyTurn) return [];
-    return findPossibleCaptures(selectedHandCard, s.tableItems);
-  }, [selectedHandCard, isMyTurn, s.tableItems]);
+    return findPossibleCaptures(selectedHandCard, s.tableSlots);
+  }, [selectedHandCard, isMyTurn, s.tableSlots]);
 
   const canCapture = useMemo(() => {
     if (!selectedHandCard || selectedTableIndices.length === 0) return false;
@@ -200,24 +233,41 @@ export default function ByggkasinoBoard({
     });
   }, [selectedHandCard, selectedTableIndices, possibleCaptures]);
 
-  const canAutoCapture = useMemo(() => {
-    if (!selectedHandCard) return false;
-    return possibleCaptures.length === 1;
-  }, [selectedHandCard, possibleCaptures]);
+  const selectedTableCardsForGroup = useMemo((): Card[] | null => {
+    if (selectedTableIndices.length < 2) return null;
+    const cards: Card[] = [];
+    for (const i of selectedTableIndices) {
+      const item = s.tableSlots[i];
+      if (!item || item.kind !== 'card') return null;
+      cards.push(item.card);
+    }
+    return cards;
+  }, [selectedTableIndices, s.tableSlots]);
+
+  const computedGroupValue = useMemo(() => {
+    if (!selectedTableCardsForGroup || !myPlayer) return 0;
+    return resolveTableGroupDeclaredValue(selectedTableCardsForGroup, myPlayer.hand);
+  }, [selectedTableCardsForGroup, myPlayer]);
+
+  const canGroup =
+    isMyTurn &&
+    !selectedHandCard &&
+    selectedTableCardsForGroup !== null &&
+    computedGroupValue > 0;
 
   const selectedTableCardsForBuild = useMemo((): Card[] => {
     if (selectedTableIndices.length === 0) return [];
     return selectedTableIndices
       .map(i => {
-        const item = s.tableItems[i];
+        const item = s.tableSlots[i];
         return item?.kind === 'card' ? item.card : null;
       })
       .filter((c): c is Card => c != null);
-  }, [selectedTableIndices, s.tableItems]);
+  }, [selectedTableIndices, s.tableSlots]);
 
   const canBuild = useMemo(() => {
     if (!selectedHandCard || !canParticipateInBuildOrSum(selectedHandCard)) return false;
-    if (selectedTableIndices.length === 0) return false;
+    if (selectedTableIndices.length !== 1) return false;
     if (selectedTableCardsForBuild.length !== selectedTableIndices.length) return false;
     const d = resolveBuildDeclaredValue(
       selectedHandCard,
@@ -229,19 +279,19 @@ export default function ByggkasinoBoard({
   }, [selectedHandCard, selectedTableIndices, selectedTableCardsForBuild, myPlayer]);
 
   const computedBuildValue = useMemo(() => {
-    if (!selectedHandCard || selectedTableCardsForBuild.length === 0) return 0;
+    if (!selectedHandCard || selectedTableIndices.length !== 1 || selectedTableCardsForBuild.length === 0) return 0;
     return resolveBuildDeclaredValue(
       selectedHandCard,
       selectedTableCardsForBuild,
       myPlayer?.hand ?? [],
       selectedHandCard
     );
-  }, [selectedHandCard, selectedTableCardsForBuild, myPlayer]);
+  }, [selectedHandCard, selectedTableIndices.length, selectedTableCardsForBuild, myPlayer]);
 
   const canExtendBuild = useMemo(() => {
     if (!selectedHandCard || !canParticipateInBuildOrSum(selectedHandCard)) return false;
     if (selectedTableIndices.length !== 1) return false;
-    const item = s.tableItems[selectedTableIndices[0]];
+    const item = s.tableSlots[selectedTableIndices[0]];
     if (!item || item.kind !== 'build') return false;
     const newVal = resolveExtendBuildDeclaredValue(
       selectedHandCard,
@@ -250,29 +300,35 @@ export default function ByggkasinoBoard({
       selectedHandCard
     );
     return newVal > 0;
-  }, [selectedHandCard, selectedTableIndices, s.tableItems, myPlayer]);
+  }, [selectedHandCard, selectedTableIndices, s.tableSlots, myPlayer]);
 
   const canTrail = useMemo(() => {
     if (!selectedHandCard) return false;
-    const hasOwnBuild = s.tableItems.some(
-      it => it.kind === 'build' && it.build.ownerId === myId
+    const hasOwnBuild = s.tableSlots.some(
+      it => it?.kind === 'build' && it.build.ownerId === myId
     );
     return !hasOwnBuild;
-  }, [selectedHandCard, s.tableItems, myId]);
+  }, [selectedHandCard, s.tableSlots, myId]);
 
   const handleCapture = useCallback(() => {
-    if (!selectedHandCard) return;
-    let indices = selectedTableIndices;
-    if (indices.length === 0 && canAutoCapture && possibleCaptures.length === 1) {
-      indices = possibleCaptures[0];
-    }
+    if (!selectedHandCard || selectedTableIndices.length === 0) return;
     onAction({
-      type: 'capture',
+      type: 'capture-preview',
       playedCard: selectedHandCard,
-      capturedItemIndices: indices,
+      capturedSlotIndices: selectedTableIndices,
     });
     resetSelection();
-  }, [selectedHandCard, selectedTableIndices, canAutoCapture, possibleCaptures, onAction, resetSelection]);
+  }, [selectedHandCard, selectedTableIndices, onAction, resetSelection]);
+
+  const handleGroup = useCallback(() => {
+    if (!canGroup || computedGroupValue <= 0) return;
+    onAction({
+      type: 'group-table',
+      tableCardIndices: [...selectedTableIndices].sort((a, b) => a - b),
+      declaredValue: computedGroupValue,
+    });
+    setSelectedTableIndices([]);
+  }, [canGroup, computedGroupValue, selectedTableIndices, onAction]);
 
   const handleBuild = useCallback(() => {
     if (!selectedHandCard) return;
@@ -287,7 +343,7 @@ export default function ByggkasinoBoard({
 
   const handleExtendBuild = useCallback(() => {
     if (!selectedHandCard || selectedTableIndices.length !== 1) return;
-    const item = s.tableItems[selectedTableIndices[0]];
+    const item = s.tableSlots[selectedTableIndices[0]];
     if (!item || item.kind !== 'build') return;
     const newVal = resolveExtendBuildDeclaredValue(
       selectedHandCard,
@@ -303,17 +359,22 @@ export default function ByggkasinoBoard({
       declaredValue: newVal,
     });
     resetSelection();
-  }, [selectedHandCard, selectedTableIndices, s.tableItems, myPlayer, onAction, resetSelection]);
+  }, [selectedHandCard, selectedTableIndices, s.tableSlots, myPlayer, onAction, resetSelection]);
 
-  const handleTrail = useCallback(() => {
+  const handleTrailToSlot = useCallback((slotIndex: number) => {
     if (!selectedHandCard) return;
-    onAction({ type: 'trail', playedCard: selectedHandCard });
+    onAction({ type: 'trail', playedCard: selectedHandCard, targetSlotIndex: slotIndex });
     resetSelection();
   }, [selectedHandCard, onAction, resetSelection]);
 
   const handleStartNextRound = useCallback(() => {
     onAction({ type: 'start-next-round' });
   }, [onAction]);
+
+  useEffect(() => {
+    if (!s.pendingCapturePreview) return;
+    resetSelection();
+  }, [s.pendingCapturePreview, resetSelection]);
 
   useEffect(() => {
     const element = tableRef.current;
@@ -399,6 +460,16 @@ export default function ByggkasinoBoard({
   }, [handWidth, myPlayer?.hand.length]);
 
   const currentPlayer = s.players[s.currentPlayerIndex];
+  const hasEmptyTableSlot = s.tableSlots.some(slot => slot == null);
+  const canTrailToPlaceholder =
+    isMyTurn &&
+    !!selectedHandCard &&
+    canTrail &&
+    selectedTableIndices.length === 0 &&
+    !s.pendingCapturePreview;
+  const shouldShowVirtualTrailRow = canTrailToPlaceholder && !hasEmptyTableSlot;
+  const renderedTableRows = s.tableRows + (shouldShowVirtualTrailRow ? 1 : 0);
+  const renderedTableSlotCount = renderedTableRows * BYGG_TABLE_COLUMNS;
 
   const headsUpContent = useMemo((): ReactNode => {
     if (s.phase === 'announcement' && s.actionAnnouncement) {
@@ -460,7 +531,7 @@ export default function ByggkasinoBoard({
       if (selectedHandCard) {
         return `Your turn · ${cardDisplayText(selectedHandCard)} selected`;
       }
-      return 'Your turn · Select a card';
+      return 'Your turn · Select loose cards to group (2+) or a hand card';
     }
     return (
       <>
@@ -594,47 +665,54 @@ export default function ByggkasinoBoard({
         ))}
 
         <div className={`byggkasino-center ${isHandZoomed ? 'byggkasino-center--zoom' : ''}`}>
-          <div className="byggkasino-tableLabel">Table</div>
           <div className="byggkasino-tableItems">
-            <AnimatePresence mode="popLayout">
-              {s.tableItems.length === 0 && (
-                <motion.div
-                  key="empty"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="byggkasino-tableEmpty"
-                >
-                  Table is empty
-                </motion.div>
-              )}
-              {s.tableItems.map((item, i) => {
-                const isSelected = selectedTableIndices.includes(i);
-                if (item.kind === 'card') {
+            <AnimatePresence mode="sync">
+              {Array.from({ length: renderedTableSlotCount }, (_, slotIndex) => {
+                const slotKey = `table-slot-${slotIndex}`;
+                const item = s.tableSlots[slotIndex] ?? null;
+                const isSelected = selectedTableIndices.includes(slotIndex);
+                const isPreviewTarget =
+                  !!s.pendingCapturePreview && s.pendingCapturePreview.capturedSlotIndices.includes(slotIndex);
+                const previewCard = isPreviewTarget ? (s.pendingCapturePreview?.playedCard ?? null) : null;
+                if (item?.kind === 'card') {
                   return (
                     <TableCard
-                      key={`table-card-${item.card.suit}-${item.card.rank}`}
+                      key={slotKey}
                       card={item.card}
                       selected={isSelected}
-                      onClick={() => handleTableItemClick(i)}
-                      disabled={!isMyTurn || !selectedHandCard}
+                      onClick={() => handleTableItemClick(slotIndex)}
+                      disabled={!isMyTurn || !!s.pendingCapturePreview}
+                      previewCard={previewCard}
                     />
                   );
                 }
+                if (item?.kind === 'build') {
+                  return (
+                    <BuildPile
+                      key={slotKey}
+                      build={item}
+                      selected={isSelected}
+                      onClick={() => handleTableItemClick(slotIndex)}
+                      disabled={!isMyTurn || !selectedHandCard || !!s.pendingCapturePreview}
+                      previewCard={previewCard}
+                    />
+                  );
+                }
+                const canTrailHere = canTrailToPlaceholder;
                 return (
-                  <BuildPile
-                    key={`table-build-${item.build.ownerId}`}
-                    build={item}
-                    selected={isSelected}
-                    onClick={() => handleTableItemClick(i)}
-                    disabled={!isMyTurn || !selectedHandCard}
+                  <motion.button
+                    key={slotKey}
+                    type="button"
+                    onClick={() => {
+                      if (!canTrailHere) return;
+                      handleTrailToSlot(slotIndex);
+                    }}
+                    disabled={!canTrailHere}
+                    className={`byggkasino-tableSlot ${canTrailHere ? 'byggkasino-tableSlot--trailTarget' : ''}`}
                   />
                 );
               })}
             </AnimatePresence>
-          </div>
-          <div className="byggkasino-tableMeta">
-            Deck: {s.deck.length} &middot; Captured: {myPlayer?.capturedCards.length ?? 0} &middot; R{s.roundNumber} / {s.targetScore}
           </div>
         </div>
       </div>
@@ -702,7 +780,7 @@ export default function ByggkasinoBoard({
             {isMyTurn ? (
               selectedHandCard ? (
                 <>
-                  {(canCapture || canAutoCapture) && (
+                  {canCapture && (
                     <button
                       type="button"
                       onClick={handleCapture}
@@ -725,17 +803,36 @@ export default function ByggkasinoBoard({
                       Extend Build
                     </button>
                   )}
-                  {canTrail && selectedTableIndices.length === 0 && (
-                    <button type="button" onClick={handleTrail} className="byggkasino-actionButton byggkasino-actionButton--trail">
-                      Trail
-                    </button>
+                  {s.pendingCapturePreview && (
+                    <span className="byggkasino-actionHint">Resolving capture...</span>
                   )}
-                  {!canCapture && !canAutoCapture && !canBuild && !canExtendBuild && !(canTrail && selectedTableIndices.length === 0) && (
-                    <span className="byggkasino-actionHint">Select table cards to capture or build.</span>
+                  {!s.pendingCapturePreview && !canCapture && !canBuild && !canExtendBuild && (
+                    <span className="byggkasino-actionHint">
+                      {canTrail && selectedTableIndices.length === 0
+                        ? 'Click an empty table slot to trail.'
+                        : 'Select table cards to capture or build.'}
+                    </span>
                   )}
                 </>
               ) : (
-                <span className="byggkasino-actionHint">Select a card from your hand.</span>
+                <>
+                  {canGroup && (
+                    <button
+                      type="button"
+                      onClick={handleGroup}
+                      className="byggkasino-actionButton byggkasino-actionButton--build"
+                    >
+                      Group ({computedGroupValue})
+                    </button>
+                  )}
+                  {!canGroup && (
+                    <span className="byggkasino-actionHint">
+                      {selectedTableIndices.length >= 2
+                        ? 'You need a hand card that could capture this group.'
+                        : 'Select a hand card, or 2+ loose table cards to group.'}
+                    </span>
+                  )}
+                </>
               )
             ) : (
               <span className="byggkasino-actionHint">Waiting for your turn.</span>

@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type { Card, TableItem } from './types';
+import type { Card, TableSlot } from './types';
 import {
   achievableSumsForCards,
   findPossibleCaptures,
   isValidBuild,
   isValidCapture,
+  isValidTableGroup,
   playerCanCaptureBuildValue,
   resolveBuildDeclaredValue,
+  resolveTableGroupDeclaredValue,
 } from './rules';
 import { processByggkasinoAction } from './logic';
 import type { ByggkasinoState } from './types';
@@ -35,7 +37,7 @@ describe('cardValuesForSum via rules helpers', () => {
 
 describe('isValidBuild', () => {
   it('accepts ace + 4 as 5 or 18', () => {
-    const table: TableItem[] = [{ kind: 'card', card: C4 }];
+    const table: TableSlot[] = [{ kind: 'card', card: C4 }];
     expect(isValidBuild(AH, [0], table, 5)).toBe(true);
     expect(isValidBuild(AH, [0], table, 18)).toBe(true);
     expect(isValidBuild(AH, [0], table, 6)).toBe(false);
@@ -43,20 +45,26 @@ describe('isValidBuild', () => {
 
   it('allows J in a build sum', () => {
     const five: Card = { suit: 'diamonds', rank: 5 };
-    const table: TableItem[] = [{ kind: 'card', card: five }];
+    const table: TableSlot[] = [{ kind: 'card', card: five }];
     expect(isValidBuild(JH, [0], table, 16)).toBe(true);
+  });
+
+  it('rejects hand card plus two table cards in one build', () => {
+    const table: TableSlot[] = [{ kind: 'card', card: C3 }, { kind: 'card', card: C3 }];
+    const seven: Card = { suit: 'diamonds', rank: 7 };
+    expect(isValidBuild(seven, [0, 1], table, 7)).toBe(false);
   });
 });
 
 describe('isValidCapture', () => {
   it('J captures loose J by value', () => {
-    const table: TableItem[] = [{ kind: 'card', card: { suit: 'clubs', rank: 11 } }];
+    const table: TableSlot[] = [{ kind: 'card', card: { suit: 'clubs', rank: 11 } }];
     expect(isValidCapture(JH, table, [0])).toBe(true);
   });
 
   it('ace captures build declared 14', () => {
     const H10: Card = { suit: 'hearts', rank: 10 };
-    const table: TableItem[] = [
+    const table: TableSlot[] = [
       {
         kind: 'build',
         build: { cards: [H10, C4], value: 14, ownerId: 'x' },
@@ -65,10 +73,28 @@ describe('isValidCapture', () => {
     expect(isValidCapture(AH, table, [0])).toBe(true);
   });
 
-  it('captures multi-card sum with ace low', () => {
-    const table: TableItem[] = [{ kind: 'card', card: C3 }, { kind: 'card', card: C3 }];
+  it('rejects multi-card loose sum without a grouped build', () => {
+    const table: TableSlot[] = [{ kind: 'card', card: C3 }, { kind: 'card', card: C3 }];
     const seven: Card = { suit: 'diamonds', rank: 7 };
-    expect(isValidCapture(seven, table, [0, 1])).toBe(true);
+    expect(isValidCapture(seven, table, [0, 1])).toBe(false);
+  });
+
+  it('captures a grouped build whose value matches the hand card', () => {
+    const table: TableSlot[] = [
+      {
+        kind: 'build',
+        build: { cards: [C3, C3], value: 6, ownerId: 'p0' },
+      },
+    ];
+    const six: Card = { suit: 'diamonds', rank: 6 };
+    expect(isValidCapture(six, table, [0])).toBe(true);
+  });
+
+  it('allows two loose cards when each individually matches', () => {
+    const sevenH: Card = { suit: 'hearts', rank: 7 };
+    const table: TableSlot[] = [{ kind: 'card', card: sevenH }, { kind: 'card', card: sevenH }];
+    const sevenD: Card = { suit: 'diamonds', rank: 7 };
+    expect(isValidCapture(sevenD, table, [0, 1])).toBe(true);
   });
 });
 
@@ -85,6 +111,20 @@ describe('resolveBuildDeclaredValue', () => {
     const hand: Card[] = [AH, { suit: 'spades', rank: 5 }];
     const d = resolveBuildDeclaredValue(AH, [C4], hand, AH);
     expect(d).toBe(5);
+  });
+});
+
+describe('isValidTableGroup and resolveTableGroupDeclaredValue', () => {
+  it('isValidTableGroup requires two cards and a matching sum', () => {
+    expect(isValidTableGroup([C3, C3], 6)).toBe(true);
+    expect(isValidTableGroup([C3], 3)).toBe(false);
+    expect(isValidTableGroup([C3, C3], 7)).toBe(false);
+  });
+
+  it('resolveTableGroupDeclaredValue requires a capturable value in hand', () => {
+    const six: Card = { suit: 'diamonds', rank: 6 };
+    expect(resolveTableGroupDeclaredValue([C3, C3], [six])).toBe(6);
+    expect(resolveTableGroupDeclaredValue([C3, C3], [{ suit: 'clubs', rank: 8 }])).toBe(0);
   });
 });
 
@@ -112,7 +152,8 @@ describe('processByggkasinoAction build with ace low sum', () => {
         },
       ],
       deck: [],
-      tableItems: [{ kind: 'card', card: C4 }],
+      tableRows: 1,
+      tableSlots: [{ kind: 'card', card: C4 }],
       currentPlayerIndex: 0,
       dealerIndex: 0,
       phase: 'playing',
@@ -124,6 +165,7 @@ describe('processByggkasinoAction build with ace low sum', () => {
       gameOver: false,
       winners: [],
       actionAnnouncement: null,
+      pendingCapturePreview: null,
     };
 
     const next = processByggkasinoAction(
@@ -132,13 +174,13 @@ describe('processByggkasinoAction build with ace low sum', () => {
       'p0'
     ) as ByggkasinoState;
     expect(next).not.toBe(s);
-    expect(next.tableItems.some(it => it.kind === 'build' && it.build.value === 5)).toBe(true);
+    expect(next.tableSlots.some(it => it?.kind === 'build' && it.build.value === 5)).toBe(true);
   });
 });
 
 describe('findPossibleCaptures', () => {
   it('returns build capture for J on build 11', () => {
-    const table: TableItem[] = [
+    const table: TableSlot[] = [
       { kind: 'build', build: { cards: [C5, C6], value: 11, ownerId: 'x' } },
     ];
     const groups = findPossibleCaptures({ suit: 'diamonds', rank: 11 }, table);

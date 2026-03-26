@@ -1046,6 +1046,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const CROSS_CRIB_CRIB_REVEAL_STEP_MS = 750; // ms between each crib card flip
   const SETTLER_BOT_DELAY = 900; // ms between bot actions in Settler
   const BYGGKASINO_BOT_DELAY = 900; // ms between Byggkasino bot plays
+  const BYGGKASINO_CAPTURE_PREVIEW_DELAY = 1000; // ms for capture preview overlay before capture resolves
   const BYGGKASINO_ACTION_ANNOUNCEMENT_DELAY = 3000; // ms to show last play in heads-up before next turn
   const BYGGKASINO_ROUND_END_DELAY = 4500; // ms to show round summary before next deal
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1501,6 +1502,26 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     // ── Byggkasino bot scheduling ──
     if (room.gameType === 'byggkasino') {
       const bs = gameState as ByggkasinoState;
+
+      if (bs.pendingCapturePreview) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as ByggkasinoState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || !currentGs.pendingCapturePreview) return;
+
+          const next = processGameAction(
+            'byggkasino',
+            currentGs,
+            { type: 'finalize-capture' },
+            ''
+          );
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+          }
+        }, BYGGKASINO_CAPTURE_PREVIEW_DELAY);
+        return;
+      }
 
       if (bs.phase === 'announcement') {
         botTimerRef.current = setTimeout(() => {

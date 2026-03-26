@@ -1,4 +1,4 @@
-import type { Card, TableItem, Build, ByggkasinoPlayer, RoundScoreBreakdown } from './types';
+import type { Card, TableSlot, Build, ByggkasinoPlayer, RoundScoreBreakdown } from './types';
 import {
   cardValuesForSum,
   canParticipateInBuildOrSum,
@@ -11,18 +11,20 @@ import {
  * Check whether a played card can legally capture the selected table items.
  *
  * A card captures by:
- * - Matching rank or value on single loose cards
+ * - Matching rank or value on single loose cards (multiple loose only if each matches alone)
  * - Matching the declared value of a build (any value in the card's sum set)
- * - Matching the sum of a group of loose cards (each card picks one legal value)
+ * Multi-card loose sums require a prior table Group (build), not direct capture.
  */
 export function isValidCapture(
   playedCard: Card,
-  tableItems: TableItem[],
+  tableSlots: TableSlot[],
   selectedIndices: number[]
 ): boolean {
   if (selectedIndices.length === 0) return false;
 
-  const selected = selectedIndices.map(i => tableItems[i]).filter(Boolean);
+  const selected = selectedIndices
+    .map(i => tableSlots[i])
+    .filter((item): item is Exclude<TableSlot, null> => item != null);
   if (selected.length !== selectedIndices.length) return false;
 
   const looseCards = selected.filter((it): it is { kind: 'card'; card: Card } => it.kind === 'card');
@@ -59,6 +61,8 @@ function validateLooseCardGroups(targetValue: number, cards: Card[]): boolean {
   if (cards.length === 0) return true;
 
   const nonSingles = cards.filter(c => !cardIsSingleMatchForTarget(c, targetValue));
+
+  if (cards.length >= 2 && nonSingles.length > 0) return false;
 
   if (nonSingles.length === 0) return true;
 
@@ -119,16 +123,17 @@ export function achievableSumsForCards(cards: Card[]): number[] {
 export function isValidBuild(
   handCard: Card,
   selectedTableCardIndices: number[],
-  allTableItems: TableItem[],
+  allTableSlots: TableSlot[],
   declaredValue: number
 ): boolean {
   if (!canParticipateInBuildOrSum(handCard)) return false;
   if (declaredValue < 1) return false;
   if (selectedTableCardIndices.length === 0) return false;
+  if (selectedTableCardIndices.length >= 2) return false;
 
   const tableCards: Card[] = [];
   for (const idx of selectedTableCardIndices) {
-    const item = allTableItems[idx];
+    const item = allTableSlots[idx];
     if (!item || item.kind !== 'card') return false;
     if (!canParticipateInBuildOrSum(item.card)) return false;
     tableCards.push(item.card);
@@ -196,6 +201,28 @@ export function resolveExtendBuildDeclaredValue(
   const sorted = [...new Set(candidates)].sort((a, b) => a - b);
   for (const d of sorted) {
     if (!playerCanCaptureBuildValue(hand, d, excludeHandCard)) continue;
+    return d;
+  }
+  return 0;
+}
+
+/** True if 2+ table cards can be grouped to this declared sum (for Group action). */
+export function isValidTableGroup(tableCards: Card[], declaredValue: number): boolean {
+  if (tableCards.length < 2) return false;
+  if (declaredValue < 1) return false;
+  if (!tableCards.every(c => canParticipateInBuildOrSum(c))) return false;
+  return canAssignSumToCards(tableCards, declaredValue);
+}
+
+/**
+ * Smallest declared sum for a table-only group that is legal and capturable with the given hand; 0 if none.
+ */
+export function resolveTableGroupDeclaredValue(tableCards: Card[], hand: Card[]): number {
+  const sums = achievableSumsForCards(tableCards);
+  for (const d of sums) {
+    if (d < 1) continue;
+    if (!isValidTableGroup(tableCards, d)) continue;
+    if (!playerCanCaptureBuildValue(hand, d)) continue;
     return d;
   }
   return 0;
@@ -274,37 +301,30 @@ export function scoreRound(players: ByggkasinoPlayer[]): Record<string, RoundSco
  * Find all possible captures for a given card from the table.
  * Returns arrays of index sets — each set is one valid capture combination.
  */
-export function findPossibleCaptures(playedCard: Card, tableItems: TableItem[]): number[][] {
+export function findPossibleCaptures(playedCard: Card, tableSlots: TableSlot[]): number[][] {
   const results: number[][] = [];
   const playedOptions = [...new Set(cardValuesForSum(playedCard))];
 
   for (const playedVal of playedOptions) {
     if (!playedCardMatchesBuildValue(playedCard, playedVal)) continue;
 
-    const buildIndices = tableItems
+    const buildIndices = tableSlots
       .map((item, i) => ({ item, i }))
-      .filter(({ item }) => item.kind === 'build' && item.build.value === playedVal)
+      .filter(({ item }) => item?.kind === 'build' && item.build.value === playedVal)
       .map(m => m.i);
 
-    const looseIndices = tableItems
+    const looseIndices = tableSlots
       .map((item, i) => ({ item, i }))
-      .filter(({ item }) => item.kind === 'card')
+      .filter(({ item }) => item?.kind === 'card')
       .map(m => m.i);
 
     const exactMatchLoose = looseIndices.filter(i => {
-      const item = tableItems[i];
+      const item = tableSlots[i];
+      if (!item) return false;
       return item.kind === 'card' && cardIsSingleMatchForTarget(item.card, playedVal);
     });
 
-    const sumCandidates = looseIndices.filter(i => {
-      const item = tableItems[i];
-      if (item.kind !== 'card') return false;
-      return !cardIsSingleMatchForTarget(item.card, playedVal) && canParticipateInBuildOrSum(item.card);
-    });
-
-    const sumGroups = findSumGroups(sumCandidates, tableItems, playedVal);
-
-    const captureGroups = [...exactMatchLoose.map(i => [i]), ...sumGroups];
+    const captureGroups = exactMatchLoose.map(i => [i]);
 
     if (captureGroups.length === 0 && buildIndices.length === 0) continue;
 
@@ -328,31 +348,4 @@ export function findPossibleCaptures(playedCard: Card, tableItems: TableItem[]):
     seen.add(key);
     return true;
   });
-}
-
-function findSumGroups(indices: number[], tableItems: TableItem[], target: number): number[][] {
-  const results: number[][] = [];
-
-  function backtrack(start: number, current: number[], sumSoFar: number) {
-    if (current.length >= 2 && sumSoFar === target) {
-      results.push([...current]);
-    }
-    if (sumSoFar >= target) return;
-
-    for (let i = start; i < indices.length; i++) {
-      const idx = indices[i];
-      const item = tableItems[idx];
-      if (item.kind !== 'card') continue;
-      for (const v of cardValuesForSum(item.card)) {
-        const newSum = sumSoFar + v;
-        if (newSum > target) continue;
-        current.push(idx);
-        backtrack(i + 1, current, newSum);
-        current.pop();
-      }
-    }
-  }
-
-  backtrack(0, [], 0);
-  return results;
 }

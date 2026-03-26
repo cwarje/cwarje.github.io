@@ -18,6 +18,15 @@ export type TableItem =
   | { kind: 'card'; card: Card }
   | { kind: 'build'; build: Build };
 
+export type TableSlot = TableItem | null;
+export const BYGG_TABLE_COLUMNS = 4;
+
+export interface PendingCapturePreview {
+  playerId: string;
+  playedCard: Card;
+  capturedSlotIndices: number[];
+}
+
 export interface ByggkasinoPlayer {
   id: string;
   name: string;
@@ -65,7 +74,8 @@ export interface RoundScoreBreakdown {
 export interface ByggkasinoState {
   players: ByggkasinoPlayer[];
   deck: Card[];
-  tableItems: TableItem[];
+  tableSlots: TableSlot[];
+  tableRows: number;
   currentPlayerIndex: number;
   dealerIndex: number;
   phase: ByggkasinoPhase;
@@ -79,13 +89,16 @@ export interface ByggkasinoState {
   gameOver: boolean;
   winners: string[];
   actionAnnouncement: ByggkasinoActionAnnouncement | null;
+  pendingCapturePreview: PendingCapturePreview | null;
 }
 
 export type ByggkasinoAction =
-  | { type: 'capture'; playedCard: Card; capturedItemIndices: number[] }
+  | { type: 'capture-preview'; playedCard: Card; capturedSlotIndices: number[] }
+  | { type: 'finalize-capture' }
+  | { type: 'group-table'; tableCardIndices: number[]; declaredValue: number }
   | { type: 'build'; playedCard: Card; tableCardIndices: number[]; declaredValue: number }
   | { type: 'extend-build'; playedCard: Card; buildIndex: number; declaredValue: number }
-  | { type: 'trail'; playedCard: Card }
+  | { type: 'trail'; playedCard: Card; targetSlotIndex: number }
   | { type: 'start-next-round' }
   | { type: 'finish-action-announcement' };
 
@@ -131,4 +144,8 @@ export function rankDisplay(rank: Rank): string {
   if (rank === 12) return 'Q';
   if (rank === 13) return 'K';
   return String(rank);
+}
+
+export function countOccupiedTableSlots(tableSlots: TableSlot[]): number {
+  return tableSlots.filter(Boolean).length;
 }
