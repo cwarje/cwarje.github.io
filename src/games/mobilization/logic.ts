@@ -9,6 +9,7 @@ import {
   isValidMobilizationTrickPlay,
   isValidSolitairePlay,
   removalSortKey,
+  trickRoundHasNoScoringCardsRemaining,
 } from './rules';
 
 const SUITS: Suit[] = ['clubs', 'diamonds', 'spades', 'hearts'];
@@ -97,7 +98,7 @@ function dealTrickRound(
 
   const leaderIndex = (dealerIndex + 1) % playerCount;
 
-  return {
+  const base: MobilizationState = {
     players: dealt,
     phase: 'playing',
     roundIndex,
@@ -113,6 +114,16 @@ function dealTrickRound(
     pigHolderId: null,
     solitaireColumns: emptySolitaireColumns(),
   };
+
+  if (trickRoundHasNoScoringCardsRemaining(base)) {
+    return {
+      ...base,
+      phase: 'round-depleted',
+      trickRoundDepletedKind: roundIndex === 1 ? 'clubs' : 'queens',
+    };
+  }
+
+  return base;
 }
 
 function dealSolitaireRound(
@@ -203,6 +214,7 @@ function endTrickRound(state: MobilizationState): MobilizationState {
       gameOver: true,
       trickWinner: null,
       currentTrick: [],
+      trickRoundDepletedKind: undefined,
     };
   }
 
@@ -213,6 +225,7 @@ function endTrickRound(state: MobilizationState): MobilizationState {
     gameOver: false,
     trickWinner: null,
     currentTrick: [],
+    trickRoundDepletedKind: undefined,
   };
 }
 
@@ -255,9 +268,27 @@ function startNextRoundFrom(state: MobilizationState): MobilizationState {
   return dealTrickRound(basePlayers, nextRound, nextDealer);
 }
 
+function devJumpToRound(state: MobilizationState, target: number): MobilizationState {
+  if (!Number.isInteger(target) || target < 0 || target > 5) return state;
+  const playerCount = state.players.length;
+  if (playerCount === 0) return state;
+
+  const basePlayers = state.players.map(p => ({
+    ...resetRoundStats(p),
+    totalScore: 0,
+  }));
+  const dealerIndex = target % playerCount;
+  if (target === 4) return dealSolitaireRound(basePlayers, target, dealerIndex);
+  return dealTrickRound(basePlayers, target, dealerIndex);
+}
+
 export function processMobilizationAction(state: unknown, action: unknown, playerId: string): unknown {
   const s = state as MobilizationState;
   const a = action as MobilizationAction;
+
+  if (import.meta.env.DEV && a.type === 'dev-jump-round') {
+    return devJumpToRound(s, a.roundIndex);
+  }
 
   if (s.gameOver) return state;
 
@@ -328,7 +359,7 @@ export function processMobilizationAction(state: unknown, action: unknown, playe
         });
       }
 
-      return {
+      const continuing: MobilizationState = {
         ...s,
         players: updatedPlayers,
         currentTrick: [],
@@ -337,6 +368,21 @@ export function processMobilizationAction(state: unknown, action: unknown, playe
         leaderIndex: winnerIndex,
         currentPlayerIndex: winnerIndex,
       };
+
+      if (trickRoundHasNoScoringCardsRemaining(continuing)) {
+        return {
+          ...continuing,
+          phase: 'round-depleted',
+          trickRoundDepletedKind: r === 1 ? 'clubs' : 'queens',
+        };
+      }
+
+      return continuing;
+    }
+
+    case 'complete-trick-round-depletion': {
+      if (s.phase !== 'round-depleted') return state;
+      return endTrickRound(s);
     }
 
     case 'solitaire-pass': {
@@ -443,7 +489,7 @@ function chooseSolitaireMove(state: MobilizationState, playerIndex: number): Mob
 
 export function runMobilizationBotTurn(state: unknown): unknown {
   const s = state as MobilizationState;
-  if (s.gameOver || s.phase === 'round-end') return state;
+  if (s.gameOver || s.phase === 'round-end' || s.phase === 'round-depleted') return state;
 
   const current = s.players[s.currentPlayerIndex];
   if (!current?.isBot) return state;

@@ -18,6 +18,24 @@ export function isValidMobilizationTrickPlay(state: MobilizationState, playerInd
   return true;
 }
 
+/** True when no club (round 1) or queen (round 2) remains in any hand or the current trick. */
+export function trickRoundHasNoScoringCardsRemaining(state: MobilizationState): boolean {
+  const r = state.roundIndex;
+  if (r === 1) {
+    const anyClub =
+      state.players.some(p => p.hand.some(c => c.suit === 'clubs'))
+      || state.currentTrick.some(t => t.card.suit === 'clubs');
+    return !anyClub;
+  }
+  if (r === 2) {
+    const anyQueen =
+      state.players.some(p => p.hand.some(c => c.rank === 12))
+      || state.currentTrick.some(t => t.card.rank === 12);
+    return !anyQueen;
+  }
+  return false;
+}
+
 export function getMobilizationTrickWinnerId(trick: { playerId: string; card: Card }[]): string | null {
   return getTrickWinnerPlayerId(trick, null);
 }

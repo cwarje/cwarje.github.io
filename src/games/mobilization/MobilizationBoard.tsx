@@ -31,6 +31,7 @@ interface MobilizationBoardProps {
   myId: string;
   onAction: (action: unknown) => void;
   isHandZoomed?: boolean;
+  isHost?: boolean;
 }
 
 interface SeatLayout {
@@ -112,7 +113,13 @@ function canPlaceSolitaireAt(
   return false;
 }
 
-export default function MobilizationBoard({ state, myId, onAction, isHandZoomed = false }: MobilizationBoardProps) {
+function legalRowToGridRow(row: 'top' | 'mid' | 'bottom'): 0 | 1 | 2 {
+  if (row === 'top') return 0;
+  if (row === 'mid') return 1;
+  return 2;
+}
+
+export default function MobilizationBoard({ state, myId, onAction, isHandZoomed = false, isHost = false }: MobilizationBoardProps) {
   const myIndex = state.players.findIndex(player => player.id === myId);
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const myPlayer = myIndex >= 0 ? state.players[myIndex] : null;
@@ -124,10 +131,18 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
   const [seatPillElement, setSeatPillElement] = useState<HTMLDivElement | null>(null);
   const [seatPillSize, setSeatPillSize] = useState<ElementSize>({ width: 0, height: 0 });
   const [selectedSolitaireCard, setSelectedSolitaireCard] = useState<Card | null>(null);
+  const [solitaireHandHoverCard, setSolitaireHandHoverCard] = useState<Card | null>(null);
 
   useEffect(() => {
-    if (state.phase !== 'solitaire') setSelectedSolitaireCard(null);
+    if (state.phase !== 'solitaire') {
+      setSelectedSolitaireCard(null);
+      setSolitaireHandHoverCard(null);
+    }
   }, [state.phase, state.roundIndex]);
+
+  useEffect(() => {
+    if (state.phase === 'solitaire' && !isMyTurn) setSolitaireHandHoverCard(null);
+  }, [state.phase, isMyTurn]);
 
   const seatLayouts = useMemo<SeatLayout[]>(() => {
     const playerCount = state.players.length;
@@ -202,7 +217,23 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
     return getLegalSolitairePlays(state.solitaireColumns, myPlayer.hand);
   }, [state.phase, state.solitaireColumns, myPlayer]);
 
+  const solitaireHandHoverCellKeys = useMemo(() => {
+    if (!solitaireHandHoverCard) return new Set<string>();
+    const keys = new Set<string>();
+    for (const lp of myLegalSolitaire) {
+      if (cardEquals(lp.card, solitaireHandHoverCard)) {
+        keys.add(`${lp.columnIndex}-${legalRowToGridRow(lp.row)}`);
+      }
+    }
+    return keys;
+  }, [myLegalSolitaire, solitaireHandHoverCard]);
+
   const headsUpContent = useMemo((): ReactNode => {
+    if (state.phase === 'round-depleted') {
+      const noun = state.trickRoundDepletedKind === 'clubs' ? 'clubs' : 'queens';
+      return `Round over, no more ${noun} to take`;
+    }
+
     if (state.phase === 'round-end') {
       return (
         <>
@@ -254,7 +285,7 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
       );
     }
     return null;
-  }, [state.phase, state.players, state.trickWinner, state.currentPlayerIndex, isMyTurn, myId, myLegalSolitaire.length]);
+  }, [state.phase, state.players, state.trickWinner, state.currentPlayerIndex, state.trickRoundDepletedKind, isMyTurn, myId, myLegalSolitaire.length]);
 
   useEffect(() => {
     const element = tableRef.current;
@@ -398,14 +429,38 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
     onAction({ type: 'solitaire-pass' });
   };
 
+  const devJumpToolbar =
+    import.meta.env.DEV && isHost ? (
+      <div
+        className="pointer-events-auto fixed top-24 right-3 z-[35] flex max-w-[11rem] flex-col gap-1 rounded-lg border border-amber-500/40 bg-black/70 px-2 py-1.5 text-left shadow-lg backdrop-blur-sm"
+        role="region"
+        aria-label="Development: jump to round"
+      >
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-200/90">Dev rounds</span>
+        <div className="flex flex-wrap gap-1">
+          {([0, 1, 2, 3, 4, 5] as const).map(r => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => onAction({ type: 'dev-jump-round', roundIndex: r })}
+              className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-[11px] font-medium text-white hover:bg-white/15"
+            >
+              R{r}
+            </button>
+          ))}
+        </div>
+      </div>
+    ) : null;
+
   if (state.gameOver) {
     const rankedPlayers = [...state.players].sort((a, b) => b.totalScore - a.totalScore);
     return (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="river-board h-full flex flex-col items-center justify-center space-y-6 text-center"
+        className="river-board relative h-full flex flex-col items-center justify-center space-y-6 text-center"
       >
+        {devJumpToolbar}
         <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
         <h2 className="text-3xl font-extrabold text-white">Game Over</h2>
         <div className="space-y-3 w-full max-w-2xl">
@@ -424,7 +479,7 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
   }
 
   const renderSolitaireCenter = () => (
-    <div className={`mobilization-solitaireWrap ${isHandZoomed ? 'mobilization-solitaireWrap--zoom' : ''}`}>
+    <div className="mobilization-solitaireWrap">
       <div className="mobilization-solitaireGrid">
         {[0, 1, 2].flatMap((rowIdx) =>
           [0, 1, 2, 3].map((colIdx) => {
@@ -439,13 +494,15 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
               && isMyTurn
               && canPlaceSolitaireAt(state, selectedSolitaireCard, colIdx, rowIdx);
 
+            const isHandHoverTarget = solitaireHandHoverCellKeys.has(`${colIdx}-${rowIdx}`);
+
             return (
               <button
                 key={`${colIdx}-${rowIdx}`}
                 type="button"
                 disabled={!canDrop}
                 onClick={() => solitaireCellClick(colIdx, rowIdx)}
-                className={`mobilization-solitaireCell ${card ? 'mobilization-solitaireCell--filled' : 'mobilization-solitaireCell--empty'} ${canDrop ? 'mobilization-solitaireCell--dropTarget' : ''}`}
+                className={`mobilization-solitaireCell ${card ? 'mobilization-solitaireCell--filled' : 'mobilization-solitaireCell--empty'} ${canDrop ? 'mobilization-solitaireCell--dropTarget' : ''} ${isHandHoverTarget ? 'mobilization-solitaireCell--handHover' : ''}`}
               >
                 {card ? (
                   <div className="mobilization-solitaireCardInner">{renderCardFace(card, false, true)}</div>
@@ -463,7 +520,8 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
   );
 
   return (
-    <div className={`river-board river-board--players-${state.players.length} space-y-3 sm:space-y-4`}>
+    <div className={`river-board river-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
+      {devJumpToolbar}
       <div ref={tableRef} className={`river-table river-table--players-${state.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
@@ -539,7 +597,7 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
 
       <div className="river-headsUp" aria-live="polite">
         <p
-          className={`river-headsUpText ${state.phase === 'round-end' ? 'river-headsUpText--roundEnd' : ''}`}
+          className={`river-headsUpText ${state.phase === 'round-end' || state.phase === 'round-depleted' ? 'river-headsUpText--roundEnd' : ''}`}
         >
           {headsUpContent ?? '\u00a0'}
         </p>
@@ -565,8 +623,14 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
                 const isSol = state.phase === 'solitaire' && isMyTurn;
                 const legalSol = isSol && myLegalSolitaire.some(lp => cardEquals(lp.card, card));
                 const selected = selectedSolitaireCard && cardEquals(selectedSolitaireCard, card);
-                const canPlay = state.phase === 'playing' ? isTrick : state.phase === 'solitaire' ? legalSol : false;
-                const isDisabled = state.phase === 'playing' ? !isTrick : state.phase === 'solitaire' ? !legalSol : true;
+                const canPlay =
+                  state.phase === 'playing' ? isTrick : state.phase === 'solitaire' ? legalSol : false;
+                const isDisabled =
+                  state.phase === 'playing'
+                    ? !isTrick
+                    : state.phase === 'solitaire'
+                      ? !legalSol
+                      : true;
                 const isLast = i === myPlayer.hand.length - 1;
                 const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
 
@@ -581,6 +645,16 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
                       if (state.phase === 'playing') playTrickCard(card);
                       else if (state.phase === 'solitaire') solitaireSelectOrPlay(card);
                     }}
+                    onMouseEnter={
+                      state.phase === 'solitaire' && isMyTurn && legalSol
+                        ? () => setSolitaireHandHoverCard(card)
+                        : undefined
+                    }
+                    onMouseLeave={
+                      state.phase === 'solitaire' && isMyTurn && legalSol
+                        ? () => setSolitaireHandHoverCard(null)
+                        : undefined
+                    }
                     disabled={isDisabled}
                     className="river-handHitbox"
                     style={{
@@ -598,14 +672,18 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
                         height: `${handLayout.cardHeight}px`,
                       }}
                     >
-                      {renderCardFace(card, (state.phase === 'playing' || state.phase === 'solitaire') && isDisabled)}
+                      {renderCardFace(
+                        card,
+                        (state.phase === 'playing' || state.phase === 'solitaire' || state.phase === 'round-depleted')
+                          && isDisabled,
+                      )}
                     </span>
                   </motion.button>
                 );
               })}
             </div>
           </div>
-          <div className="river-actionRow">
+          <div className="river-actionRow river-actionRow--mobilization">
             {state.phase === 'solitaire' && isMyTurn ? (
               myLegalSolitaire.length === 0 ? (
                 <div className="mobilization-solitaireActions">

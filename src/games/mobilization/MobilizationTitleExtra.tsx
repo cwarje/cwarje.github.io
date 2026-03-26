@@ -2,12 +2,12 @@ import type { GameHudProps } from '../registry';
 import type { Card, MobilizationState } from './types';
 
 const ROUND_TITLES = [
-  'No Tricks',
-  'Clubs',
-  'Queens',
-  'King Of Clubs and Last Trick',
+  '-2pts for each trick',
+  '-2pts for each club',
+  '-5pts for each Queen',
+  '-5pts for King of Clubs, -5pts for last trick',
   'Solitaire',
-  'Positive Tricks',
+  '+2pts for each trick',
 ] as const;
 
 function rankDisplay(rank: number): string {
@@ -33,15 +33,15 @@ export default function MobilizationTitleExtra({ state }: GameHudProps) {
   const s = state as MobilizationState;
   if (s.gameOver) return null;
   const title = ROUND_TITLES[s.roundIndex] ?? 'Mobilization';
-  const removedLine =
-    s.removedCards.length === 0
-      ? 'Removed: none'
-      : `Removed: ${s.removedCards.map(formatCardShort).join(', ')}`;
 
   return (
-    <div className="mobilization-titleExtra mt-1 space-y-0.5 text-sm font-semibold text-cyan-100/95">
+    <div className="mobilization-titleExtra mt-1 space-y-0.5 text-sm font-semibold text-white">
       <p className="leading-tight">{title}</p>
-      <p className="text-xs font-medium text-cyan-200/80 leading-tight">{removedLine}</p>
+      {s.removedCards.length > 0 ? (
+        <p className="text-xs font-medium leading-tight">
+          {`Removed: ${s.removedCards.map(formatCardShort).join(', ')}`}
+        </p>
+      ) : null}
     </div>
   );
 }

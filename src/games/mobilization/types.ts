@@ -34,11 +34,15 @@ export interface SolitaireColumn {
   bottomNext: Rank | null;
 }
 
-export type MobilizationPhase = 'playing' | 'round-end' | 'solitaire';
+export type MobilizationPhase = 'playing' | 'round-depleted' | 'round-end' | 'solitaire';
+
+export type MobilizationTrickRoundDepletedKind = 'clubs' | 'queens';
 
 export interface MobilizationState {
   players: MobilizationPlayer[];
   phase: MobilizationPhase;
+  /** Set when phase is round-depleted (HUD copy) */
+  trickRoundDepletedKind?: MobilizationTrickRoundDepletedKind;
   /** 0..5 = six rounds */
   roundIndex: number;
   dealerIndex: number;
@@ -57,6 +61,16 @@ export interface MobilizationState {
 export type MobilizationAction =
   | { type: 'play-card'; card: Card }
   | { type: 'resolve-trick' }
+  | { type: 'complete-trick-round-depletion' }
   | { type: 'start-next-round' }
   | { type: 'solitaire-play'; card: Card; columnIndex: number }
-  | { type: 'solitaire-pass' };
+  | { type: 'solitaire-pass' }
+  | { type: 'dev-jump-round'; roundIndex: number };
+
+export function isMobilizationDevJumpAction(payload: unknown): payload is { type: 'dev-jump-round'; roundIndex: number } {
+  if (!payload || typeof payload !== 'object') return false;
+  const p = payload as Record<string, unknown>;
+  if (p.type !== 'dev-jump-round') return false;
+  const r = p.roundIndex;
+  return typeof r === 'number' && Number.isInteger(r) && r >= 0 && r <= 5;
+}

@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Dice5, Heart, Ship, Crosshair, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Flag } from 'lucide-react';
+import { Dice5, Heart, Ship, Crosshair, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon } from 'lucide-react';
 import type { GameType, Player, GameStartOptions } from '../networking/types';
 
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
@@ -49,6 +49,7 @@ import CrossCribTitleExtra from './cross-crib/CrossCribTitleExtra';
 import UpRiverToolbarExtra from './up-and-down-the-river/UpRiverToolbarExtra';
 import TwelveToolbarExtra from './twelve/TwelveToolbarExtra';
 import MobilizationTitleExtra from './mobilization/MobilizationTitleExtra';
+import { PigIcon } from '../components/icons/PigIcon';
 
 // ---------------------------------------------------------------------------
 // Shared types
@@ -470,10 +471,12 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
       rules: [
         '4–6 players with a 52-card deck; when the count does not divide evenly, low-priority cards are removed each round (shown in the HUD).',
         'Ace is high in trick-taking. There is no trump; follow the lead suit when you can.',
-        'Round 1 (No Tricks): −2 per trick you take. Round 2 (Clubs): −2 per club card in tricks you win. Round 3 (Queens): −5 per queen in tricks you win.',
-        'Round 4 (King Of Clubs and Last Trick): −5 if you capture the king of clubs in a trick you win, and −5 if you take the last trick (both can apply).',
+        'Round 1: −2pts for each trick you take.',
+        'Round 2: −2pts for each club card in tricks you win.',
+        'Round 3: −5pts for each Queen in tricks you win.',
+        'Round 4: −5pts if you capture the King of Clubs in a trick you win, and −5pts if you take the last trick (both can apply).',
         'Round 5 (Solitaire): shared 4×3 grid — middle row only accepts 7s; then build down to ace above and up to king below in that suit. Pass if you cannot play and you take the pig. First to empty their hand gains +5; pig holder −5; everyone −2 per card left in hand.',
-        'Round 6 (Positive Tricks): +2 per trick you take. Highest total score wins.',
+        'Round 6: +2pts for each trick you take. Highest total score wins.',
       ],
       howToPlay: [
         'Play proceeds like Up and Down the River for seating and trick layout.',
@@ -482,16 +485,16 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
         'After each round, scores update; the game ends after round six with final rankings.',
       ],
     },
-    icon: Flag,
+    icon: PigIcon,
     theme: {
-      gradient: 'from-slate-600/25 to-cyan-800/25',
-      cardBorder: 'border-cyan-500/20',
-      hoverBorder: 'hover:border-cyan-500/35',
-      playersTag: 'bg-cyan-500/20 text-cyan-100 border border-cyan-500/30',
-      iconColor: 'text-cyan-300',
-      buttonColors: 'bg-cyan-700 hover:bg-cyan-600',
-      panelBg: 'bg-slate-950',
-      labelColor: 'text-cyan-100',
+      gradient: 'from-pink-500/20 to-pink-600/20',
+      cardBorder: 'border-pink-500/20',
+      hoverBorder: 'hover:border-pink-500/30',
+      playersTag: 'bg-pink-500/25 text-pink-200 border border-pink-500/30',
+      iconColor: 'text-pink-400',
+      buttonColors: 'bg-pink-600 hover:bg-pink-500',
+      panelBg: 'bg-pink-950',
+      labelColor: 'text-pink-200',
     },
     createState: createMobilizationState,
     processAction: processMobilizationAction,

@@ -14,7 +14,7 @@ import type { BattleshipState } from '../games/battleship/types';
 import type { YahtzeeState } from '../games/yahtzee/types';
 import type { FarkleState } from '../games/farkle/types';
 import type { UpRiverState } from '../games/up-and-down-the-river/types';
-import type { MobilizationState } from '../games/mobilization/types';
+import { isMobilizationDevJumpAction, type MobilizationState } from '../games/mobilization/types';
 import type { TwelveState } from '../games/twelve/types';
 import type { SettlerState } from '../games/settler/types';
 import {
@@ -342,35 +342,51 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           break;
         }
         case 'action': {
-          if (currentRoom.phase === 'playing' && currentRoom.gameType) {
-            const mappedDeviceId = peerDeviceMapRef.current.get(conn.peer);
-            const claimedDeviceId = typeof msg.deviceId === 'string' ? msg.deviceId : null;
-            const senderDeviceId = mappedDeviceId ?? claimedDeviceId;
-            if (!senderDeviceId) return;
-            if (mappedDeviceId && claimedDeviceId && mappedDeviceId !== claimedDeviceId) return;
-            if (!mappedDeviceId) {
-              const isKnownPlayer = currentRoom.players.some(player => player.id === senderDeviceId);
-              if (!isKnownPlayer) return;
-              peerDeviceMapRef.current.set(conn.peer, senderDeviceId);
+          if (!currentRoom.gameType) break;
+          const allowDevMobilizationJump =
+            import.meta.env.DEV &&
+            currentRoom.gameType === 'mobilization' &&
+            isMobilizationDevJumpAction(msg.payload);
+          if (
+            currentRoom.phase !== 'playing' &&
+            !(allowDevMobilizationJump && currentRoom.phase === 'finished')
+          ) {
+            break;
+          }
+          const mappedDeviceId = peerDeviceMapRef.current.get(conn.peer);
+          const claimedDeviceId = typeof msg.deviceId === 'string' ? msg.deviceId : null;
+          const senderDeviceId = mappedDeviceId ?? claimedDeviceId;
+          if (!senderDeviceId) return;
+          if (mappedDeviceId && claimedDeviceId && mappedDeviceId !== claimedDeviceId) return;
+          if (!mappedDeviceId) {
+            const isKnownPlayer = currentRoom.players.some(player => player.id === senderDeviceId);
+            if (!isKnownPlayer) return;
+            peerDeviceMapRef.current.set(conn.peer, senderDeviceId);
+          }
+          if (
+            currentRoom.gameType === 'poker'
+            && isPokerHostControlAction(msg.payload)
+            && senderDeviceId !== currentRoom.hostId
+          ) {
+            return;
+          }
+          const currentGs = gameStateRef.current;
+          const wasFinished = currentRoom.phase === 'finished';
+          const newGs = processGameAction(currentRoom.gameType, currentGs, msg.payload, senderDeviceId);
+          if (newGs !== currentGs) {
+            setGameState(newGs);
+            broadcastGameState(newGs);
+            let roomForPhase = roomRef.current ?? currentRoom;
+            if (wasFinished && allowDevMobilizationJump) {
+              roomForPhase = { ...roomForPhase, phase: 'playing' as const };
+              setRoom(roomForPhase);
+              broadcastRoomState(roomForPhase);
             }
-            if (
-              currentRoom.gameType === 'poker'
-              && isPokerHostControlAction(msg.payload)
-              && senderDeviceId !== currentRoom.hostId
-            ) {
-              return;
-            }
-            const currentGs = gameStateRef.current;
-            const newGs = processGameAction(currentRoom.gameType, currentGs, msg.payload, senderDeviceId);
-            if (newGs !== currentGs) {
-              setGameState(newGs);
-              broadcastGameState(newGs);
-              // Check for game over (poker stays in 'playing' phase for continuous play)
-              if (checkGameOver(currentRoom.gameType, newGs) && currentRoom.gameType !== 'poker') {
-                const finishedRoom = { ...roomRef.current!, phase: 'finished' as const };
-                setRoom(finishedRoom);
-                broadcastRoomState(finishedRoom);
-              }
+            // Check for game over (poker stays in 'playing' phase for continuous play)
+            if (checkGameOver(currentRoom.gameType, newGs) && currentRoom.gameType !== 'poker') {
+              const finishedRoom = { ...roomForPhase, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
             }
           }
           break;
@@ -900,7 +916,17 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     if (isHost) {
       // Host processes directly
       const currentRoom = roomRef.current;
-      if (!currentRoom || currentRoom.phase !== 'playing' || !currentRoom.gameType) return;
+      if (!currentRoom || !currentRoom.gameType) return;
+      const allowDevMobilizationJump =
+        import.meta.env.DEV &&
+        currentRoom.gameType === 'mobilization' &&
+        isMobilizationDevJumpAction(payload);
+      if (
+        currentRoom.phase !== 'playing' &&
+        !(allowDevMobilizationJump && currentRoom.phase === 'finished')
+      ) {
+        return;
+      }
       if (
         currentRoom.gameType === 'poker'
         && isPokerHostControlAction(payload)
@@ -909,13 +935,20 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       const currentGs = gameStateRef.current;
+      const wasFinished = currentRoom.phase === 'finished';
       const newGs = processGameAction(currentRoom.gameType, currentGs, payload, myId);
       if (newGs !== currentGs) {
         setGameState(newGs);
         broadcastGameState(newGs);
+        let roomForPhase = currentRoom;
+        if (wasFinished && allowDevMobilizationJump) {
+          roomForPhase = { ...currentRoom, phase: 'playing' as const };
+          setRoom(roomForPhase);
+          broadcastRoomState(roomForPhase);
+        }
         // Poker stays in 'playing' phase for continuous play
         if (checkGameOver(currentRoom.gameType, newGs) && currentRoom.gameType !== 'poker') {
-          const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+          const finishedRoom = { ...roomForPhase, phase: 'finished' as const };
           setRoom(finishedRoom);
           broadcastRoomState(finishedRoom);
         }
@@ -1163,6 +1196,26 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             setGameState(resolved);
             broadcastGameState(resolved);
             if (checkGameOver('mobilization', resolved)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, TRICK_DISPLAY_DELAY);
+        return;
+      }
+
+      if (ms.phase === 'round-depleted') {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as MobilizationState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'round-depleted') return;
+
+          const completed = processGameAction('mobilization', currentGs, { type: 'complete-trick-round-depletion' }, '');
+          if (completed !== currentGs) {
+            setGameState(completed);
+            broadcastGameState(completed);
+            if (checkGameOver('mobilization', completed)) {
               const finishedRoom = { ...currentRoom, phase: 'finished' as const };
               setRoom(finishedRoom);
               broadcastRoomState(finishedRoom);
