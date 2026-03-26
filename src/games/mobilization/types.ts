@@ -23,7 +23,7 @@ export interface MobilizationPlayer {
   totalScore: number;
 }
 
-/** One column in the Solitaire round: middle = 7 anchor, top builds 6→A, bottom 8→K */
+/** One column in the Solitaire round: `top*` = 6→A chain, `bottom*` = 8→K (UI draws 8→K above the 7, 6→A below). */
 export interface SolitaireColumn {
   seven: Card | null;
   topCard: Card | null;
@@ -34,7 +34,25 @@ export interface SolitaireColumn {
   bottomNext: Rank | null;
 }
 
-export type MobilizationPhase = 'playing' | 'round-depleted' | 'round-end' | 'solitaire';
+export type MobilizationPhase =
+  | 'playing'
+  | 'round-depleted'
+  | 'round-end'
+  | 'solitaire'
+  | 'solitaire-reveal';
+
+/** Shown for 3s after each Solitaire play or pig pass (phase `solitaire-reveal`). */
+export type SolitaireReveal =
+  | {
+      kind: 'play';
+      actorId: string;
+      card: Card;
+      columnIndex: number;
+      /** Grid row: 0 = top, 1 = seven row, 2 = bottom */
+      rowIndex: 0 | 1 | 2;
+      roundWinnerId?: string;
+    }
+  | { kind: 'pass'; actorId: string };
 
 export type MobilizationTrickRoundDepletedKind = 'clubs' | 'queens';
 
@@ -56,6 +74,8 @@ export interface MobilizationState {
   gameOver: boolean;
   pigHolderId: string | null;
   solitaireColumns: SolitaireColumn[];
+  /** Set only while `phase === 'solitaire-reveal'` */
+  solitaireReveal?: SolitaireReveal | null;
 }
 
 export type MobilizationAction =
@@ -65,6 +85,7 @@ export type MobilizationAction =
   | { type: 'start-next-round' }
   | { type: 'solitaire-play'; card: Card; columnIndex: number }
   | { type: 'solitaire-pass' }
+  | { type: 'solitaire-finish-reveal' }
   | { type: 'dev-jump-round'; roundIndex: number };
 
 export function isMobilizationDevJumpAction(payload: unknown): payload is { type: 'dev-jump-round'; roundIndex: number } {

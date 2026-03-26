@@ -1024,6 +1024,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const UP_RIVER_BOT_DELAY = 900; // ms between bot bid/card play
   const UP_RIVER_ROUND_END_DELAY = 5000; // ms to show bid result borders before next round
   const MOBILIZATION_BOT_DELAY = 900; // ms between Mobilization bot actions
+  const MOBILIZATION_SOLITAIRE_REVEAL_DELAY = 3000; // ms to show last Solitaire play / pig pass
   const TWELVE_BOT_DELAY = 900; // ms between bot actions
   const TWELVE_ANNOUNCEMENT_DELAY = 4000; // ms to show trump/tjog announcement
   const TWELVE_ROUND_END_DELAY = 6500; // ms to show round summary before next round
@@ -1184,6 +1185,26 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     if (room.gameType === 'mobilization') {
       const ms = gameState as MobilizationState;
       if (ms.gameOver) return;
+
+      if (ms.phase === 'solitaire-reveal') {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as MobilizationState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'solitaire-reveal') return;
+
+          const next = processGameAction('mobilization', currentGs, { type: 'solitaire-finish-reveal' }, '');
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('mobilization', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, MOBILIZATION_SOLITAIRE_REVEAL_DELAY);
+        return;
+      }
 
       if (ms.phase === 'playing' && ms.trickWinner) {
         botTimerRef.current = setTimeout(() => {

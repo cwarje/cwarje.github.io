@@ -108,15 +108,15 @@ function canPlaceSolitaireAt(
   const col = state.solitaireColumns[columnIndex];
   if (!col) return false;
   if (rowIndex === 1) return canPlaySevenOnColumn(col, card);
-  if (rowIndex === 0) return canPlayOnSolitaireTop(col, card);
-  if (rowIndex === 2) return canPlayOnSolitaireBottom(col, card);
+  if (rowIndex === 0) return canPlayOnSolitaireBottom(col, card);
+  if (rowIndex === 2) return canPlayOnSolitaireTop(col, card);
   return false;
 }
 
 function legalRowToGridRow(row: 'top' | 'mid' | 'bottom'): 0 | 1 | 2 {
-  if (row === 'top') return 0;
+  if (row === 'top') return 2;
   if (row === 'mid') return 1;
-  return 2;
+  return 0;
 }
 
 export default function MobilizationBoard({ state, myId, onAction, isHandZoomed = false, isHost = false }: MobilizationBoardProps) {
@@ -250,9 +250,45 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
       );
     }
 
+    if (state.phase === 'solitaire-reveal' && state.solitaireReveal) {
+      const rev = state.solitaireReveal;
+      if (rev.kind === 'pass') {
+        if (rev.actorId === myId) return 'You took the pig';
+        const actor = state.players.find(p => p.id === rev.actorId);
+        return (
+          <>
+            {actor ? (
+              <span style={{ color: getPlayerHudTextColor(actor.color) }}>{actor.name}</span>
+            ) : (
+              'Player'
+            )}
+            {' took the pig'}
+          </>
+        );
+      }
+      const actor = state.players.find(p => p.id === rev.actorId);
+      const c = rev.card;
+      return (
+        <>
+          {rev.actorId === myId ? (
+            'You'
+          ) : actor ? (
+            <span style={{ color: getPlayerHudTextColor(actor.color) }}>{actor.name}</span>
+          ) : (
+            'Player'
+          )}
+          {' played '}
+          <span className={SUIT_COLORS[c.suit]}>
+            {rankDisplay(c.rank)}
+            {SUIT_SYMBOLS[c.suit]}
+          </span>
+        </>
+      );
+    }
+
     if (state.phase === 'solitaire') {
       if (isMyTurn && myLegalSolitaire.length === 0) return 'You must pass (no legal play)';
-      if (isMyTurn) return 'Your turn — play a card on the grid or pass';
+      if (isMyTurn) return 'Your turn';
       const w = state.players[state.currentPlayerIndex];
       if (!w) return null;
       return (
@@ -285,7 +321,17 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
       );
     }
     return null;
-  }, [state.phase, state.players, state.trickWinner, state.currentPlayerIndex, state.trickRoundDepletedKind, isMyTurn, myId, myLegalSolitaire.length]);
+  }, [
+    state.phase,
+    state.players,
+    state.trickWinner,
+    state.currentPlayerIndex,
+    state.trickRoundDepletedKind,
+    state.solitaireReveal,
+    isMyTurn,
+    myId,
+    myLegalSolitaire.length,
+  ]);
 
   useEffect(() => {
     const element = tableRef.current;
@@ -345,7 +391,8 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
       state.players[state.currentPlayerIndex]?.id === player.id
       && (state.phase === 'solitaire' || (state.phase === 'playing' && !state.trickWinner));
     const isMe = player.id === myId;
-    const hasPig = state.phase === 'solitaire' && state.pigHolderId === player.id;
+    const hasPig =
+      (state.phase === 'solitaire' || state.phase === 'solitaire-reveal') && state.pigHolderId === player.id;
     const seatPillStateClass =
       state.phase === 'round-end'
         ? player.roundScore >= 0
@@ -359,30 +406,30 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
 
-    const isSolitaire = state.phase === 'solitaire';
-    const midLabel = isSolitaire ? 'Pig' : 'Rnd';
-    const midValue = isSolitaire
-      ? hasPig ? '\u{1F437}' : '—'
-      : state.phase === 'round-end'
-        ? String(player.roundScore)
-        : '—';
+    const isSolitaire = state.phase === 'solitaire' || state.phase === 'solitaire-reveal';
 
     return (
       <div
         ref={shouldMeasure ? setSeatPillElement : undefined}
-        className={`river-seatPill ${seatPillStateClass} ${isMe ? 'river-seatPill--me' : ''}`}
+        className={`river-seatPill river-seatPill--mobilization2col ${seatPillStateClass} ${isMe ? 'river-seatPill--me' : ''}`}
       >
-        <div className="river-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
-          <span className="river-seatName">{isMe ? 'You' : player.name}</span>
+        <div
+          className="river-seatPillTop river-seatPillTop--mobilization"
+          style={{ backgroundColor: seatColor, color: seatTextColor }}
+        >
+          <span className="river-seatName river-seatName--mobilization">{isMe ? 'You' : player.name}</span>
+          {hasPig ? (
+            <span className="mobilization-seatPig" aria-label="Has the pig">
+              {'\u{1F437}'}
+            </span>
+          ) : null}
         </div>
         <div className="river-seatPillLabels">
           <span className="river-seatCell river-seatCell--bid">{isSolitaire ? 'Hand' : 'Trx'}</span>
-          <span className="river-seatCell river-seatCell--tricks">{midLabel}</span>
           <span className="river-seatCell river-seatCell--total">Tot</span>
         </div>
         <div className="river-seatPillValues">
           <span className="river-seatCell river-seatCell--bid">{isSolitaire ? player.hand.length : player.tricksThisRound}</span>
-          <span className="river-seatCell river-seatCell--tricks">{midValue}</span>
           <span className="river-seatCell river-seatCell--total">{player.totalScore}</span>
         </div>
       </div>
@@ -478,23 +525,30 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
     );
   }
 
-  const renderSolitaireCenter = () => (
+  const renderSolitaireCenter = () => {
+    const playReveal =
+      state.phase === 'solitaire-reveal' && state.solitaireReveal?.kind === 'play' ? state.solitaireReveal : null;
+
+    return (
     <div className="mobilization-solitaireWrap">
       <div className="mobilization-solitaireGrid">
         {[0, 1, 2].flatMap((rowIdx) =>
           [0, 1, 2, 3].map((colIdx) => {
             const col = state.solitaireColumns[colIdx];
             let card: Card | null = null;
-            if (rowIdx === 0) card = col?.topCard ?? null;
+            if (rowIdx === 0) card = col?.bottomCard ?? null;
             else if (rowIdx === 1) card = col?.seven ?? null;
-            else card = col?.bottomCard ?? null;
+            else card = col?.topCard ?? null;
 
             const canDrop =
-              !!selectedSolitaireCard
+              state.phase === 'solitaire'
+              && !!selectedSolitaireCard
               && isMyTurn
               && canPlaceSolitaireAt(state, selectedSolitaireCard, colIdx, rowIdx);
 
             const isHandHoverTarget = solitaireHandHoverCellKeys.has(`${colIdx}-${rowIdx}`);
+            const isRevealHighlight =
+              !!playReveal && playReveal.columnIndex === colIdx && playReveal.rowIndex === rowIdx;
 
             return (
               <button
@@ -502,7 +556,7 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
                 type="button"
                 disabled={!canDrop}
                 onClick={() => solitaireCellClick(colIdx, rowIdx)}
-                className={`mobilization-solitaireCell ${card ? 'mobilization-solitaireCell--filled' : 'mobilization-solitaireCell--empty'} ${canDrop ? 'mobilization-solitaireCell--dropTarget' : ''} ${isHandHoverTarget ? 'mobilization-solitaireCell--handHover' : ''}`}
+                className={`mobilization-solitaireCell ${card ? 'mobilization-solitaireCell--filled' : 'mobilization-solitaireCell--empty'} ${canDrop ? 'mobilization-solitaireCell--dropTarget' : ''} ${isHandHoverTarget ? 'mobilization-solitaireCell--handHover' : ''} ${isRevealHighlight ? 'mobilization-solitaireCell--revealHighlight' : ''}`}
               >
                 {card ? (
                   <div className="mobilization-solitaireCardInner">{renderCardFace(card, false, true)}</div>
@@ -517,7 +571,8 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
         )}
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className={`river-board river-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
@@ -537,7 +592,7 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
         ))}
 
         <div className={`river-center ${isHandZoomed ? 'river-center--zoom' : ''}`}>
-          {state.phase === 'solitaire' ? (
+          {state.phase === 'solitaire' || state.phase === 'solitaire-reveal' ? (
             renderSolitaireCenter()
           ) : (
             <div className="river-centerGrid">

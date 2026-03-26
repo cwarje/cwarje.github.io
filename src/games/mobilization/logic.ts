@@ -35,12 +35,17 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function sortHand(hand: Card[]): Card[] {
+function handSortRank(rank: Rank, acesLow: boolean): number {
+  return acesLow && rank === 14 ? 1 : rank;
+}
+
+function sortHand(hand: Card[], options?: { acesLow?: boolean }): Card[] {
+  const acesLow = options?.acesLow ?? false;
   return [...hand].sort((a, b) => {
     if (MOBILIZATION_SUIT_ORDER[a.suit] !== MOBILIZATION_SUIT_ORDER[b.suit]) {
       return MOBILIZATION_SUIT_ORDER[a.suit] - MOBILIZATION_SUIT_ORDER[b.suit];
     }
-    return a.rank - b.rank;
+    return handSortRank(a.rank, acesLow) - handSortRank(b.rank, acesLow);
   });
 }
 
@@ -141,7 +146,7 @@ function dealSolitaireRound(
     const hand = deck.slice(i * perPlayer, (i + 1) * perPlayer);
     return {
       ...resetRoundStats(p),
-      hand: sortHand(hand),
+      hand: sortHand(hand, { acesLow: true }),
     };
   });
 
@@ -253,6 +258,7 @@ function endSolitaireRound(state: MobilizationState, winnerId: string): Mobiliza
     pigHolderId: null,
     trickWinner: null,
     currentTrick: [],
+    solitaireReveal: undefined,
   };
 }
 
@@ -290,14 +296,16 @@ function applySolitairePlay(
   hand: Card[],
   card: Card,
   columnIndex: number,
-): { columns: SolitaireColumn[]; hand: Card[] } | null {
+): { columns: SolitaireColumn[]; hand: Card[]; gridRow: 0 | 1 | 2 } | null {
   if (!hand.some(c => cardEquals(c, card))) return null;
   if (!isValidSolitairePlay(columns, card, columnIndex)) return null;
 
   const col = columns[columnIndex];
   let newCol: SolitaireColumn;
+  let gridRow: 0 | 1 | 2;
 
   if (col.seven === null && card.rank === 7) {
+    gridRow = 1;
     newCol = {
       seven: card,
       topCard: null,
@@ -307,9 +315,11 @@ function applySolitairePlay(
     };
   }
   else if (col.topNext !== null && col.seven && card.rank === col.topNext && card.suit === col.seven.suit) {
+    gridRow = 2;
     newCol = applySolitaireTopPlay(col, card);
   }
   else if (col.bottomNext !== null && col.seven && card.rank === col.bottomNext && card.suit === col.seven.suit) {
+    gridRow = 0;
     newCol = applySolitaireBottomPlay(col, card);
   }
   else {
@@ -319,7 +329,7 @@ function applySolitairePlay(
   const newColumns = [...columns];
   newColumns[columnIndex] = newCol;
   const newHand = hand.filter(c => !cardEquals(c, card));
-  return { columns: newColumns, hand: newHand };
+  return { columns: newColumns, hand: newHand, gridRow };
 }
 
 export function processMobilizationAction(state: unknown, action: unknown, playerId: string): unknown {
@@ -434,8 +444,10 @@ export function processMobilizationAction(state: unknown, action: unknown, playe
 
       return {
         ...s,
+        phase: 'solitaire-reveal',
         pigHolderId: playerId,
         currentPlayerIndex: (s.currentPlayerIndex + 1) % s.players.length,
+        solitaireReveal: { kind: 'pass', actorId: playerId },
       };
     }
 
@@ -452,23 +464,40 @@ export function processMobilizationAction(state: unknown, action: unknown, playe
       const newColumns = applied.columns;
 
       const winnerIdx = newPlayers.findIndex(p => p.hand.length === 0);
-      if (winnerIdx !== -1) {
-        return endSolitaireRound(
-          {
-            ...s,
-            players: newPlayers,
-            solitaireColumns: newColumns,
-          },
-          newPlayers[winnerIdx].id,
-        );
-      }
+      const roundWinnerId = winnerIdx !== -1 ? newPlayers[winnerIdx]!.id : undefined;
 
       return {
         ...s,
+        phase: 'solitaire-reveal',
         players: newPlayers,
         solitaireColumns: newColumns,
         currentPlayerIndex: (s.currentPlayerIndex + 1) % s.players.length,
+        solitaireReveal: {
+          kind: 'play',
+          actorId: playerId,
+          card: a.card,
+          columnIndex: a.columnIndex,
+          rowIndex: applied.gridRow,
+          ...(roundWinnerId ? { roundWinnerId } : {}),
+        },
       };
+    }
+
+    case 'solitaire-finish-reveal': {
+      if (s.phase !== 'solitaire-reveal' || !s.solitaireReveal) return state;
+
+      const reveal = s.solitaireReveal;
+      const base: MobilizationState = {
+        ...s,
+        phase: 'solitaire',
+        solitaireReveal: undefined,
+      };
+
+      if (reveal.kind === 'play' && reveal.roundWinnerId) {
+        return endSolitaireRound(base, reveal.roundWinnerId);
+      }
+
+      return base;
     }
 
     default:
@@ -529,6 +558,104 @@ function trickPenaltyIfWeWin(
   }
 }
 
+/** Player indices still to act after the current player this trick (trick order from leader). */
+function playerIndicesAfterCurrentInTrick(state: MobilizationState): number[] {
+  const n = state.players.length;
+  const leader = state.leaderIndex;
+  const played = state.currentTrick.length;
+  const out: number[] = [];
+  for (let k = played + 1; k < n; k++) {
+    out.push((leader + k) % n);
+  }
+  return out;
+}
+
+function maxRankInSuitAmongPlayers(
+  state: MobilizationState,
+  suit: Card['suit'],
+  playerIndices: number[],
+): number {
+  let max = -1;
+  for (const pi of playerIndices) {
+    const h = state.players[pi]?.hand;
+    if (!h) continue;
+    for (const c of h) {
+      if (c.suit === suit && c.rank > max) max = c.rank;
+    }
+  }
+  return max;
+}
+
+function highestLedSuitRankInPartialTrick(
+  trick: { playerId: string; card: Card }[],
+  leadSuit: Card['suit'],
+  withCard: Card,
+): number {
+  let high = -1;
+  for (const t of trick) {
+    if (t.card.suit === leadSuit && t.card.rank > high) high = t.card.rank;
+  }
+  if (withCard.suit === leadSuit && withCard.rank > high) high = withCard.rank;
+  return high;
+}
+
+/** True if this play cannot win the trick given full hands (void discard, or someone later can beat led-suit high). */
+function isSafeSlough(state: MobilizationState, playerIndex: number, card: Card): boolean {
+  const trick = state.currentTrick;
+  const after = playerIndicesAfterCurrentInTrick(state);
+  const playerId = state.players[playerIndex]!.id;
+
+  if (trick.length === 0) {
+    const futureMax = maxRankInSuitAmongPlayers(state, card.suit, after);
+    return futureMax > card.rank;
+  }
+
+  const leadSuit = trick[0]!.card.suit;
+  const hand = state.players[playerIndex]?.hand ?? [];
+  const hasLeadSuit = hand.some(c => c.suit === leadSuit);
+  if (!hasLeadSuit) return true;
+
+  const high = highestLedSuitRankInPartialTrick(trick, leadSuit, card);
+  const futureMax = maxRankInSuitAmongPlayers(state, leadSuit, after);
+  if (futureMax > high) return true;
+
+  const partialWinner = getMobilizationTrickWinnerId([...trick, { playerId, card }]);
+  return partialWinner !== playerId;
+}
+
+/** Negative if a is a better card to slough than b (dump-desirability order for this round). */
+function compareSloughDesirable(roundIndex: number, a: Card, b: Card): number {
+  switch (roundIndex) {
+    case 0:
+      return compareCardLowFirst(a, b);
+    case 1: {
+      const ac = a.suit === 'clubs' ? 1 : 0;
+      const bc = b.suit === 'clubs' ? 1 : 0;
+      if (ac !== bc) return ac - bc;
+      return compareCardHighFirst(a, b);
+    }
+    case 2: {
+      const aq = a.rank === 12 ? 1 : 0;
+      const bq = b.rank === 12 ? 1 : 0;
+      if (aq !== bq) return aq - bq;
+      return compareCardLowFirst(a, b);
+    }
+    case 3: {
+      const tier = (c: Card) => {
+        if (c.suit === 'clubs' && c.rank === 13) return 2;
+        if (c.suit === 'clubs') return 1;
+        return 0;
+      };
+      const ta = tier(a);
+      const tb = tier(b);
+      if (ta !== tb) return tb - ta;
+      return compareCardLowFirst(a, b);
+    }
+    default:
+      return compareCardLowFirst(a, b);
+  }
+}
+
 function chooseTrickCard(state: MobilizationState, playerIndex: number): Card | null {
   const hand = state.players[playerIndex].hand;
   const valid = hand.filter(c => isValidMobilizationTrickPlay(state, playerIndex, c));
@@ -538,12 +665,45 @@ function chooseTrickCard(state: MobilizationState, playerIndex: number): Card | 
   const completesTrick = state.currentTrick.length + 1 === state.players.length;
 
   if (!completesTrick) {
-    const pickLow = state.roundIndex !== 5;
+    const r = state.roundIndex;
+    if (r === 5) {
+      let best = valid[0]!;
+      for (let i = 1; i < valid.length; i++) {
+        const c = valid[i]!;
+        if (compareCardHighFirst(c, best) < 0) best = c;
+      }
+      return best;
+    }
+    if (r >= 0 && r <= 3) {
+      if (r === 1 && state.currentTrick.length > 0) {
+        const leadSuit = state.currentTrick[0]!.card.suit;
+        const canFollowLead = hand.some(c => c.suit === leadSuit);
+        if (!canFollowLead) {
+          const clubDiscards = valid.filter(c => c.suit === 'clubs');
+          if (clubDiscards.length > 0) {
+            let bestClub = clubDiscards[0]!;
+            for (let i = 1; i < clubDiscards.length; i++) {
+              const c = clubDiscards[i]!;
+              if (compareCardHighFirst(c, bestClub) < 0) bestClub = c;
+            }
+            return bestClub;
+          }
+        }
+      }
+      const safe = valid.filter(c => isSafeSlough(state, playerIndex, c));
+      if (safe.length > 0) {
+        let bestSlough = safe[0]!;
+        for (let i = 1; i < safe.length; i++) {
+          const c = safe[i]!;
+          if (compareSloughDesirable(r, c, bestSlough) < 0) bestSlough = c;
+        }
+        return bestSlough;
+      }
+    }
     let best = valid[0]!;
     for (let i = 1; i < valid.length; i++) {
       const c = valid[i]!;
-      const cmp = pickLow ? compareCardLowFirst(c, best) : compareCardHighFirst(c, best);
-      if (cmp < 0) best = c;
+      if (compareCardLowFirst(c, best) < 0) best = c;
     }
     return best;
   }
@@ -614,7 +774,9 @@ function chooseSolitaireMove(state: MobilizationState, playerIndex: number): Mob
 
 export function runMobilizationBotTurn(state: unknown): unknown {
   const s = state as MobilizationState;
-  if (s.gameOver || s.phase === 'round-end' || s.phase === 'round-depleted') return state;
+  if (s.gameOver || s.phase === 'round-end' || s.phase === 'round-depleted' || s.phase === 'solitaire-reveal') {
+    return state;
+  }
 
   const current = s.players[s.currentPlayerIndex];
   if (!current?.isBot) return state;
