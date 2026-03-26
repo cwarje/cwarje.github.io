@@ -33,6 +33,20 @@ export default function GameCard({ gameType, onSelect, onInfo, disabled, isExpan
       aria-expanded={isExpanded}
       className={`relative w-full flex flex-col p-6 min-h-[140px] rounded-2xl bg-gradient-to-br ${theme.gradient} backdrop-blur-md border ${theme.cardBorder} ${isExpanded ? 'rounded-b-none border-b-0' : ''} ${disabled ? 'opacity-40 cursor-not-allowed' : `${theme.hoverBorder} cursor-pointer`} transition-colors duration-300 group`}
     >
+      {gameDef.showNewBadge && (
+        <span className="absolute top-3 left-3 inline-grid grid-cols-1 grid-rows-1 place-items-center px-2 py-0.5 rounded-md bg-amber-400/95 shadow-sm">
+          {/* Invisible layer locks badge height to the same box as solid `text-amber-950` copy */}
+          <span
+            className="col-start-1 row-start-1 invisible whitespace-nowrap text-[10px] font-bold uppercase tracking-wider text-amber-950"
+            aria-hidden
+          >
+            New
+          </span>
+          <span className="col-start-1 row-start-1 new-badge-text-sheen text-[10px] font-bold uppercase tracking-wider">
+            New
+          </span>
+        </span>
+      )}
       <span
         className={`absolute top-3 right-3 px-2.5 py-1 rounded-md text-xs font-medium uppercase tracking-wider ${theme.playersTag}`}
       >

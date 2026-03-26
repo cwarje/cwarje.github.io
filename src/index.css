@@ -80,6 +80,45 @@
   50% { box-shadow: 0 0 30px rgba(239, 68, 68, 0.6); }
 }
 
+/* “New” game card — animated sheen on label text only (L→R, Cursor-style) */
+@keyframes newBadgeTextSheen {
+  0% {
+    background-position: 130% 50%;
+  }
+  100% {
+    background-position: -30% 50%;
+  }
+}
+
+.new-badge-text-sheen {
+  /* Dark amber base with a narrow bright band that sweeps across */
+  background-image: linear-gradient(
+    105deg,
+    #451a03 0%,
+    #451a03 42%,
+    #fff7d6 50%,
+    #451a03 58%,
+    #451a03 100%
+  );
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: newBadgeTextSheen 2.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .new-badge-text-sheen {
+    animation: none;
+    color: #451a03;
+    -webkit-text-fill-color: #451a03;
+    background-image: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
+  }
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

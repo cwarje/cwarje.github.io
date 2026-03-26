@@ -14,6 +14,7 @@ import {
 
 const SUITS: Suit[] = ['clubs', 'diamonds', 'spades', 'hearts'];
 const RANKS: Rank[] = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+const MOBILIZATION_SUIT_ORDER: Record<Suit, number> = { clubs: 0, diamonds: 1, spades: 2, hearts: 3 };
 
 function createFullDeck(): Card[] {
   const deck: Card[] = [];
@@ -35,9 +36,10 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 function sortHand(hand: Card[]): Card[] {
-  const suitOrder: Record<Suit, number> = { clubs: 0, diamonds: 1, spades: 2, hearts: 3 };
   return [...hand].sort((a, b) => {
-    if (suitOrder[a.suit] !== suitOrder[b.suit]) return suitOrder[a.suit] - suitOrder[b.suit];
+    if (MOBILIZATION_SUIT_ORDER[a.suit] !== MOBILIZATION_SUIT_ORDER[b.suit]) {
+      return MOBILIZATION_SUIT_ORDER[a.suit] - MOBILIZATION_SUIT_ORDER[b.suit];
+    }
     return a.rank - b.rank;
   });
 }
@@ -282,6 +284,44 @@ function devJumpToRound(state: MobilizationState, target: number): MobilizationS
   return dealTrickRound(basePlayers, target, dealerIndex);
 }
 
+/** Same column + hand update as `solitaire-play`; shared by action handler and bot simulation. */
+function applySolitairePlay(
+  columns: SolitaireColumn[],
+  hand: Card[],
+  card: Card,
+  columnIndex: number,
+): { columns: SolitaireColumn[]; hand: Card[] } | null {
+  if (!hand.some(c => cardEquals(c, card))) return null;
+  if (!isValidSolitairePlay(columns, card, columnIndex)) return null;
+
+  const col = columns[columnIndex];
+  let newCol: SolitaireColumn;
+
+  if (col.seven === null && card.rank === 7) {
+    newCol = {
+      seven: card,
+      topCard: null,
+      bottomCard: null,
+      topNext: 6,
+      bottomNext: 8,
+    };
+  }
+  else if (col.topNext !== null && col.seven && card.rank === col.topNext && card.suit === col.seven.suit) {
+    newCol = applySolitaireTopPlay(col, card);
+  }
+  else if (col.bottomNext !== null && col.seven && card.rank === col.bottomNext && card.suit === col.seven.suit) {
+    newCol = applySolitaireBottomPlay(col, card);
+  }
+  else {
+    return null;
+  }
+
+  const newColumns = [...columns];
+  newColumns[columnIndex] = newCol;
+  const newHand = hand.filter(c => !cardEquals(c, card));
+  return { columns: newColumns, hand: newHand };
+}
+
 export function processMobilizationAction(state: unknown, action: unknown, playerId: string): unknown {
   const s = state as MobilizationState;
   const a = action as MobilizationAction;
@@ -403,37 +443,13 @@ export function processMobilizationAction(state: unknown, action: unknown, playe
       if (s.phase !== 'solitaire') return state;
       const playerIndex = s.players.findIndex(p => p.id === playerId);
       if (playerIndex === -1 || playerIndex !== s.currentPlayerIndex) return state;
-      if (!s.players[playerIndex].hand.some(c => cardEquals(c, a.card))) return state;
-      if (!isValidSolitairePlay(s.solitaireColumns, a.card, a.columnIndex)) return state;
 
-      const col = s.solitaireColumns[a.columnIndex];
-      let newCol: SolitaireColumn;
+      const applied = applySolitairePlay(s.solitaireColumns, s.players[playerIndex].hand, a.card, a.columnIndex);
+      if (!applied) return state;
 
-      if (col.seven === null && a.card.rank === 7) {
-        newCol = {
-          seven: a.card,
-          topCard: null,
-          bottomCard: null,
-          topNext: 6,
-          bottomNext: 8,
-        };
-      }
-      else if (col.topNext !== null && col.seven && a.card.rank === col.topNext && a.card.suit === col.seven.suit) {
-        newCol = applySolitaireTopPlay(col, a.card);
-      }
-      else if (col.bottomNext !== null && col.seven && a.card.rank === col.bottomNext && a.card.suit === col.seven.suit) {
-        newCol = applySolitaireBottomPlay(col, a.card);
-      }
-      else {
-        return state;
-      }
-
-      const newColumns = [...s.solitaireColumns];
-      newColumns[a.columnIndex] = newCol;
-
-      const newHand = s.players[playerIndex].hand.filter(c => !cardEquals(c, a.card));
       const newPlayers = [...s.players];
-      newPlayers[playerIndex] = { ...newPlayers[playerIndex], hand: newHand };
+      newPlayers[playerIndex] = { ...newPlayers[playerIndex], hand: applied.hand };
+      const newColumns = applied.columns;
 
       const winnerIdx = newPlayers.findIndex(p => p.hand.length === 0);
       if (winnerIdx !== -1) {
@@ -470,21 +486,130 @@ export function isMobilizationOver(state: unknown): boolean {
   return (state as MobilizationState).gameOver;
 }
 
+function compareCardLowFirst(a: Card, b: Card): number {
+  if (a.rank !== b.rank) return a.rank - b.rank;
+  return MOBILIZATION_SUIT_ORDER[a.suit] - MOBILIZATION_SUIT_ORDER[b.suit];
+}
+
+function compareCardHighFirst(a: Card, b: Card): number {
+  if (a.rank !== b.rank) return b.rank - a.rank;
+  return MOBILIZATION_SUIT_ORDER[b.suit] - MOBILIZATION_SUIT_ORDER[a.suit];
+}
+
+/** Penalty if we win this trick (minimize in rounds 0–3; round 5 uses negative penalty). */
+function trickPenaltyIfWeWin(
+  state: MobilizationState,
+  playerIndex: number,
+  trick: { playerId: string; card: Card }[],
+): number {
+  const r = state.roundIndex;
+  const clubsInTrick = trick.filter(t => t.card.suit === 'clubs').length;
+  const queensInTrick = trick.filter(t => t.card.rank === 12).length;
+  const hasKingClubs = trick.some(t => t.card.suit === 'clubs' && t.card.rank === 13);
+  const isLastTrick = state.trickNumber >= state.cardsPerTrickRound;
+  const p = state.players[playerIndex]!;
+
+  switch (r) {
+    case 0:
+      return 2;
+    case 1:
+      return 2 * clubsInTrick;
+    case 2:
+      return 5 * queensInTrick;
+    case 3: {
+      let cost = 0;
+      if (hasKingClubs && !p.hadKingClubs) cost += 5;
+      if (isLastTrick) cost += 5;
+      return cost;
+    }
+    case 5:
+      return -2;
+    default:
+      return 0;
+  }
+}
+
 function chooseTrickCard(state: MobilizationState, playerIndex: number): Card | null {
   const hand = state.players[playerIndex].hand;
   const valid = hand.filter(c => isValidMobilizationTrickPlay(state, playerIndex, c));
   if (valid.length === 0) return null;
-  return valid[Math.floor(Math.random() * valid.length)] ?? null;
+
+  const playerId = state.players[playerIndex].id;
+  const completesTrick = state.currentTrick.length + 1 === state.players.length;
+
+  if (!completesTrick) {
+    const pickLow = state.roundIndex !== 5;
+    let best = valid[0]!;
+    for (let i = 1; i < valid.length; i++) {
+      const c = valid[i]!;
+      const cmp = pickLow ? compareCardLowFirst(c, best) : compareCardHighFirst(c, best);
+      if (cmp < 0) best = c;
+    }
+    return best;
+  }
+
+  let best = valid[0]!;
+  let bestPenalty = (() => {
+    const full = [...state.currentTrick, { playerId, card: best }];
+    const w = getMobilizationTrickWinnerId(full);
+    return w === playerId ? trickPenaltyIfWeWin(state, playerIndex, full) : 0;
+  })();
+
+  for (let i = 1; i < valid.length; i++) {
+    const card = valid[i]!;
+    const fullTrick = [...state.currentTrick, { playerId, card }];
+    const winnerId = getMobilizationTrickWinnerId(fullTrick);
+    const penalty = winnerId === playerId ? trickPenaltyIfWeWin(state, playerIndex, fullTrick) : 0;
+    if (penalty < bestPenalty || (penalty === bestPenalty && compareCardLowFirst(card, best) < 0)) {
+      best = card;
+      bestPenalty = penalty;
+    }
+  }
+
+  return best;
 }
 
 function chooseSolitaireMove(state: MobilizationState, playerIndex: number): MobilizationAction | null {
   const hand = state.players[playerIndex].hand;
   const legal = getLegalSolitairePlays(state.solitaireColumns, hand);
-  if (legal.length > 0) {
-    const pick = legal[Math.floor(Math.random() * legal.length)]!;
-    return { type: 'solitaire-play', card: pick.card, columnIndex: pick.columnIndex };
+  if (legal.length === 0) return { type: 'solitaire-pass' };
+
+  type Legal = (typeof legal)[number];
+  let best: Legal | null = null;
+  let bestMob = -1;
+  let bestSuitRemain = -1;
+
+  for (const cand of legal) {
+    const applied = applySolitairePlay(state.solitaireColumns, hand, cand.card, cand.columnIndex);
+    if (!applied) continue;
+    const mob = getLegalSolitairePlays(applied.columns, applied.hand).length;
+    const suitRemain = applied.hand.filter(c => c.suit === cand.card.suit).length;
+    if (best === null) {
+      best = cand;
+      bestMob = mob;
+      bestSuitRemain = suitRemain;
+      continue;
+    }
+    const better =
+      mob > bestMob
+      || (mob === bestMob && suitRemain > bestSuitRemain)
+      || (
+        mob === bestMob
+        && suitRemain === bestSuitRemain
+        && (
+          cand.columnIndex < best.columnIndex
+          || (cand.columnIndex === best.columnIndex && compareCardLowFirst(cand.card, best.card) < 0)
+        )
+      );
+    if (better) {
+      best = cand;
+      bestMob = mob;
+      bestSuitRemain = suitRemain;
+    }
   }
-  return { type: 'solitaire-pass' };
+
+  if (!best) return { type: 'solitaire-pass' };
+  return { type: 'solitaire-play', card: best.card, columnIndex: best.columnIndex };
 }
 
 export function runMobilizationBotTurn(state: unknown): unknown {

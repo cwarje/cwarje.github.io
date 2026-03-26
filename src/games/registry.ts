@@ -123,6 +123,8 @@ export interface GameDefinition {
   hasHandZoom?: boolean;
   production?: boolean;
   hudTitleLines?: string[];
+  /** Homepage card: small “New” ribbon */
+  showNewBadge?: boolean;
   /** If set, only these total player counts (humans + bots) are valid. */
   allowedPlayerCounts?: number[];
 }
@@ -505,6 +507,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: true,
     production: true,
+    showNewBadge: true,
     hudTitleLines: ['Mobilization'],
     TitleExtra: MobilizationTitleExtra,
   },
@@ -657,12 +660,12 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
 
 /** All registered game types */
 export const ALL_GAME_TYPES: GameType[] = [
+  'mobilization',
   'yahtzee',
   'hearts',
   'twelve',
   'settler',
   'up-and-down-the-river',
-  'mobilization',
   'farkle',
   'cross-crib',
   'poker',
@@ -672,12 +675,12 @@ export const ALL_GAME_TYPES: GameType[] = [
 
 /** Game types shown in production (homepage order) */
 export const PRODUCTION_GAME_TYPES: GameType[] = [
+  'mobilization',
   'yahtzee',
   'hearts',
   'twelve',
   'settler',
   'up-and-down-the-river',
-  'mobilization',
   'farkle',
   'cross-crib',
   'poker',
