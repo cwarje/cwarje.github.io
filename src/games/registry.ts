@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Dice5, Heart, Ship, Crosshair, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon } from 'lucide-react';
+import { Dice5, Heart, Ship, Crosshair, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Flag } from 'lucide-react';
 import type { GameType, Player, GameStartOptions } from '../networking/types';
 
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
@@ -9,6 +9,13 @@ import { createBattleshipState, processBattleshipAction, isBattleshipOver, runBa
 import { createLiarsDiceState, processLiarsDiceAction, isLiarsDiceOver, runLiarsDiceBotTurn, getLiarsDiceWinners } from './liars-dice/logic';
 import { createPokerState, processPokerAction, isPokerOver, runPokerBotTurn, getPokerWinners } from './poker/logic';
 import { createUpRiverState, processUpRiverAction, isUpRiverOver, runUpRiverBotTurn, getUpRiverWinners } from './up-and-down-the-river/logic';
+import {
+  createMobilizationState,
+  processMobilizationAction,
+  isMobilizationOver,
+  runMobilizationBotTurn,
+  getMobilizationWinners,
+} from './mobilization/logic';
 import { createTwelveState, processTwelveAction, isTwelveOver, runTwelveBotTurn, getTwelveWinners } from './twelve/logic';
 import {
   createSettlerStateFromPlayers,
@@ -26,6 +33,7 @@ import BattleshipBoard from './battleship/BattleshipBoard';
 import LiarsDiceBoard from './liars-dice/LiarsDiceBoard';
 import PokerBoard from './poker/PokerBoard';
 import UpAndDownTheRiverBoard from './up-and-down-the-river/UpAndDownTheRiverBoard';
+import MobilizationBoard from './mobilization/MobilizationBoard';
 import TwelveBoard from './twelve/TwelveBoard';
 import SettlerBoard from './settler/SettlerBoard';
 import CrossCribBoard from './cross-crib/CrossCribBoard';
@@ -40,6 +48,7 @@ import PokerTitleExtra from './poker/PokerTitleExtra';
 import CrossCribTitleExtra from './cross-crib/CrossCribTitleExtra';
 import UpRiverToolbarExtra from './up-and-down-the-river/UpRiverToolbarExtra';
 import TwelveToolbarExtra from './twelve/TwelveToolbarExtra';
+import MobilizationTitleExtra from './mobilization/MobilizationTitleExtra';
 
 // ---------------------------------------------------------------------------
 // Shared types
@@ -449,6 +458,54 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     hudTitleLines: ['Up and Down', 'the River'],
   },
 
+  mobilization: {
+    title: 'Mobilization',
+    shortDescription:
+      'Six rounds of trick-taking and a solitaire grid: dodge penalties, survive the pig, then cash in on positive tricks.',
+    playersLabel: '4-6 Players',
+    minPlayers: 4,
+    maxPlayers: 6,
+    info: {
+      goal: 'Finish six varied rounds with the highest total score. Many rounds penalize you for taking the wrong cards or tricks.',
+      rules: [
+        '4–6 players with a 52-card deck; when the count does not divide evenly, low-priority cards are removed each round (shown in the HUD).',
+        'Ace is high in trick-taking. There is no trump; follow the lead suit when you can.',
+        'Round 1 (No Tricks): −2 per trick you take. Round 2 (Clubs): −2 per club card in tricks you win. Round 3 (Queens): −5 per queen in tricks you win.',
+        'Round 4 (King Of Clubs and Last Trick): −5 if you capture the king of clubs in a trick you win, and −5 if you take the last trick (both can apply).',
+        'Round 5 (Solitaire): shared 4×3 grid — middle row only accepts 7s; then build down to ace above and up to king below in that suit. Pass if you cannot play and you take the pig. First to empty their hand gains +5; pig holder −5; everyone −2 per card left in hand.',
+        'Round 6 (Positive Tricks): +2 per trick you take. Highest total score wins.',
+      ],
+      howToPlay: [
+        'Play proceeds like Up and Down the River for seating and trick layout.',
+        'On your turn in a trick round, choose a legal card that follows suit when possible.',
+        'In Solitaire, tap a card then a highlighted cell, or play automatically when only one placement exists. Use Pass when you have no legal play.',
+        'After each round, scores update; the game ends after round six with final rankings.',
+      ],
+    },
+    icon: Flag,
+    theme: {
+      gradient: 'from-slate-600/25 to-cyan-800/25',
+      cardBorder: 'border-cyan-500/20',
+      hoverBorder: 'hover:border-cyan-500/35',
+      playersTag: 'bg-cyan-500/20 text-cyan-100 border border-cyan-500/30',
+      iconColor: 'text-cyan-300',
+      buttonColors: 'bg-cyan-700 hover:bg-cyan-600',
+      panelBg: 'bg-slate-950',
+      labelColor: 'text-cyan-100',
+    },
+    createState: createMobilizationState,
+    processAction: processMobilizationAction,
+    isOver: isMobilizationOver,
+    runBotTurn: runMobilizationBotTurn,
+    getWinners: getMobilizationWinners,
+    Board: MobilizationBoard,
+    fullBoard: true,
+    hasHandZoom: true,
+    production: true,
+    hudTitleLines: ['Mobilization'],
+    TitleExtra: MobilizationTitleExtra,
+  },
+
   twelve: {
     title: 'Tolva',
     shortDescription: 'Trick-taking with table piles, optional trump, and race-to-12 scoring.',
@@ -602,6 +659,7 @@ export const ALL_GAME_TYPES: GameType[] = [
   'twelve',
   'settler',
   'up-and-down-the-river',
+  'mobilization',
   'farkle',
   'cross-crib',
   'poker',
@@ -616,6 +674,7 @@ export const PRODUCTION_GAME_TYPES: GameType[] = [
   'twelve',
   'settler',
   'up-and-down-the-river',
+  'mobilization',
   'farkle',
   'cross-crib',
   'poker',
