@@ -12,6 +12,15 @@ export interface Build {
   cards: Card[];
   value: number;
   ownerId: string;
+  /** Number of independent groups stacked at the same declared value (1 = single, 2 = double, etc.). */
+  groupCount: number;
+}
+
+export function buildMultiplicityLabel(build: Build): string {
+  if (build.groupCount <= 1) return String(build.value);
+  if (build.groupCount === 2) return `D${build.value}`;
+  if (build.groupCount === 3) return `T${build.value}`;
+  return `${build.groupCount}x${build.value}`;
 }
 
 export type TableItem =
@@ -37,7 +46,7 @@ export interface ByggkasinoPlayer {
   sweepCount: number;
 }
 
-export type ByggkasinoPhase = 'playing' | 'announcement' | 'round-end' | 'game-over';
+export type ByggkasinoPhase = 'playing' | 'announcement' | 'table-remnant' | 'round-end' | 'game-over';
 
 /** Shown in the heads-up strip during phase `announcement` (host timer clears it). */
 export type ByggkasinoActionAnnouncement =
@@ -55,8 +64,8 @@ export type ByggkasinoActionAnnouncement =
       playerId: string;
       playedCard: Card;
       declaredValue: number;
-      /** Loose table cards combined into the build (not counting the played card). */
-      tableCardCount: number;
+      /** Played card first, then loose table cards (same order as the resulting build pile). */
+      buildCards: Card[];
     }
   | { kind: 'extend-build'; playerId: string; playedCard: Card; declaredValue: number }
   | { kind: 'trail'; playerId: string; playedCard: Card };
@@ -80,6 +89,8 @@ export interface ByggkasinoState {
   dealerIndex: number;
   phase: ByggkasinoPhase;
   roundNumber: number;
+  /** 1-based count of 4-card deals within the current scoring round (resets each round). */
+  dealNumberInRound: number;
   lastCapturerIndex: number;
   /** Cumulative scores across rounds, keyed by player id. */
   scores: Record<string, number>;
@@ -100,7 +111,8 @@ export type ByggkasinoAction =
   | { type: 'extend-build'; playedCard: Card; buildIndex: number; declaredValue: number }
   | { type: 'trail'; playedCard: Card; targetSlotIndex: number }
   | { type: 'start-next-round' }
-  | { type: 'finish-action-announcement' };
+  | { type: 'finish-action-announcement' }
+  | { type: 'finish-table-remnant' };
 
 /** Legal numerical contributions for sums, builds, and matching build values when capturing. */
 export function cardValuesForSum(card: Card): readonly number[] {
@@ -148,4 +160,17 @@ export function rankDisplay(rank: Rank): string {
 
 export function countOccupiedTableSlots(tableSlots: TableSlot[]): number {
   return tableSlots.filter(Boolean).length;
+}
+
+/** House rule: 5♠ clears the entire table when played while the table is non-empty. */
+export function isFiveOfSpadesSweepCard(card: Card): boolean {
+  return card.suit === 'spades' && card.rank === 5;
+}
+
+export function occupiedTableSlotIndices(tableSlots: TableSlot[]): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < tableSlots.length; i++) {
+    if (tableSlots[i] != null) out.push(i);
+  }
+  return out;
 }

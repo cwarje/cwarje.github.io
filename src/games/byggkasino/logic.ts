@@ -1,5 +1,6 @@
 import type { Player } from '../../networking/types';
 import type {
+  Build,
   Card,
   Suit,
   Rank,
@@ -7,15 +8,25 @@ import type {
   ByggkasinoState,
   ByggkasinoAction,
   ByggkasinoActionAnnouncement,
+  PendingCapturePreview,
   TableItem,
   TableSlot,
 } from './types';
-import { BYGG_TABLE_COLUMNS, cardEquals, minCardValueForSum } from './types';
+import {
+  BYGG_TABLE_COLUMNS,
+  canParticipateInBuildOrSum,
+  cardEquals,
+  countOccupiedTableSlots,
+  isFiveOfSpadesSweepCard,
+  minCardValueForSum,
+  occupiedTableSlotIndices,
+} from './types';
 import {
   isValidCapture,
   isValidBuild,
   isValidBuildExtension,
   isValidTableGroup,
+  canAssignSumToCards,
   playerCanCaptureBuildValue,
   scoreRound,
   findPossibleCaptures,
@@ -64,6 +75,15 @@ function occupiedTableEntries(tableSlots: TableSlot[]): Array<{ slotIndex: numbe
   return entries;
 }
 
+export function countRemnantCardsOnTable(tableSlots: TableSlot[]): number {
+  const tableItems = occupiedTableEntries(tableSlots).map(entry => entry.item);
+  const looseCards = tableItems.filter((it): it is { kind: 'card'; card: Card } => it.kind === 'card').length;
+  const buildCards = tableItems
+    .filter((it): it is { kind: 'build'; build: Build } => it.kind === 'build')
+    .reduce((sum, it) => sum + it.build.cards.length, 0);
+  return looseCards + buildCards;
+}
+
 function ensureSlotCapacity(tableSlots: TableSlot[], tableRows: number, requiredSlotIndex: number): {
   tableSlots: TableSlot[];
   tableRows: number;
@@ -93,7 +113,15 @@ function dealCards(state: ByggkasinoState): ByggkasinoState {
     deck = deck.slice(cardsPerPlayer);
     return { ...p, hand };
   });
-  return { ...state, players, deck, actionAnnouncement: null, pendingCapturePreview: null };
+  const prevDeal = state.dealNumberInRound ?? 1;
+  return {
+    ...state,
+    players,
+    deck,
+    dealNumberInRound: prevDeal + 1,
+    actionAnnouncement: null,
+    pendingCapturePreview: null,
+  };
 }
 
 function startRound(
@@ -129,6 +157,7 @@ function startRound(
     dealerIndex,
     phase: 'playing',
     roundNumber,
+    dealNumberInRound: 1,
     lastCapturerIndex: -1,
     scores,
     lastRoundScores: {},
@@ -171,11 +200,20 @@ function advanceTurn(state: ByggkasinoState): ByggkasinoState {
     if (state.deck.length > 0) {
       return dealCards({ ...state, currentPlayerIndex: (state.dealerIndex + 1) % state.players.length });
     }
-    return endRound(state);
+    return enterTableRemnantPhase(state);
   }
 
   const nextIndex = (state.currentPlayerIndex + 1) % state.players.length;
   return { ...state, currentPlayerIndex: nextIndex };
+}
+
+function enterTableRemnantPhase(state: ByggkasinoState): ByggkasinoState {
+  return {
+    ...state,
+    phase: 'table-remnant',
+    actionAnnouncement: null,
+    pendingCapturePreview: null,
+  };
 }
 
 /** After a play: redeal or round-end immediately; otherwise next player + announcement phase. */
@@ -207,7 +245,7 @@ function endRound(state: ByggkasinoState): ByggkasinoState {
       .filter((it): it is { kind: 'card'; card: Card } => it.kind === 'card')
       .map(it => it.card);
     const remainingBuildCards = tableItems
-      .filter((it): it is { kind: 'build'; build: { cards: Card[]; value: number; ownerId: string } } => it.kind === 'build')
+      .filter((it): it is { kind: 'build'; build: Build } => it.kind === 'build')
       .flatMap(it => it.build.cards);
 
     players = players.map((p, i) =>
@@ -255,6 +293,78 @@ function removeCardFromHand(player: ByggkasinoPlayer, card: Card): ByggkasinoPla
   return { ...player, hand };
 }
 
+function captureSlotsFromIndices(
+  tableSlots: TableSlot[],
+  playedCard: Card,
+  capturedSlotIndices: number[]
+): { capturedCards: Card[]; newTableSlots: TableSlot[]; sweep: boolean; capturedBuild: boolean } {
+  const capturedCards: Card[] = [playedCard];
+  const newTableSlots = [...tableSlots];
+  for (const idx of capturedSlotIndices) {
+    const item = newTableSlots[idx];
+    if (!item) continue;
+    if (item.kind === 'card') {
+      capturedCards.push(item.card);
+    } else {
+      capturedCards.push(...item.build.cards);
+    }
+    newTableSlots[idx] = null;
+  }
+  const sweep = newTableSlots.every(slot => slot == null);
+  const capturedBuild = capturedSlotIndices.some(i => tableSlots[i]?.kind === 'build');
+  return { capturedCards, newTableSlots, sweep, capturedBuild };
+}
+
+function tryApplyFiveOfSpadesTableSweep(
+  s: ByggkasinoState,
+  playerIndex: number,
+  playedCard: Card
+): ByggkasinoState | null {
+  if (!isFiveOfSpadesSweepCard(playedCard)) return null;
+  if (countOccupiedTableSlots(s.tableSlots) === 0) return null;
+  const player = s.players[playerIndex];
+  if (!player.hand.some(c => cardEquals(c, playedCard))) return null;
+
+  const indices = occupiedTableSlotIndices(s.tableSlots).sort((a, b) => a - b);
+  const outcome = captureSlotsFromIndices(s.tableSlots, playedCard, indices);
+  const updatedPlayer = {
+    ...removeCardFromHand(player, playedCard),
+    capturedCards: [...player.capturedCards, ...outcome.capturedCards],
+    sweepCount: player.sweepCount + (outcome.sweep ? 1 : 0),
+  };
+  const newPlayers = s.players.map((p, i) => (i === playerIndex ? updatedPlayer : p));
+  return finishPlayWithOptionalAnnouncement(
+    {
+      ...s,
+      players: newPlayers,
+      tableSlots: outcome.newTableSlots,
+      lastCapturerIndex: playerIndex,
+    },
+    {
+      kind: 'capture',
+      playerId: player.id,
+      capturedCards: outcome.capturedCards,
+      sweep: outcome.sweep,
+      capturedBuild: outcome.capturedBuild,
+    }
+  );
+}
+
+/** Same card list / sweep / build flags as `finalize-capture` will apply; for HUD during preview. */
+export function getCaptureOutcomeFromPreview(
+  s: ByggkasinoState,
+  preview: PendingCapturePreview
+): { capturedCards: Card[]; newTableSlots: TableSlot[]; sweep: boolean; capturedBuild: boolean } | null {
+  const { playedCard, capturedSlotIndices, playerId: capturePlayerId } = preview;
+  const playerIndex = s.players.findIndex(p => p.id === capturePlayerId);
+  if (playerIndex === -1) return null;
+  const player = s.players[playerIndex];
+  if (!player.hand.some(c => cardEquals(c, playedCard))) return null;
+  if (!isValidCapture(playedCard, s.tableSlots, capturedSlotIndices)) return null;
+
+  return captureSlotsFromIndices(s.tableSlots, playedCard, capturedSlotIndices);
+}
+
 export function processByggkasinoAction(
   state: unknown,
   action: unknown,
@@ -282,36 +392,26 @@ export function processByggkasinoAction(
     return { ...s, phase: 'playing', actionAnnouncement: null, pendingCapturePreview: null };
   }
 
+  if (a.type === 'finish-table-remnant') {
+    if (s.phase !== 'table-remnant') return state;
+    return endRound(s);
+  }
+
   if (a.type === 'finalize-capture') {
     if (!s.pendingCapturePreview) return state;
     if (s.phase !== 'playing' || s.gameOver) return state;
-    const { playedCard, capturedSlotIndices, playerId: capturePlayerId } = s.pendingCapturePreview;
+    const outcome = getCaptureOutcomeFromPreview(s, s.pendingCapturePreview);
+    if (!outcome) return { ...s, pendingCapturePreview: null };
+    const { playedCard, playerId: capturePlayerId } = s.pendingCapturePreview;
     const playerIndex = s.players.findIndex(p => p.id === capturePlayerId);
-    if (playerIndex === -1) return { ...s, pendingCapturePreview: null };
     const player = s.players[playerIndex];
-    if (!player.hand.some(c => cardEquals(c, playedCard))) return { ...s, pendingCapturePreview: null };
-    if (!isValidCapture(playedCard, s.tableSlots, capturedSlotIndices)) return { ...s, pendingCapturePreview: null };
-
-    const capturedCards: Card[] = [playedCard];
-    const newTableSlots = [...s.tableSlots];
-    for (const idx of capturedSlotIndices) {
-      const item = newTableSlots[idx];
-      if (!item) continue;
-      if (item.kind === 'card') {
-        capturedCards.push(item.card);
-      } else {
-        capturedCards.push(...item.build.cards);
-      }
-      newTableSlots[idx] = null;
-    }
-    const isSweep = newTableSlots.every(slot => slot == null);
+    const { capturedCards, newTableSlots, sweep: isSweep, capturedBuild } = outcome;
     const updatedPlayer = {
       ...removeCardFromHand(player, playedCard),
       capturedCards: [...player.capturedCards, ...capturedCards],
       sweepCount: player.sweepCount + (isSweep ? 1 : 0),
     };
     const newPlayers = s.players.map((p, i) => (i === playerIndex ? updatedPlayer : p));
-    const capturedBuild = capturedSlotIndices.some(i => s.tableSlots[i]?.kind === 'build');
     return finishPlayWithOptionalAnnouncement(
       {
         ...s,
@@ -341,6 +441,8 @@ export function processByggkasinoAction(
     case 'capture-preview': {
       const { playedCard, capturedSlotIndices } = a;
       if (!player.hand.some(c => cardEquals(c, playedCard))) return state;
+      const fiveSweep = tryApplyFiveOfSpadesTableSweep(s, playerIndex, playedCard);
+      if (fiveSweep) return fiveSweep;
       if (!isValidCapture(playedCard, s.tableSlots, capturedSlotIndices)) return state;
       return {
         ...s,
@@ -354,31 +456,91 @@ export function processByggkasinoAction(
 
     case 'group-table': {
       const { tableCardIndices, declaredValue } = a;
-      const hasOwnBuild = s.tableSlots.some(
-        it => it?.kind === 'build' && it.build.ownerId === playerId
-      );
-      if (hasOwnBuild) return state;
-
       const unique = [...new Set(tableCardIndices)];
       if (unique.length < 2) return state;
       const sortedIdx = [...unique].sort((x, y) => x - y);
-      const tableCards: Card[] = [];
+
+      const looseCards: Card[] = [];
+      const selectedBuilds: { index: number; build: Build }[] = [];
       for (const idx of sortedIdx) {
         const item = s.tableSlots[idx];
-        if (!item || item.kind !== 'card') return state;
-        tableCards.push(item.card);
+        if (!item) return state;
+        if (item.kind === 'card') {
+          looseCards.push(item.card);
+        } else {
+          selectedBuilds.push({ index: idx, build: item.build });
+        }
       }
-      if (!isValidTableGroup(tableCards, declaredValue)) return state;
+
+      if (selectedBuilds.length === 0) {
+        if (!isValidTableGroup(looseCards, declaredValue)) return state;
+        if (!playerCanCaptureBuildValue(player.hand, declaredValue)) return state;
+
+        const ownedBuildEntry = s.tableSlots
+          .map((it, i) => ({ it, i }))
+          .find(({ it }) => it?.kind === 'build' && it.build.ownerId === playerId && it.build.value === declaredValue);
+
+        const hasOwnBuildOtherValue = s.tableSlots.some(
+          it => it?.kind === 'build' && it.build.ownerId === playerId && it.build.value !== declaredValue
+        );
+        if (hasOwnBuildOtherValue) return state;
+
+        const newTableSlots = [...s.tableSlots];
+        for (const i of sortedIdx) newTableSlots[i] = null;
+
+        if (ownedBuildEntry) {
+          const existing = (ownedBuildEntry.it as { kind: 'build'; build: Build }).build;
+          newTableSlots[ownedBuildEntry.i] = {
+            kind: 'build',
+            build: {
+              cards: [...existing.cards, ...looseCards],
+              value: declaredValue,
+              ownerId: playerId,
+              groupCount: existing.groupCount + 1,
+            },
+          };
+        } else {
+          newTableSlots[sortedIdx[0]] = {
+            kind: 'build',
+            build: { cards: looseCards, value: declaredValue, ownerId: playerId, groupCount: 1 },
+          };
+        }
+        return { ...s, tableSlots: newTableSlots };
+      }
+
+      if (!selectedBuilds.every(b => b.build.value === declaredValue)) return state;
+      if (looseCards.length > 0) {
+        const looseOk =
+          looseCards.length >= 2
+            ? isValidTableGroup(looseCards, declaredValue)
+            : canParticipateInBuildOrSum(looseCards[0]) &&
+              canAssignSumToCards(looseCards, declaredValue);
+        if (!looseOk) return state;
+      }
+      const totalComponents = selectedBuilds.length + (looseCards.length > 0 ? 1 : 0);
+      if (totalComponents < 2) return state;
       if (!playerCanCaptureBuildValue(player.hand, declaredValue)) return state;
 
+      const hasOwnBuildOtherValue = s.tableSlots.some(
+        it => it?.kind === 'build' && it.build.ownerId === playerId && it.build.value !== declaredValue
+      );
+      if (hasOwnBuildOtherValue) return state;
+
+      const allCards = selectedBuilds.flatMap(b => b.build.cards).concat(looseCards);
+      const mergedGroupCount =
+        selectedBuilds.reduce((sum, b) => sum + b.build.groupCount, 0) +
+        (looseCards.length > 0 ? 1 : 0);
+
       const newTableSlots = [...s.tableSlots];
-      for (const i of sortedIdx) {
-        newTableSlots[i] = null;
-      }
-      const targetSlotIndex = sortedIdx[0];
-      newTableSlots[targetSlotIndex] = {
+      for (const i of sortedIdx) newTableSlots[i] = null;
+      newTableSlots[sortedIdx[0]] = {
         kind: 'build',
-        build: { cards: tableCards, value: declaredValue, ownerId: playerId },
+        build: {
+          cards: allCards,
+          value: declaredValue,
+          ownerId: playerId,
+          groupCount: mergedGroupCount,
+        },
       };
       return { ...s, tableSlots: newTableSlots };
     }
@@ -386,6 +548,8 @@ export function processByggkasinoAction(
     case 'build': {
       const { playedCard, tableCardIndices, declaredValue } = a;
       if (!player.hand.some(c => cardEquals(c, playedCard))) return state;
+      const fiveSweepBuild = tryApplyFiveOfSpadesTableSweep(s, playerIndex, playedCard);
+      if (fiveSweepBuild) return fiveSweepBuild;
       if (!isValidBuild(playedCard, tableCardIndices, s.tableSlots, declaredValue)) return state;
       if (!playerCanCaptureBuildValue(player.hand, declaredValue, playedCard)) return state;
 
@@ -401,7 +565,7 @@ export function processByggkasinoAction(
       }
       const newBuild: TableItem = {
         kind: 'build',
-        build: { cards: buildCards, value: declaredValue, ownerId: playerId },
+        build: { cards: buildCards, value: declaredValue, ownerId: playerId, groupCount: 1 },
       };
       let targetSlotIndex = tableCardIndices[0];
       if (targetSlotIndex == null || targetSlotIndex < 0) return state;
@@ -417,7 +581,7 @@ export function processByggkasinoAction(
           playerId: player.id,
           playedCard,
           declaredValue,
-          tableCardCount: tableCardIndices.length,
+          buildCards,
         }
       );
     }
@@ -425,6 +589,8 @@ export function processByggkasinoAction(
     case 'extend-build': {
       const { playedCard, buildIndex, declaredValue } = a;
       if (!player.hand.some(c => cardEquals(c, playedCard))) return state;
+      const fiveSweepExtend = tryApplyFiveOfSpadesTableSweep(s, playerIndex, playedCard);
+      if (fiveSweepExtend) return fiveSweepExtend;
 
       const buildItem = s.tableSlots[buildIndex];
       if (!buildItem || buildItem.kind !== 'build') return state;
@@ -437,6 +603,7 @@ export function processByggkasinoAction(
           cards: [...buildItem.build.cards, playedCard],
           value: declaredValue,
           ownerId: playerId,
+          groupCount: buildItem.build.groupCount,
         },
       };
 
@@ -459,6 +626,8 @@ export function processByggkasinoAction(
     case 'trail': {
       const { playedCard, targetSlotIndex } = a;
       if (!player.hand.some(c => cardEquals(c, playedCard))) return state;
+      const fiveSweepTrail = tryApplyFiveOfSpadesTableSweep(s, playerIndex, playedCard);
+      if (fiveSweepTrail) return fiveSweepTrail;
 
       const hasOwnBuild = s.tableSlots.some(
         it => it?.kind === 'build' && it.build.ownerId === playerId
@@ -529,10 +698,9 @@ function tryLegalGroupTable(
 
 export function runByggkasinoBotTurn(state: unknown): unknown {
   const s = state as ByggkasinoState;
-  if (s.phase === 'round-end') {
-    return processByggkasinoAction(s, { type: 'start-next-round' }, s.players[0].id);
-  }
+  if (s.phase === 'round-end') return state;
   if (s.phase === 'announcement') return state;
+  if (s.phase === 'table-remnant') return state;
   if (s.phase !== 'playing' || s.gameOver) return state;
   if (s.pendingCapturePreview) return state;
 

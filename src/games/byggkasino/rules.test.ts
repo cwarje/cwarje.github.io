@@ -9,6 +9,7 @@ import {
   playerCanCaptureBuildValue,
   resolveBuildDeclaredValue,
   resolveTableGroupDeclaredValue,
+  resolveTableGroupWithBuildsDeclaredValue,
 } from './rules';
 import { processByggkasinoAction } from './logic';
 import type { ByggkasinoState } from './types';
@@ -67,7 +68,7 @@ describe('isValidCapture', () => {
     const table: TableSlot[] = [
       {
         kind: 'build',
-        build: { cards: [H10, C4], value: 14, ownerId: 'x' },
+        build: { cards: [H10, C4], value: 14, ownerId: 'x', groupCount: 1 },
       },
     ];
     expect(isValidCapture(AH, table, [0])).toBe(true);
@@ -79,11 +80,23 @@ describe('isValidCapture', () => {
     expect(isValidCapture(seven, table, [0, 1])).toBe(false);
   });
 
+  it('rejects capturing a loose card when its capture value does not match the played card', () => {
+    const table9: TableSlot[] = [{ kind: 'card', card: { suit: 'clubs', rank: 9 } }];
+    const tenH: Card = { suit: 'hearts', rank: 10 };
+    const tenD: Card = { suit: 'diamonds', rank: 10 };
+    expect(isValidCapture(tenH, table9, [0])).toBe(false);
+    expect(isValidCapture(tenD, table9, [0])).toBe(false);
+
+    const table7: TableSlot[] = [{ kind: 'card', card: { suit: 'clubs', rank: 7 } }];
+    const eight: Card = { suit: 'hearts', rank: 8 };
+    expect(isValidCapture(eight, table7, [0])).toBe(false);
+  });
+
   it('captures a grouped build whose value matches the hand card', () => {
     const table: TableSlot[] = [
       {
         kind: 'build',
-        build: { cards: [C3, C3], value: 6, ownerId: 'p0' },
+        build: { cards: [C3, C3], value: 6, ownerId: 'p0', groupCount: 1 },
       },
     ];
     const six: Card = { suit: 'diamonds', rank: 6 };
@@ -95,6 +108,53 @@ describe('isValidCapture', () => {
     const table: TableSlot[] = [{ kind: 'card', card: sevenH }, { kind: 'card', card: sevenH }];
     const sevenD: Card = { suit: 'diamonds', rank: 7 };
     expect(isValidCapture(sevenD, table, [0, 1])).toBe(true);
+  });
+
+  it('allows capturing build 10 or loose 10, but not both in one capture', () => {
+    const C2: Card = { suit: 'clubs', rank: 2 };
+    const C8: Card = { suit: 'clubs', rank: 8 };
+    const S10: Card = { suit: 'spades', rank: 10 };
+    const tenC: Card = { suit: 'clubs', rank: 10 };
+    const table: TableSlot[] = [
+      { kind: 'build', build: { cards: [C2, C8], value: 10, ownerId: 'x', groupCount: 1 } },
+      { kind: 'card', card: S10 },
+    ];
+    expect(isValidCapture(tenC, table, [0])).toBe(true);
+    expect(isValidCapture(tenC, table, [1])).toBe(true);
+    expect(isValidCapture(tenC, table, [0, 1])).toBe(false);
+  });
+
+  it('rejects capturing grouped 13 plus loose king together', () => {
+    const king: Card = { suit: 'hearts', rank: 13 };
+    const table: TableSlot[] = [
+      {
+        kind: 'build',
+        build: {
+          cards: [{ suit: 'clubs', rank: 7 }, { suit: 'diamonds', rank: 6 }],
+          value: 13,
+          ownerId: 'p0',
+          groupCount: 1,
+        },
+      },
+      { kind: 'card', card: { suit: 'spades', rank: 13 } },
+    ];
+    expect(isValidCapture(king, table, [0])).toBe(true);
+    expect(isValidCapture(king, table, [1])).toBe(true);
+    expect(isValidCapture(king, table, [0, 1])).toBe(false);
+  });
+
+  it('5 of spades captures only when selection is the full occupied table', () => {
+    const S5: Card = { suit: 'spades', rank: 5 };
+    const table: TableSlot[] = [{ kind: 'card', card: C3 }, null, { kind: 'card', card: C6 }];
+    expect(isValidCapture(S5, table, [0, 2])).toBe(true);
+    expect(isValidCapture(S5, table, [0])).toBe(false);
+    expect(isValidCapture(S5, table, [])).toBe(false);
+  });
+
+  it('5 of spades cannot capture when table is empty', () => {
+    const S5: Card = { suit: 'spades', rank: 5 };
+    const table: TableSlot[] = [null, null];
+    expect(isValidCapture(S5, table, [])).toBe(false);
   });
 });
 
@@ -158,6 +218,7 @@ describe('processByggkasinoAction build with ace low sum', () => {
       dealerIndex: 0,
       phase: 'playing',
       roundNumber: 1,
+      dealNumberInRound: 1,
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
@@ -178,12 +239,121 @@ describe('processByggkasinoAction build with ace low sum', () => {
   });
 });
 
+// findPossibleCaptures returns legal build-only and loose-only capture sets.
 describe('findPossibleCaptures', () => {
   it('returns build capture for J on build 11', () => {
     const table: TableSlot[] = [
-      { kind: 'build', build: { cards: [C5, C6], value: 11, ownerId: 'x' } },
+      { kind: 'build', build: { cards: [C5, C6], value: 11, ownerId: 'x', groupCount: 1 } },
     ];
     const groups = findPossibleCaptures({ suit: 'diamonds', rank: 11 }, table);
     expect(groups.some(g => g.includes(0))).toBe(true);
+  });
+
+  it('5 of spades offers full-table index set when table is non-empty', () => {
+    const S5: Card = { suit: 'spades', rank: 5 };
+    const table: TableSlot[] = [
+      { kind: 'card', card: C3 },
+      {
+        kind: 'build',
+        build: { cards: [C4, C5], value: 9, ownerId: 'x', groupCount: 1 },
+      },
+    ];
+    const groups = findPossibleCaptures(S5, table);
+    expect(groups.some(g => g.length === 2 && g.includes(0) && g.includes(1))).toBe(true);
+  });
+
+  it('5 of spades yields no capture groups when table is empty', () => {
+    const S5: Card = { suit: 'spades', rank: 5 };
+    expect(findPossibleCaptures(S5, [null, null])).toEqual([]);
+  });
+
+  it('keeps build and loose captures separate for same value', () => {
+    const C2: Card = { suit: 'clubs', rank: 2 };
+    const C8: Card = { suit: 'clubs', rank: 8 };
+    const S10: Card = { suit: 'spades', rank: 10 };
+    const tenC: Card = { suit: 'clubs', rank: 10 };
+    const table: TableSlot[] = [
+      { kind: 'build', build: { cards: [C2, C8], value: 10, ownerId: 'x', groupCount: 1 } },
+      { kind: 'card', card: S10 },
+    ];
+    const groups = findPossibleCaptures(tenC, table).map(g => [...g].sort((a, b) => a - b));
+    expect(groups).toContainEqual([0]);
+    expect(groups).toContainEqual([1]);
+    expect(groups).not.toContainEqual([0, 1]);
+  });
+});
+
+describe('resolveTableGroupWithBuildsDeclaredValue', () => {
+  it('resolves value for build + loose cards summing to the same value', () => {
+    const table: TableSlot[] = [
+      { kind: 'build', build: { cards: [C3, C4], value: 7, ownerId: 'p0', groupCount: 1 } },
+      { kind: 'card', card: AH },
+      { kind: 'card', card: C6 },
+    ];
+    const hand: Card[] = [{ suit: 'hearts', rank: 7 }];
+    expect(resolveTableGroupWithBuildsDeclaredValue(table, [0, 1, 2], hand)).toBe(7);
+  });
+
+  it('resolves value for two builds of the same value', () => {
+    const table: TableSlot[] = [
+      { kind: 'build', build: { cards: [C3, C4], value: 7, ownerId: 'p0', groupCount: 1 } },
+      { kind: 'build', build: { cards: [AH, C6], value: 7, ownerId: 'p0', groupCount: 1 } },
+    ];
+    const hand: Card[] = [{ suit: 'hearts', rank: 7 }];
+    expect(resolveTableGroupWithBuildsDeclaredValue(table, [0, 1], hand)).toBe(7);
+  });
+
+  it('resolves value for build 13 + loose king', () => {
+    const table: TableSlot[] = [
+      {
+        kind: 'build',
+        build: {
+          cards: [{ suit: 'clubs', rank: 7 }, { suit: 'diamonds', rank: 6 }],
+          value: 13,
+          ownerId: 'p0',
+          groupCount: 1,
+        },
+      },
+      { kind: 'card', card: { suit: 'spades', rank: 13 } },
+    ];
+    const hand: Card[] = [{ suit: 'hearts', rank: 13 }];
+    expect(resolveTableGroupWithBuildsDeclaredValue(table, [0, 1], hand)).toBe(13);
+  });
+
+  it('rejects builds with different values', () => {
+    const table: TableSlot[] = [
+      { kind: 'build', build: { cards: [C3, C4], value: 7, ownerId: 'p0', groupCount: 1 } },
+      { kind: 'build', build: { cards: [C3, C5], value: 8, ownerId: 'p1', groupCount: 1 } },
+    ];
+    const hand: Card[] = [{ suit: 'hearts', rank: 7 }, { suit: 'hearts', rank: 8 }];
+    expect(resolveTableGroupWithBuildsDeclaredValue(table, [0, 1], hand)).toBe(0);
+  });
+
+  it('rejects single build without loose cards', () => {
+    const table: TableSlot[] = [
+      { kind: 'build', build: { cards: [C3, C4], value: 7, ownerId: 'p0', groupCount: 1 } },
+    ];
+    const hand: Card[] = [{ suit: 'hearts', rank: 7 }];
+    expect(resolveTableGroupWithBuildsDeclaredValue(table, [0], hand)).toBe(0);
+  });
+
+  it('rejects when loose cards do not sum to build value', () => {
+    const table: TableSlot[] = [
+      { kind: 'build', build: { cards: [C3, C4], value: 7, ownerId: 'p0', groupCount: 1 } },
+      { kind: 'card', card: C5 },
+      { kind: 'card', card: C6 },
+    ];
+    const hand: Card[] = [{ suit: 'hearts', rank: 7 }];
+    expect(resolveTableGroupWithBuildsDeclaredValue(table, [0, 1, 2], hand)).toBe(0);
+  });
+
+  it('rejects when hand cannot capture the declared value', () => {
+    const table: TableSlot[] = [
+      { kind: 'build', build: { cards: [C3, C4], value: 7, ownerId: 'p0', groupCount: 1 } },
+      { kind: 'card', card: AH },
+      { kind: 'card', card: C6 },
+    ];
+    const hand: Card[] = [{ suit: 'hearts', rank: 8 }];
+    expect(resolveTableGroupWithBuildsDeclaredValue(table, [0, 1, 2], hand)).toBe(0);
   });
 });

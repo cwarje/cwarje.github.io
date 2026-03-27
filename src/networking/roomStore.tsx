@@ -59,6 +59,11 @@ function isPokerHostControlAction(payload: unknown): payload is { type: 'next-ha
   return actionType === 'next-hand' || actionType === 'end-session';
 }
 
+function isByggkasinoStartNextRoundAction(payload: unknown): boolean {
+  if (typeof payload !== 'object' || payload === null) return false;
+  return (payload as { type?: unknown }).type === 'start-next-round';
+}
+
 function applyProfileToGameState(
   gameType: GameType,
   state: unknown,
@@ -378,6 +383,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           if (
             currentRoom.gameType === 'poker'
             && isPokerHostControlAction(msg.payload)
+            && senderDeviceId !== currentRoom.hostId
+          ) {
+            return;
+          }
+          if (
+            currentRoom.gameType === 'byggkasino'
+            && isByggkasinoStartNextRoundAction(msg.payload)
             && senderDeviceId !== currentRoom.hostId
           ) {
             return;
@@ -946,6 +958,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       ) {
         return;
       }
+      if (
+        currentRoom.gameType === 'byggkasino'
+        && isByggkasinoStartNextRoundAction(payload)
+        && myId !== currentRoom.hostId
+      ) {
+        return;
+      }
       const currentGs = gameStateRef.current;
       const wasFinished = currentRoom.phase === 'finished';
       const newGs = processGameAction(currentRoom.gameType, currentGs, payload, myId);
@@ -1046,9 +1065,9 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const CROSS_CRIB_CRIB_REVEAL_STEP_MS = 750; // ms between each crib card flip
   const SETTLER_BOT_DELAY = 900; // ms between bot actions in Settler
   const BYGGKASINO_BOT_DELAY = 900; // ms between Byggkasino bot plays
-  const BYGGKASINO_CAPTURE_PREVIEW_DELAY = 1000; // ms for capture preview overlay before capture resolves
+  const BYGGKASINO_CAPTURE_PREVIEW_DELAY = 1600; // ms for capture preview overlay before capture resolves
   const BYGGKASINO_ACTION_ANNOUNCEMENT_DELAY = 3000; // ms to show last play in heads-up before next turn
-  const BYGGKASINO_ROUND_END_DELAY = 4500; // ms to show round summary before next deal
+  const BYGGKASINO_TABLE_REMNANT_DELAY = 3000; // ms to show who takes remaining table cards before scoring
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settlerIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1543,13 +1562,18 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (bs.phase === 'round-end') {
+      if (bs.phase === 'table-remnant') {
         botTimerRef.current = setTimeout(() => {
           const currentGs = gameStateRef.current as ByggkasinoState | null;
           const currentRoom = roomRef.current;
-          if (!currentGs || !currentRoom || currentGs.phase !== 'round-end') return;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'table-remnant') return;
 
-          const next = runSingleBotTurn('byggkasino', currentGs);
+          const next = processGameAction(
+            'byggkasino',
+            currentGs,
+            { type: 'finish-table-remnant' },
+            ''
+          );
           if (next !== currentGs) {
             setGameState(next);
             broadcastGameState(next);
@@ -1559,7 +1583,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
               broadcastRoomState(finishedRoom);
             }
           }
-        }, BYGGKASINO_ROUND_END_DELAY);
+        }, BYGGKASINO_TABLE_REMNANT_DELAY);
         return;
       }
 

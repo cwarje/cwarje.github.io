@@ -5,6 +5,8 @@ import {
   cardEquals,
   cardIsSingleMatchForTarget,
   playedCardMatchesBuildValue,
+  isFiveOfSpadesSweepCard,
+  occupiedTableSlotIndices,
 } from './types';
 
 /**
@@ -14,12 +16,23 @@ import {
  * - Matching rank or value on single loose cards (multiple loose only if each matches alone)
  * - Matching the declared value of a build (any value in the card's sum set)
  * Multi-card loose sums require a prior table Group (build), not direct capture.
+ * Builds and loose cards cannot be captured together in a single capture action.
+ * Loose cards matching a build value must be grouped first.
  */
 export function isValidCapture(
   playedCard: Card,
   tableSlots: TableSlot[],
   selectedIndices: number[]
 ): boolean {
+  if (isFiveOfSpadesSweepCard(playedCard)) {
+    const occ = occupiedTableSlotIndices(tableSlots);
+    if (occ.length === 0) return false;
+    const sortedOcc = [...occ].sort((a, b) => a - b);
+    const uniqSel = [...new Set(selectedIndices)].sort((a, b) => a - b);
+    if (uniqSel.length !== sortedOcc.length) return false;
+    return uniqSel.every((v, i) => v === sortedOcc[i]);
+  }
+
   if (selectedIndices.length === 0) return false;
 
   const selected = selectedIndices
@@ -29,6 +42,7 @@ export function isValidCapture(
 
   const looseCards = selected.filter((it): it is { kind: 'card'; card: Card } => it.kind === 'card');
   const builds = selected.filter((it): it is { kind: 'build'; build: Build } => it.kind === 'build');
+  if (builds.length > 0 && looseCards.length > 0) return false;
 
   const playedOptions = [...new Set(cardValuesForSum(playedCard))];
 
@@ -61,44 +75,10 @@ function validateLooseCardGroups(targetValue: number, cards: Card[]): boolean {
   if (cards.length === 0) return true;
 
   const nonSingles = cards.filter(c => !cardIsSingleMatchForTarget(c, targetValue));
-
-  if (cards.length >= 2 && nonSingles.length > 0) return false;
-
-  if (nonSingles.length === 0) return true;
-
-  if (!nonSingles.every(c => canParticipateInBuildOrSum(c))) return false;
-
-  return canPartitionToSum(nonSingles, targetValue);
+  return nonSingles.length === 0;
 }
 
-function canPartitionToSum(cards: Card[], target: number): boolean {
-  if (cards.length === 0) return true;
-  return partitionHelperMulti(cards, 0, target, 0);
-}
-
-function partitionHelperMulti(cards: Card[], index: number, target: number, currentSum: number): boolean {
-  if (index === cards.length) {
-    return currentSum === 0 || currentSum === target;
-  }
-
-  const opts = cardValuesForSum(cards[index]);
-  for (const val of opts) {
-    const newSum = currentSum + val;
-    if (newSum === target) {
-      if (partitionHelperMulti(cards, index + 1, target, 0)) return true;
-    } else if (newSum < target) {
-      if (partitionHelperMulti(cards, index + 1, target, newSum)) return true;
-    }
-
-    if (currentSum === 0) {
-      if (partitionHelperMulti(cards, index + 1, target, 0)) return true;
-    }
-  }
-
-  return false;
-}
-
-function canAssignSumToCards(cards: Card[], target: number): boolean {
+export function canAssignSumToCards(cards: Card[], target: number): boolean {
   function dfs(i: number, remaining: number): boolean {
     if (i === cards.length) return remaining === 0;
     return cardValuesForSum(cards[i]).some(v => dfs(i + 1, remaining - v));
@@ -228,6 +208,48 @@ export function resolveTableGroupDeclaredValue(tableCards: Card[], hand: Card[])
   return 0;
 }
 
+/**
+ * Resolve the declared value for a group-table that may include existing builds.
+ * Returns 0 if no legal grouping exists.
+ *
+ * Valid selections:
+ * - 2+ loose cards summing to a capturable value (original behaviour)
+ * - 1+ builds (all same value) + 0 or more loose cards summing to that value
+ * - 2+ builds of the same value (with or without extra loose cards)
+ */
+export function resolveTableGroupWithBuildsDeclaredValue(
+  tableSlots: TableSlot[],
+  selectedIndices: number[],
+  hand: Card[]
+): number {
+  const builds: Build[] = [];
+  const looseCards: Card[] = [];
+  for (const i of selectedIndices) {
+    const item = tableSlots[i];
+    if (!item) return 0;
+    if (item.kind === 'build') builds.push(item.build);
+    else looseCards.push(item.card);
+  }
+
+  if (builds.length === 0) {
+    return resolveTableGroupDeclaredValue(looseCards, hand);
+  }
+
+  const buildValue = builds[0].value;
+  if (!builds.every(b => b.value === buildValue)) return 0;
+
+  if (looseCards.length > 0) {
+    if (!looseCards.every(c => canParticipateInBuildOrSum(c))) return 0;
+    if (!canAssignSumToCards(looseCards, buildValue)) return 0;
+  }
+
+  const totalComponents = builds.length + (looseCards.length > 0 ? 1 : 0);
+  if (totalComponents < 2) return 0;
+
+  if (!playerCanCaptureBuildValue(hand, buildValue)) return 0;
+  return buildValue;
+}
+
 export function scoreRound(players: ByggkasinoPlayer[]): Record<string, RoundScoreBreakdown> {
   const scores: Record<string, RoundScoreBreakdown> = {};
 
@@ -303,6 +325,14 @@ export function scoreRound(players: ByggkasinoPlayer[]): Record<string, RoundSco
  */
 export function findPossibleCaptures(playedCard: Card, tableSlots: TableSlot[]): number[][] {
   const results: number[][] = [];
+
+  if (isFiveOfSpadesSweepCard(playedCard)) {
+    const occ = occupiedTableSlotIndices(tableSlots);
+    if (occ.length > 0) {
+      results.push([...occ].sort((a, b) => a - b));
+    }
+  }
+
   const playedOptions = [...new Set(cardValuesForSum(playedCard))];
 
   for (const playedVal of playedOptions) {
@@ -324,20 +354,18 @@ export function findPossibleCaptures(playedCard: Card, tableSlots: TableSlot[]):
       return item.kind === 'card' && cardIsSingleMatchForTarget(item.card, playedVal);
     });
 
-    const captureGroups = exactMatchLoose.map(i => [i]);
-
-    if (captureGroups.length === 0 && buildIndices.length === 0) continue;
-
-    const allCombined = [...buildIndices];
-    if (captureGroups.length > 0) {
-      for (const group of captureGroups) {
-        allCombined.push(...group);
+    if (buildIndices.length > 0) {
+      const sortedBuilds = [...buildIndices].sort((a, b) => a - b);
+      if (isValidCapture(playedCard, tableSlots, sortedBuilds)) {
+        results.push(sortedBuilds);
       }
     }
 
-    if (allCombined.length > 0) {
-      const unique = [...new Set(allCombined)];
-      results.push(unique);
+    if (exactMatchLoose.length > 0) {
+      const sortedLoose = [...exactMatchLoose].sort((a, b) => a - b);
+      if (isValidCapture(playedCard, tableSlots, sortedLoose)) {
+        results.push(sortedLoose);
+      }
     }
   }
 

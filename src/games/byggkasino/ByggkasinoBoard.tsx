@@ -1,13 +1,26 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { BYGG_TABLE_COLUMNS, type Card, type Suit, type ByggkasinoState, type TableItem } from './types';
-import { cardEquals, rankDisplay, canParticipateInBuildOrSum } from './types';
 import {
-  findPossibleCaptures,
+  BYGG_TABLE_COLUMNS,
+  type Card,
+  type Suit,
+  type ByggkasinoState,
+  type TableItem,
+  buildMultiplicityLabel,
+  cardEquals,
+  rankDisplay,
+  canParticipateInBuildOrSum,
+  countOccupiedTableSlots,
+  isFiveOfSpadesSweepCard,
+  occupiedTableSlotIndices,
+} from './types';
+import { countRemnantCardsOnTable, getCaptureOutcomeFromPreview } from './logic';
+import {
+  isValidCapture,
   resolveBuildDeclaredValue,
   resolveExtendBuildDeclaredValue,
-  resolveTableGroupDeclaredValue,
+  resolveTableGroupWithBuildsDeclaredValue,
 } from './rules';
 import {
   DARK_PLAYER_COLORS,
@@ -34,6 +47,7 @@ interface ByggkasinoBoardProps {
   state: unknown;
   myId: string;
   onAction: (action: unknown) => void;
+  isHost?: boolean;
   isHandZoomed?: boolean;
 }
 
@@ -60,6 +74,31 @@ function getByggLayoutRadii(playerCount: number): { seatRadiusX: number; seatRad
 
 function cardDisplayText(card: Card): string {
   return `${rankDisplay(card.rank)}${SUIT_SYMBOLS[card.suit]}`;
+}
+
+function captureHudMessage(
+  actor: ByggkasinoState['players'][number],
+  myId: string,
+  capturedCards: Card[],
+  sweep: boolean
+): ReactNode {
+  const displayName = actor.id === myId ? 'You' : actor.name;
+  const nameEl = <span style={{ color: getPlayerHudTextColor(actor.color) }}>{displayName}</span>;
+  let suffix = '';
+  if (sweep) suffix += ' (clean table)';
+  const playedCard = capturedCards[0];
+  const fromTable = capturedCards.slice(1);
+  const capturePhrase =
+    fromTable.length === 0
+      ? ` took ${capturedCards.map(cardDisplayText).join(', ')}`
+      : `: ${cardDisplayText(playedCard)} took ${fromTable.map(cardDisplayText).join(', ')}`;
+  return (
+    <>
+      {nameEl}
+      {capturePhrase}
+      {suffix}
+    </>
+  );
 }
 
 function CardFace({ card, small = false }: { card: Card; small?: boolean }) {
@@ -148,7 +187,7 @@ function BuildPile({
           </div>
         ))}
       </div>
-      <span className="byggkasino-buildPileValueBadge">{build.build.value}</span>
+      <span className="byggkasino-buildPileValueBadge">{buildMultiplicityLabel(build.build)}</span>
       {previewCard && (
         <div className="byggkasino-capturePreviewCard">
           <div className="byggkasino-card">
@@ -164,6 +203,7 @@ export default function ByggkasinoBoard({
   state,
   myId,
   onAction,
+  isHost = false,
   isHandZoomed = false,
 }: ByggkasinoBoardProps) {
   const s = state as ByggkasinoState;
@@ -209,7 +249,7 @@ export default function ByggkasinoBoard({
         });
         return;
       }
-      if (!item || item.kind !== 'card') return;
+      if (!item) return;
       setSelectedTableIndices(prev => {
         if (prev.includes(index)) return prev.filter(i => i !== index);
         return [...prev, index];
@@ -218,41 +258,21 @@ export default function ByggkasinoBoard({
     [isMyTurn, selectedHandCard, s.pendingCapturePreview, s.tableSlots]
   );
 
-  const possibleCaptures = useMemo(() => {
-    if (!selectedHandCard || !isMyTurn) return [];
-    return findPossibleCaptures(selectedHandCard, s.tableSlots);
-  }, [selectedHandCard, isMyTurn, s.tableSlots]);
-
   const canCapture = useMemo(() => {
-    if (!selectedHandCard || selectedTableIndices.length === 0) return false;
-    return possibleCaptures.some(group => {
-      const sortedGroup = [...group].sort();
-      const sortedSelected = [...selectedTableIndices].sort();
-      if (sortedGroup.length !== sortedSelected.length) return false;
-      return sortedGroup.every((v, i) => v === sortedSelected[i]);
-    });
-  }, [selectedHandCard, selectedTableIndices, possibleCaptures]);
-
-  const selectedTableCardsForGroup = useMemo((): Card[] | null => {
-    if (selectedTableIndices.length < 2) return null;
-    const cards: Card[] = [];
-    for (const i of selectedTableIndices) {
-      const item = s.tableSlots[i];
-      if (!item || item.kind !== 'card') return null;
-      cards.push(item.card);
-    }
-    return cards;
-  }, [selectedTableIndices, s.tableSlots]);
+    if (!selectedHandCard) return false;
+    if (isFiveOfSpadesSweepCard(selectedHandCard) && countOccupiedTableSlots(s.tableSlots) > 0) return true;
+    if (selectedTableIndices.length === 0) return false;
+    return isValidCapture(selectedHandCard, s.tableSlots, selectedTableIndices);
+  }, [selectedHandCard, selectedTableIndices, s.tableSlots]);
 
   const computedGroupValue = useMemo(() => {
-    if (!selectedTableCardsForGroup || !myPlayer) return 0;
-    return resolveTableGroupDeclaredValue(selectedTableCardsForGroup, myPlayer.hand);
-  }, [selectedTableCardsForGroup, myPlayer]);
+    if (selectedTableIndices.length < 2 || !myPlayer) return 0;
+    return resolveTableGroupWithBuildsDeclaredValue(s.tableSlots, selectedTableIndices, myPlayer.hand);
+  }, [selectedTableIndices, s.tableSlots, myPlayer]);
 
   const canGroup =
     isMyTurn &&
-    !selectedHandCard &&
-    selectedTableCardsForGroup !== null &&
+    selectedTableIndices.length >= 2 &&
     computedGroupValue > 0;
 
   const selectedTableCardsForBuild = useMemo((): Card[] => {
@@ -267,6 +287,7 @@ export default function ByggkasinoBoard({
 
   const canBuild = useMemo(() => {
     if (!selectedHandCard || !canParticipateInBuildOrSum(selectedHandCard)) return false;
+    if (isFiveOfSpadesSweepCard(selectedHandCard) && countOccupiedTableSlots(s.tableSlots) > 0) return false;
     if (selectedTableIndices.length !== 1) return false;
     if (selectedTableCardsForBuild.length !== selectedTableIndices.length) return false;
     const d = resolveBuildDeclaredValue(
@@ -290,6 +311,7 @@ export default function ByggkasinoBoard({
 
   const canExtendBuild = useMemo(() => {
     if (!selectedHandCard || !canParticipateInBuildOrSum(selectedHandCard)) return false;
+    if (isFiveOfSpadesSweepCard(selectedHandCard) && countOccupiedTableSlots(s.tableSlots) > 0) return false;
     if (selectedTableIndices.length !== 1) return false;
     const item = s.tableSlots[selectedTableIndices[0]];
     if (!item || item.kind !== 'build') return false;
@@ -307,18 +329,26 @@ export default function ByggkasinoBoard({
     const hasOwnBuild = s.tableSlots.some(
       it => it?.kind === 'build' && it.build.ownerId === myId
     );
-    return !hasOwnBuild;
+    if (hasOwnBuild) {
+      return isFiveOfSpadesSweepCard(selectedHandCard) && countOccupiedTableSlots(s.tableSlots) > 0;
+    }
+    return true;
   }, [selectedHandCard, s.tableSlots, myId]);
 
   const handleCapture = useCallback(() => {
-    if (!selectedHandCard || selectedTableIndices.length === 0) return;
+    if (!selectedHandCard) return;
+    let capturedSlotIndices = selectedTableIndices;
+    if (isFiveOfSpadesSweepCard(selectedHandCard) && countOccupiedTableSlots(s.tableSlots) > 0) {
+      capturedSlotIndices = occupiedTableSlotIndices(s.tableSlots);
+    }
+    if (capturedSlotIndices.length === 0) return;
     onAction({
       type: 'capture-preview',
       playedCard: selectedHandCard,
-      capturedSlotIndices: selectedTableIndices,
+      capturedSlotIndices,
     });
     resetSelection();
-  }, [selectedHandCard, selectedTableIndices, onAction, resetSelection]);
+  }, [selectedHandCard, selectedTableIndices, s.tableSlots, onAction, resetSelection]);
 
   const handleGroup = useCallback(() => {
     if (!canGroup || computedGroupValue <= 0) return;
@@ -384,7 +414,7 @@ export default function ByggkasinoBoard({
     const resizeObserver = new ResizeObserver(updateSize);
     resizeObserver.observe(element);
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [s.phase]);
 
   useEffect(() => {
     if (!seatPillElement) return;
@@ -403,7 +433,7 @@ export default function ByggkasinoBoard({
     const resizeObserver = new ResizeObserver(updateSize);
     resizeObserver.observe(element);
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [s.phase]);
 
   const seatLayouts = useMemo<ByggSeatLayout[]>(() => {
     const playerCount = s.players.length;
@@ -476,34 +506,16 @@ export default function ByggkasinoBoard({
       const ann = s.actionAnnouncement;
       const actor = s.players.find(p => p.id === ann.playerId);
       if (!actor) return null;
+      if (ann.kind === 'capture') {
+        return captureHudMessage(actor, myId, ann.capturedCards, ann.sweep);
+      }
       const displayName = actor.id === myId ? 'You' : actor.name;
       const nameEl = <span style={{ color: getPlayerHudTextColor(actor.color) }}>{displayName}</span>;
-
-      if (ann.kind === 'capture') {
-        let suffix = '';
-        if (ann.sweep) suffix += ' (sweep)';
-        if (ann.capturedBuild) suffix += ' · including a build';
-        const cardsText = ann.capturedCards.map(cardDisplayText).join(', ');
-        return (
-          <>
-            {nameEl}
-            {` captured ${cardsText}`}
-            {suffix}
-          </>
-        );
-      }
       if (ann.kind === 'build') {
-        const tbl =
-          ann.tableCardCount === 1
-            ? ' from 1 table card'
-            : ann.tableCardCount > 1
-              ? ` from ${ann.tableCardCount} table cards`
-              : '';
         return (
           <>
             {nameEl}
-            {` built ${ann.declaredValue}`}
-            {tbl}
+            {` built ${ann.declaredValue} from ${ann.buildCards.map(cardDisplayText).join(', ')}`}
           </>
         );
       }
@@ -519,11 +531,44 @@ export default function ByggkasinoBoard({
         return (
           <>
             {nameEl}
-            {` trailed ${cardDisplayText(ann.playedCard)}`}
+            {` played ${cardDisplayText(ann.playedCard)}`}
           </>
         );
       }
       return null;
+    }
+
+    if (s.phase === 'table-remnant') {
+      const remnantCount = countRemnantCardsOnTable(s.tableSlots);
+      if (s.lastCapturerIndex >= 0) {
+        const actor = s.players[s.lastCapturerIndex];
+        if (!actor) return null;
+        const displayName = actor.id === myId ? 'You' : actor.name;
+        const nameEl = <span style={{ color: getPlayerHudTextColor(actor.color) }}>{displayName}</span>;
+        const cardWord = remnantCount === 1 ? 'card' : 'cards';
+        return (
+          <>
+            {nameEl}
+            {remnantCount > 0
+              ? ` took last and takes the ${remnantCount} remaining ${cardWord} on the table`
+              : ' took last. The table is empty'}
+          </>
+        );
+      }
+      if (remnantCount > 0) {
+        return 'No player took this round. Remaining table cards are not awarded.';
+      }
+      return 'No player took this round. The table is empty.';
+    }
+
+    if (s.pendingCapturePreview) {
+      const previewOutcome = getCaptureOutcomeFromPreview(s, s.pendingCapturePreview);
+      if (previewOutcome) {
+        const actor = s.players.find(p => p.id === s.pendingCapturePreview!.playerId);
+        if (actor) {
+          return captureHudMessage(actor, myId, previewOutcome.capturedCards, previewOutcome.sweep);
+        }
+      }
     }
 
     if (!currentPlayer) return null;
@@ -531,7 +576,7 @@ export default function ByggkasinoBoard({
       if (selectedHandCard) {
         return `Your turn · ${cardDisplayText(selectedHandCard)} selected`;
       }
-      return 'Your turn · Select loose cards to group (2+) or a hand card';
+      return 'Your turn · You must play a card';
     }
     return (
       <>
@@ -539,7 +584,17 @@ export default function ByggkasinoBoard({
         {"'s turn"}
       </>
     );
-  }, [s.phase, s.actionAnnouncement, s.players, myId, currentPlayer, isMyTurn, selectedHandCard]);
+  }, [
+    s.phase,
+    s.actionAnnouncement,
+    s.players,
+    s.pendingCapturePreview,
+    s.tableSlots,
+    myId,
+    currentPlayer,
+    isMyTurn,
+    selectedHandCard,
+  ]);
 
   const renderSeatPill = (layout: ByggSeatLayout, shouldMeasure = false) => {
     const player = layout.player;
@@ -560,7 +615,16 @@ export default function ByggkasinoBoard({
         <div className="byggkasino-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
           <span className="byggkasino-seatPillName">{isMe ? 'You' : player.name}</span>
         </div>
-        <div className="byggkasino-seatPillScore">{s.scores[player.id] ?? 0}</div>
+        <div className="river-seatPillLabels">
+          <span className="river-seatCell river-seatCell--bid" title="Clean tables">CT</span>
+          <span className="river-seatCell river-seatCell--tricks" title="Cards">Crds</span>
+          <span className="river-seatCell river-seatCell--total">Tot</span>
+        </div>
+        <div className="river-seatPillValues">
+          <span className="river-seatCell river-seatCell--bid">{player.sweepCount}</span>
+          <span className="river-seatCell river-seatCell--tricks">{player.capturedCards.length}</span>
+          <span className="river-seatCell river-seatCell--total">{s.scores[player.id] ?? 0}</span>
+        </div>
       </div>
     );
   };
@@ -570,83 +634,91 @@ export default function ByggkasinoBoard({
       .map(id => s.players.find(p => p.id === id)?.name ?? id)
       .join(', ');
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-6 p-4">
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="text-center"
-        >
-          <h2 className="text-3xl font-bold text-yellow-400 mb-2">Game Over!</h2>
-          <p className="text-xl text-white/90 mb-4">
-            {s.winners.includes(myId) ? 'You win!' : `${winnerNames} wins!`}
-          </p>
-          <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-2 mb-4">
-            <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-2">Final Scores</h3>
-            {s.players.map(p => {
-              const isSelf = p.id === myId;
-              return (
-                <div key={p.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                  <span className="text-sm font-medium" style={{ color: getPlayerHudTextColor(p.color) }}>
-                    {p.name}{isSelf ? ' (You)' : ''}
-                  </span>
-                  <span className="font-bold text-white tabular-nums">{s.scores[p.id] ?? 0}</span>
-                </div>
-              );
-            })}
-          </div>
-        </motion.div>
+      <div className="byggkasino-board">
+        <div className="flex flex-1 flex-col items-center justify-center min-h-0 gap-6">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="text-center"
+          >
+            <h2 className="text-3xl font-bold text-yellow-400 mb-2">Game Over!</h2>
+            <p className="text-xl text-white/90 mb-4">
+              {s.winners.includes(myId) ? 'You win!' : `${winnerNames} wins!`}
+            </p>
+            <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-2 mb-4">
+              <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-2">Final Scores</h3>
+              {s.players.map(p => {
+                const isSelf = p.id === myId;
+                return (
+                  <div key={p.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                    <span className="text-sm font-medium" style={{ color: getPlayerHudTextColor(p.color) }}>
+                      {p.name}{isSelf ? ' (You)' : ''}
+                    </span>
+                    <span className="font-bold text-white tabular-nums">{s.scores[p.id] ?? 0}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        </div>
       </div>
     );
   }
 
   if (s.phase === 'round-end') {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-6 p-4">
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="text-center max-w-sm w-full"
-        >
-          <h2 className="text-2xl font-bold text-white mb-1">Round {s.roundNumber} Complete</h2>
-          <p className="text-white/50 text-sm mb-4">Target: {s.targetScore} points</p>
-
-          <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-3 mb-4">
-            {s.players.map(p => {
-              const roundScore = s.lastRoundScores[p.id];
-              return (
-                <div key={p.id} className="text-left">
-                  <div className="flex items-center justify-between mb-1">
-                    <span
-                      className="font-medium text-sm"
-                      style={{ color: getPlayerHudTextColor(p.color) }}
-                    >
-                      {p.name}{p.id === myId ? ' (You)' : ''}
-                    </span>
-                    <span className="font-bold text-white tabular-nums">{s.scores[p.id] ?? 0}</span>
-                  </div>
-                  {roundScore && (
-                    <div className="text-xs text-white/40 flex flex-wrap gap-x-3">
-                      {roundScore.mostCards > 0 && <span>Cards +{roundScore.mostCards}</span>}
-                      {roundScore.mostSpades > 0 && <span>Spades +{roundScore.mostSpades}</span>}
-                      {roundScore.bigCasino > 0 && <span>10{SUIT_SYMBOLS.diamonds} +{roundScore.bigCasino}</span>}
-                      {roundScore.littleCasino > 0 && <span>2{SUIT_SYMBOLS.spades} +{roundScore.littleCasino}</span>}
-                      {roundScore.aces > 0 && <span>Aces +{roundScore.aces}</span>}
-                      {roundScore.sweeps > 0 && <span>Sweeps +{roundScore.sweeps}</span>}
-                      {roundScore.total === 0 && <span>No points</span>}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <button
-            onClick={handleStartNextRound}
-            className="px-6 py-2 bg-lime-600 hover:bg-lime-500 text-white rounded-lg font-medium transition-colors"
+      <div className="byggkasino-board">
+        <div className="flex flex-1 flex-col items-center justify-center min-h-0 gap-6">
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="text-center max-w-sm w-full"
           >
-            Next Round
-          </button>
-        </motion.div>
+            <h2 className="text-2xl font-bold text-white mb-4">Round {s.roundNumber}</h2>
+
+            <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-3 mb-4">
+              {s.players.map(p => {
+                const roundScore = s.lastRoundScores[p.id];
+                return (
+                  <div key={p.id} className="text-left">
+                    <div className="flex items-center justify-between mb-1">
+                      <span
+                        className="font-medium text-sm"
+                        style={{ color: getPlayerHudTextColor(p.color) }}
+                      >
+                        {p.name}{p.id === myId ? ' (You)' : ''}
+                      </span>
+                      <span className="font-bold text-white tabular-nums">{s.scores[p.id] ?? 0}</span>
+                    </div>
+                    {roundScore && (
+                      <div className="text-xs text-white flex flex-wrap gap-x-3">
+                        {roundScore.mostCards > 0 && <span>Cards +{roundScore.mostCards}</span>}
+                        {roundScore.mostSpades > 0 && <span>Spades +{roundScore.mostSpades}</span>}
+                        {roundScore.bigCasino > 0 && <span>10{SUIT_SYMBOLS.diamonds} +{roundScore.bigCasino}</span>}
+                        {roundScore.littleCasino > 0 && <span>2{SUIT_SYMBOLS.spades} +{roundScore.littleCasino}</span>}
+                        {roundScore.aces > 0 && <span>Aces +{roundScore.aces}</span>}
+                        {roundScore.sweeps > 0 && <span>Clean tables +{roundScore.sweeps}</span>}
+                        {roundScore.total === 0 && <span>No points</span>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {isHost ? (
+              <button
+                type="button"
+                onClick={handleStartNextRound}
+                className="px-6 py-2 bg-lime-600 hover:bg-lime-500 text-white rounded-lg font-medium transition-colors"
+              >
+                Next Round
+              </button>
+            ) : (
+              <p className="text-sm text-white">Waiting for the host to continue…</p>
+            )}
+          </motion.div>
+        </div>
       </div>
     );
   }
@@ -693,7 +765,7 @@ export default function ByggkasinoBoard({
                       build={item}
                       selected={isSelected}
                       onClick={() => handleTableItemClick(slotIndex)}
-                      disabled={!isMyTurn || !selectedHandCard || !!s.pendingCapturePreview}
+                      disabled={!isMyTurn || !!s.pendingCapturePreview}
                       previewCard={previewCard}
                     />
                   );
@@ -770,72 +842,42 @@ export default function ByggkasinoBoard({
             </div>
           </div>
 
-          {myPlayer.hand.length === 0 && (
-            <div className="byggkasino-emptyHand">
-              {s.deck.length > 0 ? 'Waiting for new cards...' : 'No cards remaining'}
-            </div>
-          )}
-
           <div className="byggkasino-actionRow">
-            {isMyTurn ? (
-              selectedHandCard ? (
-                <>
-                  {canCapture && (
-                    <button
-                      type="button"
-                      onClick={handleCapture}
-                      className="byggkasino-actionButton byggkasino-actionButton--capture"
-                    >
-                      Capture
-                    </button>
-                  )}
-                  {canBuild && (
-                    <button type="button" onClick={handleBuild} className="byggkasino-actionButton byggkasino-actionButton--build">
-                      Build ({computedBuildValue})
-                    </button>
-                  )}
-                  {canExtendBuild && (
-                    <button
-                      type="button"
-                      onClick={handleExtendBuild}
-                      className="byggkasino-actionButton byggkasino-actionButton--extend"
-                    >
-                      Extend Build
-                    </button>
-                  )}
-                  {s.pendingCapturePreview && (
-                    <span className="byggkasino-actionHint">Resolving capture...</span>
-                  )}
-                  {!s.pendingCapturePreview && !canCapture && !canBuild && !canExtendBuild && (
-                    <span className="byggkasino-actionHint">
-                      {canTrail && selectedTableIndices.length === 0
-                        ? 'Click an empty table slot to trail.'
-                        : 'Select table cards to capture or build.'}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <>
-                  {canGroup && (
-                    <button
-                      type="button"
-                      onClick={handleGroup}
-                      className="byggkasino-actionButton byggkasino-actionButton--build"
-                    >
-                      Group ({computedGroupValue})
-                    </button>
-                  )}
-                  {!canGroup && (
-                    <span className="byggkasino-actionHint">
-                      {selectedTableIndices.length >= 2
-                        ? 'You need a hand card that could capture this group.'
-                        : 'Select a hand card, or 2+ loose table cards to group.'}
-                    </span>
-                  )}
-                </>
-              )
-            ) : (
-              <span className="byggkasino-actionHint">Waiting for your turn.</span>
+            {isMyTurn && selectedHandCard && (
+              <>
+                {canCapture && (
+                  <button
+                    type="button"
+                    onClick={handleCapture}
+                    className="byggkasino-actionButton byggkasino-actionButton--capture"
+                  >
+                    Take
+                  </button>
+                )}
+                {canBuild && (
+                  <button type="button" onClick={handleBuild} className="byggkasino-actionButton byggkasino-actionButton--build">
+                    Build ({computedBuildValue})
+                  </button>
+                )}
+                {canExtendBuild && (
+                  <button
+                    type="button"
+                    onClick={handleExtendBuild}
+                    className="byggkasino-actionButton byggkasino-actionButton--extend"
+                  >
+                    Extend Build
+                  </button>
+                )}
+              </>
+            )}
+            {isMyTurn && canGroup && (
+              <button
+                type="button"
+                onClick={handleGroup}
+                className="byggkasino-actionButton byggkasino-actionButton--build"
+              >
+                Group ({computedGroupValue})
+              </button>
             )}
           </div>
         </div>
