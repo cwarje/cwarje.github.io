@@ -415,7 +415,7 @@ export function processByggkasinoAction(
         players: s.players.map((pl, i) => (i === pi ? restored : pl)),
       };
     }
-    const { playedCard, playerId: capturePlayerId } = previewSnapshot;
+    const { playerId: capturePlayerId } = previewSnapshot;
     const playerIndex = s.players.findIndex(p => p.id === capturePlayerId);
     const player = s.players[playerIndex];
     const { capturedCards, newTableSlots, sweep: isSweep, capturedBuild } = outcome;

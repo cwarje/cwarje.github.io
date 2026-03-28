@@ -658,17 +658,7 @@ export default function ByggkasinoBoard({
         {"'s turn"}
       </>
     );
-  }, [
-    s.phase,
-    s.actionAnnouncement,
-    s.players,
-    s.pendingCapturePreview,
-    s.tableSlots,
-    myId,
-    currentPlayer,
-    isMyTurn,
-    selectedHandCard,
-  ]);
+  }, [s, myId, currentPlayer, isMyTurn, selectedHandCard]);
 
   const renderSeatPill = (layout: ByggSeatLayout, shouldMeasure = false) => {
     const player = layout.player;
