@@ -8,6 +8,7 @@ import {
   isValidTableGroup,
   playerCanCaptureBuildValue,
   resolveBuildDeclaredValue,
+  resolveHandAssistedGroupDeclaredValue,
   resolveTableGroupDeclaredValue,
   resolveTableGroupWithBuildsDeclaredValue,
 } from './rules';
@@ -185,6 +186,41 @@ describe('isValidTableGroup and resolveTableGroupDeclaredValue', () => {
     const six: Card = { suit: 'diamonds', rank: 6 };
     expect(resolveTableGroupDeclaredValue([C3, C3], [six])).toBe(6);
     expect(resolveTableGroupDeclaredValue([C3, C3], [{ suit: 'clubs', rank: 8 }])).toBe(0);
+  });
+});
+
+describe('resolveHandAssistedGroupDeclaredValue', () => {
+  const H3: Card = { suit: 'hearts', rank: 3 };
+  const S3: Card = { suit: 'spades', rank: 3 };
+
+  it('allows grouping a matching loose card when another matching hand card remains', () => {
+    const table: TableSlot[] = [{ kind: 'card', card: S3 }];
+    const hand: Card[] = [C3, H3, C4, C5];
+    expect(resolveHandAssistedGroupDeclaredValue(C3, table, [0], hand)).toBe(3);
+  });
+
+  it('allows grouping a matching build value when another matching hand card remains', () => {
+    const table: TableSlot[] = [
+      {
+        kind: 'build',
+        build: { cards: [S3, { suit: 'diamonds', rank: 3 }], value: 3, ownerId: 'p0', groupCount: 2 },
+      },
+    ];
+    const hand: Card[] = [C3, H3, C4];
+    expect(resolveHandAssistedGroupDeclaredValue(C3, table, [0], hand)).toBe(3);
+  });
+
+  it('rejects grouping when no follow-up capture card remains in hand', () => {
+    const looseTable: TableSlot[] = [{ kind: 'card', card: S3 }];
+    const groupedTable: TableSlot[] = [
+      {
+        kind: 'build',
+        build: { cards: [S3, { suit: 'diamonds', rank: 3 }], value: 3, ownerId: 'p0', groupCount: 2 },
+      },
+    ];
+    const hand: Card[] = [C3, C4, C5];
+    expect(resolveHandAssistedGroupDeclaredValue(C3, looseTable, [0], hand)).toBe(0);
+    expect(resolveHandAssistedGroupDeclaredValue(C3, groupedTable, [0], hand)).toBe(0);
   });
 });
 

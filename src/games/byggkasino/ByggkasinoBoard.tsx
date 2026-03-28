@@ -20,6 +20,7 @@ import {
   isValidCapture,
   resolveBuildDeclaredValue,
   resolveExtendBuildDeclaredValue,
+  resolveHandAssistedGroupDeclaredValue,
   resolveTableGroupWithBuildsDeclaredValue,
 } from './rules';
 import {
@@ -265,14 +266,26 @@ export default function ByggkasinoBoard({
     return isValidCapture(selectedHandCard, s.tableSlots, selectedTableIndices);
   }, [selectedHandCard, selectedTableIndices, s.tableSlots]);
 
-  const computedGroupValue = useMemo(() => {
+  const computedTableGroupValue = useMemo(() => {
     if (selectedTableIndices.length < 2 || !myPlayer) return 0;
     return resolveTableGroupWithBuildsDeclaredValue(s.tableSlots, selectedTableIndices, myPlayer.hand);
   }, [selectedTableIndices, s.tableSlots, myPlayer]);
 
+  const computedHandAssistedGroupValue = useMemo(() => {
+    if (!selectedHandCard || selectedTableIndices.length !== 1 || !myPlayer) return 0;
+    return resolveHandAssistedGroupDeclaredValue(
+      selectedHandCard,
+      s.tableSlots,
+      selectedTableIndices,
+      myPlayer.hand
+    );
+  }, [selectedHandCard, selectedTableIndices, s.tableSlots, myPlayer]);
+
+  const computedGroupValue = selectedHandCard ? computedHandAssistedGroupValue : computedTableGroupValue;
+
   const canGroup =
     isMyTurn &&
-    selectedTableIndices.length >= 2 &&
+    (selectedHandCard ? selectedTableIndices.length === 1 : selectedTableIndices.length >= 2) &&
     computedGroupValue > 0;
 
   const selectedTableCardsForBuild = useMemo((): Card[] => {
@@ -352,13 +365,28 @@ export default function ByggkasinoBoard({
 
   const handleGroup = useCallback(() => {
     if (!canGroup || computedGroupValue <= 0) return;
+    const isHandAssistedGroup =
+      !!selectedHandCard && selectedTableIndices.length === 1 && computedHandAssistedGroupValue > 0;
     onAction({
       type: 'group-table',
       tableCardIndices: [...selectedTableIndices].sort((a, b) => a - b),
       declaredValue: computedGroupValue,
+      ...(isHandAssistedGroup ? { playedCard: selectedHandCard } : {}),
     });
+    if (isHandAssistedGroup) {
+      resetSelection();
+      return;
+    }
     setSelectedTableIndices([]);
-  }, [canGroup, computedGroupValue, selectedTableIndices, onAction]);
+  }, [
+    canGroup,
+    computedGroupValue,
+    selectedHandCard,
+    selectedTableIndices,
+    computedHandAssistedGroupValue,
+    onAction,
+    resetSelection,
+  ]);
 
   const handleBuild = useCallback(() => {
     if (!selectedHandCard) return;

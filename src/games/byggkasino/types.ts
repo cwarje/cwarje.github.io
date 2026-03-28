@@ -106,7 +106,7 @@ export interface ByggkasinoState {
 export type ByggkasinoAction =
   | { type: 'capture-preview'; playedCard: Card; capturedSlotIndices: number[] }
   | { type: 'finalize-capture' }
-  | { type: 'group-table'; tableCardIndices: number[]; declaredValue: number }
+  | { type: 'group-table'; tableCardIndices: number[]; declaredValue: number; playedCard?: Card }
   | { type: 'build'; playedCard: Card; tableCardIndices: number[]; declaredValue: number }
   | { type: 'extend-build'; playedCard: Card; buildIndex: number; declaredValue: number }
   | { type: 'trail'; playedCard: Card; targetSlotIndex: number }

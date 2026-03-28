@@ -1047,6 +1047,161 @@ describe('byggkasino dealNumberInRound', () => {
   });
 });
 
+describe('byggkasino hand-assisted duplicate grouping', () => {
+  const C3: Card = { suit: 'clubs', rank: 3 };
+  const H3: Card = { suit: 'hearts', rank: 3 };
+  const D3: Card = { suit: 'diamonds', rank: 3 };
+  const S3: Card = { suit: 'spades', rank: 3 };
+  const C8: Card = { suit: 'clubs', rank: 8 };
+
+  it('groups loose 3 with played 3 into D3 and consumes the played card', () => {
+    const s: ByggkasinoState = {
+      players: [
+        {
+          id: 'p0',
+          name: 'A',
+          color: 'red',
+          isBot: false,
+          hand: [C3, H3, { suit: 'clubs', rank: 4 }, { suit: 'clubs', rank: 5 }],
+          capturedCards: [],
+          sweepCount: 0,
+        },
+        {
+          id: 'p1',
+          name: 'B',
+          color: 'blue',
+          isBot: false,
+          hand: [C8],
+          capturedCards: [],
+          sweepCount: 0,
+        },
+      ],
+      deck: [],
+      tableRows: 1,
+      tableSlots: [{ kind: 'card', card: S3 }, { kind: 'card', card: { suit: 'clubs', rank: 9 } }, null, null],
+      currentPlayerIndex: 0,
+      dealerIndex: 0,
+      phase: 'playing',
+      roundNumber: 1,
+      dealNumberInRound: 1,
+      lastCapturerIndex: -1,
+      scores: { p0: 0, p1: 0 },
+      lastRoundScores: {},
+      targetScore: 21,
+      gameOver: false,
+      winners: [],
+      actionAnnouncement: null,
+      pendingCapturePreview: null,
+    };
+
+    const next = processByggkasinoAction(
+      s,
+      { type: 'group-table', tableCardIndices: [0], declaredValue: 3, playedCard: C3 },
+      'p0'
+    ) as ByggkasinoState;
+
+    expect(next).not.toBe(s);
+    expect(next.players[0].hand).toHaveLength(3);
+    expect(next.players[0].hand).toContainEqual(H3);
+    const buildSlot = next.tableSlots[0];
+    expect(buildSlot?.kind).toBe('build');
+    if (buildSlot?.kind === 'build') {
+      expect(buildSlot.build.value).toBe(3);
+      expect(buildSlot.build.groupCount).toBe(2);
+      expect(buildSlot.build.cards).toEqual([S3, C3]);
+    }
+  });
+
+  it('groups D3 with a hand 3 into T3, then allows capture on next turn with remaining 3', () => {
+    const s: ByggkasinoState = {
+      players: [
+        {
+          id: 'p0',
+          name: 'A',
+          color: 'red',
+          isBot: false,
+          hand: [C3, H3, { suit: 'clubs', rank: 4 }, { suit: 'clubs', rank: 5 }],
+          capturedCards: [],
+          sweepCount: 0,
+        },
+        {
+          id: 'p1',
+          name: 'B',
+          color: 'blue',
+          isBot: false,
+          hand: [C8],
+          capturedCards: [],
+          sweepCount: 0,
+        },
+      ],
+      deck: [],
+      tableRows: 1,
+      tableSlots: [
+        {
+          kind: 'build',
+          build: { cards: [S3, D3], value: 3, ownerId: 'p0', groupCount: 2 },
+        },
+        { kind: 'card', card: { suit: 'diamonds', rank: 9 } },
+        null,
+        null,
+      ],
+      currentPlayerIndex: 0,
+      dealerIndex: 0,
+      phase: 'playing',
+      roundNumber: 1,
+      dealNumberInRound: 1,
+      lastCapturerIndex: -1,
+      scores: { p0: 0, p1: 0 },
+      lastRoundScores: {},
+      targetScore: 21,
+      gameOver: false,
+      winners: [],
+      actionAnnouncement: null,
+      pendingCapturePreview: null,
+    };
+
+    const grouped = processByggkasinoAction(
+      s,
+      { type: 'group-table', tableCardIndices: [0], declaredValue: 3, playedCard: C3 },
+      'p0'
+    ) as ByggkasinoState;
+    expect(grouped).not.toBe(s);
+    const buildSlot = grouped.tableSlots[0];
+    expect(buildSlot?.kind).toBe('build');
+    if (buildSlot?.kind === 'build') {
+      expect(buildSlot.build.groupCount).toBe(3);
+      expect(buildSlot.build.cards).toEqual([S3, D3, C3]);
+    }
+
+    const p1Turn = processByggkasinoAction(
+      grouped,
+      { type: 'finish-action-announcement' },
+      ''
+    ) as ByggkasinoState;
+    const trailed = processByggkasinoAction(
+      p1Turn,
+      { type: 'trail', playedCard: C8, targetSlotIndex: 2 },
+      'p1'
+    ) as ByggkasinoState;
+    const p0Turn = processByggkasinoAction(
+      trailed,
+      { type: 'finish-action-announcement' },
+      ''
+    ) as ByggkasinoState;
+
+    const preview = processByggkasinoAction(
+      p0Turn,
+      { type: 'capture-preview', playedCard: H3, capturedSlotIndices: [0] },
+      'p0'
+    ) as ByggkasinoState;
+    expect(preview.pendingCapturePreview).not.toBeNull();
+
+    const finalized = processByggkasinoAction(preview, { type: 'finalize-capture' }, '') as ByggkasinoState;
+    expect(finalized.tableSlots[0]).toBeNull();
+    expect(finalized.players[0].capturedCards).toHaveLength(4);
+  });
+});
+
 describe('byggkasino table-remnant phase', () => {
   it('waits in table-remnant, then awards remaining table cards when finished', () => {
     const lastCard: Card = { suit: 'hearts', rank: 11 };

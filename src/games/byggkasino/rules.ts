@@ -250,6 +250,42 @@ export function resolveTableGroupWithBuildsDeclaredValue(
   return buildValue;
 }
 
+/**
+ * Resolve grouping a selected hand card into one matching table item.
+ * This supports raising a loose card or existing build/group to the next multiplicity.
+ * Returns 0 when no legal hand-assisted grouping exists.
+ */
+export function resolveHandAssistedGroupDeclaredValue(
+  playedCard: Card,
+  tableSlots: TableSlot[],
+  selectedIndices: number[],
+  hand: Card[]
+): number {
+  if (selectedIndices.length !== 1) return 0;
+  const item = tableSlots[selectedIndices[0]];
+  if (!item) return 0;
+
+  const candidates = new Set<number>();
+  if (item.kind === 'build') {
+    if (playedCardMatchesBuildValue(playedCard, item.build.value)) {
+      candidates.add(item.build.value);
+    }
+  } else {
+    const playedValues = cardValuesForSum(playedCard);
+    for (const tableValue of cardValuesForSum(item.card)) {
+      if (playedValues.includes(tableValue)) candidates.add(tableValue);
+    }
+  }
+
+  const sortedCandidates = [...candidates].sort((a, b) => a - b);
+  for (const value of sortedCandidates) {
+    if (value < 1) continue;
+    if (!playerCanCaptureBuildValue(hand, value, playedCard)) continue;
+    return value;
+  }
+  return 0;
+}
+
 export function scoreRound(players: ByggkasinoPlayer[]): Record<string, RoundScoreBreakdown> {
   const scores: Record<string, RoundScoreBreakdown> = {};
 

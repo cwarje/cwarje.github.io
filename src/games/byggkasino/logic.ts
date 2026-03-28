@@ -32,6 +32,7 @@ import {
   findPossibleCaptures,
   achievableSumsForCards,
   resolveTableGroupDeclaredValue,
+  resolveHandAssistedGroupDeclaredValue,
 } from './rules';
 
 const SUITS: Suit[] = ['clubs', 'diamonds', 'spades', 'hearts'];
@@ -455,10 +456,97 @@ export function processByggkasinoAction(
     }
 
     case 'group-table': {
-      const { tableCardIndices, declaredValue } = a;
+      const { tableCardIndices, declaredValue, playedCard } = a;
       const unique = [...new Set(tableCardIndices)];
-      if (unique.length < 2) return state;
+      const isHandAssistedGroup = playedCard != null;
+      if (!isHandAssistedGroup && unique.length < 2) return state;
+      if (isHandAssistedGroup && unique.length !== 1) return state;
       const sortedIdx = [...unique].sort((x, y) => x - y);
+
+      if (isHandAssistedGroup) {
+        if (!player.hand.some(c => cardEquals(c, playedCard))) return state;
+        const fiveSweepGroup = tryApplyFiveOfSpadesTableSweep(s, playerIndex, playedCard);
+        if (fiveSweepGroup) return fiveSweepGroup;
+
+        const resolvedValue = resolveHandAssistedGroupDeclaredValue(
+          playedCard,
+          s.tableSlots,
+          sortedIdx,
+          player.hand
+        );
+        if (resolvedValue <= 0 || resolvedValue !== declaredValue) return state;
+
+        const selectedIndex = sortedIdx[0];
+        const selectedItem = s.tableSlots[selectedIndex];
+        if (!selectedItem) return state;
+
+        const hasOwnBuildOtherValue = s.tableSlots.some(
+          it => it?.kind === 'build' && it.build.ownerId === playerId && it.build.value !== declaredValue
+        );
+        if (hasOwnBuildOtherValue) return state;
+
+        const newTableSlots = [...s.tableSlots];
+        if (selectedItem.kind === 'build') {
+          newTableSlots[selectedIndex] = {
+            kind: 'build',
+            build: {
+              cards: [...selectedItem.build.cards, playedCard],
+              value: declaredValue,
+              ownerId: playerId,
+              groupCount: selectedItem.build.groupCount + 1,
+            },
+          };
+        } else {
+          const ownedBuildEntry = s.tableSlots
+            .map((it, i) => ({ it, i }))
+            .find(({ it, i }) =>
+              i !== selectedIndex &&
+              it?.kind === 'build' &&
+              it.build.ownerId === playerId &&
+              it.build.value === declaredValue
+            );
+
+          newTableSlots[selectedIndex] = null;
+          if (ownedBuildEntry) {
+            const existing = (ownedBuildEntry.it as { kind: 'build'; build: Build }).build;
+            newTableSlots[ownedBuildEntry.i] = {
+              kind: 'build',
+              build: {
+                cards: [...existing.cards, selectedItem.card, playedCard],
+                value: declaredValue,
+                ownerId: playerId,
+                groupCount: existing.groupCount + 1,
+              },
+            };
+          } else {
+            newTableSlots[selectedIndex] = {
+              kind: 'build',
+              build: {
+                cards: [selectedItem.card, playedCard],
+                value: declaredValue,
+                ownerId: playerId,
+                groupCount: 2,
+              },
+            };
+          }
+        }
+
+        const updatedPlayer = removeCardFromHand(player, playedCard);
+        const newPlayers = s.players.map((p, i) => (i === playerIndex ? updatedPlayer : p));
+        return finishPlayWithOptionalAnnouncement(
+          { ...s, players: newPlayers, tableSlots: newTableSlots },
+          {
+            kind: 'build',
+            playerId: player.id,
+            playedCard,
+            declaredValue,
+            buildCards:
+              selectedItem.kind === 'build'
+                ? [...selectedItem.build.cards, playedCard]
+                : [selectedItem.card, playedCard],
+          }
+        );
+      }
 
       const looseCards: Card[] = [];
       const selectedBuilds: { index: number; build: Build }[] = [];
