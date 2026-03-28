@@ -272,6 +272,7 @@ describe('processByggkasinoAction build with ace low sum', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],

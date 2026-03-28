@@ -1,4 +1,4 @@
-import type { PlayerColor } from '../../networking/types';
+import type { ByggkasinoMatchLength, PlayerColor } from '../../networking/types';
 
 export type Suit = 'hearts' | 'diamonds' | 'clubs' | 'spades';
 export type Rank = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
@@ -99,6 +99,7 @@ export interface ByggkasinoState {
   scores: Record<string, number>;
   /** Per-round score breakdown from the most recent round, keyed by player id. */
   lastRoundScores: Record<string, RoundScoreBreakdown>;
+  matchLength: ByggkasinoMatchLength;
   targetScore: number;
   gameOver: boolean;
   winners: string[];

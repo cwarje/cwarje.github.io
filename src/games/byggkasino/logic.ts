@@ -1,4 +1,4 @@
-import type { Player } from '../../networking/types';
+import type { ByggkasinoMatchLength, Player } from '../../networking/types';
 import type {
   Build,
   Card,
@@ -129,7 +129,8 @@ function startRound(
   roundNumber: number,
   dealerIndex: number,
   scores: Record<string, number>,
-  targetScore: number
+  targetScore: number,
+  matchLength: ByggkasinoMatchLength
 ): ByggkasinoState {
   const deck = shuffle(createDeck());
   let cursor = 0;
@@ -161,6 +162,7 @@ function startRound(
     lastCapturerIndex: -1,
     scores,
     lastRoundScores: {},
+    matchLength,
     targetScore,
     gameOver: false,
     winners: [],
@@ -171,9 +173,11 @@ function startRound(
 
 export function createByggkasinoState(
   players: Player[],
-  options?: { targetScore?: number }
+  options?: { matchLength?: ByggkasinoMatchLength }
 ): ByggkasinoState {
-  const targetScore = options?.targetScore ?? DEFAULT_TARGET_SCORE;
+  const matchLength = options?.matchLength ?? 'to21';
+  const targetScore =
+    matchLength === 'to11' ? 11 : matchLength === 'to21' ? DEFAULT_TARGET_SCORE : 0;
 
   const initialPlayers: ByggkasinoPlayer[] = players.map(p => ({
     id: p.id,
@@ -190,7 +194,7 @@ export function createByggkasinoState(
     scores[p.id] = 0;
   }
 
-  return startRound(initialPlayers, 1, 0, scores, targetScore);
+  return startRound(initialPlayers, 1, 0, scores, targetScore, matchLength);
 }
 
 function advanceTurn(state: ByggkasinoState): ByggkasinoState {
@@ -265,7 +269,10 @@ function endRound(state: ByggkasinoState): ByggkasinoState {
   }
 
   const maxScore = Math.max(...Object.values(newScores));
-  const isGameOver = maxScore >= state.targetScore;
+  const isGameOver =
+    state.matchLength === 'eachDealerOnce'
+      ? state.roundNumber >= state.players.length
+      : maxScore >= state.targetScore;
 
   let winners: string[] = [];
   if (isGameOver) {
@@ -383,7 +390,14 @@ export function processByggkasinoAction(
       capturedCards: [],
       sweepCount: 0,
     }));
-    return startRound(resetPlayers, s.roundNumber + 1, newDealerIndex, s.scores, s.targetScore);
+    return startRound(
+      resetPlayers,
+      s.roundNumber + 1,
+      newDealerIndex,
+      s.scores,
+      s.targetScore,
+      s.matchLength
+    );
   }
 
   if (a.type === 'finish-action-announcement') {

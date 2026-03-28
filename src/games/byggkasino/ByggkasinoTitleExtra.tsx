@@ -50,9 +50,14 @@ export default function ByggkasinoTitleExtra({ state }: GameHudProps) {
   const dealer = s.players[s.dealerIndex];
   const dealerLabel = dealer ? possessiveName(dealer.name) : "Someone's";
 
+  const matchLine =
+    s.matchLength === 'eachDealerOnce'
+      ? 'Each player deals once'
+      : `Game to ${s.targetScore} points`;
+
   return (
     <div className="mt-1 space-y-0.5">
-      <p className="text-xs sm:text-sm text-white/80">Game to {s.targetScore} points</p>
+      <p className="text-xs sm:text-sm text-white/80">{matchLine}</p>
       <p className="text-xs sm:text-sm text-white/80">
         Round {s.roundNumber} ({dealerLabel} deal)
       </p>

@@ -8,17 +8,22 @@ This project runs fully peer-to-peer in the browser: one player hosts a lobby an
 
 Current game types (from `src/games/registry.ts` and `src/networking/types.ts`):
 
+- `mobilization` (4-6 players)
+- `byggkasino` (2-4 players; optional `byggkasinoMatchLength` in start options: `to11`, `to21`, or `eachDealerOnce` — default `to21`)
 - `yahtzee` (1-4 players)
-- `farkle` (2-6 players)
-- `hearts` (4 players, target score options 50 or 100)
+- `farkle` (2-6 players; target score 3000, 5000, or 10000)
+- `hearts` (4 players; target score 50 or 100)
 - `battleship` (2 players)
 - `liars-dice` (2-4 players)
 - `poker` (2-8 players)
-- `up-and-down-the-river` (4-6 players)
-- `tolva` (2-4 players)
-- `cross-crib` (2-4 players)
+- `up-and-down-the-river` (4-6 players; start order `up-down` or `down-up`)
+- `twelve` (2-4 players; UI title **Tolva** — table piles, pile count 3-6)
+- `settler` (3-4 players)
+- `cross-crib` (2 or 4 players only)
 
-Production builds show a subset (yahtzee, farkle, hearts, poker, up-and-down-the-river, tolva, cross-crib); battleship and liars-dice are available in dev mode.
+**Production** home page and game picker use `PRODUCTION_GAME_TYPES` in `registry.ts`: mobilization, byggkasino, yahtzee, hearts, twelve, settler, up-and-down-the-river, farkle, cross-crib, poker.
+
+**Dev-only** (`production: false`): battleship and liars-dice.
 
 ## Key features
 
@@ -116,8 +121,8 @@ Main files:
 
 Important message types:
 
-- Client -> host: `join`, `action`, `leave`
-- Host -> client: `room-state`, `game-state`, `error`, `host-disconnected`
+- Client -> host: `join`, `update-profile`, `action`, `leave`, `ready`
+- Host -> client: `room-state`, `game-state`, `error`, `kicked`, `host-disconnected`
 
 Reconnect behavior:
 
@@ -176,7 +181,7 @@ Scripts are defined in `package.json`:
 - `test:coverage`: run Vitest with coverage output
 - `test:e2e`: run Playwright smoke tests
 - `preview`: serve built app locally
-- `ci`: run lint + typecheck + tests + build locally (same order as CI)
+- `ci`: run lint, typecheck, unit tests, and build locally (does not run Playwright; use `npm run test:e2e` for that)
 
 ### Local troubleshooting
 
@@ -197,7 +202,7 @@ Deployment:
 
 - Validation workflow: `.github/workflows/ci.yml`
   - Triggers on pull requests and pushes to `master`
-  - Runs lint, typecheck, Vitest unit/component tests, build, and Playwright smoke tests
+  - Parallel jobs: lint + typecheck, unit tests (`vitest run`), production build, Playwright smoke tests (Chromium)
 - Deployment workflow: `.github/workflows/deploy.yml`
   - Triggers on push to `master` (or manual workflow dispatch)
   - Builds and deploys `dist/` to GitHub Pages
@@ -252,8 +257,10 @@ Recommended implementation workflow:
 ## Tech stack
 
 - React 19
+- React Router 7
 - TypeScript 5
 - Vite 7
 - PeerJS
 - Tailwind CSS v4
 - Framer Motion
+- Lucide React (icons)

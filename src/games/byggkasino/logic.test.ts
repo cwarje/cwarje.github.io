@@ -99,6 +99,7 @@ describe('byggkasino trail', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -153,6 +154,7 @@ describe('byggkasino group-table then capture', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -239,6 +241,7 @@ describe('byggkasino 5 of spades sweep', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -299,6 +302,7 @@ describe('byggkasino 5 of spades sweep', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -351,6 +355,7 @@ describe('byggkasino 5 of spades sweep', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -408,6 +413,7 @@ describe('byggkasino 5 of spades sweep', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -461,6 +467,7 @@ describe('byggkasino 5 of spades sweep', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -529,6 +536,7 @@ describe('byggkasino 5 of spades sweep', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -600,6 +608,7 @@ describe('byggkasino double/triple builds', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -675,6 +684,7 @@ describe('byggkasino double/triple builds', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -749,6 +759,7 @@ describe('byggkasino double/triple builds', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -820,6 +831,7 @@ describe('byggkasino double/triple builds', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -891,6 +903,7 @@ describe('byggkasino double/triple builds', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -955,6 +968,7 @@ describe('byggkasino double/triple builds', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -1024,6 +1038,7 @@ describe('byggkasino double/triple builds', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -1091,6 +1106,7 @@ describe('byggkasino multi-card build with merge', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -1160,6 +1176,7 @@ describe('byggkasino multi-card build with merge', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -1233,6 +1250,7 @@ describe('byggkasino multi-card build with merge', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -1296,6 +1314,7 @@ describe('byggkasino dealNumberInRound', () => {
       lastCapturerIndex: 0,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -1357,6 +1376,7 @@ describe('byggkasino hand-assisted duplicate grouping', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -1423,6 +1443,7 @@ describe('byggkasino hand-assisted duplicate grouping', () => {
       lastCapturerIndex: -1,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -1509,6 +1530,7 @@ describe('byggkasino table-remnant phase', () => {
       lastCapturerIndex: 0,
       scores: { p0: 0, p1: 0 },
       lastRoundScores: {},
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],
@@ -1555,6 +1577,50 @@ describe('byggkasino table-remnant phase', () => {
   });
 });
 
+describe('byggkasino eachDealerOnce game end', () => {
+  it('ends after one scoring round per player, not when a score target is met', () => {
+    const tableRemnantState = (roundNumber: number): ByggkasinoState => ({
+      players: [
+        { id: 'p0', name: 'A', color: 'red', isBot: false, hand: [], capturedCards: [], sweepCount: 0 },
+        { id: 'p1', name: 'B', color: 'blue', isBot: false, hand: [], capturedCards: [], sweepCount: 0 },
+      ],
+      deck: [],
+      tableRows: 1,
+      tableSlots: [],
+      currentPlayerIndex: 0,
+      dealerIndex: 0,
+      phase: 'table-remnant',
+      roundNumber,
+      dealNumberInRound: 1,
+      lastCapturerIndex: 0,
+      scores: { p0: 0, p1: 0 },
+      lastRoundScores: {},
+      matchLength: 'eachDealerOnce',
+      targetScore: 0,
+      gameOver: false,
+      winners: [],
+      actionAnnouncement: null,
+      pendingCapturePreview: null,
+    });
+
+    const afterRound1 = processByggkasinoAction(
+      tableRemnantState(1),
+      { type: 'finish-table-remnant' },
+      ''
+    ) as ByggkasinoState;
+    expect(afterRound1.phase).toBe('round-end');
+    expect(afterRound1.gameOver).toBe(false);
+
+    const afterRound2 = processByggkasinoAction(
+      tableRemnantState(2),
+      { type: 'finish-table-remnant' },
+      ''
+    ) as ByggkasinoState;
+    expect(afterRound2.phase).toBe('game-over');
+    expect(afterRound2.gameOver).toBe(true);
+  });
+});
+
 describe('runByggkasinoBotTurn', () => {
   it('does not advance from round-end', () => {
     const s: ByggkasinoState = {
@@ -1594,6 +1660,7 @@ describe('runByggkasinoBotTurn', () => {
           total: 0,
         },
       },
+      matchLength: 'to21',
       targetScore: 21,
       gameOver: false,
       winners: [],

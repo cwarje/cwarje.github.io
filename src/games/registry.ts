@@ -44,6 +44,7 @@ import HeartsOptions from './hearts/HeartsOptions';
 import FarkleOptions from './farkle/FarkleOptions';
 import UpRiverOptions from './up-and-down-the-river/UpRiverOptions';
 import TwelveOptions from './twelve/TwelveOptions';
+import ByggkasinoOptions from './byggkasino/ByggkasinoOptions';
 
 import HeartsTitleExtra from './hearts/HeartsTitleExtra';
 import PokerTitleExtra from './poker/PokerTitleExtra';
@@ -663,12 +664,12 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
   byggkasino: {
     title: 'Byggkasino',
     shortDescription:
-      'Take cards from the table by matching, summing, or building. Score points for key cards and clean tables. First to 21 wins.',
+      'Take cards from the table by matching, summing, or building. Play to 11, to 21, or one full deal per player — highest score wins.',
     playersLabel: '2-4 Players',
     minPlayers: 2,
     maxPlayers: 4,
     info: {
-      goal: 'Score points by taking cards and earning bonuses. First player or team to reach 21 points wins.',
+      goal: 'Score points by taking cards and earning bonuses. Choose a match length: first to 11, first to 21, or one scoring round per player (each deals once); highest total wins.',
       rules: [
         'Standard 52-card deck. Ace = 1, 2-10 = face value, J/Q/K = rank only (no numerical value for sums). 4 players play in teams of 2 (partners sit opposite). 2 or 3 players play individually.',
         'Deal 4 cards to each player and 4 face-up to the table. When all hands are empty, deal 4 more cards to each player (no new table cards) until the deck is exhausted.',
@@ -699,12 +700,13 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
       labelColor: 'text-lime-200',
     },
     createState: (players, options) =>
-      createByggkasinoState(players, { targetScore: options?.byggkasinoTargetScore }),
+      createByggkasinoState(players, { matchLength: options?.byggkasinoMatchLength }),
     processAction: processByggkasinoAction,
     isOver: isByggkasinoOver,
     runBotTurn: runByggkasinoBotTurn,
     getWinners: getByggkasinoWinners,
     Board: ByggkasinoBoard,
+    OptionsPanel: ByggkasinoOptions,
     TitleExtra: ByggkasinoTitleExtra,
     fullBoard: true,
     hasHandZoom: true,
