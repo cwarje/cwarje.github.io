@@ -52,10 +52,23 @@ describe('isValidBuild', () => {
     expect(isValidBuild(JH, [0], table, 16)).toBe(true);
   });
 
-  it('rejects hand card plus two table cards in one build', () => {
-    const table: TableSlot[] = [{ kind: 'card', card: C3 }, { kind: 'card', card: C3 }];
+  it('accepts hand card plus two table cards when sum matches', () => {
+    const table: TableSlot[] = [{ kind: 'card', card: C4 }, { kind: 'card', card: C3 }];
     const seven: Card = { suit: 'diamonds', rank: 7 };
-    expect(isValidBuild(seven, [0, 1], table, 7)).toBe(false);
+    expect(isValidBuild(seven, [0, 1], table, 14)).toBe(true);
+    expect(isValidBuild(seven, [0, 1], table, 10)).toBe(false);
+  });
+
+  it('accepts hand card plus three table cards when sum matches', () => {
+    const H8: Card = { suit: 'hearts', rank: 8 };
+    const table: TableSlot[] = [
+      { kind: 'card', card: H8 },
+      { kind: 'card', card: C4 },
+      { kind: 'card', card: C3 },
+    ];
+    const handCard: Card = { suit: 'diamonds', rank: 3 };
+    expect(isValidBuild(handCard, [0, 1, 2], table, 18)).toBe(true);
+    expect(isValidBuild(handCard, [0, 1, 2], table, 15)).toBe(false);
   });
 });
 

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   BYGG_TABLE_COLUMNS,
@@ -73,8 +73,22 @@ function getByggLayoutRadii(playerCount: number): { seatRadiusX: number; seatRad
   return { seatRadiusX: 32, seatRadiusY: 33 };
 }
 
-function cardDisplayText(card: Card): string {
-  return `${rankDisplay(card.rank)}${SUIT_SYMBOLS[card.suit]}`;
+function headsUpCardSpan(card: Card): ReactNode {
+  return (
+    <span className={SUIT_COLORS[card.suit]}>
+      {rankDisplay(card.rank)}
+      {SUIT_SYMBOLS[card.suit]}
+    </span>
+  );
+}
+
+function headsUpCardList(cards: Card[]): ReactNode {
+  return cards.map((card, i) => (
+    <Fragment key={`${i}-${card.suit}-${card.rank}`}>
+      {i > 0 ? ', ' : null}
+      {headsUpCardSpan(card)}
+    </Fragment>
+  ));
 }
 
 function captureHudMessage(
@@ -89,14 +103,16 @@ function captureHudMessage(
   if (sweep) suffix += ' (clean table)';
   const playedCard = capturedCards[0];
   const fromTable = capturedCards.slice(1);
-  const capturePhrase =
-    fromTable.length === 0
-      ? ` took ${capturedCards.map(cardDisplayText).join(', ')}`
-      : `: ${cardDisplayText(playedCard)} took ${fromTable.map(cardDisplayText).join(', ')}`;
   return (
     <>
       {nameEl}
-      {capturePhrase}
+      {fromTable.length === 0 ? (
+        <> took {headsUpCardList(capturedCards)}</>
+      ) : (
+        <>
+          : {headsUpCardSpan(playedCard)} took {headsUpCardList(fromTable)}
+        </>
+      )}
       {suffix}
     </>
   );
@@ -301,26 +317,50 @@ export default function ByggkasinoBoard({
   const canBuild = useMemo(() => {
     if (!selectedHandCard || !canParticipateInBuildOrSum(selectedHandCard)) return false;
     if (isFiveOfSpadesSweepCard(selectedHandCard) && countOccupiedTableSlots(s.tableSlots) > 0) return false;
-    if (selectedTableIndices.length !== 1) return false;
-    if (selectedTableCardsForBuild.length !== selectedTableIndices.length) return false;
+    if (selectedTableIndices.length === 0) return false;
+    if (selectedTableCardsForBuild.length === 0) return false;
     const d = resolveBuildDeclaredValue(
       selectedHandCard,
       selectedTableCardsForBuild,
       myPlayer?.hand ?? [],
       selectedHandCard
     );
-    return d > 0;
-  }, [selectedHandCard, selectedTableIndices, selectedTableCardsForBuild, myPlayer]);
+    if (d <= 0) return false;
+    const selectedBuilds = selectedTableIndices
+      .map(i => s.tableSlots[i])
+      .filter(item => item?.kind === 'build');
+    if (selectedBuilds.some(item => item?.kind === 'build' && item.build.value !== d)) return false;
+    return true;
+  }, [selectedHandCard, selectedTableIndices, selectedTableCardsForBuild, s.tableSlots, myPlayer]);
 
   const computedBuildValue = useMemo(() => {
-    if (!selectedHandCard || selectedTableIndices.length !== 1 || selectedTableCardsForBuild.length === 0) return 0;
-    return resolveBuildDeclaredValue(
+    if (!selectedHandCard || selectedTableIndices.length === 0 || selectedTableCardsForBuild.length === 0) return 0;
+    const d = resolveBuildDeclaredValue(
       selectedHandCard,
       selectedTableCardsForBuild,
       myPlayer?.hand ?? [],
       selectedHandCard
     );
-  }, [selectedHandCard, selectedTableIndices.length, selectedTableCardsForBuild, myPlayer]);
+    if (d <= 0) return 0;
+    const selectedBuilds = selectedTableIndices
+      .map(i => s.tableSlots[i])
+      .filter(item => item?.kind === 'build');
+    if (selectedBuilds.some(item => item?.kind === 'build' && item.build.value !== d)) return 0;
+    return d;
+  }, [selectedHandCard, selectedTableIndices, selectedTableCardsForBuild, s.tableSlots, myPlayer]);
+
+  const computedBuildLabel = useMemo(() => {
+    if (computedBuildValue <= 0) return '0';
+    const mergedGroupCount = selectedTableIndices.reduce((sum, i) => {
+      const item = s.tableSlots[i];
+      return sum + (item?.kind === 'build' ? item.build.groupCount : 0);
+    }, 0);
+    const totalGroupCount = mergedGroupCount + 1;
+    if (totalGroupCount === 2) return `D${computedBuildValue}`;
+    if (totalGroupCount === 3) return `T${computedBuildValue}`;
+    if (totalGroupCount > 3) return `${totalGroupCount}x${computedBuildValue}`;
+    return String(computedBuildValue);
+  }, [computedBuildValue, selectedTableIndices, s.tableSlots]);
 
   const canExtendBuild = useMemo(() => {
     if (!selectedHandCard || !canParticipateInBuildOrSum(selectedHandCard)) return false;
@@ -543,7 +583,8 @@ export default function ByggkasinoBoard({
         return (
           <>
             {nameEl}
-            {` built ${ann.declaredValue} from ${ann.buildCards.map(cardDisplayText).join(', ')}`}
+            {` built ${ann.declaredValue} from `}
+            {headsUpCardList(ann.buildCards)}
           </>
         );
       }
@@ -559,7 +600,8 @@ export default function ByggkasinoBoard({
         return (
           <>
             {nameEl}
-            {` played ${cardDisplayText(ann.playedCard)}`}
+            {' played '}
+            {headsUpCardSpan(ann.playedCard)}
           </>
         );
       }
@@ -602,7 +644,11 @@ export default function ByggkasinoBoard({
     if (!currentPlayer) return null;
     if (isMyTurn) {
       if (selectedHandCard) {
-        return `Your turn · ${cardDisplayText(selectedHandCard)} selected`;
+        return (
+          <>
+            Your turn · {headsUpCardSpan(selectedHandCard)} selected
+          </>
+        );
       }
       return 'Your turn · You must play a card';
     }
@@ -887,7 +933,7 @@ export default function ByggkasinoBoard({
                 )}
                 {canBuild && (
                   <button type="button" onClick={handleBuild} className="byggkasino-actionButton byggkasino-actionButton--build">
-                    Build ({computedBuildValue})
+                    Build ({computedBuildLabel})
                   </button>
                 )}
                 {canExtendBuild && (

@@ -108,7 +108,6 @@ export function isValidBuild(
   if (!canParticipateInBuildOrSum(handCard)) return false;
   if (declaredValue < 1) return false;
   if (selectedTableCardIndices.length === 0) return false;
-  if (selectedTableCardIndices.length >= 2) return false;
 
   const tableCards: Card[] = [];
   for (const idx of selectedTableCardIndices) {

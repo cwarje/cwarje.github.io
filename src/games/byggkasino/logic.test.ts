@@ -1040,6 +1040,215 @@ describe('byggkasino double/triple builds', () => {
   });
 });
 
+describe('byggkasino multi-card build with merge', () => {
+  it('builds D15 from hand 3 + table 8,4 + existing build-15, then captures with 2♠', () => {
+    const S2: Card = { suit: 'spades', rank: 2 };
+    const H3: Card = { suit: 'hearts', rank: 3 };
+    const C8: Card = { suit: 'clubs', rank: 8 };
+    const D4: Card = { suit: 'diamonds', rank: 4 };
+    const s: ByggkasinoState = {
+      players: [
+        {
+          id: 'p0',
+          name: 'A',
+          color: 'red',
+          isBot: false,
+          hand: [S2, H3],
+          capturedCards: [],
+          sweepCount: 0,
+        },
+        {
+          id: 'p1',
+          name: 'B',
+          color: 'blue',
+          isBot: false,
+          hand: [{ suit: 'clubs', rank: 6 }],
+          capturedCards: [],
+          sweepCount: 0,
+        },
+      ],
+      deck: [],
+      tableRows: 1,
+      tableSlots: [
+        {
+          kind: 'build',
+          build: {
+            cards: [{ suit: 'clubs', rank: 7 }, { suit: 'hearts', rank: 8 }],
+            value: 15,
+            ownerId: 'p1',
+            groupCount: 1,
+          },
+        },
+        { kind: 'card', card: C8 },
+        { kind: 'card', card: D4 },
+        null,
+      ],
+      currentPlayerIndex: 0,
+      dealerIndex: 0,
+      phase: 'playing',
+      roundNumber: 1,
+      dealNumberInRound: 1,
+      lastCapturerIndex: -1,
+      scores: { p0: 0, p1: 0 },
+      lastRoundScores: {},
+      targetScore: 21,
+      gameOver: false,
+      winners: [],
+      actionAnnouncement: null,
+      pendingCapturePreview: null,
+    };
+
+    const built = processByggkasinoAction(
+      s,
+      { type: 'build', playedCard: H3, tableCardIndices: [1, 2, 0], declaredValue: 15 },
+      'p0'
+    ) as ByggkasinoState;
+
+    expect(built).not.toBe(s);
+    expect(built.players[0].hand).toHaveLength(1);
+    expect(built.players[0].hand[0]).toEqual(S2);
+
+    const buildSlot = built.tableSlots[1];
+    expect(buildSlot?.kind).toBe('build');
+    if (buildSlot?.kind === 'build') {
+      expect(buildSlot.build.value).toBe(15);
+      expect(buildSlot.build.groupCount).toBe(2);
+      expect(buildSlot.build.ownerId).toBe('p0');
+    }
+    expect(built.tableSlots[0]).toBeNull();
+    expect(built.tableSlots[2]).toBeNull();
+  });
+
+  it('builds with multiple loose table cards without merging any build', () => {
+    const H3: Card = { suit: 'hearts', rank: 3 };
+    const C8: Card = { suit: 'clubs', rank: 8 };
+    const D4: Card = { suit: 'diamonds', rank: 4 };
+    const s: ByggkasinoState = {
+      players: [
+        {
+          id: 'p0',
+          name: 'A',
+          color: 'red',
+          isBot: false,
+          hand: [H3, { suit: 'spades', rank: 2 }],
+          capturedCards: [],
+          sweepCount: 0,
+        },
+        {
+          id: 'p1',
+          name: 'B',
+          color: 'blue',
+          isBot: false,
+          hand: [{ suit: 'clubs', rank: 6 }],
+          capturedCards: [],
+          sweepCount: 0,
+        },
+      ],
+      deck: [],
+      tableRows: 1,
+      tableSlots: [
+        { kind: 'card', card: C8 },
+        { kind: 'card', card: D4 },
+        null,
+        null,
+      ],
+      currentPlayerIndex: 0,
+      dealerIndex: 0,
+      phase: 'playing',
+      roundNumber: 1,
+      dealNumberInRound: 1,
+      lastCapturerIndex: -1,
+      scores: { p0: 0, p1: 0 },
+      lastRoundScores: {},
+      targetScore: 21,
+      gameOver: false,
+      winners: [],
+      actionAnnouncement: null,
+      pendingCapturePreview: null,
+    };
+
+    const built = processByggkasinoAction(
+      s,
+      { type: 'build', playedCard: H3, tableCardIndices: [0, 1], declaredValue: 15 },
+      'p0'
+    ) as ByggkasinoState;
+
+    expect(built).not.toBe(s);
+    const buildSlot = built.tableSlots[0];
+    expect(buildSlot?.kind).toBe('build');
+    if (buildSlot?.kind === 'build') {
+      expect(buildSlot.build.value).toBe(15);
+      expect(buildSlot.build.groupCount).toBe(1);
+      expect(buildSlot.build.ownerId).toBe('p0');
+    }
+    expect(built.tableSlots[1]).toBeNull();
+  });
+
+  it('rejects build when selected builds have a different value than the declared sum', () => {
+    const H3: Card = { suit: 'hearts', rank: 3 };
+    const C8: Card = { suit: 'clubs', rank: 8 };
+    const D4: Card = { suit: 'diamonds', rank: 4 };
+    const s: ByggkasinoState = {
+      players: [
+        {
+          id: 'p0',
+          name: 'A',
+          color: 'red',
+          isBot: false,
+          hand: [H3, { suit: 'spades', rank: 2 }],
+          capturedCards: [],
+          sweepCount: 0,
+        },
+        {
+          id: 'p1',
+          name: 'B',
+          color: 'blue',
+          isBot: false,
+          hand: [{ suit: 'clubs', rank: 6 }],
+          capturedCards: [],
+          sweepCount: 0,
+        },
+      ],
+      deck: [],
+      tableRows: 1,
+      tableSlots: [
+        {
+          kind: 'build',
+          build: {
+            cards: [{ suit: 'clubs', rank: 5 }, { suit: 'diamonds', rank: 5 }],
+            value: 10,
+            ownerId: 'p1',
+            groupCount: 1,
+          },
+        },
+        { kind: 'card', card: C8 },
+        { kind: 'card', card: D4 },
+        null,
+      ],
+      currentPlayerIndex: 0,
+      dealerIndex: 0,
+      phase: 'playing',
+      roundNumber: 1,
+      dealNumberInRound: 1,
+      lastCapturerIndex: -1,
+      scores: { p0: 0, p1: 0 },
+      lastRoundScores: {},
+      targetScore: 21,
+      gameOver: false,
+      winners: [],
+      actionAnnouncement: null,
+      pendingCapturePreview: null,
+    };
+
+    const result = processByggkasinoAction(
+      s,
+      { type: 'build', playedCard: H3, tableCardIndices: [1, 2, 0], declaredValue: 15 },
+      'p0'
+    );
+    expect(result).toBe(s);
+  });
+});
+
 describe('byggkasino dealNumberInRound', () => {
   it('increments when redealing four cards mid scoring round', () => {
     const deckTail: Card[] = [

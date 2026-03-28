@@ -653,14 +653,33 @@ export function processByggkasinoAction(
       if (!player.hand.some(c => cardEquals(c, playedCard))) return state;
       const fiveSweepBuild = tryApplyFiveOfSpadesTableSweep(s, playerIndex, playedCard);
       if (fiveSweepBuild) return fiveSweepBuild;
-      if (!isValidBuild(playedCard, tableCardIndices, s.tableSlots, declaredValue)) return state;
+
+      const looseCardIndices = tableCardIndices.filter(i => s.tableSlots[i]?.kind === 'card');
+      const buildIndices = tableCardIndices.filter(i => s.tableSlots[i]?.kind === 'build');
+      if (looseCardIndices.length === 0) return state;
+
+      if (!isValidBuild(playedCard, looseCardIndices, s.tableSlots, declaredValue)) return state;
       if (!playerCanCaptureBuildValue(player.hand, declaredValue, playedCard)) return state;
 
+      for (const i of buildIndices) {
+        const item = s.tableSlots[i];
+        if (!item || item.kind !== 'build' || item.build.value !== declaredValue) return state;
+      }
+
       const buildCards: Card[] = [playedCard];
-      for (const idx of tableCardIndices) {
+      for (const idx of looseCardIndices) {
         const item = s.tableSlots[idx];
         if (item?.kind === 'card') buildCards.push(item.card);
       }
+      for (const idx of buildIndices) {
+        const item = s.tableSlots[idx];
+        if (item?.kind === 'build') buildCards.push(...item.build.cards);
+      }
+
+      const mergedGroupCount = buildIndices.reduce((sum, i) => {
+        const item = s.tableSlots[i];
+        return sum + (item?.kind === 'build' ? item.build.groupCount : 0);
+      }, 0);
 
       const newTableSlots = [...s.tableSlots];
       for (const i of tableCardIndices) {
@@ -668,9 +687,9 @@ export function processByggkasinoAction(
       }
       const newBuild: TableItem = {
         kind: 'build',
-        build: { cards: buildCards, value: declaredValue, ownerId: playerId, groupCount: 1 },
+        build: { cards: buildCards, value: declaredValue, ownerId: playerId, groupCount: mergedGroupCount + 1 },
       };
-      let targetSlotIndex = tableCardIndices[0];
+      const targetSlotIndex = looseCardIndices[0];
       if (targetSlotIndex == null || targetSlotIndex < 0) return state;
       newTableSlots[targetSlotIndex] = newBuild;
 
