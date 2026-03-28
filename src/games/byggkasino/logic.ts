@@ -256,7 +256,9 @@ function endRound(state: ByggkasinoState): ByggkasinoState {
     );
   }
 
-  const roundScores = scoreRound(players);
+  const lastCapturePlayerId =
+    state.lastCapturerIndex >= 0 ? players[state.lastCapturerIndex]!.id : null;
+  const roundScores = scoreRound(players, lastCapturePlayerId);
 
   const newScores = { ...state.scores };
   for (const p of players) {

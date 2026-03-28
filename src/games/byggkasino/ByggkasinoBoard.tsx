@@ -578,8 +578,8 @@ export default function ByggkasinoBoard({
           <>
             {nameEl}
             {remnantCount > 0
-              ? ` took last and takes the ${remnantCount} remaining ${cardWord} on the table`
-              : ' took last. The table is empty'}
+              ? ` made the last capture and takes the ${remnantCount} remaining ${cardWord} on the table`
+              : ' made the last capture. The table is empty'}
           </>
         );
       }
@@ -726,6 +726,9 @@ export default function ByggkasinoBoard({
                         {roundScore.littleCasino > 0 && <span>2{SUIT_SYMBOLS.spades} +{roundScore.littleCasino}</span>}
                         {roundScore.aces > 0 && <span>Aces +{roundScore.aces}</span>}
                         {roundScore.sweeps > 0 && <span>Clean tables +{roundScore.sweeps}</span>}
+                        {roundScore.lastCapture > 0 && (
+                          <span title="Last capture this round">Last capture +{roundScore.lastCapture}</span>
+                        )}
                         {roundScore.total === 0 && <span>No points</span>}
                       </div>
                     )}

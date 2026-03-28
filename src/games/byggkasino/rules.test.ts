@@ -11,9 +11,10 @@ import {
   resolveHandAssistedGroupDeclaredValue,
   resolveTableGroupDeclaredValue,
   resolveTableGroupWithBuildsDeclaredValue,
+  scoreRound,
 } from './rules';
 import { processByggkasinoAction } from './logic';
-import type { ByggkasinoState } from './types';
+import type { ByggkasinoPlayer, ByggkasinoState } from './types';
 
 const AH: Card = { suit: 'hearts', rank: 1 };
 const C4: Card = { suit: 'clubs', rank: 4 };
@@ -391,5 +392,31 @@ describe('resolveTableGroupWithBuildsDeclaredValue', () => {
     ];
     const hand: Card[] = [{ suit: 'hearts', rank: 8 }];
     expect(resolveTableGroupWithBuildsDeclaredValue(table, [0, 1, 2], hand)).toBe(0);
+  });
+});
+
+describe('scoreRound', () => {
+  const basePlayer = (id: string, captured: Card[]): ByggkasinoPlayer => ({
+    id,
+    name: id,
+    color: 'red',
+    isBot: false,
+    hand: [],
+    capturedCards: captured,
+    sweepCount: 0,
+  });
+
+  it('awards lastCapture only to the given player id', () => {
+    const players = [basePlayer('p0', [C3]), basePlayer('p1', [C4, C5])];
+    const withBonus = scoreRound(players, 'p0');
+    expect(withBonus.p0.lastCapture).toBe(1);
+    expect(withBonus.p1.lastCapture).toBe(0);
+    expect(withBonus.p0.total).toBe(withBonus.p0.mostCards + withBonus.p0.lastCapture);
+  });
+
+  it('ignores unknown lastCapturePlayerId', () => {
+    const players = [basePlayer('p0', [C3])];
+    const out = scoreRound(players, 'nobody');
+    expect(out.p0.lastCapture).toBe(0);
   });
 });

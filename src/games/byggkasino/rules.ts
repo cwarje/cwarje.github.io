@@ -286,7 +286,13 @@ export function resolveHandAssistedGroupDeclaredValue(
   return 0;
 }
 
-export function scoreRound(players: ByggkasinoPlayer[]): Record<string, RoundScoreBreakdown> {
+/**
+ * @param lastCapturePlayerId Player who made the last capture this round (not necessarily last to trail).
+ */
+export function scoreRound(
+  players: ByggkasinoPlayer[],
+  lastCapturePlayerId: string | null = null
+): Record<string, RoundScoreBreakdown> {
   const scores: Record<string, RoundScoreBreakdown> = {};
 
   for (const p of players) {
@@ -297,6 +303,7 @@ export function scoreRound(players: ByggkasinoPlayer[]): Record<string, RoundSco
       littleCasino: 0,
       aces: 0,
       sweeps: 0,
+      lastCapture: 0,
       total: 0,
     };
   }
@@ -347,9 +354,20 @@ export function scoreRound(players: ByggkasinoPlayer[]): Record<string, RoundSco
     scores[p.id].sweeps = p.sweepCount;
   }
 
+  if (lastCapturePlayerId != null && scores[lastCapturePlayerId] != null) {
+    scores[lastCapturePlayerId].lastCapture = 1;
+  }
+
   for (const p of players) {
     const s = scores[p.id];
-    s.total = s.mostCards + s.mostSpades + s.bigCasino + s.littleCasino + s.aces + s.sweeps;
+    s.total =
+      s.mostCards +
+      s.mostSpades +
+      s.bigCasino +
+      s.littleCasino +
+      s.aces +
+      s.sweeps +
+      s.lastCapture;
   }
 
   return scores;

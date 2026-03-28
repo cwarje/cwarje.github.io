@@ -1270,6 +1270,17 @@ describe('byggkasino table-remnant phase', () => {
       lastCard,
     ]);
     expect(afterRemnant.lastRoundScores.p0).toBeDefined();
+    expect(afterRemnant.lastRoundScores.p0.lastCapture).toBe(1);
+    expect(afterRemnant.lastRoundScores.p0.total).toBe(
+      afterRemnant.lastRoundScores.p0.mostCards +
+        afterRemnant.lastRoundScores.p0.mostSpades +
+        afterRemnant.lastRoundScores.p0.bigCasino +
+        afterRemnant.lastRoundScores.p0.littleCasino +
+        afterRemnant.lastRoundScores.p0.aces +
+        afterRemnant.lastRoundScores.p0.sweeps +
+        afterRemnant.lastRoundScores.p0.lastCapture
+    );
+    expect(afterRemnant.lastRoundScores.p1?.lastCapture ?? 0).toBe(0);
   });
 });
 
@@ -1291,8 +1302,26 @@ describe('runByggkasinoBotTurn', () => {
       lastCapturerIndex: -1,
       scores: { p0: 3, p1: 2 },
       lastRoundScores: {
-        p0: { mostCards: 3, mostSpades: 0, bigCasino: 0, littleCasino: 0, aces: 0, sweeps: 0, total: 3 },
-        p1: { mostCards: 0, mostSpades: 0, bigCasino: 0, littleCasino: 0, aces: 0, sweeps: 0, total: 0 },
+        p0: {
+          mostCards: 3,
+          mostSpades: 0,
+          bigCasino: 0,
+          littleCasino: 0,
+          aces: 0,
+          sweeps: 0,
+          lastCapture: 0,
+          total: 3,
+        },
+        p1: {
+          mostCards: 0,
+          mostSpades: 0,
+          bigCasino: 0,
+          littleCasino: 0,
+          aces: 0,
+          sweeps: 0,
+          lastCapture: 0,
+          total: 0,
+        },
       },
       targetScore: 21,
       gameOver: false,
