@@ -26,7 +26,6 @@ export function isValidCapture(
 ): boolean {
   if (isFiveOfSpadesSweepCard(playedCard)) {
     const occ = occupiedTableSlotIndices(tableSlots);
-    if (occ.length === 0) return false;
     const sortedOcc = [...occ].sort((a, b) => a - b);
     const uniqSel = [...new Set(selectedIndices)].sort((a, b) => a - b);
     if (uniqSel.length !== sortedOcc.length) return false;
@@ -382,9 +381,7 @@ export function findPossibleCaptures(playedCard: Card, tableSlots: TableSlot[]):
 
   if (isFiveOfSpadesSweepCard(playedCard)) {
     const occ = occupiedTableSlotIndices(tableSlots);
-    if (occ.length > 0) {
-      results.push([...occ].sort((a, b) => a - b));
-    }
+    results.push([...occ].sort((a, b) => a - b));
   }
 
   const playedOptions = [...new Set(cardValuesForSum(playedCard))];

@@ -30,6 +30,7 @@ export type TableItem =
 export type TableSlot = TableItem | null;
 export const BYGG_TABLE_COLUMNS = 4;
 
+/** While set, `playedCard` is not in that player's `hand` (removed until finalize or abort). */
 export interface PendingCapturePreview {
   playerId: string;
   playedCard: Card;
@@ -164,7 +165,7 @@ export function countOccupiedTableSlots(tableSlots: TableSlot[]): number {
   return tableSlots.filter(Boolean).length;
 }
 
-/** House rule: 5♠ clears the entire table when played while the table is non-empty. */
+/** House rule: 5♠ always sweeps the table when played (captures all table cards; on an empty table, captures itself for a sweep point). */
 export function isFiveOfSpadesSweepCard(card: Card): boolean {
   return card.suit === 'spades' && card.rank === 5;
 }

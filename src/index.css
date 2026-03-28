@@ -949,7 +949,7 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   justify-items: center;
   gap: 16px 4px;
-  width: min(100%, 300px);
+  width: min(100%, 320px);
 }
 
 .byggkasino-tableEmpty {
@@ -1011,8 +1011,8 @@
 
 .byggkasino-tableCard {
   position: relative;
-  width: 56px;
-  height: 80px;
+  width: 64px;
+  height: 92px;
   border: 0;
   background: transparent;
   padding: 0;
@@ -1021,8 +1021,8 @@
 }
 
 .byggkasino-tableSlot {
-  width: 56px;
-  height: 80px;
+  width: 64px;
+  height: 92px;
   border-radius: 10px;
   border: none;
   background: rgba(255, 255, 255, 0.08);
@@ -1046,8 +1046,8 @@
 
 .byggkasino-buildPile {
   position: relative;
-  width: 56px;
-  height: 80px;
+  width: 64px;
+  height: 92px;
   border-radius: 10px;
   border: 0;
   background: transparent;
@@ -1082,18 +1082,24 @@
   height: 100%;
 }
 
+.byggkasino-tableCard > .byggkasino-card,
+.byggkasino-buildPileLayer .byggkasino-card,
+.byggkasino-capturePreviewCard .byggkasino-card {
+  padding: 9px 10px 9px 7px;
+}
+
 .byggkasino-buildPileValueBadge {
   position: absolute;
-  right: -6px;
-  top: -8px;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 5px;
+  right: -8px;
+  top: -10px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
   border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72rem;
+  font-size: 0.9rem;
   line-height: 1;
   font-weight: 800;
   border: 2px solid #111827;
@@ -1104,7 +1110,7 @@
 .byggkasino-capturePreviewCard {
   position: absolute;
   inset: 0;
-  transform: translate(-2px, -10px);
+  transform: translate(-3px, -11px);
   pointer-events: none;
 }
 
@@ -1233,22 +1239,32 @@
   }
 
   .byggkasino-tableCard {
-    width: 48px;
-    height: 70px;
+    width: 55px;
+    height: 81px;
   }
 
   .byggkasino-tableSlot {
-    width: 48px;
-    height: 70px;
+    width: 55px;
+    height: 81px;
   }
 
   .byggkasino-buildPile {
-    width: 48px;
-    height: 70px;
+    width: 55px;
+    height: 81px;
   }
 
   .byggkasino-card {
     padding: 4px 0 0 0;
+  }
+
+  .byggkasino-hand .byggkasino-card {
+    padding: 6px 8px 6px 0;
+  }
+
+  .byggkasino-tableCard > .byggkasino-card,
+  .byggkasino-buildPileLayer .byggkasino-card,
+  .byggkasino-capturePreviewCard .byggkasino-card {
+    padding: 6px 7px 6px 4px;
   }
 
   .byggkasino-cardRank {
@@ -1257,6 +1273,14 @@
 
   .byggkasino-cardSuit {
     font-size: 1.2rem;
+  }
+
+  .byggkasino-hand .byggkasino-cardRank {
+    font-size: 1.1rem;
+  }
+
+  .byggkasino-hand .byggkasino-cardSuit {
+    font-size: 1.1rem;
   }
 
   .byggkasino-headsUpText {

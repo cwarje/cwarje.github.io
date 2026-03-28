@@ -16,7 +16,6 @@ import {
   BYGG_TABLE_COLUMNS,
   canParticipateInBuildOrSum,
   cardEquals,
-  countOccupiedTableSlots,
   isFiveOfSpadesSweepCard,
   minCardValueForSum,
   occupiedTableSlotIndices,
@@ -324,7 +323,6 @@ function tryApplyFiveOfSpadesTableSweep(
   playedCard: Card
 ): ByggkasinoState | null {
   if (!isFiveOfSpadesSweepCard(playedCard)) return null;
-  if (countOccupiedTableSlots(s.tableSlots) === 0) return null;
   const player = s.players[playerIndex];
   if (!player.hand.some(c => cardEquals(c, playedCard))) return null;
 
@@ -361,8 +359,6 @@ export function getCaptureOutcomeFromPreview(
   const { playedCard, capturedSlotIndices, playerId: capturePlayerId } = preview;
   const playerIndex = s.players.findIndex(p => p.id === capturePlayerId);
   if (playerIndex === -1) return null;
-  const player = s.players[playerIndex];
-  if (!player.hand.some(c => cardEquals(c, playedCard))) return null;
   if (!isValidCapture(playedCard, s.tableSlots, capturedSlotIndices)) return null;
 
   return captureSlotsFromIndices(s.tableSlots, playedCard, capturedSlotIndices);
@@ -403,14 +399,28 @@ export function processByggkasinoAction(
   if (a.type === 'finalize-capture') {
     if (!s.pendingCapturePreview) return state;
     if (s.phase !== 'playing' || s.gameOver) return state;
-    const outcome = getCaptureOutcomeFromPreview(s, s.pendingCapturePreview);
-    if (!outcome) return { ...s, pendingCapturePreview: null };
-    const { playedCard, playerId: capturePlayerId } = s.pendingCapturePreview;
+    const previewSnapshot = s.pendingCapturePreview;
+    const outcome = getCaptureOutcomeFromPreview(s, previewSnapshot);
+    if (!outcome) {
+      const pi = s.players.findIndex(p => p.id === previewSnapshot.playerId);
+      if (pi === -1) return { ...s, pendingCapturePreview: null };
+      const p = s.players[pi];
+      const needsRestore = !p.hand.some(c => cardEquals(c, previewSnapshot.playedCard));
+      const restored = needsRestore
+        ? { ...p, hand: [...p.hand, previewSnapshot.playedCard] }
+        : p;
+      return {
+        ...s,
+        pendingCapturePreview: null,
+        players: s.players.map((pl, i) => (i === pi ? restored : pl)),
+      };
+    }
+    const { playedCard, playerId: capturePlayerId } = previewSnapshot;
     const playerIndex = s.players.findIndex(p => p.id === capturePlayerId);
     const player = s.players[playerIndex];
     const { capturedCards, newTableSlots, sweep: isSweep, capturedBuild } = outcome;
     const updatedPlayer = {
-      ...removeCardFromHand(player, playedCard),
+      ...player,
       capturedCards: [...player.capturedCards, ...capturedCards],
       sweepCount: player.sweepCount + (isSweep ? 1 : 0),
     };
@@ -447,8 +457,11 @@ export function processByggkasinoAction(
       const fiveSweep = tryApplyFiveOfSpadesTableSweep(s, playerIndex, playedCard);
       if (fiveSweep) return fiveSweep;
       if (!isValidCapture(playedCard, s.tableSlots, capturedSlotIndices)) return state;
+      const playerWithoutPlayed = removeCardFromHand(player, playedCard);
+      const newPlayers = s.players.map((p, i) => (i === playerIndex ? playerWithoutPlayed : p));
       return {
         ...s,
+        players: newPlayers,
         pendingCapturePreview: {
           playerId: player.id,
           playedCard,

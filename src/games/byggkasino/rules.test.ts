@@ -153,10 +153,10 @@ describe('isValidCapture', () => {
     expect(isValidCapture(S5, table, [])).toBe(false);
   });
 
-  it('5 of spades cannot capture when table is empty', () => {
+  it('5 of spades captures empty table with empty index set (self-sweep)', () => {
     const S5: Card = { suit: 'spades', rank: 5 };
     const table: TableSlot[] = [null, null];
-    expect(isValidCapture(S5, table, [])).toBe(false);
+    expect(isValidCapture(S5, table, [])).toBe(true);
   });
 });
 
@@ -299,9 +299,9 @@ describe('findPossibleCaptures', () => {
     expect(groups.some(g => g.length === 2 && g.includes(0) && g.includes(1))).toBe(true);
   });
 
-  it('5 of spades yields no capture groups when table is empty', () => {
+  it('5 of spades yields empty index set as capture when table is empty', () => {
     const S5: Card = { suit: 'spades', rank: 5 };
-    expect(findPossibleCaptures(S5, [null, null])).toEqual([]);
+    expect(findPossibleCaptures(S5, [null, null])).toEqual([[]]);
   });
 
   it('keeps build and loose captures separate for same value', () => {

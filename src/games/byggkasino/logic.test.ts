@@ -179,6 +179,7 @@ describe('byggkasino group-table then capture', () => {
       'p0'
     ) as ByggkasinoState;
     expect(preview.pendingCapturePreview).not.toBeNull();
+    expect(preview.players[0].hand).toHaveLength(0);
 
     const fromHelper = getCaptureOutcomeFromPreview(preview, preview.pendingCapturePreview!);
     expect(fromHelper).not.toBeNull();
@@ -317,7 +318,7 @@ describe('byggkasino 5 of spades sweep', () => {
     expect(next.tableSlots.every(slot => slot == null)).toBe(true);
   });
 
-  it('trail 5♠ on empty table trails normally without sweep point', () => {
+  it('trail 5♠ on empty table sweeps itself and awards sweep', () => {
     const s: ByggkasinoState = {
       players: [
         {
@@ -363,9 +364,68 @@ describe('byggkasino 5 of spades sweep', () => {
       'p0'
     ) as ByggkasinoState;
 
-    expect(next.players[0].sweepCount).toBe(0);
-    expect(next.actionAnnouncement?.kind).toBe('trail');
-    expect(next.tableSlots[0]).toEqual({ kind: 'card', card: S5 });
+    expect(next.players[0].sweepCount).toBe(1);
+    expect(next.actionAnnouncement?.kind).toBe('capture');
+    if (next.actionAnnouncement?.kind === 'capture') {
+      expect(next.actionAnnouncement.sweep).toBe(true);
+      expect(next.actionAnnouncement.capturedCards).toEqual([S5]);
+    }
+    expect(next.players[0].capturedCards).toEqual([S5]);
+    expect(next.tableSlots.every(slot => slot == null)).toBe(true);
+    expect(next.lastCapturerIndex).toBe(0);
+  });
+
+  it('capture-preview 5♠ on empty table with empty indices sweeps immediately', () => {
+    const s: ByggkasinoState = {
+      players: [
+        {
+          id: 'p0',
+          name: 'A',
+          color: 'red',
+          isBot: false,
+          hand: [S5],
+          capturedCards: [],
+          sweepCount: 0,
+        },
+        {
+          id: 'p1',
+          name: 'B',
+          color: 'blue',
+          isBot: false,
+          hand: [{ suit: 'hearts', rank: 8 }],
+          capturedCards: [],
+          sweepCount: 0,
+        },
+      ],
+      deck: [],
+      tableRows: 1,
+      tableSlots: [null, null, null, null],
+      currentPlayerIndex: 0,
+      dealerIndex: 0,
+      phase: 'playing',
+      roundNumber: 1,
+      dealNumberInRound: 1,
+      lastCapturerIndex: -1,
+      scores: { p0: 0, p1: 0 },
+      lastRoundScores: {},
+      targetScore: 21,
+      gameOver: false,
+      winners: [],
+      actionAnnouncement: null,
+      pendingCapturePreview: null,
+    };
+
+    const next = processByggkasinoAction(
+      s,
+      { type: 'capture-preview', playedCard: S5, capturedSlotIndices: [] },
+      'p0'
+    ) as ByggkasinoState;
+
+    expect(next.pendingCapturePreview).toBeNull();
+    expect(next.actionAnnouncement?.kind).toBe('capture');
+    expect(next.players[0].sweepCount).toBe(1);
+    expect(next.players[0].capturedCards).toEqual([S5]);
+    expect(next.tableSlots.every(slot => slot == null)).toBe(true);
   });
 
   it('build with 5♠ on non-empty table sweeps instead of building', () => {
@@ -628,6 +688,7 @@ describe('byggkasino double/triple builds', () => {
       'p0'
     ) as ByggkasinoState;
     expect(preview.pendingCapturePreview).not.toBeNull();
+    expect(preview.players[0].hand).toHaveLength(0);
 
     const finalized = processByggkasinoAction(preview, { type: 'finalize-capture' }, '') as ByggkasinoState;
     expect(finalized.players[0].capturedCards).toHaveLength(5);
@@ -1195,6 +1256,7 @@ describe('byggkasino hand-assisted duplicate grouping', () => {
       'p0'
     ) as ByggkasinoState;
     expect(preview.pendingCapturePreview).not.toBeNull();
+    expect(preview.players[0].hand).toHaveLength(2);
 
     const finalized = processByggkasinoAction(preview, { type: 'finalize-capture' }, '') as ByggkasinoState;
     expect(finalized.tableSlots[0]).toBeNull();

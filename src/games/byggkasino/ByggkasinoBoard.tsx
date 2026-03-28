@@ -129,9 +129,9 @@ function TableCard({
 }) {
   return (
     <motion.button
-      initial={{ scale: 0.92, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ scale: 0.92, opacity: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       whileHover={!disabled ? { y: -4 } : undefined}
       onClick={onClick}
       disabled={disabled}
@@ -167,9 +167,9 @@ function BuildPile({
   const topCards = build.build.cards.slice(-3);
   return (
     <motion.button
-      initial={{ scale: 0.92, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ scale: 0.92, opacity: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       whileHover={!disabled ? { y: -4 } : undefined}
       onClick={onClick}
       disabled={disabled}
@@ -180,7 +180,7 @@ function BuildPile({
           <div
             key={`${card.suit}-${card.rank}-${i}`}
             className="byggkasino-buildPileLayer"
-            style={{ transform: `translate(${i * 4}px, ${-i * 3}px)` }}
+            style={{ transform: `translate(${i * 5}px, ${-i * 4}px)` }}
           >
             <div className="byggkasino-card">
               <CardFace card={card} />
@@ -261,7 +261,7 @@ export default function ByggkasinoBoard({
 
   const canCapture = useMemo(() => {
     if (!selectedHandCard) return false;
-    if (isFiveOfSpadesSweepCard(selectedHandCard) && countOccupiedTableSlots(s.tableSlots) > 0) return true;
+    if (isFiveOfSpadesSweepCard(selectedHandCard)) return true;
     if (selectedTableIndices.length === 0) return false;
     return isValidCapture(selectedHandCard, s.tableSlots, selectedTableIndices);
   }, [selectedHandCard, selectedTableIndices, s.tableSlots]);
@@ -354,7 +354,7 @@ export default function ByggkasinoBoard({
     if (isFiveOfSpadesSweepCard(selectedHandCard) && countOccupiedTableSlots(s.tableSlots) > 0) {
       capturedSlotIndices = occupiedTableSlotIndices(s.tableSlots);
     }
-    if (capturedSlotIndices.length === 0) return;
+    if (capturedSlotIndices.length === 0 && !isFiveOfSpadesSweepCard(selectedHandCard)) return;
     onAction({
       type: 'capture-preview',
       playedCard: selectedHandCard,
@@ -864,7 +864,7 @@ export default function ByggkasinoBoard({
                       }}
                     >
                       <div className={`byggkasino-card ${!isMyTurn ? 'byggkasino-card--disabled' : ''} ${isSelected ? 'byggkasino-card--selected' : ''}`}>
-                        <CardFace card={card} small={!isHandZoomed} />
+                        <CardFace card={card} />
                       </div>
                     </span>
                   </motion.button>
