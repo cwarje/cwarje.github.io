@@ -1,4 +1,4 @@
-import type { ByggkasinoMatchLength, PlayerColor } from '../../networking/types';
+import type { CasinoMatchLength, PlayerColor } from '../../networking/types';
 
 export type Suit = 'hearts' | 'diamonds' | 'clubs' | 'spades';
 export type Rank = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
@@ -28,7 +28,7 @@ export type TableItem =
   | { kind: 'build'; build: Build };
 
 export type TableSlot = TableItem | null;
-export const BYGG_TABLE_COLUMNS = 4;
+export const CASINO_TABLE_COLUMNS = 4;
 
 /** While set, `playedCard` is not in that player's `hand` (removed until finalize or abort). */
 export interface PendingCapturePreview {
@@ -37,7 +37,7 @@ export interface PendingCapturePreview {
   capturedSlotIndices: number[];
 }
 
-export interface ByggkasinoPlayer {
+export interface CasinoPlayer {
   id: string;
   name: string;
   color: PlayerColor;
@@ -47,10 +47,10 @@ export interface ByggkasinoPlayer {
   sweepCount: number;
 }
 
-export type ByggkasinoPhase = 'playing' | 'announcement' | 'table-remnant' | 'round-end' | 'game-over';
+export type CasinoPhase = 'playing' | 'announcement' | 'table-remnant' | 'round-end' | 'game-over';
 
 /** Shown in the heads-up strip during phase `announcement` (host timer clears it). */
-export type ByggkasinoActionAnnouncement =
+export type CasinoActionAnnouncement =
   | {
       kind: 'capture';
       playerId: string;
@@ -83,14 +83,14 @@ export interface RoundScoreBreakdown {
   total: number;
 }
 
-export interface ByggkasinoState {
-  players: ByggkasinoPlayer[];
+export interface CasinoState {
+  players: CasinoPlayer[];
   deck: Card[];
   tableSlots: TableSlot[];
   tableRows: number;
   currentPlayerIndex: number;
   dealerIndex: number;
-  phase: ByggkasinoPhase;
+  phase: CasinoPhase;
   roundNumber: number;
   /** 1-based count of 4-card deals within the current scoring round (resets each round). */
   dealNumberInRound: number;
@@ -99,15 +99,15 @@ export interface ByggkasinoState {
   scores: Record<string, number>;
   /** Per-round score breakdown from the most recent round, keyed by player id. */
   lastRoundScores: Record<string, RoundScoreBreakdown>;
-  matchLength: ByggkasinoMatchLength;
+  matchLength: CasinoMatchLength;
   targetScore: number;
   gameOver: boolean;
   winners: string[];
-  actionAnnouncement: ByggkasinoActionAnnouncement | null;
+  actionAnnouncement: CasinoActionAnnouncement | null;
   pendingCapturePreview: PendingCapturePreview | null;
 }
 
-export type ByggkasinoAction =
+export type CasinoAction =
   | { type: 'capture-preview'; playedCard: Card; capturedSlotIndices: number[] }
   | { type: 'finalize-capture' }
   | { type: 'group-table'; tableCardIndices: number[]; declaredValue: number; playedCard?: Card }

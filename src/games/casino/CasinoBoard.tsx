@@ -2,10 +2,10 @@ import type { ReactNode } from 'react';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  BYGG_TABLE_COLUMNS,
+  CASINO_TABLE_COLUMNS,
   type Card,
   type Suit,
-  type ByggkasinoState,
+  type CasinoState,
   type TableItem,
   buildMultiplicityLabel,
   cardEquals,
@@ -44,7 +44,7 @@ const SUIT_COLORS: Record<Suit, string> = {
   spades: 'text-gray-800',
 };
 
-interface ByggkasinoBoardProps {
+interface CasinoBoardProps {
   state: unknown;
   myId: string;
   onAction: (action: unknown) => void;
@@ -52,10 +52,10 @@ interface ByggkasinoBoardProps {
   isHandZoomed?: boolean;
 }
 
-interface ByggSeatLayout {
+interface CasinoSeatLayout {
   relativeIndex: number;
   playerIndex: number;
-  player: ByggkasinoState['players'][number];
+  player: CasinoState['players'][number];
   seatLeft: number;
   seatTop: number;
 }
@@ -65,9 +65,9 @@ interface ElementSize {
   height: number;
 }
 
-const BYGG_SEAT_EDGE_GAP_PX = 8;
+const CASINO_SEAT_EDGE_GAP_PX = 8;
 
-function getByggLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
+function getCasinoLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
   if (playerCount === 4) return { seatRadiusX: 39, seatRadiusY: 36 };
   if (playerCount === 3) return { seatRadiusX: 36, seatRadiusY: 34 };
   return { seatRadiusX: 32, seatRadiusY: 33 };
@@ -92,7 +92,7 @@ function headsUpCardList(cards: Card[]): ReactNode {
 }
 
 function captureHudMessage(
-  actor: ByggkasinoState['players'][number],
+  actor: CasinoState['players'][number],
   myId: string,
   capturedCards: Card[],
   sweep: boolean
@@ -123,9 +123,9 @@ function CardFace({ card, small = false }: { card: Card; small?: boolean }) {
   const colorClass = SUIT_COLORS[card.suit];
   const label = rankDisplay(card.rank);
   return (
-    <div className={`byggkasino-cardFace ${small ? 'byggkasino-cardFace--small' : ''}`}>
-      <span className={`byggkasino-cardRank ${colorClass}`}>{label}</span>
-      <span className={`byggkasino-cardSuit ${colorClass}`}>{symbol}</span>
+    <div className={`casino-cardFace ${small ? 'casino-cardFace--small' : ''}`}>
+      <span className={`casino-cardRank ${colorClass}`}>{label}</span>
+      <span className={`casino-cardSuit ${colorClass}`}>{symbol}</span>
     </div>
   );
 }
@@ -151,14 +151,14 @@ function TableCard({
       whileHover={!disabled ? { y: -4 } : undefined}
       onClick={onClick}
       disabled={disabled}
-      className={`byggkasino-tableCard ${selected ? 'byggkasino-tableCard--selected' : ''} ${disabled ? 'byggkasino-tableCard--disabled' : ''}`}
+      className={`casino-tableCard ${selected ? 'casino-tableCard--selected' : ''} ${disabled ? 'casino-tableCard--disabled' : ''}`}
     >
-      <div className="byggkasino-card">
+      <div className="casino-card">
         <CardFace card={card} />
       </div>
       {previewCard && (
-        <div className="byggkasino-capturePreviewCard">
-          <div className="byggkasino-card">
+        <div className="casino-capturePreviewCard">
+          <div className="casino-card">
             <CardFace card={previewCard} />
           </div>
         </div>
@@ -189,25 +189,25 @@ function BuildPile({
       whileHover={!disabled ? { y: -4 } : undefined}
       onClick={onClick}
       disabled={disabled}
-      className={`byggkasino-buildPile ${selected ? 'byggkasino-buildPile--selected' : ''} ${disabled ? 'byggkasino-buildPile--disabled' : ''}`}
+      className={`casino-buildPile ${selected ? 'casino-buildPile--selected' : ''} ${disabled ? 'casino-buildPile--disabled' : ''}`}
     >
-      <div className="byggkasino-buildPileStack">
+      <div className="casino-buildPileStack">
         {topCards.map((card, i) => (
           <div
             key={`${card.suit}-${card.rank}-${i}`}
-            className="byggkasino-buildPileLayer"
+            className="casino-buildPileLayer"
             style={{ transform: `translate(${i * 5}px, ${-i * 4}px)` }}
           >
-            <div className="byggkasino-card">
+            <div className="casino-card">
               <CardFace card={card} />
             </div>
           </div>
         ))}
       </div>
-      <span className="byggkasino-buildPileValueBadge">{buildMultiplicityLabel(build.build)}</span>
+      <span className="casino-buildPileValueBadge">{buildMultiplicityLabel(build.build)}</span>
       {previewCard && (
-        <div className="byggkasino-capturePreviewCard">
-          <div className="byggkasino-card">
+        <div className="casino-capturePreviewCard">
+          <div className="casino-card">
             <CardFace card={previewCard} />
           </div>
         </div>
@@ -216,14 +216,14 @@ function BuildPile({
   );
 }
 
-export default function ByggkasinoBoard({
+export default function CasinoBoard({
   state,
   myId,
   onAction,
   isHost = false,
   isHandZoomed = false,
-}: ByggkasinoBoardProps) {
-  const s = state as ByggkasinoState;
+}: CasinoBoardProps) {
+  const s = state as CasinoState;
   const myIndex = s.players.findIndex(p => p.id === myId);
   const myPlayer = myIndex >= 0 ? s.players[myIndex] : null;
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
@@ -503,10 +503,10 @@ export default function ByggkasinoBoard({
     return () => resizeObserver.disconnect();
   }, [s.phase]);
 
-  const seatLayouts = useMemo<ByggSeatLayout[]>(() => {
+  const seatLayouts = useMemo<CasinoSeatLayout[]>(() => {
     const playerCount = s.players.length;
     if (playerCount === 0) return [];
-    const fallbackRadii = getByggLayoutRadii(playerCount);
+    const fallbackRadii = getCasinoLayoutRadii(playerCount);
     const canUseMeasuredRadii =
       tableSize.width > 0 &&
       tableSize.height > 0 &&
@@ -514,8 +514,8 @@ export default function ByggkasinoBoard({
       seatPillSize.height > 0;
     const radii = canUseMeasuredRadii
       ? (() => {
-          const usableHalfWidth = tableSize.width / 2 - seatPillSize.width / 2 - BYGG_SEAT_EDGE_GAP_PX;
-          const usableHalfHeight = tableSize.height / 2 - seatPillSize.height / 2 - BYGG_SEAT_EDGE_GAP_PX;
+          const usableHalfWidth = tableSize.width / 2 - seatPillSize.width / 2 - CASINO_SEAT_EDGE_GAP_PX;
+          const usableHalfHeight = tableSize.height / 2 - seatPillSize.height / 2 - CASINO_SEAT_EDGE_GAP_PX;
           return {
             seatRadiusX: Math.max(0, Math.min(50, (usableHalfWidth / tableSize.width) * 100)),
             seatRadiusY: Math.max(0, Math.min(50, (usableHalfHeight / tableSize.height) * 100)),
@@ -567,7 +567,7 @@ export default function ByggkasinoBoard({
     !s.pendingCapturePreview;
   const shouldShowVirtualTrailRow = canTrailToPlaceholder && !hasEmptyTableSlot;
   const renderedTableRows = s.tableRows + (shouldShowVirtualTrailRow ? 1 : 0);
-  const renderedTableSlotCount = renderedTableRows * BYGG_TABLE_COLUMNS;
+  const renderedTableSlotCount = renderedTableRows * CASINO_TABLE_COLUMNS;
 
   const headsUpContent = useMemo((): ReactNode => {
     if (s.phase === 'announcement' && s.actionAnnouncement) {
@@ -660,24 +660,24 @@ export default function ByggkasinoBoard({
     );
   }, [s, myId, currentPlayer, isMyTurn, selectedHandCard]);
 
-  const renderSeatPill = (layout: ByggSeatLayout, shouldMeasure = false) => {
+  const renderSeatPill = (layout: CasinoSeatLayout, shouldMeasure = false) => {
     const player = layout.player;
     const isCurrentTurn = s.phase === 'playing' && s.players[s.currentPlayerIndex]?.id === player.id;
     const isMe = player.id === myId;
     const activeClass = isCurrentTurn
       ? isMe
-        ? 'byggkasino-seatPill--activeSelf'
-        : 'byggkasino-seatPill--activeOther'
+        ? 'casino-seatPill--activeSelf'
+        : 'casino-seatPill--activeOther'
       : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
     return (
       <div
         ref={shouldMeasure ? setSeatPillElement : undefined}
-        className={`byggkasino-seatPill ${activeClass} ${isMe ? 'byggkasino-seatPill--me' : ''}`}
+        className={`casino-seatPill ${activeClass} ${isMe ? 'casino-seatPill--me' : ''}`}
       >
-        <div className="byggkasino-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
-          <span className="byggkasino-seatPillName">{isMe ? 'You' : player.name}</span>
+        <div className="casino-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
+          <span className="casino-seatPillName">{isMe ? 'You' : player.name}</span>
         </div>
         <div className="river-seatPillLabels">
           <span className="river-seatCell river-seatCell--bid" title="Clean tables">CT</span>
@@ -698,7 +698,7 @@ export default function ByggkasinoBoard({
       .map(id => s.players.find(p => p.id === id)?.name ?? id)
       .join(', ');
     return (
-      <div className="byggkasino-board">
+      <div className="casino-board">
         <div className="flex flex-1 flex-col items-center justify-center min-h-0 gap-6">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
@@ -731,7 +731,7 @@ export default function ByggkasinoBoard({
 
   if (s.phase === 'round-end') {
     return (
-      <div className="byggkasino-board">
+      <div className="casino-board">
         <div className="flex flex-1 flex-col items-center justify-center min-h-0 gap-6">
           <motion.div
             initial={{ y: 20, opacity: 0 }}
@@ -791,20 +791,20 @@ export default function ByggkasinoBoard({
   }
 
   return (
-    <div className={`byggkasino-board byggkasino-board--players-${s.players.length} space-y-3 sm:space-y-4`}>
-      <div ref={tableRef} className={`byggkasino-table byggkasino-table--players-${s.players.length}`}>
+    <div className={`casino-board casino-board--players-${s.players.length} space-y-3 sm:space-y-4`}>
+      <div ref={tableRef} className={`casino-table casino-table--players-${s.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
             key={`seat-${layout.player.id}`}
-            className={`byggkasino-seat ${layout.relativeIndex === 0 ? 'byggkasino-seat--self' : ''}`}
+            className={`casino-seat ${layout.relativeIndex === 0 ? 'casino-seat--self' : ''}`}
             style={{ left: `${layout.seatLeft}%`, top: `${layout.seatTop}%` }}
           >
             {renderSeatPill(layout, layout.relativeIndex === 0)}
           </div>
         ))}
 
-        <div className={`byggkasino-center ${isHandZoomed ? 'byggkasino-center--zoom' : ''}`}>
-          <div className="byggkasino-tableItems">
+        <div className={`casino-center ${isHandZoomed ? 'casino-center--zoom' : ''}`}>
+          <div className="casino-tableItems">
             <AnimatePresence mode="sync">
               {Array.from({ length: renderedTableSlotCount }, (_, slotIndex) => {
                 const slotKey = `table-slot-${slotIndex}`;
@@ -847,7 +847,7 @@ export default function ByggkasinoBoard({
                       handleTrailToSlot(slotIndex);
                     }}
                     disabled={!canTrailHere}
-                    className={`byggkasino-tableSlot ${canTrailHere ? 'byggkasino-tableSlot--trailTarget' : ''}`}
+                    className={`casino-tableSlot ${canTrailHere ? 'casino-tableSlot--trailTarget' : ''}`}
                   />
                 );
               })}
@@ -856,15 +856,15 @@ export default function ByggkasinoBoard({
         </div>
       </div>
 
-      <div className="byggkasino-headsUp" aria-live="polite">
-        <p className="byggkasino-headsUpText">{headsUpContent ?? '\u00a0'}</p>
+      <div className="casino-headsUp" aria-live="polite">
+        <p className="casino-headsUpText">{headsUpContent ?? '\u00a0'}</p>
       </div>
 
       {myPlayer && (
         <div>
-          <div ref={handContainerRef} className={`byggkasino-hand ${isHandZoomed ? 'byggkasino-hand--zoom' : ''}`}>
+          <div ref={handContainerRef} className={`casino-hand ${isHandZoomed ? 'casino-hand--zoom' : ''}`}>
             <div
-              className="byggkasino-handSpread"
+              className="casino-handSpread"
               style={{
                 width: `${handLayout.spreadWidth}px`,
                 height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
@@ -883,7 +883,7 @@ export default function ByggkasinoBoard({
                     transition={{ delay: i * 0.02 }}
                     onClick={() => handleHandCardClick(card)}
                     disabled={!isMyTurn}
-                    className="byggkasino-handHitbox"
+                    className="casino-handHitbox"
                     style={{
                       left: `${i * handLayout.step}px`,
                       width: `${hitboxWidth}px`,
@@ -892,14 +892,14 @@ export default function ByggkasinoBoard({
                     }}
                   >
                     <span
-                      className={`byggkasino-handCardWrap ${isMyTurn ? 'byggkasino-handCardWrap--active' : ''}`}
+                      className={`casino-handCardWrap ${isMyTurn ? 'casino-handCardWrap--active' : ''}`}
                       style={{
                         width: `${handLayout.cardWidth}px`,
                         height: `${handLayout.cardHeight}px`,
                         transform: isSelected ? `translateY(-${handLayout.selectedLift}px)` : 'translateY(0px)',
                       }}
                     >
-                      <div className={`byggkasino-card ${!isMyTurn ? 'byggkasino-card--disabled' : ''} ${isSelected ? 'byggkasino-card--selected' : ''}`}>
+                      <div className={`casino-card ${!isMyTurn ? 'casino-card--disabled' : ''} ${isSelected ? 'casino-card--selected' : ''}`}>
                         <CardFace card={card} />
                       </div>
                     </span>
@@ -909,20 +909,20 @@ export default function ByggkasinoBoard({
             </div>
           </div>
 
-          <div className="byggkasino-actionRow">
+          <div className="casino-actionRow">
             {isMyTurn && selectedHandCard && (
               <>
                 {canCapture && (
                   <button
                     type="button"
                     onClick={handleCapture}
-                    className="byggkasino-actionButton byggkasino-actionButton--capture"
+                    className="casino-actionButton casino-actionButton--capture"
                   >
                     Take
                   </button>
                 )}
                 {canBuild && (
-                  <button type="button" onClick={handleBuild} className="byggkasino-actionButton byggkasino-actionButton--build">
+                  <button type="button" onClick={handleBuild} className="casino-actionButton casino-actionButton--build">
                     Build ({computedBuildLabel})
                   </button>
                 )}
@@ -930,7 +930,7 @@ export default function ByggkasinoBoard({
                   <button
                     type="button"
                     onClick={handleExtendBuild}
-                    className="byggkasino-actionButton byggkasino-actionButton--extend"
+                    className="casino-actionButton casino-actionButton--extend"
                   >
                     Extend Build
                   </button>
@@ -941,7 +941,7 @@ export default function ByggkasinoBoard({
               <button
                 type="button"
                 onClick={handleGroup}
-                className="byggkasino-actionButton byggkasino-actionButton--build"
+                className="casino-actionButton casino-actionButton--build"
               >
                 Group ({computedGroupValue})
               </button>

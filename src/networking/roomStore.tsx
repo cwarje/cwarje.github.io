@@ -24,7 +24,7 @@ import {
 } from '../games/settler/logic';
 import type { CrossCribState } from '../games/cross-crib/types';
 import { cribCardsToSelect } from '../games/cross-crib/types';
-import type { ByggkasinoState } from '../games/byggkasino/types';
+import type { CasinoState } from '../games/casino/types';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 import { shouldBotBank } from '../games/farkle/logic';
 import { GAME_REGISTRY } from '../games/registry';
@@ -59,7 +59,7 @@ function isPokerHostControlAction(payload: unknown): payload is { type: 'next-ha
   return actionType === 'next-hand' || actionType === 'end-session';
 }
 
-function isByggkasinoStartNextRoundAction(payload: unknown): boolean {
+function isCasinoStartNextRoundAction(payload: unknown): boolean {
   if (typeof payload !== 'object' || payload === null) return false;
   return (payload as { type?: unknown }).type === 'start-next-round';
 }
@@ -195,8 +195,8 @@ function applyProfileToGameState(
       });
       return changed ? { ...current, players } : current;
     }
-    case 'byggkasino': {
-      const current = state as ByggkasinoState;
+    case 'casino': {
+      const current = state as CasinoState;
       let changed = false;
       const players = current.players.map((player) => {
         if (player.id !== playerId) return player;
@@ -388,8 +388,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             return;
           }
           if (
-            currentRoom.gameType === 'byggkasino'
-            && isByggkasinoStartNextRoundAction(msg.payload)
+            currentRoom.gameType === 'casino'
+            && isCasinoStartNextRoundAction(msg.payload)
             && senderDeviceId !== currentRoom.hostId
           ) {
             return;
@@ -959,8 +959,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       if (
-        currentRoom.gameType === 'byggkasino'
-        && isByggkasinoStartNextRoundAction(payload)
+        currentRoom.gameType === 'casino'
+        && isCasinoStartNextRoundAction(payload)
         && myId !== currentRoom.hostId
       ) {
         return;
@@ -1064,10 +1064,10 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const CROSS_CRIB_BOT_DELAY = 900; // ms between bot card placements
   const CROSS_CRIB_CRIB_REVEAL_STEP_MS = 750; // ms between each crib card flip
   const SETTLER_BOT_DELAY = 900; // ms between bot actions in Settler
-  const BYGGKASINO_BOT_DELAY = 900; // ms between Byggkasino bot plays
-  const BYGGKASINO_CAPTURE_PREVIEW_DELAY = 1600; // ms for capture preview overlay before capture resolves
-  const BYGGKASINO_ACTION_ANNOUNCEMENT_DELAY = 3000; // ms to show last play in heads-up before next turn
-  const BYGGKASINO_TABLE_REMNANT_DELAY = 3000; // ms to show who takes remaining table cards before scoring
+  const CASINO_BOT_DELAY = 900; // ms between Casino bot plays
+  const CASINO_CAPTURE_PREVIEW_DELAY = 1600; // ms for capture preview overlay before capture resolves
+  const CASINO_ACTION_ANNOUNCEMENT_DELAY = 3000; // ms to show last play in heads-up before next turn
+  const CASINO_TABLE_REMNANT_DELAY = 3000; // ms to show who takes remaining table cards before scoring
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settlerIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1518,18 +1518,18 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // ── Byggkasino bot scheduling ──
-    if (room.gameType === 'byggkasino') {
-      const bs = gameState as ByggkasinoState;
+    // ── Casino bot scheduling ──
+    if (room.gameType === 'casino') {
+      const bs = gameState as CasinoState;
 
       if (bs.pendingCapturePreview) {
         botTimerRef.current = setTimeout(() => {
-          const currentGs = gameStateRef.current as ByggkasinoState | null;
+          const currentGs = gameStateRef.current as CasinoState | null;
           const currentRoom = roomRef.current;
           if (!currentGs || !currentRoom || !currentGs.pendingCapturePreview) return;
 
           const next = processGameAction(
-            'byggkasino',
+            'casino',
             currentGs,
             { type: 'finalize-capture' },
             ''
@@ -1538,18 +1538,18 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             setGameState(next);
             broadcastGameState(next);
           }
-        }, BYGGKASINO_CAPTURE_PREVIEW_DELAY);
+        }, CASINO_CAPTURE_PREVIEW_DELAY);
         return;
       }
 
       if (bs.phase === 'announcement') {
         botTimerRef.current = setTimeout(() => {
-          const currentGs = gameStateRef.current as ByggkasinoState | null;
+          const currentGs = gameStateRef.current as CasinoState | null;
           const currentRoom = roomRef.current;
           if (!currentGs || !currentRoom || currentGs.phase !== 'announcement') return;
 
           const next = processGameAction(
-            'byggkasino',
+            'casino',
             currentGs,
             { type: 'finish-action-announcement' },
             ''
@@ -1558,18 +1558,18 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             setGameState(next);
             broadcastGameState(next);
           }
-        }, BYGGKASINO_ACTION_ANNOUNCEMENT_DELAY);
+        }, CASINO_ACTION_ANNOUNCEMENT_DELAY);
         return;
       }
 
       if (bs.phase === 'table-remnant') {
         botTimerRef.current = setTimeout(() => {
-          const currentGs = gameStateRef.current as ByggkasinoState | null;
+          const currentGs = gameStateRef.current as CasinoState | null;
           const currentRoom = roomRef.current;
           if (!currentGs || !currentRoom || currentGs.phase !== 'table-remnant') return;
 
           const next = processGameAction(
-            'byggkasino',
+            'casino',
             currentGs,
             { type: 'finish-table-remnant' },
             ''
@@ -1577,13 +1577,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           if (next !== currentGs) {
             setGameState(next);
             broadcastGameState(next);
-            if (checkGameOver('byggkasino', next)) {
+            if (checkGameOver('casino', next)) {
               const finishedRoom = { ...currentRoom, phase: 'finished' as const };
               setRoom(finishedRoom);
               broadcastRoomState(finishedRoom);
             }
           }
-        }, BYGGKASINO_TABLE_REMNANT_DELAY);
+        }, CASINO_TABLE_REMNANT_DELAY);
         return;
       }
 
@@ -1596,17 +1596,17 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           const currentRoom = roomRef.current;
           if (!currentGs || !currentRoom) return;
 
-          const next = runSingleBotTurn('byggkasino', currentGs);
+          const next = runSingleBotTurn('casino', currentGs);
           if (next !== currentGs) {
             setGameState(next);
             broadcastGameState(next);
-            if (checkGameOver('byggkasino', next)) {
+            if (checkGameOver('casino', next)) {
               const finishedRoom = { ...currentRoom, phase: 'finished' as const };
               setRoom(finishedRoom);
               broadcastRoomState(finishedRoom);
             }
           }
-        }, BYGGKASINO_BOT_DELAY);
+        }, CASINO_BOT_DELAY);
       }
       return;
     }

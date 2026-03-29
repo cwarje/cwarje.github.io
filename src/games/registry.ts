@@ -25,7 +25,7 @@ import {
   getSettlerWinnersUnknown,
 } from './settler/logic';
 import { createCrossCribState, processCrossCribAction, isCrossCribOver, runCrossCribBotTurn, getCrossCribWinners } from './cross-crib/logic';
-import { createByggkasinoState, processByggkasinoAction, isByggkasinoOver, runByggkasinoBotTurn, getByggkasinoWinners } from './byggkasino/logic';
+import { createCasinoState, processCasinoAction, isCasinoOver, runCasinoBotTurn, getCasinoWinners } from './casino/logic';
 
 import YahtzeeBoard from './yahtzee/YahtzeeBoard';
 import FarkleBoard from './farkle/FarkleBoard';
@@ -38,18 +38,18 @@ import MobilizationBoard from './mobilization/MobilizationBoard';
 import TwelveBoard from './twelve/TwelveBoard';
 import SettlerBoard from './settler/SettlerBoard';
 import CrossCribBoard from './cross-crib/CrossCribBoard';
-import ByggkasinoBoard from './byggkasino/ByggkasinoBoard';
+import CasinoBoard from './casino/CasinoBoard';
 
 import HeartsOptions from './hearts/HeartsOptions';
 import FarkleOptions from './farkle/FarkleOptions';
 import UpRiverOptions from './up-and-down-the-river/UpRiverOptions';
 import TwelveOptions from './twelve/TwelveOptions';
-import ByggkasinoOptions from './byggkasino/ByggkasinoOptions';
+import CasinoOptions from './casino/CasinoOptions';
 
 import HeartsTitleExtra from './hearts/HeartsTitleExtra';
 import PokerTitleExtra from './poker/PokerTitleExtra';
 import CrossCribTitleExtra from './cross-crib/CrossCribTitleExtra';
-import ByggkasinoTitleExtra from './byggkasino/ByggkasinoTitleExtra';
+import CasinoTitleExtra from './casino/CasinoTitleExtra';
 import UpRiverToolbarExtra from './up-and-down-the-river/UpRiverToolbarExtra';
 import TwelveToolbarExtra from './twelve/TwelveToolbarExtra';
 import MobilizationTitleExtra from './mobilization/MobilizationTitleExtra';
@@ -661,8 +661,8 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     TitleExtra: CrossCribTitleExtra,
   },
 
-  byggkasino: {
-    title: 'Byggkasino',
+  casino: {
+    title: 'Casino',
     shortDescription:
       'Take cards from the table by matching, summing, or building. Play to 11, to 21, or one full deal per player — highest score wins.',
     playersLabel: '2-4 Players',
@@ -700,26 +700,26 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
       labelColor: 'text-lime-200',
     },
     createState: (players, options) =>
-      createByggkasinoState(players, { matchLength: options?.byggkasinoMatchLength }),
-    processAction: processByggkasinoAction,
-    isOver: isByggkasinoOver,
-    runBotTurn: runByggkasinoBotTurn,
-    getWinners: getByggkasinoWinners,
-    Board: ByggkasinoBoard,
-    OptionsPanel: ByggkasinoOptions,
-    TitleExtra: ByggkasinoTitleExtra,
+      createCasinoState(players, { matchLength: options?.casinoMatchLength }),
+    processAction: processCasinoAction,
+    isOver: isCasinoOver,
+    runBotTurn: runCasinoBotTurn,
+    getWinners: getCasinoWinners,
+    Board: CasinoBoard,
+    OptionsPanel: CasinoOptions,
+    TitleExtra: CasinoTitleExtra,
     fullBoard: true,
     hasHandZoom: true,
     production: true,
     showNewBadge: true,
-    hudTitleLines: ['Byggkasino'],
+    hudTitleLines: ['Casino'],
   },
 };
 
 /** All registered game types */
 export const ALL_GAME_TYPES: GameType[] = [
   'mobilization',
-  'byggkasino',
+  'casino',
   'yahtzee',
   'hearts',
   'twelve',
@@ -735,7 +735,7 @@ export const ALL_GAME_TYPES: GameType[] = [
 /** Game types shown in production (homepage order) */
 export const PRODUCTION_GAME_TYPES: GameType[] = [
   'mobilization',
-  'byggkasino',
+  'casino',
   'yahtzee',
   'hearts',
   'twelve',

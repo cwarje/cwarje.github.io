@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
-import type { ByggkasinoMatchLength } from '../../networking/types';
+import type { CasinoMatchLength } from '../../networking/types';
 import type { GameOptionsPanelProps } from '../registry';
 
-const MATCH_OPTIONS: readonly { value: ByggkasinoMatchLength; label: string }[] = [
+const MATCH_OPTIONS: readonly { value: CasinoMatchLength; label: string }[] = [
   { value: 'to11', label: 'Game to 11' },
   { value: 'to21', label: 'Game to 21' },
   { value: 'eachDealerOnce', label: 'Each player deals once' },
 ];
 
-export default function ByggkasinoOptions({ onChange, labelClass }: GameOptionsPanelProps) {
-  const [matchLength, setMatchLength] = useState<ByggkasinoMatchLength>('to21');
+export default function CasinoOptions({ onChange, labelClass }: GameOptionsPanelProps) {
+  const [matchLength, setMatchLength] = useState<CasinoMatchLength>('to21');
 
   useEffect(() => {
-    onChange({ byggkasinoMatchLength: matchLength });
+    onChange({ casinoMatchLength: matchLength });
   }, [matchLength, onChange]);
 
   return (

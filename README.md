@@ -9,7 +9,7 @@ This project runs fully peer-to-peer in the browser: one player hosts a lobby an
 Current game types (from `src/games/registry.ts` and `src/networking/types.ts`):
 
 - `mobilization` (4-6 players)
-- `byggkasino` (2-4 players; optional `byggkasinoMatchLength` in start options: `to11`, `to21`, or `eachDealerOnce` — default `to21`)
+- `casino` (2-4 players; optional `casinoMatchLength` in start options: `to11`, `to21`, or `eachDealerOnce` — default `to21`)
 - `yahtzee` (1-4 players)
 - `farkle` (2-6 players; target score 3000, 5000, or 10000)
 - `hearts` (4 players; target score 50 or 100)
@@ -21,7 +21,7 @@ Current game types (from `src/games/registry.ts` and `src/networking/types.ts`):
 - `settler` (3-4 players)
 - `cross-crib` (2 or 4 players only)
 
-**Production** home page and game picker use `PRODUCTION_GAME_TYPES` in `registry.ts`: mobilization, byggkasino, yahtzee, hearts, twelve, settler, up-and-down-the-river, farkle, cross-crib, poker.
+**Production** home page and game picker use `PRODUCTION_GAME_TYPES` in `registry.ts`: mobilization, casino, yahtzee, hearts, twelve, settler, up-and-down-the-river, farkle, cross-crib, poker.
 
 **Dev-only** (`production: false`): battleship and liars-dice.
 

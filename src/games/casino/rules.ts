@@ -1,4 +1,4 @@
-import type { Card, TableSlot, Build, ByggkasinoPlayer, RoundScoreBreakdown } from './types';
+import type { Card, TableSlot, Build, CasinoPlayer, RoundScoreBreakdown } from './types';
 import {
   cardValuesForSum,
   canParticipateInBuildOrSum,
@@ -288,7 +288,7 @@ export function resolveHandAssistedGroupDeclaredValue(
  * @param lastCapturePlayerId Player who made the last capture this round (not necessarily last to trail).
  */
 export function scoreRound(
-  players: ByggkasinoPlayer[],
+  players: CasinoPlayer[],
   lastCapturePlayerId: string | null = null
 ): Record<string, RoundScoreBreakdown> {
   const scores: Record<string, RoundScoreBreakdown> = {};

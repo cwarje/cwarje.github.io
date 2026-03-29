@@ -834,10 +834,10 @@
   text-align: right;
 }
 
-/* Byggkasino board */
-.byggkasino-board {
-  --byggkasino-bg: #2f8b45;
-  background: var(--byggkasino-bg);
+/* Casino board */
+.casino-board {
+  --casino-bg: #2f8b45;
+  background: var(--casino-bg);
   border: 0;
   border-radius: 0;
   padding: 12px;
@@ -849,12 +849,12 @@
 }
 
 @media (min-width: 640px) {
-  .byggkasino-board {
+  .casino-board {
     padding: 18px;
   }
 }
 
-.byggkasino-table {
+.casino-table {
   position: relative;
   width: 100%;
   min-height: 320px;
@@ -863,7 +863,7 @@
   min-height: 0;
 }
 
-.byggkasino-seat {
+.casino-seat {
   position: absolute;
   display: flex;
   justify-content: center;
@@ -872,11 +872,11 @@
   z-index: 3;
 }
 
-.byggkasino-seat--self {
+.casino-seat--self {
   z-index: 4;
 }
 
-.byggkasino-seatPill {
+.casino-seatPill {
   width: min(100%, 132px);
   min-width: 84px;
   background: #f3f4f6;
@@ -889,19 +889,19 @@
   overflow: hidden;
 }
 
-.byggkasino-seatPill--activeSelf {
-  animation: byggkasinoSeatPillBorderBlink 1.6s linear infinite;
+.casino-seatPill--activeSelf {
+  animation: casinoSeatPillBorderBlink 1.6s linear infinite;
 }
 
-.byggkasino-seatPill--activeOther {
+.casino-seatPill--activeOther {
   border-color: #fde68a;
 }
 
-.byggkasino-seatPill--me {
+.casino-seatPill--me {
   background: #dbeafe;
 }
 
-@keyframes byggkasinoSeatPillBorderBlink {
+@keyframes casinoSeatPillBorderBlink {
   0%, 49.999% {
     border-color: #111827;
   }
@@ -910,14 +910,14 @@
   }
 }
 
-.byggkasino-seatPillTop {
+.casino-seatPillTop {
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 4px 6px;
 }
 
-.byggkasino-seatPillName {
+.casino-seatPillName {
   display: block;
   width: 100%;
   text-align: center;
@@ -928,7 +928,7 @@
   font-size: 12px;
 }
 
-.byggkasino-center {
+.casino-center {
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -940,11 +940,11 @@
   pointer-events: none;
 }
 
-.byggkasino-center > * {
+.casino-center > * {
   pointer-events: auto;
 }
 
-.byggkasino-tableItems {
+.casino-tableItems {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   justify-items: center;
@@ -952,13 +952,13 @@
   width: min(100%, 320px);
 }
 
-.byggkasino-tableEmpty {
+.casino-tableEmpty {
   color: rgba(255, 255, 255, 0.45);
   font-style: italic;
   padding: 0.6rem 0;
 }
 
-.byggkasino-card {
+.casino-card {
   width: 100%;
   height: 100%;
   border: 3px solid #111827;
@@ -971,7 +971,7 @@
   padding: 6px 8px 6px 3px;
 }
 
-.byggkasino-cardFace {
+.casino-cardFace {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -981,11 +981,11 @@
   gap: 2px;
 }
 
-.byggkasino-cardFace--small {
+.casino-cardFace--small {
   width: 1.2em;
 }
 
-.byggkasino-cardRank {
+.casino-cardRank {
   display: block;
   width: 100%;
   text-align: center;
@@ -993,7 +993,7 @@
   font-weight: 700;
 }
 
-.byggkasino-cardSuit {
+.casino-cardSuit {
   display: block;
   width: 100%;
   text-align: center;
@@ -1001,15 +1001,15 @@
   font-weight: 700;
 }
 
-.byggkasino-card--disabled {
+.casino-card--disabled {
   background: #c8c8c8;
 }
 
-.byggkasino-card--selected {
+.casino-card--selected {
   box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.45);
 }
 
-.byggkasino-tableCard {
+.casino-tableCard {
   position: relative;
   width: 64px;
   height: 92px;
@@ -1020,7 +1020,7 @@
   cursor: pointer;
 }
 
-.byggkasino-tableSlot {
+.casino-tableSlot {
   width: 64px;
   height: 92px;
   border-radius: 10px;
@@ -1029,22 +1029,22 @@
   cursor: default;
 }
 
-.byggkasino-tableSlot--trailTarget {
+.casino-tableSlot--trailTarget {
   border: 2px dashed rgba(250, 204, 21, 0.75);
   background: rgba(250, 204, 21, 0.16);
   cursor: pointer;
 }
 
-.byggkasino-tableCard--selected .byggkasino-card {
+.casino-tableCard--selected .casino-card {
   box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.55);
 }
 
-.byggkasino-tableCard--disabled {
+.casino-tableCard--disabled {
   opacity: 0.58;
   cursor: default;
 }
 
-.byggkasino-buildPile {
+.casino-buildPile {
   position: relative;
   width: 64px;
   height: 92px;
@@ -1057,38 +1057,38 @@
   cursor: pointer;
 }
 
-.byggkasino-buildPile--selected {
+.casino-buildPile--selected {
   box-shadow: 0 0 0 3px rgba(253, 230, 138, 0.45);
 }
 
-.byggkasino-buildPile--disabled {
+.casino-buildPile--disabled {
   opacity: 0.58;
   cursor: default;
 }
 
-.byggkasino-buildPileStack {
+.casino-buildPileStack {
   position: relative;
   width: 100%;
   height: 100%;
 }
 
-.byggkasino-buildPileLayer {
+.casino-buildPileLayer {
   position: absolute;
   inset: 0;
 }
 
-.byggkasino-buildPileLayer .byggkasino-card {
+.casino-buildPileLayer .casino-card {
   width: 100%;
   height: 100%;
 }
 
-.byggkasino-tableCard > .byggkasino-card,
-.byggkasino-buildPileLayer .byggkasino-card,
-.byggkasino-capturePreviewCard .byggkasino-card {
+.casino-tableCard > .casino-card,
+.casino-buildPileLayer .casino-card,
+.casino-capturePreviewCard .casino-card {
   padding: 9px 10px 9px 7px;
 }
 
-.byggkasino-buildPileValueBadge {
+.casino-buildPileValueBadge {
   position: absolute;
   right: -8px;
   top: -10px;
@@ -1107,20 +1107,20 @@
   background: #fde68a;
 }
 
-.byggkasino-capturePreviewCard {
+.casino-capturePreviewCard {
   position: absolute;
   inset: 0;
   transform: translate(-3px, -11px);
   pointer-events: none;
 }
 
-.byggkasino-capturePreviewCard .byggkasino-card {
+.casino-capturePreviewCard .casino-card {
   width: 100%;
   height: 100%;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.42);
 }
 
-.byggkasino-headsUp {
+.casino-headsUp {
   min-height: 32px;
   margin-top: 4px;
   display: flex;
@@ -1128,7 +1128,7 @@
   justify-content: center;
 }
 
-.byggkasino-headsUpText {
+.casino-headsUpText {
   width: 100%;
   text-align: center;
   font-size: 1.05rem;
@@ -1139,7 +1139,7 @@
   text-overflow: ellipsis;
 }
 
-.byggkasino-hand {
+.casino-hand {
   width: 100%;
   display: flex;
   justify-content: center;
@@ -1148,11 +1148,11 @@
   min-height: 126px;
 }
 
-.byggkasino-handSpread {
+.casino-handSpread {
   position: relative;
 }
 
-.byggkasino-handHitbox {
+.casino-handHitbox {
   position: absolute;
   top: 0;
   background: transparent;
@@ -1163,11 +1163,11 @@
   transition: left 0.16s ease, width 0.16s ease;
 }
 
-.byggkasino-handHitbox:disabled {
+.casino-handHitbox:disabled {
   cursor: not-allowed;
 }
 
-.byggkasino-handCardWrap {
+.casino-handCardWrap {
   position: absolute;
   left: 0;
   top: 14px;
@@ -1175,12 +1175,12 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .byggkasino-handCardWrap--active:hover {
+  .casino-handCardWrap--active:hover {
     transform: translateY(-8px) !important;
   }
 }
 
-.byggkasino-actionRow {
+.casino-actionRow {
   min-height: 56px;
   display: flex;
   align-items: flex-start;
@@ -1190,7 +1190,7 @@
   padding-top: 10px;
 }
 
-.byggkasino-actionButton {
+.casino-actionButton {
   min-width: 94px;
   padding: 7px 14px;
   border-radius: 10px;
@@ -1201,127 +1201,127 @@
   cursor: pointer;
 }
 
-.byggkasino-actionButton--capture {
+.casino-actionButton--capture {
   background: #15803d;
 }
 
-.byggkasino-actionButton--capture:hover {
+.casino-actionButton--capture:hover {
   background: #166534;
 }
 
-.byggkasino-actionButton--build {
+.casino-actionButton--build {
   background: #b45309;
 }
 
-.byggkasino-actionButton--build:hover {
+.casino-actionButton--build:hover {
   background: #92400e;
 }
 
-.byggkasino-actionButton--extend {
+.casino-actionButton--extend {
   background: #c2410c;
 }
 
-.byggkasino-actionButton--extend:hover {
+.casino-actionButton--extend:hover {
   background: #9a3412;
 }
 
-.byggkasino-actionButton--trail {
+.casino-actionButton--trail {
   background: #4b5563;
 }
 
-.byggkasino-actionButton--trail:hover {
+.casino-actionButton--trail:hover {
   background: #374151;
 }
 
 @media (max-width: 639px) {
-  .byggkasino-table {
+  .casino-table {
     min-height: 300px;
   }
 
-  .byggkasino-tableCard {
+  .casino-tableCard {
     width: 55px;
     height: 81px;
   }
 
-  .byggkasino-tableSlot {
+  .casino-tableSlot {
     width: 55px;
     height: 81px;
   }
 
-  .byggkasino-buildPile {
+  .casino-buildPile {
     width: 55px;
     height: 81px;
   }
 
-  .byggkasino-card {
+  .casino-card {
     padding: 4px 0 0 0;
   }
 
-  .byggkasino-hand .byggkasino-card {
+  .casino-hand .casino-card {
     padding: 6px 8px 6px 0;
   }
 
-  .byggkasino-tableCard > .byggkasino-card,
-  .byggkasino-buildPileLayer .byggkasino-card,
-  .byggkasino-capturePreviewCard .byggkasino-card {
+  .casino-tableCard > .casino-card,
+  .casino-buildPileLayer .casino-card,
+  .casino-capturePreviewCard .casino-card {
     padding: 6px 7px 6px 4px;
   }
 
-  .byggkasino-cardRank {
+  .casino-cardRank {
     font-size: 1.2rem;
   }
 
-  .byggkasino-cardSuit {
+  .casino-cardSuit {
     font-size: 1.2rem;
   }
 
-  .byggkasino-hand .byggkasino-cardRank {
+  .casino-hand .casino-cardRank {
     font-size: 1.1rem;
   }
 
-  .byggkasino-hand .byggkasino-cardSuit {
+  .casino-hand .casino-cardSuit {
     font-size: 1.1rem;
   }
 
-  .byggkasino-headsUpText {
+  .casino-headsUpText {
     font-size: 1rem;
   }
 }
 
 @media (min-width: 640px) {
-  .byggkasino-hand.byggkasino-hand--zoom .byggkasino-cardRank,
-  .byggkasino-center.byggkasino-center--zoom .byggkasino-cardRank {
+  .casino-hand.casino-hand--zoom .casino-cardRank,
+  .casino-center.casino-center--zoom .casino-cardRank {
     font-size: 1.8rem;
     line-height: 1;
   }
 
-  .byggkasino-hand.byggkasino-hand--zoom .byggkasino-cardSuit,
-  .byggkasino-center.byggkasino-center--zoom .byggkasino-cardSuit {
+  .casino-hand.casino-hand--zoom .casino-cardSuit,
+  .casino-center.casino-center--zoom .casino-cardSuit {
     font-size: 1.8rem;
     line-height: 1;
   }
 
-  .byggkasino-hand.byggkasino-hand--zoom .byggkasino-cardFace,
-  .byggkasino-center.byggkasino-center--zoom .byggkasino-cardFace {
+  .casino-hand.casino-hand--zoom .casino-cardFace,
+  .casino-center.casino-center--zoom .casino-cardFace {
     width: 1.8em;
   }
 }
 
 @media (max-width: 639px) {
-  .byggkasino-hand.byggkasino-hand--zoom .byggkasino-cardRank,
-  .byggkasino-center.byggkasino-center--zoom .byggkasino-cardRank {
+  .casino-hand.casino-hand--zoom .casino-cardRank,
+  .casino-center.casino-center--zoom .casino-cardRank {
     font-size: 1.6rem;
     line-height: 1;
   }
 
-  .byggkasino-hand.byggkasino-hand--zoom .byggkasino-cardSuit,
-  .byggkasino-center.byggkasino-center--zoom .byggkasino-cardSuit {
+  .casino-hand.casino-hand--zoom .casino-cardSuit,
+  .casino-center.casino-center--zoom .casino-cardSuit {
     font-size: 1.5rem;
     line-height: 1;
   }
 
-  .byggkasino-hand.byggkasino-hand--zoom .byggkasino-cardFace,
-  .byggkasino-center.byggkasino-center--zoom .byggkasino-cardFace {
+  .casino-hand.casino-hand--zoom .casino-cardFace,
+  .casino-center.casino-center--zoom .casino-cardFace {
     width: 1.75em;
   }
 }

@@ -10,19 +10,19 @@ export type GameType =
   | 'settler'
   | 'cross-crib'
   | 'mobilization'
-  | 'byggkasino';
+  | 'casino';
 export type PlayerColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet' | 'dark-purple';
 export type HeartsTargetScore = 50 | 100;
 export type FarkleTargetScore = 3000 | 5000 | 10000;
 export type UpRiverStartMode = 'up-down' | 'down-up';
 export type TwelvePileCount = 3 | 4 | 5 | 6;
-export type ByggkasinoMatchLength = 'to11' | 'to21' | 'eachDealerOnce';
+export type CasinoMatchLength = 'to11' | 'to21' | 'eachDealerOnce';
 export interface GameStartOptions {
   targetScore?: HeartsTargetScore;
   farkleTargetScore?: FarkleTargetScore;
   upRiverStartMode?: UpRiverStartMode;
   pileCount?: TwelvePileCount;
-  byggkasinoMatchLength?: ByggkasinoMatchLength;
+  casinoMatchLength?: CasinoMatchLength;
   botCount?: number;
 }
 

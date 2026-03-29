@@ -13,8 +13,8 @@ import {
   resolveTableGroupWithBuildsDeclaredValue,
   scoreRound,
 } from './rules';
-import { processByggkasinoAction } from './logic';
-import type { ByggkasinoPlayer, ByggkasinoState } from './types';
+import { processCasinoAction } from './logic';
+import type { CasinoPlayer, CasinoState } from './types';
 
 const AH: Card = { suit: 'hearts', rank: 1 };
 const C4: Card = { suit: 'clubs', rank: 4 };
@@ -238,9 +238,9 @@ describe('resolveHandAssistedGroupDeclaredValue', () => {
   });
 });
 
-describe('processByggkasinoAction build with ace low sum', () => {
+describe('processCasinoAction build with ace low sum', () => {
   it('accepts declaredValue 5 for ace + 4 when hand can capture 5', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -280,11 +280,11 @@ describe('processByggkasinoAction build with ace low sum', () => {
       pendingCapturePreview: null,
     };
 
-    const next = processByggkasinoAction(
+    const next = processCasinoAction(
       s,
       { type: 'build', playedCard: AH, tableCardIndices: [0], declaredValue: 5 },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
     expect(next).not.toBe(s);
     expect(next.tableSlots.some(it => it?.kind === 'build' && it.build.value === 5)).toBe(true);
   });
@@ -410,7 +410,7 @@ describe('resolveTableGroupWithBuildsDeclaredValue', () => {
 });
 
 describe('scoreRound', () => {
-  const basePlayer = (id: string, captured: Card[]): ByggkasinoPlayer => ({
+  const basePlayer = (id: string, captured: Card[]): CasinoPlayer => ({
     id,
     name: id,
     color: 'red',

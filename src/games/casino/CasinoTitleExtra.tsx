@@ -1,4 +1,4 @@
-import type { ByggkasinoState } from './types';
+import type { CasinoState } from './types';
 import type { GameHudProps } from '../registry';
 
 const DEAL_WORDS = [
@@ -45,8 +45,8 @@ function possessiveName(name: string): string {
   return `${trimmed}'s`;
 }
 
-export default function ByggkasinoTitleExtra({ state }: GameHudProps) {
-  const s = state as ByggkasinoState;
+export default function CasinoTitleExtra({ state }: GameHudProps) {
+  const s = state as CasinoState;
   const dealer = s.players[s.dealerIndex];
   const dealerLabel = dealer ? possessiveName(dealer.name) : "Someone's";
 

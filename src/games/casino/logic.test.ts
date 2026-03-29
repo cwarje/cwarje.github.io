@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Player } from '../../networking/types';
 import {
-  createByggkasinoState,
+  createCasinoState,
   getCaptureOutcomeFromPreview,
-  processByggkasinoAction,
-  runByggkasinoBotTurn,
+  processCasinoAction,
+  runCasinoBotTurn,
 } from './logic';
-import type { ByggkasinoState, Card } from './types';
+import type { CasinoState, Card } from './types';
 
 function makePlayer(id: string, name: string): Player {
   return {
@@ -19,9 +19,9 @@ function makePlayer(id: string, name: string): Player {
   };
 }
 
-describe('byggkasino trail', () => {
+describe('casino trail', () => {
   it('playedCard removes card from hand and adds it to the table', () => {
-    const s = createByggkasinoState([makePlayer('p0', 'A'), makePlayer('p1', 'B')]) as ByggkasinoState;
+    const s = createCasinoState([makePlayer('p0', 'A'), makePlayer('p1', 'B')]) as CasinoState;
     const idx = s.currentPlayerIndex;
     const pid = s.players[idx].id;
     const card = s.players[idx].hand[0];
@@ -30,11 +30,11 @@ describe('byggkasino trail', () => {
     const firstOpen = s.tableSlots.findIndex(slot => slot == null);
     const targetSlotIndex = firstOpen >= 0 ? firstOpen : s.tableRows * 4;
 
-    const next = processByggkasinoAction(
+    const next = processCasinoAction(
       s,
       { type: 'trail', playedCard: card, targetSlotIndex },
       pid
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(next).not.toBe(s);
     expect(next.phase).toBe('announcement');
@@ -48,13 +48,13 @@ describe('byggkasino trail', () => {
     expect(next.tableSlots.filter(Boolean)).toHaveLength(tableLenBefore + 1);
     expect(next.tableSlots[targetSlotIndex]).toEqual({ kind: 'card', card });
 
-    const afterHud = processByggkasinoAction(next, { type: 'finish-action-announcement' }, '') as ByggkasinoState;
+    const afterHud = processCasinoAction(next, { type: 'finish-action-announcement' }, '') as CasinoState;
     expect(afterHud.phase).toBe('playing');
     expect(afterHud.actionAnnouncement).toBeNull();
   });
 
   it('rejects trail when current player owns a build on the table', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -107,7 +107,7 @@ describe('byggkasino trail', () => {
       pendingCapturePreview: null,
     };
 
-    const next = processByggkasinoAction(
+    const next = processCasinoAction(
       s,
       { type: 'trail', playedCard: { suit: 'hearts', rank: 9 }, targetSlotIndex: 1 },
       'p0'
@@ -116,10 +116,10 @@ describe('byggkasino trail', () => {
   });
 });
 
-describe('byggkasino group-table then capture', () => {
+describe('casino group-table then capture', () => {
   it('groups loose cards without advancing turn, then capture finalizes', () => {
     const six: Card = { suit: 'diamonds', rank: 6 };
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -162,11 +162,11 @@ describe('byggkasino group-table then capture', () => {
       pendingCapturePreview: null,
     };
 
-    const grouped = processByggkasinoAction(
+    const grouped = processCasinoAction(
       s,
       { type: 'group-table', tableCardIndices: [0, 1], declaredValue: 6 },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(grouped).not.toBe(s);
     expect(grouped.currentPlayerIndex).toBe(0);
@@ -175,18 +175,18 @@ describe('byggkasino group-table then capture', () => {
     expect(grouped.tableSlots[0]?.kind).toBe('build');
     expect(grouped.tableSlots[1]).toBeNull();
 
-    const preview = processByggkasinoAction(
+    const preview = processCasinoAction(
       grouped,
       { type: 'capture-preview', playedCard: six, capturedSlotIndices: [0] },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
     expect(preview.pendingCapturePreview).not.toBeNull();
     expect(preview.players[0].hand).toHaveLength(0);
 
     const fromHelper = getCaptureOutcomeFromPreview(preview, preview.pendingCapturePreview!);
     expect(fromHelper).not.toBeNull();
 
-    const finalized = processByggkasinoAction(preview, { type: 'finalize-capture' }, '') as ByggkasinoState;
+    const finalized = processCasinoAction(preview, { type: 'finalize-capture' }, '') as CasinoState;
     expect(finalized.pendingCapturePreview).toBeNull();
     expect(finalized.phase).toBe('announcement');
     expect(finalized.players[0].hand).toHaveLength(0);
@@ -200,11 +200,11 @@ describe('byggkasino group-table then capture', () => {
   });
 });
 
-describe('byggkasino 5 of spades sweep', () => {
+describe('casino 5 of spades sweep', () => {
   const S5: Card = { suit: 'spades', rank: 5 };
 
   it('trail with 5♠ sweeps entire table and awards sweep', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -249,11 +249,11 @@ describe('byggkasino 5 of spades sweep', () => {
       pendingCapturePreview: null,
     };
 
-    const next = processByggkasinoAction(
+    const next = processCasinoAction(
       s,
       { type: 'trail', playedCard: S5, targetSlotIndex: 2 },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(next.pendingCapturePreview).toBeNull();
     expect(next.phase).toBe('announcement');
@@ -270,7 +270,7 @@ describe('byggkasino 5 of spades sweep', () => {
   });
 
   it('capture-preview with 5♠ resolves immediately without pending preview', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -310,11 +310,11 @@ describe('byggkasino 5 of spades sweep', () => {
       pendingCapturePreview: null,
     };
 
-    const next = processByggkasinoAction(
+    const next = processCasinoAction(
       s,
       { type: 'capture-preview', playedCard: S5, capturedSlotIndices: [0] },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(next.pendingCapturePreview).toBeNull();
     expect(next.actionAnnouncement?.kind).toBe('capture');
@@ -323,7 +323,7 @@ describe('byggkasino 5 of spades sweep', () => {
   });
 
   it('trail 5♠ on empty table sweeps itself and awards sweep', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -363,11 +363,11 @@ describe('byggkasino 5 of spades sweep', () => {
       pendingCapturePreview: null,
     };
 
-    const next = processByggkasinoAction(
+    const next = processCasinoAction(
       s,
       { type: 'trail', playedCard: S5, targetSlotIndex: 0 },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(next.players[0].sweepCount).toBe(1);
     expect(next.actionAnnouncement?.kind).toBe('capture');
@@ -381,7 +381,7 @@ describe('byggkasino 5 of spades sweep', () => {
   });
 
   it('capture-preview 5♠ on empty table with empty indices sweeps immediately', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -421,11 +421,11 @@ describe('byggkasino 5 of spades sweep', () => {
       pendingCapturePreview: null,
     };
 
-    const next = processByggkasinoAction(
+    const next = processCasinoAction(
       s,
       { type: 'capture-preview', playedCard: S5, capturedSlotIndices: [] },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(next.pendingCapturePreview).toBeNull();
     expect(next.actionAnnouncement?.kind).toBe('capture');
@@ -435,7 +435,7 @@ describe('byggkasino 5 of spades sweep', () => {
   });
 
   it('build with 5♠ on non-empty table sweeps instead of building', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -475,11 +475,11 @@ describe('byggkasino 5 of spades sweep', () => {
       pendingCapturePreview: null,
     };
 
-    const next = processByggkasinoAction(
+    const next = processCasinoAction(
       s,
       { type: 'build', playedCard: S5, tableCardIndices: [0], declaredValue: 8 },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(next.actionAnnouncement?.kind).toBe('capture');
     expect(next.players[0].sweepCount).toBe(1);
@@ -488,7 +488,7 @@ describe('byggkasino 5 of spades sweep', () => {
   });
 
   it('extend-build with 5♠ on non-empty table sweeps including builds', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -544,11 +544,11 @@ describe('byggkasino 5 of spades sweep', () => {
       pendingCapturePreview: null,
     };
 
-    const next = processByggkasinoAction(
+    const next = processCasinoAction(
       s,
       { type: 'extend-build', playedCard: S5, buildIndex: 0, declaredValue: 99 },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(next.actionAnnouncement?.kind).toBe('capture');
     if (next.actionAnnouncement?.kind === 'capture') {
@@ -561,9 +561,9 @@ describe('byggkasino 5 of spades sweep', () => {
   });
 });
 
-describe('byggkasino double/triple builds', () => {
+describe('casino double/triple builds', () => {
   it('groups loose A+6 into existing owned 7-build to create D7', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -616,11 +616,11 @@ describe('byggkasino double/triple builds', () => {
       pendingCapturePreview: null,
     };
 
-    const grouped = processByggkasinoAction(
+    const grouped = processCasinoAction(
       s,
       { type: 'group-table', tableCardIndices: [1, 2], declaredValue: 7 },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(grouped).not.toBe(s);
     expect(grouped.currentPlayerIndex).toBe(0);
@@ -636,7 +636,7 @@ describe('byggkasino double/triple builds', () => {
   });
 
   it('captures D7 build with a 7 from hand', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -692,21 +692,21 @@ describe('byggkasino double/triple builds', () => {
       pendingCapturePreview: null,
     };
 
-    const preview = processByggkasinoAction(
+    const preview = processCasinoAction(
       s,
       { type: 'capture-preview', playedCard: { suit: 'hearts', rank: 7 }, capturedSlotIndices: [0] },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
     expect(preview.pendingCapturePreview).not.toBeNull();
     expect(preview.players[0].hand).toHaveLength(0);
 
-    const finalized = processByggkasinoAction(preview, { type: 'finalize-capture' }, '') as ByggkasinoState;
+    const finalized = processCasinoAction(preview, { type: 'finalize-capture' }, '') as CasinoState;
     expect(finalized.players[0].capturedCards).toHaveLength(5);
     expect(finalized.tableSlots[0]).toBeNull();
   });
 
   it('merges two builds into a D7 via group-table with build indices', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -767,11 +767,11 @@ describe('byggkasino double/triple builds', () => {
       pendingCapturePreview: null,
     };
 
-    const grouped = processByggkasinoAction(
+    const grouped = processCasinoAction(
       s,
       { type: 'group-table', tableCardIndices: [0, 1], declaredValue: 7 },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(grouped).not.toBe(s);
     const buildSlot = grouped.tableSlots[0];
@@ -786,7 +786,7 @@ describe('byggkasino double/triple builds', () => {
   });
 
   it('groups build 13 with loose king into D13', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -839,11 +839,11 @@ describe('byggkasino double/triple builds', () => {
       pendingCapturePreview: null,
     };
 
-    const grouped = processByggkasinoAction(
+    const grouped = processCasinoAction(
       s,
       { type: 'group-table', tableCardIndices: [0, 1], declaredValue: 13 },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(grouped).not.toBe(s);
     const buildSlot = grouped.tableSlots[0];
@@ -858,7 +858,7 @@ describe('byggkasino double/triple builds', () => {
 
   it('rejects capture-preview of build 13 plus loose king before grouping', () => {
     const king: Card = { suit: 'hearts', rank: 13 };
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -911,7 +911,7 @@ describe('byggkasino double/triple builds', () => {
       pendingCapturePreview: null,
     };
 
-    const preview = processByggkasinoAction(
+    const preview = processCasinoAction(
       s,
       { type: 'capture-preview', playedCard: king, capturedSlotIndices: [0, 1] },
       'p0'
@@ -920,7 +920,7 @@ describe('byggkasino double/triple builds', () => {
   });
 
   it('triple build: D7 + loose cards summing to 7 → T7', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -976,11 +976,11 @@ describe('byggkasino double/triple builds', () => {
       pendingCapturePreview: null,
     };
 
-    const grouped = processByggkasinoAction(
+    const grouped = processCasinoAction(
       s,
       { type: 'group-table', tableCardIndices: [1, 2], declaredValue: 7 },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(grouped).not.toBe(s);
     const buildSlot = grouped.tableSlots[0];
@@ -993,7 +993,7 @@ describe('byggkasino double/triple builds', () => {
   });
 
   it('rejects group-table when player owns a build of a different value', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -1046,7 +1046,7 @@ describe('byggkasino double/triple builds', () => {
       pendingCapturePreview: null,
     };
 
-    const next = processByggkasinoAction(
+    const next = processCasinoAction(
       s,
       { type: 'group-table', tableCardIndices: [1, 2], declaredValue: 6 },
       'p0'
@@ -1055,13 +1055,13 @@ describe('byggkasino double/triple builds', () => {
   });
 });
 
-describe('byggkasino multi-card build with merge', () => {
+describe('casino multi-card build with merge', () => {
   it('builds D15 from hand 3 + table 8,4 + existing build-15, then captures with 2♠', () => {
     const S2: Card = { suit: 'spades', rank: 2 };
     const H3: Card = { suit: 'hearts', rank: 3 };
     const C8: Card = { suit: 'clubs', rank: 8 };
     const D4: Card = { suit: 'diamonds', rank: 4 };
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -1114,11 +1114,11 @@ describe('byggkasino multi-card build with merge', () => {
       pendingCapturePreview: null,
     };
 
-    const built = processByggkasinoAction(
+    const built = processCasinoAction(
       s,
       { type: 'build', playedCard: H3, tableCardIndices: [1, 2, 0], declaredValue: 15 },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(built).not.toBe(s);
     expect(built.players[0].hand).toHaveLength(1);
@@ -1139,7 +1139,7 @@ describe('byggkasino multi-card build with merge', () => {
     const H3: Card = { suit: 'hearts', rank: 3 };
     const C8: Card = { suit: 'clubs', rank: 8 };
     const D4: Card = { suit: 'diamonds', rank: 4 };
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -1184,11 +1184,11 @@ describe('byggkasino multi-card build with merge', () => {
       pendingCapturePreview: null,
     };
 
-    const built = processByggkasinoAction(
+    const built = processCasinoAction(
       s,
       { type: 'build', playedCard: H3, tableCardIndices: [0, 1], declaredValue: 15 },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(built).not.toBe(s);
     const buildSlot = built.tableSlots[0];
@@ -1205,7 +1205,7 @@ describe('byggkasino multi-card build with merge', () => {
     const H3: Card = { suit: 'hearts', rank: 3 };
     const C8: Card = { suit: 'clubs', rank: 8 };
     const D4: Card = { suit: 'diamonds', rank: 4 };
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -1258,7 +1258,7 @@ describe('byggkasino multi-card build with merge', () => {
       pendingCapturePreview: null,
     };
 
-    const result = processByggkasinoAction(
+    const result = processCasinoAction(
       s,
       { type: 'build', playedCard: H3, tableCardIndices: [1, 2, 0], declaredValue: 15 },
       'p0'
@@ -1267,7 +1267,7 @@ describe('byggkasino multi-card build with merge', () => {
   });
 });
 
-describe('byggkasino dealNumberInRound', () => {
+describe('casino dealNumberInRound', () => {
   it('increments when redealing four cards mid scoring round', () => {
     const deckTail: Card[] = [
       { suit: 'clubs', rank: 1 },
@@ -1282,7 +1282,7 @@ describe('byggkasino dealNumberInRound', () => {
       { suit: 'clubs', rank: 10 },
     ];
     const lastCard: Card = { suit: 'hearts', rank: 11 };
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -1322,11 +1322,11 @@ describe('byggkasino dealNumberInRound', () => {
       pendingCapturePreview: null,
     };
 
-    const afterTrail = processByggkasinoAction(
+    const afterTrail = processCasinoAction(
       s,
       { type: 'trail', playedCard: lastCard, targetSlotIndex: 0 },
       'p1'
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(afterTrail.dealNumberInRound).toBe(2);
     expect(afterTrail.players[0].hand).toHaveLength(4);
@@ -1336,7 +1336,7 @@ describe('byggkasino dealNumberInRound', () => {
   });
 });
 
-describe('byggkasino hand-assisted duplicate grouping', () => {
+describe('casino hand-assisted duplicate grouping', () => {
   const C3: Card = { suit: 'clubs', rank: 3 };
   const H3: Card = { suit: 'hearts', rank: 3 };
   const D3: Card = { suit: 'diamonds', rank: 3 };
@@ -1344,7 +1344,7 @@ describe('byggkasino hand-assisted duplicate grouping', () => {
   const C8: Card = { suit: 'clubs', rank: 8 };
 
   it('groups loose 3 with played 3 into D3 and consumes the played card', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -1384,11 +1384,11 @@ describe('byggkasino hand-assisted duplicate grouping', () => {
       pendingCapturePreview: null,
     };
 
-    const next = processByggkasinoAction(
+    const next = processCasinoAction(
       s,
       { type: 'group-table', tableCardIndices: [0], declaredValue: 3, playedCard: C3 },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(next).not.toBe(s);
     expect(next.players[0].hand).toHaveLength(3);
@@ -1403,7 +1403,7 @@ describe('byggkasino hand-assisted duplicate grouping', () => {
   });
 
   it('groups D3 with a hand 3 into T3, then allows capture on next turn with remaining 3', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -1451,11 +1451,11 @@ describe('byggkasino hand-assisted duplicate grouping', () => {
       pendingCapturePreview: null,
     };
 
-    const grouped = processByggkasinoAction(
+    const grouped = processCasinoAction(
       s,
       { type: 'group-table', tableCardIndices: [0], declaredValue: 3, playedCard: C3 },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
     expect(grouped).not.toBe(s);
     const buildSlot = grouped.tableSlots[0];
     expect(buildSlot?.kind).toBe('build');
@@ -1464,41 +1464,41 @@ describe('byggkasino hand-assisted duplicate grouping', () => {
       expect(buildSlot.build.cards).toEqual([S3, D3, C3]);
     }
 
-    const p1Turn = processByggkasinoAction(
+    const p1Turn = processCasinoAction(
       grouped,
       { type: 'finish-action-announcement' },
       ''
-    ) as ByggkasinoState;
-    const trailed = processByggkasinoAction(
+    ) as CasinoState;
+    const trailed = processCasinoAction(
       p1Turn,
       { type: 'trail', playedCard: C8, targetSlotIndex: 2 },
       'p1'
-    ) as ByggkasinoState;
-    const p0Turn = processByggkasinoAction(
+    ) as CasinoState;
+    const p0Turn = processCasinoAction(
       trailed,
       { type: 'finish-action-announcement' },
       ''
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
-    const preview = processByggkasinoAction(
+    const preview = processCasinoAction(
       p0Turn,
       { type: 'capture-preview', playedCard: H3, capturedSlotIndices: [0] },
       'p0'
-    ) as ByggkasinoState;
+    ) as CasinoState;
     expect(preview.pendingCapturePreview).not.toBeNull();
     expect(preview.players[0].hand).toHaveLength(2);
 
-    const finalized = processByggkasinoAction(preview, { type: 'finalize-capture' }, '') as ByggkasinoState;
+    const finalized = processCasinoAction(preview, { type: 'finalize-capture' }, '') as CasinoState;
     expect(finalized.tableSlots[0]).toBeNull();
     expect(finalized.players[0].capturedCards).toHaveLength(4);
   });
 });
 
-describe('byggkasino table-remnant phase', () => {
+describe('casino table-remnant phase', () => {
   it('waits in table-remnant, then awards remaining table cards when finished', () => {
     const lastCard: Card = { suit: 'hearts', rank: 11 };
     const remainingTableCard: Card = { suit: 'clubs', rank: 9 };
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         {
           id: 'p0',
@@ -1538,22 +1538,22 @@ describe('byggkasino table-remnant phase', () => {
       pendingCapturePreview: null,
     };
 
-    const afterLastPlay = processByggkasinoAction(
+    const afterLastPlay = processCasinoAction(
       s,
       { type: 'trail', playedCard: lastCard, targetSlotIndex: 1 },
       'p1'
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(afterLastPlay.phase).toBe('table-remnant');
     expect(afterLastPlay.tableSlots[0]).toEqual({ kind: 'card', card: remainingTableCard });
     expect(afterLastPlay.tableSlots[1]).toEqual({ kind: 'card', card: lastCard });
     expect(afterLastPlay.players[0].capturedCards).toHaveLength(1);
 
-    const afterRemnant = processByggkasinoAction(
+    const afterRemnant = processCasinoAction(
       afterLastPlay,
       { type: 'finish-table-remnant' },
       ''
-    ) as ByggkasinoState;
+    ) as CasinoState;
 
     expect(afterRemnant.phase).toBe('round-end');
     expect(afterRemnant.tableSlots).toEqual([]);
@@ -1577,9 +1577,9 @@ describe('byggkasino table-remnant phase', () => {
   });
 });
 
-describe('byggkasino eachDealerOnce game end', () => {
+describe('casino eachDealerOnce game end', () => {
   it('ends after one scoring round per player, not when a score target is met', () => {
-    const tableRemnantState = (roundNumber: number): ByggkasinoState => ({
+    const tableRemnantState = (roundNumber: number): CasinoState => ({
       players: [
         { id: 'p0', name: 'A', color: 'red', isBot: false, hand: [], capturedCards: [], sweepCount: 0 },
         { id: 'p1', name: 'B', color: 'blue', isBot: false, hand: [], capturedCards: [], sweepCount: 0 },
@@ -1603,27 +1603,27 @@ describe('byggkasino eachDealerOnce game end', () => {
       pendingCapturePreview: null,
     });
 
-    const afterRound1 = processByggkasinoAction(
+    const afterRound1 = processCasinoAction(
       tableRemnantState(1),
       { type: 'finish-table-remnant' },
       ''
-    ) as ByggkasinoState;
+    ) as CasinoState;
     expect(afterRound1.phase).toBe('round-end');
     expect(afterRound1.gameOver).toBe(false);
 
-    const afterRound2 = processByggkasinoAction(
+    const afterRound2 = processCasinoAction(
       tableRemnantState(2),
       { type: 'finish-table-remnant' },
       ''
-    ) as ByggkasinoState;
+    ) as CasinoState;
     expect(afterRound2.phase).toBe('game-over');
     expect(afterRound2.gameOver).toBe(true);
   });
 });
 
-describe('runByggkasinoBotTurn', () => {
+describe('runCasinoBotTurn', () => {
   it('does not advance from round-end', () => {
-    const s: ByggkasinoState = {
+    const s: CasinoState = {
       players: [
         { id: 'p0', name: 'A', color: 'red', isBot: false, hand: [], capturedCards: [], sweepCount: 0 },
         { id: 'p1', name: 'B', color: 'blue', isBot: false, hand: [], capturedCards: [], sweepCount: 0 },
@@ -1667,6 +1667,6 @@ describe('runByggkasinoBotTurn', () => {
       actionAnnouncement: null,
       pendingCapturePreview: null,
     };
-    expect(runByggkasinoBotTurn(s)).toBe(s);
+    expect(runCasinoBotTurn(s)).toBe(s);
   });
 });
