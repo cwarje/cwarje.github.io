@@ -1129,6 +1129,11 @@ function scoreFollowSuitOption(
   const currentLeader = getCurrentTrickLeaderId(state);
   const dangerousLeads = !!dangerousOpponentId && currentLeader === dangerousOpponentId;
   const wouldLead = wouldLeadCurrentTrick(state, player, option);
+  const teammateId = getTeammateId(state.players, player.id);
+  const leaderIsOpponent =
+    currentLeader !== null
+    && currentLeader !== player.id
+    && (teammateId === null || currentLeader !== teammateId);
   let score = 0;
 
   if (wouldLead) {
@@ -1137,6 +1142,13 @@ function scoreFollowSuitOption(
     score -= rankStrength(card.rank) * 0.35;
     if (dangerousLeads) score += 8;
     if (trickPoints >= 10) score += 4 + trickPoints * 0.25;
+    if (leaderIsOpponent) {
+      score += trickPoints * 0.55;
+      const leaderPlay = state.currentTrick.find(entry => entry.playerId === currentLeader);
+      if (leaderPlay?.card.rank === 10) {
+        score += 2.8;
+      }
+    }
     if (roundRace.isUniqueLeader && roundRace.leaderId === currentLeader) score += 2.2;
     if (state.trumpSuit === null && player.totalScore <= 9 && suitsWithRoyalPair(player).length > 0) score += 3;
     if (endgame.isLate) score += 8;

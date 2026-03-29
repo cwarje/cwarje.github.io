@@ -399,6 +399,25 @@ function teamBonusCountedOnceScenario(): TwelveBotScenarioResult {
   };
 }
 
+/** Opponent led 10 in suit; bot must win with ace instead of ducking with a low card. */
+function aceOverLedTenScenario(): TwelveBotScenarioResult {
+  const bot = makePlayer('p0', true, [card('hearts', 14), card('hearts', 6)], []);
+  const opponent = makePlayer('p1', false, [], []);
+  const state = makeState([bot, opponent], 0);
+  state.currentTrick = [{ playerId: 'p1', card: card('hearts', 10), source: 'hand' }];
+
+  const next = runTwelveBotTurn(state) as TwelveState;
+  const botPlay = next.currentTrick.find(entry => entry.playerId === 'p0');
+  const passed = !!botPlay && botPlay.card.suit === 'hearts' && botPlay.card.rank === 14;
+  return {
+    name: 'ace-over-led-ten-follow-suit',
+    passed,
+    details: passed
+      ? 'Bot took opponent-led 10 with ace.'
+      : `Unexpected play: ${JSON.stringify(botPlay)}`,
+  };
+}
+
 export function runTwelveBotScenarioChecks(): TwelveBotScenarioResult[] {
   return [
     blockDeclarationWindowScenario(),
@@ -413,5 +432,6 @@ export function runTwelveBotScenarioChecks(): TwelveBotScenarioResult[] {
     teamTrumpScoreSyncScenario(),
     teamWinnerResolutionScenario(),
     teamBonusCountedOnceScenario(),
+    aceOverLedTenScenario(),
   ];
 }
