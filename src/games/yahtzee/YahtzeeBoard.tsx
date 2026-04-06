@@ -394,29 +394,32 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
           ))}
         </div>
 
-        {isMyTurn && (
-          <button
-            onClick={handleRoll}
-            disabled={state.rollsLeft === 0 || isRolling || allDiceHeld}
-            className={`yahtzee-roll-button flex items-center gap-2 px-6 py-3 rounded-xl text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer ${
-              isYahtzeeCelebrationVisible
-                ? 'yahtzee-roll-button--gold'
-                : 'bg-primary-600 hover:bg-primary-500'
-            }`}
-          >
-            <RotateCcw className={`w-4 h-4 ${isRolling ? 'animate-spin' : ''}`} />
-            {isRolling
-              ? 'Rolling...'
-              : isYahtzeeCelebrationVisible
-              ? 'YAHTZEE!!!'
-              : `Roll ${hasRolled ? `(${state.rollsLeft} left)` : ''}`}
-          </button>
-        )}
-        {!isMyTurn && spectatorRollsLeftText && (
-          <div className="min-h-12 px-6 py-3 text-white font-medium flex items-center justify-center">
-            {spectatorRollsLeftText}
-          </div>
-        )}
+        <div className="yahtzee-controls-slot min-h-12 flex w-full items-center justify-center">
+          {isMyTurn ? (
+            <button
+              onClick={handleRoll}
+              disabled={state.rollsLeft === 0 || isRolling || allDiceHeld}
+              className={`yahtzee-roll-button flex items-center gap-2 px-6 py-3 rounded-xl text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer ${
+                isYahtzeeCelebrationVisible
+                  ? 'yahtzee-roll-button--gold'
+                  : 'bg-primary-600 hover:bg-primary-500'
+              }`}
+            >
+              <RotateCcw className={`w-4 h-4 ${isRolling ? 'animate-spin' : ''}`} />
+              {isRolling
+                ? 'Rolling...'
+                : isYahtzeeCelebrationVisible
+                ? 'YAHTZEE!!!'
+                : `Roll ${hasRolled ? `(${state.rollsLeft} left)` : ''}`}
+            </button>
+          ) : spectatorRollsLeftText ? (
+            <div className="px-6 py-3 text-white font-medium flex items-center justify-center">
+              {spectatorRollsLeftText}
+            </div>
+          ) : (
+            <div aria-hidden className="h-12" />
+          )}
+        </div>
       </div>
     </div>
   );

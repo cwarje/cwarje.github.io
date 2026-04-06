@@ -165,6 +165,7 @@ export function createYahtzeeState(players: Player[]): YahtzeeState {
     currentPlayerIndex: 0,
     dice: [1, 1, 1, 1, 1],
     held: [false, false, false, false, false],
+    botReadyToReroll: false,
     rollsLeft: 3,
     round: 1,
     gameOver: false,
@@ -252,6 +253,7 @@ export function processYahtzeeAction(state: unknown, action: unknown, playerId: 
         currentPlayerIndex: gameOver ? s.currentPlayerIndex : nextIndex,
         dice: [1, 1, 1, 1, 1],
         held: [false, false, false, false, false],
+        botReadyToReroll: false,
         rollsLeft: 3,
         round: gameOver ? 13 : nextRound,
         gameOver,
@@ -281,10 +283,7 @@ export function willYahtzeeBotScore(state: unknown): boolean {
   const player = s.players[s.currentPlayerIndex];
   if (!player || !player.isBot) return false;
   if (s.rollsLeft === 3) return false; // will roll first
-  if (s.rollsLeft === 0) return true;  // must score
-  const available = getAvailableCategories(s.dice, player.scorecard);
-  const best = pickBestCategory(s.dice, available, player.scorecard);
-  return !shouldReroll(s.dice, best, player.scorecard, s.rollsLeft);
+  return s.rollsLeft === 0; // bots always use all rerolls before scoring
 }
 
 // Bot AI — performs exactly ONE step per call (one roll or one score)
@@ -304,26 +303,35 @@ export function runYahtzeeBotTurn(state: unknown): unknown {
       dice: newDice,
       rollsLeft: 2,
       held: [false, false, false, false, false],
+      botReadyToReroll: false,
     };
   }
 
-  // Decide whether to keep rolling or score (respects joker rules)
+  // Determine the best current target category for hold strategy.
   const availableCategories = getAvailableCategories(s.dice, currentPlayer.scorecard);
   const bestCategory = pickBestCategory(s.dice, availableCategories, currentPlayer.scorecard);
 
-  // Step 2: Reroll (rollsLeft > 0 and should reroll) — hold + roll once
-  if (s.rollsLeft > 0 && shouldReroll(s.dice, bestCategory, currentPlayer.scorecard, s.rollsLeft)) {
+  // Step 2: Always reroll while rolls remain so bots always use all three rolls.
+  if (s.rollsLeft > 0) {
+    if (s.botReadyToReroll) {
+      const newDice = rollDice(s.dice, s.held);
+      return {
+        ...s,
+        dice: newDice,
+        rollsLeft: s.rollsLeft - 1,
+        botReadyToReroll: false,
+      };
+    }
+
     const newHeld = decideBotHolds(s.dice, bestCategory);
-    const newDice = rollDice(s.dice, newHeld);
     return {
       ...s,
-      dice: newDice,
       held: newHeld,
-      rollsLeft: s.rollsLeft - 1,
+      botReadyToReroll: true,
     };
   }
 
-  // Step 3: Score the best category
+  // Step 3: No rolls left, score the best category.
   return processYahtzeeAction(s, { type: 'score', category: bestCategory }, currentPlayer.id);
 }
 

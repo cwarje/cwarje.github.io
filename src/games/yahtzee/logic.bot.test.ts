@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { decideBotHolds, shouldReroll } from './logic';
-import type { Scorecard } from './types';
+import { decideBotHolds, runYahtzeeBotTurn, shouldReroll, willYahtzeeBotScore } from './logic';
+import type { Scorecard, YahtzeeState } from './types';
 
 function blankScorecard(): Scorecard {
   return {
@@ -17,6 +17,39 @@ function blankScorecard(): Scorecard {
     largeStraight: null,
     yahtzee: null,
     chance: null,
+  };
+}
+
+function makeBotTurnState(overrides: Partial<YahtzeeState> = {}): YahtzeeState {
+  return {
+    players: [
+      {
+        id: 'bot',
+        name: 'Bot',
+        color: 'red',
+        isBot: true,
+        scorecard: blankScorecard(),
+        totalScore: 0,
+      },
+      {
+        id: 'human',
+        name: 'Human',
+        color: 'blue',
+        isBot: false,
+        scorecard: blankScorecard(),
+        totalScore: 0,
+      },
+    ],
+    currentPlayerIndex: 0,
+    dice: [1, 1, 1, 2, 3],
+    held: [false, false, false, false, false],
+    botReadyToReroll: false,
+    rollsLeft: 1,
+    round: 1,
+    gameOver: false,
+    yahtzeeBonus: {},
+    lastScoredCategory: {},
+    ...overrides,
   };
 }
 
@@ -66,5 +99,50 @@ describe('shouldReroll', () => {
 
   it('does not reroll chance on the last roll when the sum is decent', () => {
     expect(shouldReroll([4, 4, 4, 4, 5], 'chance', sc, 1)).toBe(false);
+  });
+});
+
+describe('runYahtzeeBotTurn', () => {
+  it('sets holds first, then uses the final reroll on the next step', () => {
+    const state = makeBotTurnState({
+      dice: [1, 1, 1, 4, 6],
+      rollsLeft: 1,
+      botReadyToReroll: false,
+    });
+
+    const afterHolds = runYahtzeeBotTurn(state) as YahtzeeState;
+    expect(afterHolds.currentPlayerIndex).toBe(0);
+    expect(afterHolds.rollsLeft).toBe(1);
+    expect(afterHolds.dice).toEqual(state.dice);
+    expect(afterHolds.botReadyToReroll).toBe(true);
+    expect(afterHolds.held.some(Boolean)).toBe(true);
+
+    const afterReroll = runYahtzeeBotTurn(afterHolds) as YahtzeeState;
+    expect(afterReroll.currentPlayerIndex).toBe(0);
+    expect(afterReroll.rollsLeft).toBe(0);
+    expect(afterReroll.botReadyToReroll).toBe(false);
+  });
+
+  it('scores only after all rerolls are exhausted', () => {
+    const state = makeBotTurnState({
+      dice: [1, 1, 1, 4, 6],
+      rollsLeft: 0,
+    });
+
+    const next = runYahtzeeBotTurn(state) as YahtzeeState;
+    expect(next.currentPlayerIndex).toBe(1);
+    expect(next.rollsLeft).toBe(3);
+  });
+});
+
+describe('willYahtzeeBotScore', () => {
+  it('returns false when rolls remain', () => {
+    const state = makeBotTurnState({ rollsLeft: 1 });
+    expect(willYahtzeeBotScore(state)).toBe(false);
+  });
+
+  it('returns true only when no rolls remain', () => {
+    const state = makeBotTurnState({ rollsLeft: 0 });
+    expect(willYahtzeeBotScore(state)).toBe(true);
   });
 });

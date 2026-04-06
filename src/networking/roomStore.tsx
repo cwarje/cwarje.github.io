@@ -1082,6 +1082,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const BOT_PLAY_DELAY = 800;   // ms between each bot card play (Hearts)
   const BATTLESHIP_BOT_DELAY = 800; // ms before bot fires in Battleship
   const YAHTZEE_BOT_ROLL_DELAY = 2000;  // ms between each bot roll in Yahtzee
+  const YAHTZEE_BOT_HOLD_DELAY = 1200;  // ms to show held dice before bot rerolls in Yahtzee
   const YAHTZEE_BOT_SCORE_DELAY = 4000; // ms to show dice before bot scores
   const FARKLE_BOT_DELAY = 900; // ms before bot banks in Farkle
   const FARKLE_BOT_CHOOSE_DELAY = 2000; // ms before bot chooses dice to keep
@@ -1919,7 +1920,11 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
       const currentPlayer = ys.players[ys.currentPlayerIndex];
       if (currentPlayer && currentPlayer.isBot) {
-        const delay = willYahtzeeBotScore(ys) ? YAHTZEE_BOT_SCORE_DELAY : YAHTZEE_BOT_ROLL_DELAY;
+        const delay = willYahtzeeBotScore(ys)
+          ? YAHTZEE_BOT_SCORE_DELAY
+          : ys.botReadyToReroll
+            ? YAHTZEE_BOT_HOLD_DELAY
+            : YAHTZEE_BOT_ROLL_DELAY;
         botTimerRef.current = setTimeout(() => {
           const currentGs = gameStateRef.current;
           const currentRoom = roomRef.current;

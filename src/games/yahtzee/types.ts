@@ -32,6 +32,7 @@ export interface YahtzeeState {
   currentPlayerIndex: number;
   dice: number[];
   held: boolean[];
+  botReadyToReroll?: boolean; // bot has chosen holds and should reroll on next bot step
   rollsLeft: number;
   round: number;
   gameOver: boolean;
