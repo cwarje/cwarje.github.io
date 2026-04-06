@@ -25,6 +25,13 @@ import {
   getSettlerWinnersUnknown,
 } from './settler/logic';
 import { createCrossCribState, processCrossCribAction, isCrossCribOver, runCrossCribBotTurn, getCrossCribWinners } from './cross-crib/logic';
+import {
+  createCribbageState,
+  processCribbageAction,
+  isCribbageOver,
+  runCribbageBotTurn,
+  getCribbageWinners,
+} from './cribbage/logic';
 import { createCasinoState, processCasinoAction, isCasinoOver, runCasinoBotTurn, getCasinoWinners } from './casino/logic';
 
 import YahtzeeBoard from './yahtzee/YahtzeeBoard';
@@ -38,6 +45,7 @@ import MobilizationBoard from './mobilization/MobilizationBoard';
 import TwelveBoard from './twelve/TwelveBoard';
 import SettlerBoard from './settler/SettlerBoard';
 import CrossCribBoard from './cross-crib/CrossCribBoard';
+import CribbageBoard from './cribbage/CribbageBoard';
 import CasinoBoard from './casino/CasinoBoard';
 
 import HeartsOptions from './hearts/HeartsOptions';
@@ -45,15 +53,18 @@ import FarkleOptions from './farkle/FarkleOptions';
 import UpRiverOptions from './up-and-down-the-river/UpRiverOptions';
 import TwelveOptions from './twelve/TwelveOptions';
 import CasinoOptions from './casino/CasinoOptions';
+import CribbageOptions from './cribbage/CribbageOptions';
 
 import HeartsTitleExtra from './hearts/HeartsTitleExtra';
 import PokerTitleExtra from './poker/PokerTitleExtra';
 import CrossCribTitleExtra from './cross-crib/CrossCribTitleExtra';
+import CribbageTitleExtra from './cribbage/CribbageTitleExtra';
 import CasinoTitleExtra from './casino/CasinoTitleExtra';
 import UpRiverToolbarExtra from './up-and-down-the-river/UpRiverToolbarExtra';
 import TwelveToolbarExtra from './twelve/TwelveToolbarExtra';
 import MobilizationTitleExtra from './mobilization/MobilizationTitleExtra';
 import { PigIcon } from '../components/icons/PigIcon';
+import { CribbagePegHolesIcon } from '../components/icons/CribbagePegHolesIcon';
 
 // ---------------------------------------------------------------------------
 // Shared types
@@ -511,7 +522,6 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: true,
     production: true,
-    showNewBadge: true,
     hudTitleLines: ['Mobilization'],
     TitleExtra: MobilizationTitleExtra,
   },
@@ -661,6 +671,55 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     TitleExtra: CrossCribTitleExtra,
   },
 
+  cribbage: {
+    title: 'Cribbage',
+    shortDescription:
+      'Classic cribbage: crib discard, cut for starter, pegging to 31, then count hands and crib. 2–4 players; 4p is partnerships (across the table).',
+    playersLabel: '2–4 Players',
+    minPlayers: 2,
+    maxPlayers: 4,
+    allowedPlayerCounts: [2, 3, 4],
+    info: {
+      goal: 'Be first to 121 (or 61 in a short game) — individually in 2–3p, or as a team in 4p partnerships.',
+      rules: [
+        '2 players: six cards each, discard two to the dealer’s crib (four crib cards). 3 players: five each plus one card to the crib before discards, then each discards one to the crib. 4 players (partners): five each, each discards one to the crib; partners sit across (seats 0 & 2 vs 1 & 3).',
+        'The player left of the dealer (pone) cuts the stock; the card at the chosen index becomes the starter. If the starter is a Jack, the dealer scores two (heels).',
+        'Pegging: play cards in turn; running total may not exceed 31. Score fifteens and thirty-ones for two, pairs and runs as in standard cribbage, then reset the count when needed. Say go when you cannot play.',
+        'Show: each hand (four cards plus starter) scores in order clockwise from the pone; the dealer scores the crib last. Crib points go to the dealer, or to the dealer’s team in 4p.',
+        'Flushes: four in hand same suit (starter may differ) scores four; all five same suit scores five. Crib flush only if all five match.',
+      ],
+      howToPlay: [
+        'Select crib discards and confirm. As pone, pick a cut index on the stock and cut.',
+        'Play a legal card from your hand when it is your pegging turn, or tap Go if you cannot play.',
+        'The host advances the counting steps automatically after pegging; you can use Next (manual) if you are the host.',
+      ],
+    },
+    icon: CribbagePegHolesIcon,
+    theme: {
+      gradient: 'from-cyan-500/20 to-blue-600/20',
+      cardBorder: 'border-cyan-500/20',
+      hoverBorder: 'hover:border-cyan-500/30',
+      playersTag: 'bg-cyan-500/25 text-cyan-200 border border-cyan-500/30',
+      iconColor: 'text-cyan-400',
+      buttonColors: 'bg-cyan-600 hover:bg-cyan-500',
+      panelBg: 'bg-cyan-950',
+      labelColor: 'text-cyan-200',
+    },
+    createState: (players, options) => createCribbageState(players, options),
+    processAction: processCribbageAction,
+    isOver: isCribbageOver,
+    runBotTurn: runCribbageBotTurn,
+    getWinners: getCribbageWinners,
+    Board: CribbageBoard,
+    OptionsPanel: CribbageOptions,
+    TitleExtra: CribbageTitleExtra,
+    fullBoard: true,
+    hasHandZoom: true,
+    production: true,
+    showNewBadge: true,
+    hudTitleLines: ['Cribbage'],
+  },
+
   casino: {
     title: 'Casino',
     shortDescription:
@@ -711,13 +770,13 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: true,
     production: true,
-    showNewBadge: true,
     hudTitleLines: ['Casino'],
   },
 };
 
 /** All registered game types */
 export const ALL_GAME_TYPES: GameType[] = [
+  'cribbage',
   'mobilization',
   'casino',
   'yahtzee',
@@ -734,6 +793,7 @@ export const ALL_GAME_TYPES: GameType[] = [
 
 /** Game types shown in production (homepage order) */
 export const PRODUCTION_GAME_TYPES: GameType[] = [
+  'cribbage',
   'mobilization',
   'casino',
   'yahtzee',

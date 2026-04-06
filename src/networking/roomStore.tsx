@@ -24,6 +24,7 @@ import {
 } from '../games/settler/logic';
 import type { CrossCribState } from '../games/cross-crib/types';
 import { cribCardsToSelect } from '../games/cross-crib/types';
+import type { CribbageState } from '../games/cribbage/types';
 import type { CasinoState } from '../games/casino/types';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 import { shouldBotBank } from '../games/farkle/logic';
@@ -62,6 +63,11 @@ function isPokerHostControlAction(payload: unknown): payload is { type: 'next-ha
 function isCasinoStartNextRoundAction(payload: unknown): boolean {
   if (typeof payload !== 'object' || payload === null) return false;
   return (payload as { type?: unknown }).type === 'start-next-round';
+}
+
+function isCribbageAdvanceShowAction(payload: unknown): boolean {
+  if (typeof payload !== 'object' || payload === null) return false;
+  return (payload as { type?: unknown }).type === 'advance-show';
 }
 
 function applyProfileToGameState(
@@ -186,6 +192,17 @@ function applyProfileToGameState(
     }
     case 'cross-crib': {
       const current = state as CrossCribState;
+      let changed = false;
+      const players = current.players.map((player) => {
+        if (player.id !== playerId) return player;
+        if (player.name === playerName && player.color === playerColor) return player;
+        changed = true;
+        return { ...player, name: playerName, color: playerColor };
+      });
+      return changed ? { ...current, players } : current;
+    }
+    case 'cribbage': {
+      const current = state as CribbageState;
       let changed = false;
       const players = current.players.map((player) => {
         if (player.id !== playerId) return player;
@@ -390,6 +407,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           if (
             currentRoom.gameType === 'casino'
             && isCasinoStartNextRoundAction(msg.payload)
+            && senderDeviceId !== currentRoom.hostId
+          ) {
+            return;
+          }
+          if (
+            currentRoom.gameType === 'cribbage'
+            && isCribbageAdvanceShowAction(msg.payload)
             && senderDeviceId !== currentRoom.hostId
           ) {
             return;
@@ -965,6 +989,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       ) {
         return;
       }
+      if (
+        currentRoom.gameType === 'cribbage'
+        && isCribbageAdvanceShowAction(payload)
+        && myId !== currentRoom.hostId
+      ) {
+        return;
+      }
       const currentGs = gameStateRef.current;
       const wasFinished = currentRoom.phase === 'finished';
       const newGs = processGameAction(currentRoom.gameType, currentGs, payload, myId);
@@ -1063,6 +1094,10 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const CROSS_CRIB_ROUND_END_DELAY = 10000; // ms to show round summary before next round
   const CROSS_CRIB_BOT_DELAY = 900; // ms between bot card placements
   const CROSS_CRIB_CRIB_REVEAL_STEP_MS = 750; // ms between each crib card flip
+  const CRIBBAGE_BOT_DELAY = 900;
+  const CRIBBAGE_GO_ANNOUNCE_MS = 2000;
+  const CRIBBAGE_GO_SCORE_MS = 2000;
+  const CRIBBAGE_PEGGING_SCORE_REVEAL_MS = 2000;
   const SETTLER_BOT_DELAY = 900; // ms between bot actions in Settler
   const CASINO_BOT_DELAY = 900; // ms between Casino bot plays
   const CASINO_CAPTURE_PREVIEW_DELAY = 1600; // ms for capture preview overlay before capture resolves
@@ -1514,6 +1549,134 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
           }, CROSS_CRIB_BOT_DELAY);
         }
+      }
+      return;
+    }
+
+    // ── Cribbage bot scheduling ──
+    if (room.gameType === 'cribbage') {
+      const cs = gameState as CribbageState;
+      if (cs.gameOver || cs.phase === 'game-over') return;
+
+      if (cs.peggingGoReveal) {
+        const delay =
+          cs.peggingGoReveal.stage === 'announce' ? CRIBBAGE_GO_ANNOUNCE_MS : CRIBBAGE_GO_SCORE_MS;
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as CribbageState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || !currentGs.peggingGoReveal) return;
+
+          const next = processGameAction('cribbage', currentGs, { type: 'advance-pegging-go-reveal' }, '');
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('cribbage', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, delay);
+        return;
+      }
+
+      if (cs.peggingPointsReveal) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as CribbageState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || !currentGs.peggingPointsReveal) return;
+
+          const next = processGameAction('cribbage', currentGs, { type: 'advance-pegging-points-reveal' }, '');
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('cribbage', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, CRIBBAGE_PEGGING_SCORE_REVEAL_MS);
+        return;
+      }
+
+      if (cs.peggingHandEndReveal) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as CribbageState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || !currentGs.peggingHandEndReveal) return;
+
+          const next = processGameAction('cribbage', currentGs, { type: 'advance-pegging-hand-end-reveal' }, '');
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('cribbage', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, CRIBBAGE_PEGGING_SCORE_REVEAL_MS);
+        return;
+      }
+
+      if (cs.phase === 'cut-starter') {
+        const pone = (cs.dealerIndex + 1) % cs.players.length;
+        if (cs.players[pone]?.isBot) {
+          botTimerRef.current = setTimeout(() => {
+            const currentGs = gameStateRef.current;
+            const currentRoom = roomRef.current;
+            if (!currentGs || !currentRoom) return;
+
+            const next = runSingleBotTurn('cribbage', currentGs);
+            if (next !== currentGs) {
+              setGameState(next);
+              broadcastGameState(next);
+            }
+          }, CRIBBAGE_BOT_DELAY);
+        }
+        return;
+      }
+
+      if (cs.phase === 'crib-discard') {
+        const botsNeedToAct = cs.players.some((p) => p.isBot && !cs.cribConfirmed[p.id]);
+        if (botsNeedToAct) {
+          botTimerRef.current = setTimeout(() => {
+            const currentGs = gameStateRef.current;
+            const currentRoom = roomRef.current;
+            if (!currentGs || !currentRoom) return;
+
+            const next = runSingleBotTurn('cribbage', currentGs);
+            if (next !== currentGs) {
+              setGameState(next);
+              broadcastGameState(next);
+            }
+          }, CRIBBAGE_BOT_DELAY);
+        }
+        return;
+      }
+
+      if (cs.phase === 'pegging') {
+        const cur = cs.players[cs.peggingCurrentIndex];
+        if (cur?.isBot) {
+          botTimerRef.current = setTimeout(() => {
+            const currentGs = gameStateRef.current;
+            const currentRoom = roomRef.current;
+            if (!currentGs || !currentRoom) return;
+
+            const next = runSingleBotTurn('cribbage', currentGs);
+            if (next !== currentGs) {
+              setGameState(next);
+              broadcastGameState(next);
+              if (checkGameOver('cribbage', next)) {
+                const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+                setRoom(finishedRoom);
+                broadcastRoomState(finishedRoom);
+              }
+            }
+          }, CRIBBAGE_BOT_DELAY);
+        }
+        return;
       }
       return;
     }

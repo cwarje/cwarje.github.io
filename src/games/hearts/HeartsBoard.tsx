@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import type { HeartsState, Card, Suit, HeartsPlayer } from './types';
 import { isValidHeartsPlay } from './rules';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
+import { AutoFitSeatName } from '../shared/AutoFitSeatName';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
   hearts: '\u2665',
@@ -33,53 +34,6 @@ function placementLabel(position: number): string {
   if (position % 10 === 2) return `${position}nd`;
   if (position % 10 === 3) return `${position}rd`;
   return `${position}th`;
-}
-
-function getFittedTextSize(text: string, availableWidth: number, minSize: number, maxSize: number): number {
-  if (typeof document === 'undefined' || availableWidth <= 0) return minSize;
-  const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d');
-  if (!context) return maxSize;
-
-  for (let size = maxSize; size >= minSize; size -= 0.5) {
-    context.font = `700 ${size}px Inter, ui-sans-serif, system-ui, sans-serif`;
-    if (context.measureText(text).width <= availableWidth) return size;
-  }
-
-  return minSize;
-}
-
-interface AutoFitSeatNameProps {
-  name: string;
-  textColor: string;
-}
-
-function AutoFitSeatName({ name, textColor }: AutoFitSeatNameProps) {
-  const nameRef = useRef<HTMLSpanElement>(null);
-  const [fontSize, setFontSize] = useState(13);
-
-  useEffect(() => {
-    const node = nameRef.current;
-    if (!node) return;
-
-    const recalc = () => {
-      const availableWidth = Math.max(0, node.clientWidth - 2);
-      const fittedSize = getFittedTextSize(name, availableWidth, 8, 14);
-      setFontSize(prev => (Math.abs(prev - fittedSize) < 0.1 ? prev : fittedSize));
-    };
-
-    recalc();
-    const resizeObserver = new ResizeObserver(recalc);
-    resizeObserver.observe(node);
-
-    return () => resizeObserver.disconnect();
-  }, [name]);
-
-  return (
-    <span ref={nameRef} className="hearts-seatPillName" style={{ fontSize: `${fontSize}px`, color: textColor }}>
-      {name}
-    </span>
-  );
 }
 
 type Seat = 'bottom' | 'left' | 'top' | 'right';
