@@ -23,6 +23,23 @@ import {
 const SUITS: Card['suit'][] = ['clubs', 'diamonds', 'spades', 'hearts'];
 const RANKS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] as const;
 
+export type CribbageSkunkStatus = 'none' | 'skunk' | 'double-skunk';
+
+export function getCribbageSkunkThresholds(targetScore: 61 | 121): { skunk: number; doubleSkunk: number } {
+  if (targetScore === 61) {
+    return { skunk: 45, doubleSkunk: 30 };
+  }
+  return { skunk: 90, doubleSkunk: 60 };
+}
+
+export function classifyCribbageSkunk(score: number, targetScore: 61 | 121): CribbageSkunkStatus {
+  const normalized = Math.max(0, score);
+  const { skunk, doubleSkunk } = getCribbageSkunkThresholds(targetScore);
+  if (normalized <= doubleSkunk) return 'double-skunk';
+  if (normalized <= skunk) return 'skunk';
+  return 'none';
+}
+
 function createDeck(): Card[] {
   const deck: Card[] = [];
   for (const suit of SUITS) {
@@ -338,7 +355,7 @@ function advancePeggingPointsReveal(state: CribbageState): CribbageState {
     if (next.gameOver) return next;
     const allOut = next.players.every(p => p.hand.length === 0);
     if (allOut) {
-      return finishPeggingLastCardThenMaybeReveal(next, pIndex);
+      return transitionToShowPhase(next);
     }
     let nxt = nextPeggingIndex(next, pIndex);
     let guard = 0;
@@ -419,14 +436,18 @@ function applyShowStep(state: CribbageState): CribbageState {
   const starter = state.starterCard;
   const holes = state.holeCards;
   if (!starter || !holes) return state;
+  if (state.gameOver) {
+    return { ...state, phase: 'game-over' };
+  }
 
   const step = state.showAppliedSteps;
   if (step < n) {
     const playerIndex = (pone + step) % n;
     const pts = scoreShowHand(holes[playerIndex], starter);
-    let s = addPoints(state, playerIndex, pts);
+    const s = addPoints(state, playerIndex, pts);
     if (s.gameOver) {
-      return { ...s, showAppliedSteps: step + 1 };
+      // Keep show visible for the winning scoring step; finalize game-over on next advance.
+      return { ...s, phase: 'show', showAppliedSteps: step + 1 };
     }
     return { ...s, showAppliedSteps: step + 1 };
   }
@@ -434,11 +455,14 @@ function applyShowStep(state: CribbageState): CribbageState {
   if (step === n) {
     const pts = scoreCribShow(state.cribCards, starter);
     const s = addPoints(state, state.dealerIndex, pts);
+    if (s.gameOver) {
+      // Keep crib scoring step visible even when it ends the game.
+      return { ...s, phase: 'show', showAppliedSteps: step + 1 };
+    }
     return { ...s, showAppliedSteps: step + 1 };
   }
 
   if (step === n + 1) {
-    if (state.gameOver) return state;
     const nextDealer = (state.dealerIndex + 1) % n;
     return dealFreshHand({ ...state, dealerIndex: nextDealer, showAppliedSteps: 0, showStep: 0 });
   }
@@ -455,7 +479,8 @@ export function processCribbageAction(state: unknown, action: unknown, playerId:
   const s = state as CribbageState;
   const a = action as { type: string; cards?: Card[]; cutIndex?: number; card?: Card };
 
-  if (s.gameOver && a.type !== 'start-next-hand') return state;
+  const allowShowFinalizeAdvance = s.gameOver && s.phase === 'show' && a.type === 'advance-show';
+  if (s.gameOver && a.type !== 'start-next-hand' && !allowShowFinalizeAdvance) return state;
   if (s.phase === 'game-over') return state;
 
   switch (a.type) {
@@ -588,6 +613,19 @@ export function processCribbageAction(state: unknown, action: unknown, playerId:
     }
     case 'start-next-hand': {
       return state;
+    }
+    case 'dev-set-near-win': {
+      const pIndex = s.players.findIndex(p => p.id === playerId);
+      if (pIndex === -1) return state;
+      const nearWin = Math.max(0, s.targetScore - 10);
+      if (s.players.length === 4 && s.teamScores) {
+        const teamScores: [number, number] = [...s.teamScores] as [number, number];
+        teamScores[teamIndexForSeat(pIndex)] = nearWin;
+        return withWinCheck({ ...s, teamScores });
+      }
+      const playerScores = [...s.playerScores];
+      playerScores[pIndex] = nearWin;
+      return withWinCheck({ ...s, playerScores });
     }
     default:
       return state;

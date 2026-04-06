@@ -1,5 +1,6 @@
 import { useId, useLayoutEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { getCribbageSkunkThresholds } from './logic';
 
 /**
  * Peg hole centers for one horizontal serpentine band. Index = score (0 … targetScore inclusive).
@@ -56,14 +57,14 @@ const MARGIN = 10;
 
 interface SidePegsProps {
   holes: { x: number; y: number }[];
-  pegColor: string;
+  pegFill: string;
   score: number;
   targetScore: 61 | 121;
   pegR: number;
   duration: number;
 }
 
-function SidePegs({ holes, pegColor, score, targetScore, pegR, duration }: SidePegsProps) {
+function SidePegs({ holes, pegFill, score, targetScore, pegR, duration }: SidePegsProps) {
   const [pegPair, setPegPair] = useState<[number, number]>(() => [0, 0]);
 
   useLayoutEffect(() => {
@@ -95,7 +96,7 @@ function SidePegs({ holes, pegColor, score, targetScore, pegR, duration }: SideP
     <motion.circle
       key="peg1"
       r={pegR}
-      fill={pegColor}
+      fill={pegFill}
       stroke={h1 > h2 ? '#f5e6c8' : '#2b2621'}
       strokeWidth={h1 > h2 ? 0.85 : 0.75}
       initial={false}
@@ -107,7 +108,7 @@ function SidePegs({ holes, pegColor, score, targetScore, pegR, duration }: SideP
     <motion.circle
       key="peg2"
       r={pegR}
-      fill={pegColor}
+      fill={pegFill}
       stroke={h2 > h1 ? '#f5e6c8' : '#2b2621'}
       strokeWidth={h2 > h1 ? 0.85 : 0.75}
       initial={false}
@@ -123,6 +124,7 @@ export interface CribbagePegBoardSide {
   label: string;
   score: number;
   color: string;
+  splitColors?: [string, string];
 }
 
 export interface CribbagePegBoardProps {
@@ -161,6 +163,7 @@ export default function CribbagePegBoard({ targetScore, sides }: CribbagePegBoar
 
   const x0 = BOARD_PAD + MARGIN;
   const x1 = BOARD_PAD + TRACK_LEN_H - MARGIN;
+  const { skunk, doubleSkunk } = getCribbageSkunkThresholds(targetScore);
 
   return (
     <div className="min-w-0 w-full max-w-xl shrink-0">
@@ -176,6 +179,19 @@ export default function CribbagePegBoard({ targetScore, sides }: CribbagePegBoar
             <stop offset="40%" stopColor="#755637" />
             <stop offset="100%" stopColor="#433325" />
           </linearGradient>
+          {sides.map((side, i) => {
+            if (!side.splitColors) return null;
+            const [leftColor, rightColor] = side.splitColors;
+            const sideGradId = `cb-peg-split-${uid}-${i}`;
+            return (
+              <linearGradient key={sideGradId} id={sideGradId} x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor={leftColor} />
+                <stop offset="50%" stopColor={leftColor} />
+                <stop offset="50%" stopColor={rightColor} />
+                <stop offset="100%" stopColor={rightColor} />
+              </linearGradient>
+            );
+          })}
         </defs>
         <rect
           x={2}
@@ -189,9 +205,16 @@ export default function CribbagePegBoard({ targetScore, sides }: CribbagePegBoar
         />
 
         {trackLayouts.map((layout, i) => {
+          const side = sides[i];
           const bt = layout.bandTop;
           const yTop = bt + TRACK_BAND_H * 0.3;
           const yBot = bt + TRACK_BAND_H * 0.7;
+          const skunkFrom = layout.holes[skunk] ?? layout.holes[0];
+          const skunkTo = layout.holes[skunk + 1] ?? skunkFrom;
+          const skunkMid = { x: (skunkFrom.x + skunkTo.x) / 2, y: (skunkFrom.y + skunkTo.y) / 2 };
+          const doubleFrom = layout.holes[doubleSkunk] ?? layout.holes[0];
+          const doubleTo = layout.holes[doubleSkunk + 1] ?? doubleFrom;
+          const doubleMid = { x: (doubleFrom.x + doubleTo.x) / 2, y: (doubleFrom.y + doubleTo.y) / 2 };
           return (
             <g key={i}>
               <path
@@ -233,10 +256,34 @@ export default function CribbagePegBoard({ targetScore, sides }: CribbagePegBoar
                 stroke="#43382d"
                 strokeWidth={0.25}
               />
+              <text
+                x={doubleMid.x}
+                y={doubleMid.y - 4}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={4.6}
+                fontWeight={800}
+                fill="#f6ead2"
+                opacity={0.88}
+              >
+                SS
+              </text>
+              <text
+                x={skunkMid.x}
+                y={skunkMid.y - 4}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={4.6}
+                fontWeight={800}
+                fill="#f6ead2"
+                opacity={0.88}
+              >
+                S
+              </text>
               <SidePegs
                 holes={layout.holes}
-                pegColor={sides[i].color}
-                score={sides[i].score}
+                pegFill={side.splitColors ? `url(#cb-peg-split-${uid}-${i})` : side.color}
+                score={side.score}
                 targetScore={targetScore}
                 pegR={pegR}
                 duration={duration}

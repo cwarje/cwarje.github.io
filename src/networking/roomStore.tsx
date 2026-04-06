@@ -70,6 +70,15 @@ function isCribbageAdvanceShowAction(payload: unknown): boolean {
   return (payload as { type?: unknown }).type === 'advance-show';
 }
 
+function shouldTransitionRoomToFinished(gameType: GameType, state: unknown): boolean {
+  if (!checkGameOver(gameType, state) || gameType === 'poker') return false;
+  if (gameType === 'cribbage') {
+    const cribbageState = state as CribbageState;
+    return cribbageState.phase === 'game-over';
+  }
+  return true;
+}
+
 function applyProfileToGameState(
   gameType: GameType,
   state: unknown,
@@ -431,7 +440,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
               broadcastRoomState(roomForPhase);
             }
             // Check for game over (poker stays in 'playing' phase for continuous play)
-            if (checkGameOver(currentRoom.gameType, newGs) && currentRoom.gameType !== 'poker') {
+            if (shouldTransitionRoomToFinished(currentRoom.gameType, newGs)) {
               const finishedRoom = { ...roomForPhase, phase: 'finished' as const };
               setRoom(finishedRoom);
               broadcastRoomState(finishedRoom);
@@ -1009,7 +1018,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           broadcastRoomState(roomForPhase);
         }
         // Poker stays in 'playing' phase for continuous play
-        if (checkGameOver(currentRoom.gameType, newGs) && currentRoom.gameType !== 'poker') {
+        if (shouldTransitionRoomToFinished(currentRoom.gameType, newGs)) {
           const finishedRoom = { ...roomForPhase, phase: 'finished' as const };
           setRoom(finishedRoom);
           broadcastRoomState(finishedRoom);
@@ -1570,7 +1579,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           if (next !== currentGs) {
             setGameState(next);
             broadcastGameState(next);
-            if (checkGameOver('cribbage', next)) {
+            if (shouldTransitionRoomToFinished('cribbage', next)) {
               const finishedRoom = { ...currentRoom, phase: 'finished' as const };
               setRoom(finishedRoom);
               broadcastRoomState(finishedRoom);
@@ -1590,7 +1599,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           if (next !== currentGs) {
             setGameState(next);
             broadcastGameState(next);
-            if (checkGameOver('cribbage', next)) {
+            if (shouldTransitionRoomToFinished('cribbage', next)) {
               const finishedRoom = { ...currentRoom, phase: 'finished' as const };
               setRoom(finishedRoom);
               broadcastRoomState(finishedRoom);
@@ -1610,7 +1619,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           if (next !== currentGs) {
             setGameState(next);
             broadcastGameState(next);
-            if (checkGameOver('cribbage', next)) {
+            if (shouldTransitionRoomToFinished('cribbage', next)) {
               const finishedRoom = { ...currentRoom, phase: 'finished' as const };
               setRoom(finishedRoom);
               broadcastRoomState(finishedRoom);
@@ -1668,7 +1677,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             if (next !== currentGs) {
               setGameState(next);
               broadcastGameState(next);
-              if (checkGameOver('cribbage', next)) {
+              if (shouldTransitionRoomToFinished('cribbage', next)) {
                 const finishedRoom = { ...currentRoom, phase: 'finished' as const };
                 setRoom(finishedRoom);
                 broadcastRoomState(finishedRoom);

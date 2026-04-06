@@ -10,7 +10,7 @@ import {
   type CribbagePlayer,
   type CribbageState,
 } from './types';
-import { cribbageCribOwnerLabel } from './logic';
+import { classifyCribbageSkunk, cribbageCribOwnerLabel } from './logic';
 import { legalPeggingPlays, scoreCribShow, scoreShowHand } from './rules';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 import { AutoFitSeatName } from '../shared/AutoFitSeatName';
@@ -119,6 +119,7 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
   const s = state as CribbageState;
   const myIndex = s.players.findIndex(p => p.id === myId);
   const myPlayer = myIndex >= 0 ? s.players[myIndex] : null;
+  const showDevScoreShortcut = import.meta.env.DEV && myIndex >= 0;
   const n = s.players.length;
   const isTeam = n === 4;
   const cribNeed = cribCardsToSelect(n);
@@ -581,9 +582,11 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
     if (n === 4 && s.teamScores) {
       const c0 = PLAYER_COLOR_HEX[s.players[0]?.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
       const c1 = PLAYER_COLOR_HEX[s.players[1]?.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+      const c2 = PLAYER_COLOR_HEX[s.players[2]?.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+      const c3 = PLAYER_COLOR_HEX[s.players[3]?.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
       return [
-        { label: 'Team 1', score: s.teamScores[0], color: c0 },
-        { label: 'Team 2', score: s.teamScores[1], color: c1 },
+        { label: 'Team 1', score: s.teamScores[0], color: c0, splitColors: [c0, c2] as [string, string] },
+        { label: 'Team 2', score: s.teamScores[1], color: c1, splitColors: [c1, c3] as [string, string] },
       ];
     }
     return s.players.map((p, i) => ({
@@ -607,13 +610,28 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
     const sc = scoreForSeat(s, playerIndex);
+    const pillTopStyle = isTeam
+      ? (() => {
+          const teammateIndex = (playerIndex + 2) % 4;
+          const leftIndex = Math.min(playerIndex, teammateIndex);
+          const rightIndex = Math.max(playerIndex, teammateIndex);
+          const leftColor =
+            PLAYER_COLOR_HEX[s.players[leftIndex]?.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+          const rightColor =
+            PLAYER_COLOR_HEX[s.players[rightIndex]?.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+          return {
+            background: `linear-gradient(to right, ${leftColor} 50%, ${rightColor} 50%)`,
+            color: seatTextColor,
+          };
+        })()
+      : { backgroundColor: seatColor, color: seatTextColor };
 
     return (
       <div
         ref={shouldMeasure ? setSeatPillElement : undefined}
         className={`cribbage-seatPill ${activeSeatPillClass} ${player.id === myId ? 'cribbage-seatPill--me' : ''}`}
       >
-        <div className="cribbage-seatPillTop" style={{ backgroundColor: seatColor }}>
+        <div className="cribbage-seatPillTop" style={pillTopStyle}>
           <AutoFitSeatName
             name={player.id === myId ? 'You' : player.name}
             textColor={seatTextColor}
@@ -627,8 +645,10 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
     );
   };
 
-  if (s.gameOver || s.phase === 'game-over') {
+  if (s.phase === 'game-over') {
     const winnerSet = new Set(s.winners);
+    const teamHasWinner = (team: 0 | 1): boolean =>
+      s.players.some((p, seat) => winnerSet.has(p.id) && teamIndexForSeat(seat) === team);
     return (
       <motion.div
         initial={{ opacity: 0 }}
@@ -643,13 +663,35 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
           {s.players.map((p, i) => {
             const sc = scoreForSeat(s, i);
             const won = winnerSet.has(p.id);
+            const skunkStatus = (() => {
+              if (won) return 'none' as const;
+              if (s.teamScores) {
+                const team = teamIndexForSeat(i);
+                if (teamHasWinner(team)) return 'none' as const;
+                return classifyCribbageSkunk(s.teamScores[team], s.targetScore);
+              }
+              return classifyCribbageSkunk(sc, s.targetScore);
+            })();
+            const skunkLabel =
+              skunkStatus === 'double-skunk'
+                ? 'Double Skunk'
+                : skunkStatus === 'skunk'
+                  ? 'Skunk'
+                  : null;
             return (
               <li
                 key={p.id}
                 className={`flex justify-between rounded-xl px-4 py-2 ${won ? 'bg-amber-500/20 text-amber-100' : 'bg-white/5 text-white/80'}`}
               >
                 <span>{p.name}</span>
-                <span className="font-bold">{sc}</span>
+                <span className="font-bold inline-flex items-center gap-2">
+                  <span>{sc}</span>
+                  {skunkLabel && (
+                    <span className="rounded-md border border-rose-300/60 bg-rose-500/20 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-rose-100">
+                      {skunkLabel}
+                    </span>
+                  )}
+                </span>
               </li>
             );
           })}
@@ -659,7 +701,16 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
   }
 
   return (
-    <div className="river-board cribbage-board flex flex-col h-full min-h-0 text-white">
+    <div className="river-board cribbage-board relative flex flex-col h-full min-h-0 text-white">
+      {showDevScoreShortcut && (
+        <button
+          type="button"
+          onClick={() => onAction({ type: 'dev-set-near-win' })}
+          className="absolute right-3 top-3 z-20 rounded-md border border-amber-300/60 bg-amber-500/20 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/30 cursor-pointer"
+        >
+          Dev: near win
+        </button>
+      )}
       <div className="flex-1 min-h-0 flex flex-col min-w-0 gap-2 px-2 pt-2 pb-1">
         <div className="flex-1 min-h-0 min-w-0 flex flex-col">
           <div ref={tableRef} className={`river-table river-table--players-${n} flex-1 min-h-0`}>

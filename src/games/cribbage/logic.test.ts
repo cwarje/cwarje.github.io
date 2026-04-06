@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Player } from '../../networking/types';
 import type { Card } from '../cross-crib/types';
-import { createCribbageState, processCribbageAction } from './logic';
+import { classifyCribbageSkunk, createCribbageState, getCribbageSkunkThresholds, processCribbageAction } from './logic';
 import { scoreCribShow, scoreShowHand } from './rules';
 import { cribCardsToSelect, cardsDealtPerPlayer, type CribbageState } from './types';
 
@@ -31,6 +31,23 @@ function cutToPegging2p(): CribbageState {
 }
 
 describe('cribbage logic', () => {
+  it('uses scaled skunk thresholds for both target scores', () => {
+    expect(getCribbageSkunkThresholds(121)).toEqual({ skunk: 90, doubleSkunk: 60 });
+    expect(getCribbageSkunkThresholds(61)).toEqual({ skunk: 45, doubleSkunk: 30 });
+  });
+
+  it('classifies skunk and double-skunk boundaries correctly', () => {
+    expect(classifyCribbageSkunk(60, 121)).toBe('double-skunk');
+    expect(classifyCribbageSkunk(61, 121)).toBe('skunk');
+    expect(classifyCribbageSkunk(90, 121)).toBe('skunk');
+    expect(classifyCribbageSkunk(91, 121)).toBe('none');
+
+    expect(classifyCribbageSkunk(30, 61)).toBe('double-skunk');
+    expect(classifyCribbageSkunk(31, 61)).toBe('skunk');
+    expect(classifyCribbageSkunk(45, 61)).toBe('skunk');
+    expect(classifyCribbageSkunk(46, 61)).toBe('none');
+  });
+
   it('deal sizes per player count', () => {
     expect(cardsDealtPerPlayer(2)).toBe(6);
     expect(cardsDealtPerPlayer(3)).toBe(5);
@@ -100,6 +117,8 @@ describe('cribbage logic', () => {
     let s: CribbageState = {
       ...base,
       players: base.players.map((p, i) => ({ ...p, hand: i === 0 ? [c2] : [c3] })),
+      playerScores: [0, 0],
+      teamScores: null,
       peggingSequence: [{ card: { suit: 'hearts', rank: 10 }, playerIndex: 1 }],
       peggingRunningTotal: 31,
       peggingCurrentIndex: 0,
@@ -201,6 +220,8 @@ describe('cribbage logic', () => {
     let s: CribbageState = {
       ...base,
       players: base.players.map((p, i) => (i === 0 ? { ...p, hand: [c2] } : { ...p, hand: [] })),
+      playerScores: [0, 0],
+      teamScores: null,
       peggingSequence: [{ card: { suit: 'hearts', rank: 10 }, playerIndex: 1 }],
       peggingRunningTotal: 10,
       peggingCurrentIndex: 0,
@@ -221,7 +242,7 @@ describe('cribbage logic', () => {
     expect(s.showAppliedSteps).toBe(1);
   });
 
-  it('pegging 31 on final card applies last card then hand-end reveal before show', () => {
+  it('pegging 31 on final card does not also award last-card point', () => {
     const base = cutToPegging2p();
     const fiveH: Card = { suit: 'hearts', rank: 5 };
     let s: CribbageState = {
@@ -245,16 +266,83 @@ describe('cribbage logic', () => {
     s = processCribbageAction(s, { type: 'play-pegging-card', card: fiveH }, p1) as CribbageState;
     expect(s.peggingPointsReveal?.hit31).toBe(true);
     expect(s.playerScores[1]).toBe(4);
+    const p1BeforeAdvance = s.playerScores[1];
+    const showPtsP1 = scoreShowHand(s.holeCards![1], s.starterCard!);
 
     s = processCribbageAction(s, { type: 'advance-pegging-points-reveal' }, '') as CribbageState;
     expect(s.peggingPointsReveal).toBeNull();
-    expect(s.peggingHandEndReveal).toEqual({ scorerIndex: 1 });
-    expect(s.playerScores[1]).toBe(5);
-    expect(s.phase).toBe('pegging');
-
-    s = processCribbageAction(s, { type: 'advance-pegging-hand-end-reveal' }, '') as CribbageState;
     expect(s.peggingHandEndReveal).toBeNull();
+    expect(s.playerScores[1]).toBe(p1BeforeAdvance + showPtsP1);
     expect(s.phase).toBe('show');
+    expect(s.showAppliedSteps).toBe(1);
+  });
+
+  it('show winning hand remains visible until next advance finalizes game-over', () => {
+    const base = createCribbageState(makePlayers(2)) as CribbageState;
+    const h0: Card[] = [
+      { suit: 'clubs', rank: 2 },
+      { suit: 'diamonds', rank: 3 },
+      { suit: 'hearts', rank: 4 },
+      { suit: 'spades', rank: 6 },
+    ];
+    const h1: Card[] = [
+      { suit: 'clubs', rank: 5 },
+      { suit: 'diamonds', rank: 5 },
+      { suit: 'hearts', rank: 10 },
+      { suit: 'spades', rank: 13 },
+    ];
+    const starter: Card = { suit: 'clubs', rank: 5 };
+    const crib: Card[] = [
+      { suit: 'hearts', rank: 2 },
+      { suit: 'hearts', rank: 7 },
+      { suit: 'clubs', rank: 9 },
+      { suit: 'spades', rank: 11 },
+    ];
+
+    const ponePts = scoreShowHand(h1, starter);
+    expect(ponePts).toBeGreaterThan(0);
+
+    let s: CribbageState = {
+      ...base,
+      phase: 'show',
+      dealerIndex: 0,
+      players: base.players.map(p => ({ ...p, hand: [] })),
+      playerScores: [0, base.targetScore - 1],
+      teamScores: null,
+      starterCard: starter,
+      holeCards: [h0, h1],
+      cribCards: crib,
+      showAppliedSteps: 0,
+      showStep: 0,
+      peggingSequence: [],
+      peggingRunningTotal: 0,
+      peggingCurrentIndex: 0,
+      consecutivePeggingPasses: 0,
+      lastPeggingPlayerIndex: null,
+      peggingGoReveal: null,
+      peggingPointsReveal: null,
+      peggingHandEndReveal: null,
+      stock: [],
+      gameOver: false,
+      winners: [],
+      cribSeedCard: null,
+      cribSelections: {},
+      cribConfirmed: {},
+    };
+    for (const p of s.players) {
+      s.cribSelections[p.id] = [];
+      s.cribConfirmed[p.id] = false;
+    }
+
+    s = processCribbageAction(s, { type: 'advance-show' }, '') as CribbageState;
+    expect(s.gameOver).toBe(true);
+    expect(s.phase).toBe('show');
+    expect(s.showAppliedSteps).toBe(1);
+    expect(s.playerScores[1]).toBe(base.targetScore - 1 + ponePts);
+    expect(s.winners).toContain(s.players[1].id);
+
+    s = processCribbageAction(s, { type: 'advance-show' }, '') as CribbageState;
+    expect(s.phase).toBe('game-over');
     expect(s.showAppliedSteps).toBe(1);
   });
 
@@ -331,5 +419,24 @@ describe('cribbage logic', () => {
     expect(s.phase).toBe('crib-discard');
     expect(s.showAppliedSteps).toBe(0);
     expect(s.dealerIndex).toBe(1);
+  });
+
+  it('dev-set-near-win sets only acting player near target in non-team games', () => {
+    let s = createCribbageState(makePlayers(2)) as CribbageState;
+    const actorId = s.players[1].id;
+    s = processCribbageAction(s, { type: 'dev-set-near-win' }, actorId) as CribbageState;
+    expect(s.playerScores).toEqual([0, s.targetScore - 10]);
+    expect(s.gameOver).toBe(false);
+    expect(s.phase).toBe('crib-discard');
+  });
+
+  it('dev-set-near-win sets acting team near target in team games', () => {
+    let s = createCribbageState(makePlayers(4)) as CribbageState;
+    const actorId = s.players[1].id;
+    s = processCribbageAction(s, { type: 'dev-set-near-win' }, actorId) as CribbageState;
+    expect(s.teamScores).toEqual([0, s.targetScore - 10]);
+    expect(s.playerScores).toEqual([0, 0, 0, 0]);
+    expect(s.gameOver).toBe(false);
+    expect(s.phase).toBe('crib-discard');
   });
 });
