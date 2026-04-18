@@ -489,7 +489,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
         '4–6 players with a 52-card deck; when the count does not divide evenly, low-priority cards are removed each round (shown in the HUD).',
         'Ace is high in trick-taking. There is no trump; follow the lead suit when you can.',
         'Round 1: −2pts for each trick you take.',
-        'Round 2: −2pts for each club card in tricks you win.',
+        'Round 2: −2pts for each Club card in tricks you win.',
         'Round 3: −5pts for each Queen in tricks you win.',
         'Round 4: −5pts if you capture the King of Clubs in a trick you win, and −5pts if you take the last trick (both can apply).',
         'Round 5 (Solitaire): shared 4×3 grid — middle row only accepts 7s; then build down to ace above and up to king below in that suit. Pass if you cannot play and you take the pig. First to empty their hand gains +5; pig holder −5; everyone −2 per card left in hand.',
