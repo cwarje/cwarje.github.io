@@ -1,4 +1,3 @@
-import { useLayoutEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import type { GameHudProps } from '../registry';
 import type { CribbageState } from './types';
@@ -7,12 +6,6 @@ import { CribHudFlipCard } from '../shared/CribHudFlipCard';
 
 export default function CribbageTitleExtra({ state }: GameHudProps) {
   const s = state as CribbageState;
-  const prevCribLenRef = useRef(0);
-  const prevLen = prevCribLenRef.current;
-
-  useLayoutEffect(() => {
-    prevCribLenRef.current = s.cribCards.length;
-  });
 
   const owner = cribbageCribOwnerLabel(s);
   const cribLabel = `${owner}'s crib`;
@@ -47,7 +40,6 @@ export default function CribbageTitleExtra({ state }: GameHudProps) {
             </div>
           ) : (
             s.cribCards.map((card, i) => {
-              const entrance = i >= prevLen;
               return (
                 <div
                   key={`crib-hud-${card.suit}-${card.rank}-${i}`}
@@ -55,7 +47,7 @@ export default function CribbageTitleExtra({ state }: GameHudProps) {
                   style={{ zIndex: i + 1 }}
                 >
                   <motion.div
-                    initial={entrance ? { opacity: 0, y: 14 } : false}
+                    initial={{ opacity: 0, y: 14 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, ease: 'easeOut' }}
                   >

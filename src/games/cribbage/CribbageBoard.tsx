@@ -310,13 +310,25 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
   const peggingInputBlocked =
     !!s.peggingGoReveal || !!s.peggingPointsReveal || !!s.peggingHandEndReveal;
 
-  const peggingLegal =
-    s.phase === 'pegging' &&
-    !peggingInputBlocked &&
-    myIndex === s.peggingCurrentIndex &&
-    myPlayer
-      ? legalPeggingPlays(myPlayer.hand, s.peggingSequence, s.peggingRunningTotal)
-      : [];
+  const peggingLegal = useMemo(() => {
+    if (
+      s.phase !== 'pegging' ||
+      peggingInputBlocked ||
+      myIndex !== s.peggingCurrentIndex ||
+      !myPlayer
+    ) {
+      return [];
+    }
+    return legalPeggingPlays(myPlayer.hand, s.peggingSequence, s.peggingRunningTotal);
+  }, [
+    s.phase,
+    peggingInputBlocked,
+    myIndex,
+    s.peggingCurrentIndex,
+    myPlayer,
+    s.peggingSequence,
+    s.peggingRunningTotal,
+  ]);
 
   const playPegging = (card: Card) => {
     if (s.phase !== 'pegging' || peggingInputBlocked || myIndex !== s.peggingCurrentIndex) return;
@@ -324,11 +336,11 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
     onAction({ type: 'play-pegging-card', card });
   };
 
-  const passPegging = () => {
+  const passPegging = useCallback(() => {
     if (s.phase !== 'pegging' || peggingInputBlocked || myIndex !== s.peggingCurrentIndex) return;
     if (peggingLegal.length > 0) return;
     onAction({ type: 'pegging-pass' });
-  };
+  }, [s.phase, peggingInputBlocked, myIndex, s.peggingCurrentIndex, peggingLegal, onAction]);
 
   const headsUpContent = useMemo((): ReactNode => {
     if (s.phase === 'game-over') return 'Game over';
