@@ -24,23 +24,23 @@ function createInitialOrientations(): CubeOrientation[] {
   return Array.from({ length: DICE_COUNT }, () => ({ x: 0, y: 0 }));
 }
 
-const UPPER_CATEGORIES: { key: ScoreCategory; label: string }[] = [
-  { key: 'ones', label: 'Ones' },
-  { key: 'twos', label: 'Twos' },
-  { key: 'threes', label: 'Threes' },
-  { key: 'fours', label: 'Fours' },
-  { key: 'fives', label: 'Fives' },
-  { key: 'sixes', label: 'Sixes' },
+const UPPER_CATEGORIES: { key: ScoreCategory; label: string; compactLabel: string }[] = [
+  { key: 'ones', label: 'Ones', compactLabel: '1s' },
+  { key: 'twos', label: 'Twos', compactLabel: '2s' },
+  { key: 'threes', label: 'Threes', compactLabel: '3s' },
+  { key: 'fours', label: 'Fours', compactLabel: '4s' },
+  { key: 'fives', label: 'Fives', compactLabel: '5s' },
+  { key: 'sixes', label: 'Sixes', compactLabel: '6s' },
 ];
 
-const LOWER_CATEGORIES: { key: ScoreCategory; label: string }[] = [
-  { key: 'threeOfAKind', label: '3 of a Kind' },
-  { key: 'fourOfAKind', label: '4 of a Kind' },
-  { key: 'fullHouse', label: 'Full House' },
-  { key: 'smallStraight', label: 'Small Straight' },
-  { key: 'largeStraight', label: 'Large Straight' },
-  { key: 'yahtzee', label: 'Yahtzee' },
-  { key: 'chance', label: 'Chance' },
+const LOWER_CATEGORIES: { key: ScoreCategory; label: string; compactLabel: string }[] = [
+  { key: 'threeOfAKind', label: '3 of a Kind', compactLabel: '3 Kind' },
+  { key: 'fourOfAKind', label: '4 of a Kind', compactLabel: '4 Kind' },
+  { key: 'fullHouse', label: 'Full House', compactLabel: 'Full H.' },
+  { key: 'smallStraight', label: 'Small Straight', compactLabel: 'Small' },
+  { key: 'largeStraight', label: 'Large Straight', compactLabel: 'Large' },
+  { key: 'yahtzee', label: 'Yahtzee', compactLabel: 'Yahtzee' },
+  { key: 'chance', label: 'Chance', compactLabel: 'Chance' },
 ];
 
 interface YahtzeeBoardProps {
@@ -269,6 +269,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
   };
 
   const showActivePlayerHeader = state.players.length > 1;
+  const compactScorecard = state.players.length >= 5;
 
   return (
     <div className="yahtzee-board relative h-full flex flex-col space-y-4 sm:space-y-5">
@@ -285,7 +286,11 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
       <div className="p-3 overflow-x-auto">
         <table className="w-full table-fixed border-collapse text-[13px] sm:text-[15px]">
           <colgroup>
-            <col className="w-[132px] sm:w-[200px]" />
+            <col
+              className={
+                compactScorecard ? 'w-[64px] sm:w-[80px]' : 'w-[132px] sm:w-[200px]'
+              }
+            />
             {viewOrderPlayers.map((player) => (
               <col key={player.id} />
             ))}
@@ -309,7 +314,13 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
                     key={player.id}
                     className={`yahtzee-playerHeader py-2 px-2 text-center font-medium ${activeHeaderClass}`}
                   >
-                    <div className="flex min-w-0 items-center justify-center gap-1 whitespace-nowrap">
+                    <div
+                      className={
+                        compactScorecard
+                          ? 'flex min-w-0 w-full flex-col items-center justify-center gap-0.5'
+                          : 'flex min-w-0 items-center justify-center gap-1 whitespace-nowrap'
+                      }
+                    >
                       <span
                         className="truncate max-w-full"
                         style={{ color: playerNameColor }}
@@ -325,20 +336,39 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
           </thead>
           <tbody>
             {/* Upper Section */}
-            {UPPER_CATEGORIES.map(({ key, label }) => (
+            {UPPER_CATEGORIES.map(({ key, label, compactLabel }) => (
               <tr key={key} className="border-b border-white/5">
-                <td className="py-1.5 px-2 text-white max-w-[300px] truncate">{label}</td>
+                <td
+                  className={`py-1.5 text-white max-w-[300px] truncate ${
+                    compactScorecard ? 'px-1' : 'px-2'
+                  }`}
+                >
+                  {compactScorecard ? compactLabel : label}
+                </td>
                 {viewOrderPlayers.map((player) => renderScoreCell(player.id, key))}
               </tr>
             ))}
 
             {/* Upper Bonus */}
             <tr className="border-b border-white/10 bg-white/[0.03]">
-              <td className="py-1.5 px-2 text-white font-medium max-w-[300px]">Bonus (35)</td>
+              <td
+                className={`py-1.5 text-white font-medium max-w-[300px] ${
+                  compactScorecard ? 'px-1' : 'px-2'
+                }`}
+              >
+                {compactScorecard ? 'Bonus' : 'Bonus (35)'}
+              </td>
               {viewOrderPlayers.map((player) => {
                 const earned = hasUpperBonus(player.scorecard);
                 const upperTotal = getUpperTotal(player.scorecard);
                 const remaining = Math.max(0, 63 - upperTotal);
+                const bonusCellText = compactScorecard
+                  ? earned
+                    ? '35'
+                    : `${upperTotal}/63`
+                  : earned
+                    ? '35'
+                    : `0 (${remaining} left)`;
                 return (
                   <td
                     key={player.id}
@@ -346,7 +376,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
                       earned ? 'text-green-400' : 'text-white/50'
                     }`}
                   >
-                    {earned ? '35' : `0 (${remaining} left)`}
+                    {bonusCellText}
                   </td>
                 );
               })}
@@ -358,9 +388,15 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
             </tr>
 
             {/* Lower Section */}
-            {LOWER_CATEGORIES.map(({ key, label }) => (
+            {LOWER_CATEGORIES.map(({ key, label, compactLabel }) => (
               <tr key={key} className="border-b border-white/5">
-                <td className="py-1.5 px-2 text-white max-w-[300px] truncate">{label}</td>
+                <td
+                  className={`py-1.5 text-white max-w-[300px] truncate ${
+                    compactScorecard ? 'px-1' : 'px-2'
+                  }`}
+                >
+                  {compactScorecard ? compactLabel : label}
+                </td>
                 {viewOrderPlayers.map((player) => renderScoreCell(player.id, key))}
               </tr>
             ))}

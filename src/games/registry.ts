@@ -151,10 +151,10 @@ export interface GameDefinition {
 export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
   yahtzee: {
     title: 'Yahtzee',
-    shortDescription: 'Roll dice, pick categories, and chase that perfect score. Classic dice game for 1-4 players.',
-    playersLabel: '1-4 Players',
+    shortDescription: 'Roll dice, pick categories, and chase that perfect score. Classic dice game for 1-6 players.',
+    playersLabel: '1-6 Players',
     minPlayers: 1,
-    maxPlayers: 4,
+    maxPlayers: 6,
     info: {
       goal: 'Score the most points by rolling five dice to make certain combinations over 13 rounds.',
       rules: [
