@@ -4,7 +4,18 @@ type DataConnection = ReturnType<Peer['connect']>;
 import { createHostPeer, createClientPeer, connectToPeer, destroyPeer } from './peer';
 import { generateRoomCode } from '../utils/roomCode';
 import { getDeviceId } from '../utils/deviceId';
-import type { RoomState, RoomContextValue, GameType, Player, ClientMessage, HostMessage, PlayerColor, GameStartOptions } from './types';
+import type {
+  RoomState,
+  RoomContextValue,
+  GameType,
+  Player,
+  ClientMessage,
+  HostMessage,
+  PlayerColor,
+  GameStartOptions,
+  TableEvent,
+  TableEventInput,
+} from './types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor } from './playerColors';
 import { createInitialGameState, processGameAction, checkGameOver, runSingleBotTurn, getGameWinners } from '../games/gameEngine';
 import type { HeartsState } from '../games/hearts/types';
@@ -248,6 +259,7 @@ export function useRoomContext(): RoomContextValue {
 export function RoomProvider({ children }: { children: React.ReactNode }) {
   const [room, setRoom] = useState<RoomState | null>(null);
   const [gameState, setGameState] = useState<unknown>(null);
+  const [lastTableEvent, setLastTableEvent] = useState<TableEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
@@ -262,6 +274,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const gameStateRef = useRef<unknown>(null);
   const reconnectingRef = useRef(false);
   const roomCodeRef = useRef<string>('');
+  const tableEventSequenceRef = useRef(0);
   // Host: grace period timers for disconnected clients (deviceId -> timer)
   const disconnectTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -293,6 +306,16 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const broadcastGameState = useCallback((gs: unknown) => {
     broadcast({ type: 'game-state', state: gs });
   }, [broadcast]);
+
+  const publishTableEvent = useCallback((event: TableEvent) => {
+    setLastTableEvent(event);
+    broadcast({ type: 'table-event', event });
+  }, [broadcast]);
+
+  const nextTableEventSequence = useCallback(() => {
+    tableEventSequenceRef.current += 1;
+    return tableEventSequenceRef.current;
+  }, []);
 
   // Host: handle incoming connection
   const handleConnection = useCallback((conn: DataConnection) => {
@@ -448,6 +471,25 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           }
           break;
         }
+        case 'table-event': {
+          if (!currentRoom.gameType || currentRoom.phase !== 'playing') break;
+          const mappedDeviceId = peerDeviceMapRef.current.get(conn.peer);
+          const claimedDeviceId = typeof msg.deviceId === 'string' ? msg.deviceId : null;
+          const senderDeviceId = mappedDeviceId ?? claimedDeviceId;
+          if (!senderDeviceId) return;
+          if (mappedDeviceId && claimedDeviceId && mappedDeviceId !== claimedDeviceId) return;
+          if (!currentRoom.players.some(player => player.id === senderDeviceId)) return;
+          if (typeof msg.event.id !== 'string' || typeof msg.event.kind !== 'string') return;
+
+          const event: TableEvent = {
+            ...msg.event,
+            gameType: currentRoom.gameType,
+            fromPlayerId: senderDeviceId,
+            createdAt: nextTableEventSequence(),
+          };
+          publishTableEvent(event);
+          break;
+        }
         case 'leave': {
           const leavingDeviceId = peerDeviceMapRef.current.get(conn.peer);
           if (!leavingDeviceId) return;
@@ -507,7 +549,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     });
 
     // Don't add to connectionsRef here — wait for the 'join' message which has the deviceId
-  }, [broadcastRoomState, broadcastGameState]);
+  }, [broadcastRoomState, broadcastGameState, publishTableEvent, nextTableEventSequence]);
 
   // Client: auto-reconnect on disconnect with exponential backoff
   const attemptReconnect = useCallback(async () => {
@@ -742,6 +784,9 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
               break;
             case 'game-state':
               setGameState(msg.state);
+              break;
+            case 'table-event':
+              setLastTableEvent(msg.event);
               break;
             case 'error':
               setError(msg.message);
@@ -1033,6 +1078,28 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       });
     }
   }, [isHost, myId, broadcastGameState, broadcastRoomState]);
+
+  const sendTableEvent = useCallback((eventInput: TableEventInput) => {
+    const currentRoom = roomRef.current;
+    if (!currentRoom || !currentRoom.gameType || currentRoom.phase !== 'playing' || !myId) return;
+    if (typeof eventInput.id !== 'string' || typeof eventInput.kind !== 'string') return;
+
+    if (isHost) {
+      publishTableEvent({
+        ...eventInput,
+        gameType: currentRoom.gameType,
+        fromPlayerId: myId,
+        createdAt: nextTableEventSequence(),
+      });
+      return;
+    }
+
+    connectionsRef.current.forEach((conn) => {
+      if (conn.open) {
+        conn.send({ type: 'table-event', event: eventInput, deviceId: myId } as ClientMessage);
+      }
+    });
+  }, [isHost, myId, publishTableEvent, nextTableEventSequence]);
 
   // Return to lobby (host only) — calculates winners, updates wins, resets to lobby
   const returnToLobby = useCallback(() => {
@@ -2108,6 +2175,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         removeBot,
         startGame,
         sendAction,
+        sendTableEvent,
+        lastTableEvent,
         returnToLobby,
         endGame,
         error,

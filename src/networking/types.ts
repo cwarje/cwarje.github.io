@@ -38,11 +38,24 @@ export interface Player {
   connected: boolean;
 }
 
+export interface TableEvent {
+  id: string;
+  gameType: GameType;
+  kind: string;
+  fromPlayerId: string;
+  toPlayerId?: string;
+  payload?: unknown;
+  createdAt: number;
+}
+
+export type TableEventInput = Omit<TableEvent, 'gameType' | 'fromPlayerId' | 'createdAt'>;
+
 // Messages from client to host
 export type ClientMessage =
   | { type: 'join'; playerName: string; playerColor: PlayerColor; deviceId: string }
   | { type: 'update-profile'; playerName: string; playerColor: PlayerColor; deviceId: string }
   | { type: 'action'; payload: unknown; deviceId: string }
+  | { type: 'table-event'; event: TableEventInput; deviceId: string }
   | { type: 'leave' }
   | { type: 'ready' };
 
@@ -50,6 +63,7 @@ export type ClientMessage =
 export type HostMessage =
   | { type: 'room-state'; state: RoomState }
   | { type: 'game-state'; state: unknown }
+  | { type: 'table-event'; event: TableEvent }
   | { type: 'error'; message: string }
   | { type: 'kicked'; reason: string }
   | { type: 'host-disconnected' };
@@ -79,6 +93,8 @@ export interface RoomContextValue {
   removeBot: (botId: string) => void;
   startGame: (gameType: GameType, options?: GameStartOptions) => void;
   sendAction: (payload: unknown) => void;
+  sendTableEvent?: (event: TableEventInput) => void;
+  lastTableEvent?: TableEvent | null;
   returnToLobby: () => void;
   endGame: () => void;
   error: string | null;

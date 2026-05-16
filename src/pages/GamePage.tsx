@@ -10,7 +10,22 @@ import { GAME_REGISTRY } from '../games/registry';
 export default function GamePage() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
-  const { room, gameState, myId, isHost, sendAction, returnToLobby, leaveRoom, rejoinRoom, connecting, reconnecting, error, clearError } = useRoomContext();
+  const {
+    room,
+    gameState,
+    myId,
+    isHost,
+    sendAction,
+    sendTableEvent,
+    lastTableEvent,
+    returnToLobby,
+    leaveRoom,
+    rejoinRoom,
+    connecting,
+    reconnecting,
+    error,
+    clearError,
+  } = useRoomContext();
   const { toast } = useToast();
   const rejoinAttempted = useRef(false);
   const hasHadRoom = useRef(!!room);
@@ -150,6 +165,8 @@ export default function GamePage() {
               state={gameState}
               myId={myId}
               onAction={sendAction}
+              sendTableEvent={sendTableEvent}
+              lastTableEvent={lastTableEvent}
               isHost={isHost}
               isHandZoomed={isHandZoomed}
               onLeave={handleLeave}

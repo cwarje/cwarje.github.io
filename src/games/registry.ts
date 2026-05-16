@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import { Dice5, Heart, Ship, Crosshair, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers } from 'lucide-react';
-import type { GameType, Player, GameStartOptions } from '../networking/types';
+import type { GameType, Player, GameStartOptions, TableEvent, TableEventInput } from '../networking/types';
 
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
 import { createFarkleState, processFarkleAction, isFarkleOver, runFarkleBotTurn, getFarkleWinners } from './farkle/logic';
@@ -94,6 +94,8 @@ export interface BoardProps {
   isHost?: boolean;
   isHandZoomed?: boolean;
   onLeave?: () => void;
+  sendTableEvent?: (event: TableEventInput) => void;
+  lastTableEvent?: TableEvent | null;
 }
 
 export interface GameOptionsPanelProps {

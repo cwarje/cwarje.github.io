@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import type { TableEvent, TableEventInput } from '../../networking/types';
 import type { Card, Suit, TwelvePlayer, TwelveState } from './types';
 import { cardPointValue, getPilePlayableCard, isLegalPlay, rankDisplay, suitsWithRoyalPair } from './rules';
 import { getTeamRoundCardPoints } from './logic';
@@ -25,6 +26,8 @@ interface TwelveBoardProps {
   myId: string;
   onAction: (action: unknown) => void;
   isHandZoomed?: boolean;
+  sendTableEvent?: (event: TableEventInput) => void;
+  lastTableEvent?: TableEvent | null;
 }
 
 interface SeatLayout {
@@ -47,8 +50,44 @@ interface ElementSize {
   height: number;
 }
 
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface CardTossBurst {
+  id: string;
+  cardCount: number;
+  start: Point;
+  end: Point;
+}
+
+interface CardSplat {
+  id: string;
+  cardCount: number;
+}
+
+interface SeatCardSplat extends CardSplat {
+  point: Point;
+}
+
 const RIVER_SEAT_EDGE_GAP_PX = 8;
 const TRICK_EXIT_DISTANCE_PX = 72;
+const CARD_TOSS_DURATION_MS = 1250;
+const CARD_SPLAT_DURATION_MS = 1900;
+const SEAT_SPLAT_DELAY_MS = 100;
+const TWELVE_CARD_TOSS_KIND = 'twelve-card-toss';
+const CARD_TOSS_CLUSTER_OFFSETS = [
+  { x: 0, y: 0, rotate: -8 },
+  { x: -18, y: -12, rotate: 10 },
+  { x: 16, y: 10, rotate: -16 },
+  { x: -6, y: 18, rotate: 18 },
+  { x: 22, y: -10, rotate: 7 },
+  { x: -24, y: 8, rotate: -20 },
+  { x: 7, y: -22, rotate: 22 },
+  { x: 28, y: 20, rotate: -4 },
+  { x: -30, y: -20, rotate: 14 },
+];
 
 const TRICK_SLOT_PLACEMENTS: Record<number, TrickSlotPlacement[]> = {
   2: [
@@ -80,6 +119,17 @@ function getTrickSlotPlacement(playerCount: number, relativeIndex: number): Tric
   return { row: 2, col: 2, dx: '0px', dy: '0px' };
 }
 
+function clampTossCardCount(count: number): number {
+  return Math.max(0, Math.round(count));
+}
+
+function getTableEventCardCount(event: TableEvent): number {
+  const payload = event.payload;
+  if (typeof payload !== 'object' || payload === null) return 5;
+  const cardCount = (payload as { cardCount?: unknown }).cardCount;
+  return typeof cardCount === 'number' ? clampTossCardCount(cardCount) : 5;
+}
+
 function PokerFlipCard({ card, faceDown, disabled = false }: { card?: Card | null; faceDown: boolean; disabled?: boolean }) {
   if (faceDown || !card) {
     return <div className="poker-card poker-cardBack poker-cardFlip--sm" />;
@@ -105,17 +155,30 @@ function PokerFlipCard({ card, faceDown, disabled = false }: { card?: Card | nul
   );
 }
 
-export default function TwelveBoard({ state, myId, onAction, isHandZoomed = false }: TwelveBoardProps) {
+export default function TwelveBoard({
+  state,
+  myId,
+  onAction,
+  isHandZoomed = false,
+  sendTableEvent,
+  lastTableEvent,
+}: TwelveBoardProps) {
   const myIndex = state.players.findIndex(player => player.id === myId);
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const myPlayer = myIndex >= 0 ? state.players[myIndex] : null;
   const isMyTurn = myIndex >= 0 && state.currentPlayerIndex === myIndex;
+  const boardRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const handContainerRef = useRef<HTMLDivElement>(null);
+  const cosmeticTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const cardTossIdRef = useRef(0);
   const [handWidth, setHandWidth] = useState(360);
   const [tableSize, setTableSize] = useState<ElementSize>({ width: 0, height: 0 });
-  const [seatPillElement, setSeatPillElement] = useState<HTMLDivElement | null>(null);
+  const [seatPillElement, setSeatPillElement] = useState<HTMLButtonElement | null>(null);
   const [seatPillSize, setSeatPillSize] = useState<ElementSize>({ width: 0, height: 0 });
+  const [cardTossBursts, setCardTossBursts] = useState<CardTossBurst[]>([]);
+  const [cardSplats, setCardSplats] = useState<CardSplat[]>([]);
+  const [seatCardSplats, setSeatCardSplats] = useState<SeatCardSplat[]>([]);
 
   const seatLayouts = useMemo<SeatLayout[]>(() => {
     const playerCount = state.players.length;
@@ -414,6 +477,14 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
     return () => resizeObserver.disconnect();
   }, []);
 
+  useEffect(() => {
+    const timeouts = cosmeticTimeoutsRef.current;
+    return () => {
+      timeouts.forEach(timeout => clearTimeout(timeout));
+      timeouts.length = 0;
+    };
+  }, []);
+
   const handLayout = useMemo(() => {
     const cardCount = myPlayer?.hand.length ?? 0;
     const available = Math.max(handWidth - 8, 220);
@@ -469,6 +540,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
     && state.currentTrick.length === 0
     && state.trickWinner === null
     && !state.gameOver;
+  const isThrowingCards = cardTossBursts.length > 0;
 
   const renderCardFace = (card: Card, disabled = false, compact = false) => (
     <div className={`river-card ${disabled ? 'river-card--disabled' : ''} ${compact ? 'river-card--compact' : ''}`}>
@@ -521,6 +593,86 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
     if (!showDevBestCardsButton) return;
     onAction({ type: 'dev-give-best-cards' });
   };
+
+  const scheduleCosmeticCleanup = useCallback((callback: () => void, delayMs: number) => {
+    const timeout = setTimeout(() => {
+      callback();
+      cosmeticTimeoutsRef.current = cosmeticTimeoutsRef.current.filter(item => item !== timeout);
+    }, delayMs);
+    cosmeticTimeoutsRef.current.push(timeout);
+  }, []);
+
+  const getBoardPoint = (clientPoint: Point): Point | null => {
+    const boardRect = boardRef.current?.getBoundingClientRect();
+    if (!boardRect) return null;
+    return {
+      x: clientPoint.x - boardRect.left,
+      y: clientPoint.y - boardRect.top,
+    };
+  };
+
+  const getCardTossPoints = (seatLayout: SeatLayout): { start: Point; end: Point } | null => {
+    const handRect = handContainerRef.current?.getBoundingClientRect();
+    const tableRect = tableRef.current?.getBoundingClientRect();
+    if (!handRect || !tableRect) return null;
+
+    const start = getBoardPoint({
+      x: handRect.left + handRect.width / 2,
+      y: handRect.top + handRect.height * 0.42,
+    });
+    const end = getBoardPoint({
+      x: tableRect.left + (tableRect.width * seatLayout.seatLeft) / 100,
+      y: tableRect.top + (tableRect.height * seatLayout.seatTop) / 100,
+    });
+    if (!start || !end) return null;
+    return { start, end };
+  };
+
+  const launchCardToss = (seatLayout: SeatLayout) => {
+    if (!myPlayer || !sendTableEvent || seatLayout.player.id === myId || myPlayer.hand.length === 0) return;
+    const points = getCardTossPoints(seatLayout);
+    if (!points) return;
+
+    cardTossIdRef.current += 1;
+    const id = `${myId}-toss-${cardTossIdRef.current}`;
+    const cardCount = clampTossCardCount(myPlayer.hand.length);
+    setCardTossBursts(prev => [...prev, { id, cardCount, ...points }]);
+    scheduleCosmeticCleanup(() => {
+      setCardTossBursts(prev => prev.filter(burst => burst.id !== id));
+    }, CARD_TOSS_DURATION_MS);
+    scheduleCosmeticCleanup(() => {
+      const splatId = `${id}-seat-splat`;
+      setSeatCardSplats(prev => [...prev, { id: splatId, cardCount, point: points.end }]);
+      scheduleCosmeticCleanup(() => {
+        setSeatCardSplats(prev => prev.filter(splat => splat.id !== splatId));
+      }, CARD_SPLAT_DURATION_MS);
+    }, SEAT_SPLAT_DELAY_MS);
+
+    sendTableEvent({
+      id,
+      kind: TWELVE_CARD_TOSS_KIND,
+      toPlayerId: seatLayout.player.id,
+      payload: { cardCount },
+    });
+  };
+
+  useEffect(() => {
+    if (
+      !lastTableEvent ||
+      lastTableEvent.gameType !== 'twelve' ||
+      lastTableEvent.kind !== TWELVE_CARD_TOSS_KIND ||
+      lastTableEvent.toPlayerId !== myId ||
+      lastTableEvent.fromPlayerId === myId
+    ) {
+      return;
+    }
+
+    const id = lastTableEvent.id;
+    setCardSplats(prev => [...prev, { id, cardCount: getTableEventCardCount(lastTableEvent) }]);
+    scheduleCosmeticCleanup(() => {
+      setCardSplats(prev => prev.filter(splat => splat.id !== id));
+    }, CARD_SPLAT_DURATION_MS);
+  }, [lastTableEvent, myId, scheduleCosmeticCleanup]);
 
   if (state.phase === 'game-over') {
     const isTeam = state.players.length === 4;
@@ -605,22 +757,27 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
           };
         })()
       : { backgroundColor: seatColor, color: seatTextColor };
+    const canTossCards = !!sendTableEvent && !!myPlayer && myPlayer.hand.length > 0 && !isMe;
     return (
-      <div
+      <button
+        type="button"
         ref={shouldMeasure ? setSeatPillElement : undefined}
-        className={`river-seatPill ${seatPillStateClass} ${isMe ? 'river-seatPill--me' : ''}`}
+        onClick={() => launchCardToss(seatLayout)}
+        disabled={!canTossCards}
+        className={`river-seatPill twelve-seatPillButton ${seatPillStateClass} ${isMe ? 'river-seatPill--me' : ''}`}
+        aria-label={isMe ? `Your seat, ${player.totalScore} points` : `Throw cards at ${player.name}`}
       >
         <div className="river-seatPillTop" style={pillTopStyle}>
           <span className="river-seatName">
             {isMe ? 'You' : player.name} ({player.totalScore})
           </span>
         </div>
-      </div>
+      </button>
     );
   };
 
   return (
-    <div className={`river-board river-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
+    <div ref={boardRef} className={`river-board river-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
       {showDevBestCardsButton && (
         <button
           type="button"
@@ -630,6 +787,133 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
           Dev: best cards
         </button>
       )}
+      <AnimatePresence>
+        {cardTossBursts.map((burst) => {
+          const deltaX = burst.end.x - burst.start.x;
+          const deltaY = burst.end.y - burst.start.y;
+          return (
+            <div key={burst.id} className="twelve-cardTossLayer" aria-hidden="true">
+              {Array.from({ length: burst.cardCount }, (_, i) => {
+                const clusterOffset = CARD_TOSS_CLUSTER_OFFSETS[i % CARD_TOSS_CLUSTER_OFFSETS.length];
+                const repeatOffset = Math.floor(i / CARD_TOSS_CLUSTER_OFFSETS.length) * 8;
+                const startOffsetX = clusterOffset.x + repeatOffset;
+                const startOffsetY = clusterOffset.y - repeatOffset * 0.5;
+                const targetOffsetX = clusterOffset.x * 0.45;
+                const targetOffsetY = clusterOffset.y * 0.45;
+                return (
+                  <motion.div
+                    key={`${burst.id}-${i}`}
+                    className="twelve-cardTossCard"
+                    style={{ left: burst.start.x - 44, top: burst.start.y - 64 }}
+                    initial={{
+                      x: startOffsetX,
+                      y: startOffsetY,
+                      rotate: clusterOffset.rotate,
+                      scale: 1.18,
+                      opacity: 1,
+                    }}
+                    animate={{
+                      x: deltaX + targetOffsetX,
+                      y: deltaY + targetOffsetY,
+                      rotate: clusterOffset.rotate + (deltaX >= 0 ? 28 : -28),
+                      scale: 0.82,
+                      opacity: [1, 1, 0],
+                    }}
+                    transition={{
+                      duration: 1.05,
+                      delay: i * 0.035,
+                      ease: [0.22, 1, 0.36, 1],
+                      opacity: { times: [0, 0.78, 1] },
+                    }}
+                  >
+                    <div className="twelve-cardBackFace" />
+                  </motion.div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </AnimatePresence>
+      <AnimatePresence>
+        {seatCardSplats.map((splat) => (
+          <div key={splat.id} className="twelve-seatSplatLayer" aria-hidden="true">
+            {Array.from({ length: splat.cardCount }, (_, i) => {
+              const clusterOffset = CARD_TOSS_CLUSTER_OFFSETS[i % CARD_TOSS_CLUSTER_OFFSETS.length];
+              const repeatOffset = Math.floor(i / CARD_TOSS_CLUSTER_OFFSETS.length) * 14;
+              return (
+                <motion.div
+                  key={`${splat.id}-${i}`}
+                  className="twelve-seatSplatCard"
+                  style={{
+                    left: splat.point.x - 32,
+                    top: splat.point.y - 45,
+                  }}
+                  initial={{
+                    x: clusterOffset.x * 0.2,
+                    y: clusterOffset.y * 0.2,
+                    rotate: clusterOffset.rotate,
+                    scale: 0.2,
+                    opacity: 0,
+                  }}
+                  animate={{
+                    x: clusterOffset.x * 1.85 + repeatOffset,
+                    y: [clusterOffset.y * 1.85, clusterOffset.y * 1.85, clusterOffset.y * 1.85 + 10],
+                    rotate: clusterOffset.rotate + (i % 2 === 0 ? 10 : -10),
+                    scale: [0.2, 1.15, 1.08],
+                    opacity: [0, 1, 1, 0],
+                  }}
+                  transition={{
+                    duration: 1.15,
+                    delay: i * 0.016,
+                    times: [0, 0.24, 0.72, 1],
+                    ease: [0.16, 1, 0.3, 1],
+                  }}
+                >
+                  <div className="twelve-cardBackFace" />
+                </motion.div>
+              );
+            })}
+          </div>
+        ))}
+      </AnimatePresence>
+      <AnimatePresence>
+        {cardSplats.map((splat) => (
+          <div key={splat.id} className="twelve-cardSplatLayer" aria-hidden="true">
+            {Array.from({ length: splat.cardCount }, (_, i) => {
+              const clusterOffset = CARD_TOSS_CLUSTER_OFFSETS[i % CARD_TOSS_CLUSTER_OFFSETS.length];
+              const repeatOffset = Math.floor(i / CARD_TOSS_CLUSTER_OFFSETS.length) * 28;
+              return (
+                <motion.div
+                  key={`${splat.id}-${i}`}
+                  className="twelve-cardSplatCard"
+                  initial={{
+                    x: clusterOffset.x * 0.2,
+                    y: clusterOffset.y * 0.2,
+                    rotate: clusterOffset.rotate,
+                    scale: 0.08,
+                    opacity: 0,
+                  }}
+                  animate={{
+                    x: clusterOffset.x * 3.2 + repeatOffset,
+                    y: [clusterOffset.y * 3.2, clusterOffset.y * 3.2, clusterOffset.y * 3.2 + 34],
+                    rotate: clusterOffset.rotate + (i % 2 === 0 ? 16 : -16),
+                    scale: [0.08, 3.25, 3.08],
+                    opacity: [0, 1, 1, 1, 0],
+                  }}
+                  transition={{
+                    duration: 1.75,
+                    delay: i * 0.018,
+                    times: [0, 0.22, 0.58, 0.82, 1],
+                    ease: [0.16, 1, 0.3, 1],
+                  }}
+                >
+                  <div className="twelve-cardBackFace" />
+                </motion.div>
+              );
+            })}
+          </div>
+        ))}
+      </AnimatePresence>
       <div ref={tableRef} className={`river-table river-table--players-${state.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
@@ -816,7 +1100,7 @@ export default function TwelveBoard({ state, myId, onAction, isHandZoomed = fals
         <div className="space-y-3">
           <div ref={handContainerRef} className={`river-hand ${isHandZoomed ? 'river-hand--zoom' : ''}`}>
             <div
-              className="river-handSpread"
+              className={`river-handSpread ${isThrowingCards ? 'twelve-handSpread--tossing' : ''}`}
               style={{
                 width: `${handLayout.spreadWidth}px`,
                 height: `${handLayout.cardHeight + handLayout.selectedLift}px`,

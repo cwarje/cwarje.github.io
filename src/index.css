@@ -1533,6 +1533,28 @@
   background: #dbeafe;
 }
 
+.twelve-seatPillButton {
+  appearance: none;
+  padding: 0;
+  color: inherit;
+  text-align: inherit;
+}
+
+.twelve-seatPillButton:not(:disabled) {
+  cursor: pointer;
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+
+.twelve-seatPillButton:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.24);
+}
+
+.twelve-seatPillButton:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
 .river-seatPill--mobilization2col .river-seatPillLabels,
 .river-seatPill--mobilization2col .river-seatPillValues {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2021,6 +2043,11 @@
   position: relative;
 }
 
+.twelve-handSpread--tossing {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .river-handHitbox {
   position: absolute;
   top: 0;
@@ -2149,6 +2176,75 @@
 @media (hover: hover) and (pointer: fine) {
   .river-handCardWrap--active:hover {
     transform: translateY(-8px) !important;
+  }
+}
+
+.twelve-cardTossLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.twelve-cardTossCard {
+  position: absolute;
+  width: 88px;
+  height: 128px;
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.26));
+  transform-origin: center;
+}
+
+.twelve-cardSplatLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.twelve-cardSplatCard {
+  position: absolute;
+  width: 82px;
+  height: 116px;
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.34));
+  transform-origin: center;
+}
+
+.twelve-seatSplatLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 35;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.twelve-seatSplatCard {
+  position: absolute;
+  width: 64px;
+  height: 90px;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.34));
+  transform-origin: center;
+}
+
+.twelve-cardBackFace {
+  width: 100%;
+  height: 100%;
+  border: 3px solid #111827;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16) 25%, transparent 25%) 0 0 / 12px 12px,
+    linear-gradient(135deg, transparent 75%, rgba(255, 255, 255, 0.12) 75%) 0 0 / 12px 12px,
+    #800000;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .twelve-cardTossLayer,
+  .twelve-seatSplatLayer,
+  .twelve-cardSplatLayer {
+    display: none;
   }
 }
 
