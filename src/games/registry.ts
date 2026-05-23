@@ -61,7 +61,7 @@ import CrossCribTitleExtra from './cross-crib/CrossCribTitleExtra';
 import CribbageTitleExtra from './cribbage/CribbageTitleExtra';
 import CasinoTitleExtra from './casino/CasinoTitleExtra';
 import UpRiverToolbarExtra from './up-and-down-the-river/UpRiverToolbarExtra';
-import TwelveToolbarExtra from './twelve/TwelveToolbarExtra';
+import TwelveTitleExtra from './twelve/TwelveTitleExtra';
 import MobilizationTitleExtra from './mobilization/MobilizationTitleExtra';
 import { PigIcon } from '../components/icons/PigIcon';
 import { CribbagePegHolesIcon } from '../components/icons/CribbagePegHolesIcon';
@@ -572,7 +572,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     getWinners: getTwelveWinners,
     Board: TwelveBoard,
     OptionsPanel: TwelveOptions,
-    ToolbarExtra: TwelveToolbarExtra,
+    TitleExtra: TwelveTitleExtra,
     fullBoard: true,
     hasHandZoom: true,
     production: true,

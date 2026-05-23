@@ -116,7 +116,12 @@ export default function GamePage() {
                 ))
               : gameDef?.title ?? 'Game'}
           </h1>
-          {gameDef?.TitleExtra && <gameDef.TitleExtra state={gameState} />}
+          {gameDef?.TitleExtra && (
+            <gameDef.TitleExtra
+              state={gameState}
+              isHandZoomed={gameDef?.hasHandZoom ? isHandZoomed : undefined}
+            />
+          )}
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
           {gameDef?.ToolbarExtra && <gameDef.ToolbarExtra state={gameState} isHandZoomed={gameDef?.hasHandZoom ? isHandZoomed : undefined} />}
