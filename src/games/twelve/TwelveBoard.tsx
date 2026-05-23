@@ -62,9 +62,16 @@ interface CardTossBurst {
   end: Point;
 }
 
+interface SplatCardPlacement {
+  x: number;
+  y: number;
+  rotate: number;
+}
+
 interface CardSplat {
   id: string;
   cardCount: number;
+  placements: SplatCardPlacement[];
 }
 
 interface SeatCardSplat extends CardSplat {
@@ -88,6 +95,20 @@ const CARD_TOSS_CLUSTER_OFFSETS = [
   { x: 28, y: 20, rotate: -4 },
   { x: -30, y: -20, rotate: 14 },
 ];
+
+const SEAT_SPLAT_SPREAD = { xRadius: 110, yRadius: 90, maxRotate: 45 };
+const CENTER_SPLAT_SPREAD = { xRadius: 200, yRadius: 160, maxRotate: 55 };
+
+function createRandomSplatPlacements(
+  cardCount: number,
+  spread: { xRadius: number; yRadius: number; maxRotate: number },
+): SplatCardPlacement[] {
+  return Array.from({ length: cardCount }, () => ({
+    x: (Math.random() * 2 - 1) * spread.xRadius,
+    y: (Math.random() * 2 - 1) * spread.yRadius,
+    rotate: (Math.random() * 2 - 1) * spread.maxRotate,
+  }));
+}
 
 const TRICK_SLOT_PLACEMENTS: Record<number, TrickSlotPlacement[]> = {
   2: [
@@ -642,7 +663,12 @@ export default function TwelveBoard({
     }, CARD_TOSS_DURATION_MS);
     scheduleCosmeticCleanup(() => {
       const splatId = `${id}-seat-splat`;
-      setSeatCardSplats(prev => [...prev, { id: splatId, cardCount, point: points.end }]);
+      setSeatCardSplats(prev => [...prev, {
+        id: splatId,
+        cardCount,
+        point: points.end,
+        placements: createRandomSplatPlacements(cardCount, SEAT_SPLAT_SPREAD),
+      }]);
       scheduleCosmeticCleanup(() => {
         setSeatCardSplats(prev => prev.filter(splat => splat.id !== splatId));
       }, CARD_SPLAT_DURATION_MS);
@@ -668,7 +694,12 @@ export default function TwelveBoard({
     }
 
     const id = lastTableEvent.id;
-    setCardSplats(prev => [...prev, { id, cardCount: getTableEventCardCount(lastTableEvent) }]);
+    const cardCount = getTableEventCardCount(lastTableEvent);
+    setCardSplats(prev => [...prev, {
+      id,
+      cardCount,
+      placements: createRandomSplatPlacements(cardCount, CENTER_SPLAT_SPREAD),
+    }]);
     scheduleCosmeticCleanup(() => {
       setCardSplats(prev => prev.filter(splat => splat.id !== id));
     }, CARD_SPLAT_DURATION_MS);
@@ -837,10 +868,7 @@ export default function TwelveBoard({
       <AnimatePresence>
         {seatCardSplats.map((splat) => (
           <div key={splat.id} className="twelve-seatSplatLayer" aria-hidden="true">
-            {Array.from({ length: splat.cardCount }, (_, i) => {
-              const clusterOffset = CARD_TOSS_CLUSTER_OFFSETS[i % CARD_TOSS_CLUSTER_OFFSETS.length];
-              const repeatOffset = Math.floor(i / CARD_TOSS_CLUSTER_OFFSETS.length) * 14;
-              return (
+            {splat.placements.map((placement, i) => (
                 <motion.div
                   key={`${splat.id}-${i}`}
                   className="twelve-seatSplatCard"
@@ -849,68 +877,63 @@ export default function TwelveBoard({
                     top: splat.point.y - 45,
                   }}
                   initial={{
-                    x: clusterOffset.x * 0.2,
-                    y: clusterOffset.y * 0.2,
-                    rotate: clusterOffset.rotate,
+                    x: placement.x * 0.2,
+                    y: placement.y * 0.2,
+                    rotate: placement.rotate,
                     scale: 0.2,
                     opacity: 0,
                   }}
                   animate={{
-                    x: clusterOffset.x * 1.85 + repeatOffset,
-                    y: [clusterOffset.y * 1.85, clusterOffset.y * 1.85, clusterOffset.y * 1.85 + 10],
-                    rotate: clusterOffset.rotate + (i % 2 === 0 ? 10 : -10),
+                    x: placement.x,
+                    y: [placement.y, placement.y, placement.y + 10],
+                    rotate: placement.rotate,
                     scale: [0.2, 1.15, 1.08],
                     opacity: [0, 1, 1, 0],
                   }}
                   transition={{
                     duration: 1.15,
                     delay: i * 0.016,
-                    times: [0, 0.24, 0.72, 1],
+                    times: [0, 0.24, 0.99, 1],
                     ease: [0.16, 1, 0.3, 1],
                   }}
                 >
                   <div className="twelve-cardBackFace" />
                 </motion.div>
-              );
-            })}
+            ))}
           </div>
         ))}
       </AnimatePresence>
       <AnimatePresence>
         {cardSplats.map((splat) => (
           <div key={splat.id} className="twelve-cardSplatLayer" aria-hidden="true">
-            {Array.from({ length: splat.cardCount }, (_, i) => {
-              const clusterOffset = CARD_TOSS_CLUSTER_OFFSETS[i % CARD_TOSS_CLUSTER_OFFSETS.length];
-              const repeatOffset = Math.floor(i / CARD_TOSS_CLUSTER_OFFSETS.length) * 28;
-              return (
+            {splat.placements.map((placement, i) => (
                 <motion.div
                   key={`${splat.id}-${i}`}
                   className="twelve-cardSplatCard"
                   initial={{
-                    x: clusterOffset.x * 0.2,
-                    y: clusterOffset.y * 0.2,
-                    rotate: clusterOffset.rotate,
+                    x: placement.x * 0.2,
+                    y: placement.y * 0.2,
+                    rotate: placement.rotate,
                     scale: 0.08,
                     opacity: 0,
                   }}
                   animate={{
-                    x: clusterOffset.x * 3.2 + repeatOffset,
-                    y: [clusterOffset.y * 3.2, clusterOffset.y * 3.2, clusterOffset.y * 3.2 + 34],
-                    rotate: clusterOffset.rotate + (i % 2 === 0 ? 16 : -16),
+                    x: placement.x,
+                    y: [placement.y, placement.y, placement.y + 34],
+                    rotate: placement.rotate,
                     scale: [0.08, 3.25, 3.08],
                     opacity: [0, 1, 1, 1, 0],
                   }}
                   transition={{
                     duration: 1.75,
                     delay: i * 0.018,
-                    times: [0, 0.22, 0.58, 0.82, 1],
+                    times: [0, 0.22, 0.58, 0.99, 1],
                     ease: [0.16, 1, 0.3, 1],
                   }}
                 >
                   <div className="twelve-cardBackFace" />
                 </motion.div>
-              );
-            })}
+            ))}
           </div>
         ))}
       </AnimatePresence>

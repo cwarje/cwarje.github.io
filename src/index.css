@@ -2235,8 +2235,8 @@
   border: 3px solid #111827;
   border-radius: 8px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.16) 25%, transparent 25%) 0 0 / 12px 12px,
-    linear-gradient(135deg, transparent 75%, rgba(255, 255, 255, 0.12) 75%) 0 0 / 12px 12px,
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16) 25%, transparent 25%) 0 0 / 18px 18px,
+    linear-gradient(135deg, transparent 75%, rgba(255, 255, 255, 0.12) 75%) 0 0 / 18px 18px,
     #800000;
 }
 
