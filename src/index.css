@@ -2232,7 +2232,7 @@
 .twelve-cardBackFace {
   width: 100%;
   height: 100%;
-  border: 3px solid #111827;
+  border: 3px solid #000;
   border-radius: 8px;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.16) 25%, transparent 25%) 0 0 / 18px 18px,
@@ -2609,6 +2609,47 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
+}
+
+.twelve-seatPillCluster {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.twelve-seatPillCluster .twelve-seatPillButton {
+  position: relative;
+  z-index: 1;
+}
+
+.twelve-opponentHandSpread {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  z-index: 0;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.twelve-opponentHandHitbox {
+  position: absolute;
+  top: 0;
+  overflow: visible;
+  transition: left 0.16s ease, width 0.16s ease;
+}
+
+.twelve-opponentHandCardWrap {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .twelve-opponentHandHitbox {
+    transition: none;
+  }
 }
 
 .twelve-pileRow {

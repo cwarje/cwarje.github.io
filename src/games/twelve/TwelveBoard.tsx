@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { TableEvent, TableEventInput } from '../../networking/types';
 import type { Card, Suit, TwelvePlayer, TwelveState } from './types';
 import { cardPointValue, getPilePlayableCard, isLegalPlay, rankDisplay, suitsWithRoyalPair } from './rules';
@@ -144,6 +144,27 @@ function clampTossCardCount(count: number): number {
   return Math.max(0, Math.round(count));
 }
 
+const OPPONENT_HAND_CARD_WIDTH = 45;
+const OPPONENT_HAND_CARD_HEIGHT = 68;
+const OPPONENT_HAND_MAX_SPREAD = 160;
+
+interface OpponentHandLayout {
+  cardWidth: number;
+  cardHeight: number;
+  step: number;
+  spreadWidth: number;
+}
+
+function getOpponentHandLayout(cardCount: number): OpponentHandLayout {
+  const cardWidth = OPPONENT_HAND_CARD_WIDTH;
+  const cardHeight = OPPONENT_HAND_CARD_HEIGHT;
+  const defaultStep = Math.round(cardWidth * 0.58);
+  const fitStep = cardCount > 1 ? (OPPONENT_HAND_MAX_SPREAD - cardWidth) / (cardCount - 1) : defaultStep;
+  const step = cardCount > 1 ? Math.max(8, Math.min(defaultStep, fitStep)) : defaultStep;
+  const spreadWidth = cardCount > 1 ? cardWidth + step * (cardCount - 1) : cardWidth;
+  return { cardWidth, cardHeight, step, spreadWidth };
+}
+
 function getTableEventCardCount(event: TableEvent): number {
   const payload = event.payload;
   if (typeof payload !== 'object' || payload === null) return 5;
@@ -200,6 +221,7 @@ export default function TwelveBoard({
   const [cardTossBursts, setCardTossBursts] = useState<CardTossBurst[]>([]);
   const [cardSplats, setCardSplats] = useState<CardSplat[]>([]);
   const [seatCardSplats, setSeatCardSplats] = useState<SeatCardSplat[]>([]);
+  const reduceMotion = useReducedMotion();
 
   const seatLayouts = useMemo<SeatLayout[]>(() => {
     const playerCount = state.players.length;
@@ -761,6 +783,55 @@ export default function TwelveBoard({
     );
   }
 
+  const renderOpponentHandFan = (player: TwelvePlayer) => {
+    const cardCount = player.hand.length;
+    if (cardCount === 0) return null;
+
+    const layout = getOpponentHandLayout(cardCount);
+
+    return (
+      <div
+        className="twelve-opponentHandSpread"
+        aria-label={`${player.name}, ${cardCount} cards in hand`}
+        style={{
+          width: `${layout.spreadWidth}px`,
+          height: `${layout.cardHeight}px`,
+          transition: 'width 0.16s ease',
+        }}
+      >
+        <AnimatePresence initial={false}>
+          {Array.from({ length: cardCount }, (_, i) => {
+            const isLast = i === cardCount - 1;
+            const hitboxWidth = isLast ? layout.cardWidth : layout.step;
+            return (
+              <motion.div
+                key={`${player.id}-hand-slot-${i}`}
+                className="twelve-opponentHandHitbox"
+                style={{
+                  left: `${i * layout.step}px`,
+                  width: `${hitboxWidth}px`,
+                  height: `${layout.cardHeight}px`,
+                  zIndex: i + 1,
+                }}
+                initial={reduceMotion ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={reduceMotion ? undefined : { opacity: 0, x: 12, scale: 0.85 }}
+                transition={{ duration: reduceMotion ? 0 : 0.18 }}
+              >
+                <span
+                  className="twelve-opponentHandCardWrap"
+                  style={{ width: `${layout.cardWidth}px`, height: `${layout.cardHeight}px` }}
+                >
+                  <div className="twelve-cardBackFace" />
+                </span>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
+    );
+  };
+
   const renderSeatPill = (seatLayout: SeatLayout, shouldMeasure = false) => {
     const player = seatLayout.player;
     const isCurrentTurn = state.players[state.currentPlayerIndex]?.id === player.id && !state.trickWinner;
@@ -945,7 +1016,10 @@ export default function TwelveBoard({
             style={{ left: `${layout.seatLeft}%`, top: `${layout.seatTop}%` }}
           >
             <div className={`twelve-seatStack ${isHandZoomed ? 'twelve-seatStack--zoom' : ''}`}>
-              {renderSeatPill(layout, layout.relativeIndex === 0)}
+              <div className="twelve-seatPillCluster">
+                {layout.player.id !== myId && renderOpponentHandFan(layout.player)}
+                {renderSeatPill(layout, layout.relativeIndex === 0)}
+              </div>
               <div className="twelve-pileRow">
                 {layout.player.frontPiles.map((pile, pileIndex) => {
                   const playable = getPilePlayableCard(pile);
