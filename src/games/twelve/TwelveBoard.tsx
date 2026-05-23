@@ -575,6 +575,8 @@ export default function TwelveBoard({
     && state.manBid === null;
   const canCallHalfMan = canDeclareMan && totalTricksInRound >= 6;
   const canCallFullMan = canDeclareMan;
+  const hasActionButtons =
+    showSetTrumpActions || showCallTjogActions || canCallHalfMan || canCallFullMan;
   const showDevBestCardsButton =
     import.meta.env.DEV
     && myIndex >= 0
@@ -1109,19 +1111,17 @@ export default function TwelveBoard({
         </div>
       </div>
 
-      <div className="twelve-statusRow">
-        <div className="twelve-statusCol">
-          <div className="river-headsUp" aria-live="polite">
-            <p
-              className={`river-headsUpText ${state.phase === 'round-end' ? 'river-headsUpText--roundEnd' : ''}`}
-              aria-label={state.phase === 'round-end' ? state.roundSummary : undefined}
-            >
-              {headsUpContent ?? '\u00a0'}
-            </p>
-          </div>
+      <div className="twelve-statusBlock">
+        <div className="river-headsUp" aria-live="polite">
+          <p
+            className={`river-headsUpText ${state.phase === 'round-end' ? 'river-headsUpText--roundEnd' : ''} ${hasActionButtons ? 'twelve-headsUpText--withAction' : ''}`}
+            aria-label={state.phase === 'round-end' ? state.roundSummary : undefined}
+          >
+            {headsUpContent ?? '\u00a0'}
+          </p>
         </div>
-        <div className="twelve-statusCol">
-          <div className="river-actionRow">
+        <div className="river-actionRow twelve-actionRow" aria-hidden={!hasActionButtons}>
+          {hasActionButtons && (
             <div className="twelve-actionPanel">
               {showSetTrumpActions && (
                 <div className="twelve-actionGroup">
@@ -1189,7 +1189,7 @@ export default function TwelveBoard({
                 </div>
               )}
             </div>
-          </div>
+          )}
         </div>
       </div>
 

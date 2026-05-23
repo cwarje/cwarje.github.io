@@ -1813,37 +1813,46 @@
   line-height: 1.35;
 }
 
-.twelve-statusRow {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.twelve-statusCol {
+.twelve-statusBlock {
   width: 100%;
+  display: grid;
+  grid-template-rows: 24px 32px;
+  gap: 2px;
+  min-height: 58px;
+  margin-top: clamp(4px, 1.5vh, 12px);
+  align-items: end;
+  justify-items: center;
 }
 
-.twelve-statusCol .river-headsUp {
+.twelve-statusBlock .river-headsUp {
   margin-top: 0;
+  min-height: 24px;
+  height: 24px;
+  width: 100%;
+  align-self: end;
 }
 
-.twelve-statusCol .river-actionRow {
-  min-height: 30px;
+.twelve-statusBlock .river-actionRow.twelve-actionRow {
+  min-height: 32px;
+  height: 32px;
+  width: 100%;
   padding-top: 0;
   align-items: center;
+  justify-content: center;
 }
 
 @media (min-width: 640px) {
-  .twelve-statusRow {
-    flex-direction: row;
-    align-items: center;
-    gap: 12px;
+  .twelve-statusBlock .river-actionRow.twelve-actionRow {
+    min-height: 32px;
+    height: 32px;
+    padding-top: 0;
   }
+}
 
-  .twelve-statusCol {
-    flex: 0 0 50%;
-    max-width: 50%;
-  }
+.river-headsUpText.twelve-headsUpText--withAction {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .river-bidPanel {
