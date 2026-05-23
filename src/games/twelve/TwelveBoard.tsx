@@ -879,7 +879,7 @@ export default function TwelveBoard({
   };
 
   return (
-    <div ref={boardRef} className={`river-board river-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
+    <div ref={boardRef} className={`twelve-board river-board river-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
       {showDevBestCardsButton && (
         <button
           type="button"

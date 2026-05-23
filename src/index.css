@@ -2023,19 +2023,19 @@
 
   .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardRank,
   .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .poker-cardRank {
-    font-size: 1.8rem;
+    font-size: 1.5rem;
     line-height: 1;
   }
 
   .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardSuit,
   .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .poker-cardSuit {
-    font-size: 1.8rem;
+    font-size: 1.45rem;
     line-height: 1;
   }
 
   .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardCorner,
   .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .poker-cardCorner {
-    width: 1.8em;
+    width: 1.5em;
   }
 }
 
@@ -2105,6 +2105,12 @@
     padding: 6px 8px 6px 0;
   }
 
+  .twelve-board .river-center .river-card,
+  .twelve-pileButton .river-card,
+  .twelve-pileButton .poker-cardFlipFront {
+    padding: 6px 8px 6px 0;
+  }
+
   .river-hand .river-cardRank {
     font-size: 1.1rem;
   }
@@ -2157,19 +2163,19 @@
 
   .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardRank,
   .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .poker-cardRank {
-    font-size: 1.6rem;
+    font-size: 1.3rem;
     line-height: 1;
   }
 
   .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardSuit,
   .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .poker-cardSuit {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     line-height: 1;
   }
 
   .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .river-cardCorner,
   .twelve-seatStack.twelve-seatStack--zoom .twelve-pileButton .poker-cardCorner {
-    width: 1.75em;
+    width: 1.3em;
   }
 }
 
@@ -3045,6 +3051,40 @@
   height: 3.5rem;
 }
 
+/* Twelve: default hand/table rank/suit sizes */
+.twelve-board .river-hand:not(.river-hand--zoom) .river-cardRank,
+.twelve-board .river-center:not(.river-center--zoom) .river-cardRank {
+  font-size: 1.45rem;
+}
+
+.twelve-board .river-hand:not(.river-hand--zoom) .river-cardSuit,
+.twelve-board .river-center:not(.river-center--zoom) .river-cardSuit {
+  font-size: 1.38rem;
+}
+
+/* Twelve: smaller rank/suit on seat pile cards (non-zoom) */
+.twelve-pileButton .river-cardRank,
+.twelve-pileButton .poker-cardRank {
+  font-size: 1.1rem;
+}
+
+.twelve-pileButton .river-cardSuit,
+.twelve-pileButton .poker-cardSuit {
+  font-size: 1.05rem;
+}
+
+.twelve-pileButton .river-cardCorner,
+.twelve-pileButton .poker-cardCorner {
+  width: 1.1em;
+}
+
+.twelve-board .river-center .river-card {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 6px 8px 6px 3px;
+  gap: 3px;
+}
+
 /* Keep Twelve pile cards and placeholders exactly aligned with pile slots. */
 .twelve-pileButton .poker-card,
 .twelve-pileButton .poker-cardBack,
@@ -3057,18 +3097,10 @@
 
 .twelve-pileButton .river-card,
 .twelve-pileButton .poker-cardFlipFront {
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  gap: 0;
-}
-
-.twelve-pileButton .river-cardCorner,
-.twelve-pileButton .poker-cardCorner {
-  width: auto;
-  height: 100%;
-  justify-content: center;
-  gap: 0;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 6px 8px 6px 3px;
+  gap: 3px;
 }
 
 .poker-cardFlipInner {
