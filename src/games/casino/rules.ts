@@ -285,7 +285,7 @@ export function resolveHandAssistedGroupDeclaredValue(
 }
 
 /**
- * @param lastCapturePlayerId Player who made the last capture this round (not necessarily last to trail).
+ * @param lastCapturePlayerId Player who made the last trick this round (not necessarily last to trail).
  */
 export function scoreRound(
   players: CasinoPlayer[],
@@ -330,11 +330,11 @@ export function scoreRound(
   }
 
   if (maxCardsIds.length === 1) {
-    scores[maxCardsIds[0]].mostCards = 3;
+    scores[maxCardsIds[0]].mostCards = 1;
   }
 
   if (maxSpadesIds.length === 1) {
-    scores[maxSpadesIds[0]].mostSpades = 1;
+    scores[maxSpadesIds[0]].mostSpades = 2;
   }
 
   for (const p of players) {

@@ -620,8 +620,8 @@ export default function CasinoBoard({
           <>
             {nameEl}
             {remnantCount > 0
-              ? ` made the last capture and takes the ${remnantCount} remaining ${cardWord} on the table`
-              : ' made the last capture. The table is empty'}
+              ? ` made the last trick and takes the ${remnantCount} remaining ${cardWord} on the table`
+              : ' made the last trick. The table is empty'}
           </>
         );
       }
@@ -763,7 +763,7 @@ export default function CasinoBoard({
                         {roundScore.aces > 0 && <span>Aces +{roundScore.aces}</span>}
                         {roundScore.sweeps > 0 && <span>Clean tables +{roundScore.sweeps}</span>}
                         {roundScore.lastCapture > 0 && (
-                          <span title="Last capture this round">Last capture +{roundScore.lastCapture}</span>
+                          <span title="Last trick this round">Last trick +{roundScore.lastCapture}</span>
                         )}
                         {roundScore.total === 0 && <span>No points</span>}
                       </div>

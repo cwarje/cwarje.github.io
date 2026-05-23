@@ -420,6 +420,22 @@ describe('scoreRound', () => {
     sweepCount: 0,
   });
 
+  it('awards 1 point for most cards when unambiguous', () => {
+    const players = [basePlayer('p0', [C3]), basePlayer('p1', [C4, C5])];
+    const out = scoreRound(players);
+    expect(out.p1.mostCards).toBe(1);
+    expect(out.p0.mostCards).toBe(0);
+  });
+
+  it('awards 2 points for most spades when unambiguous', () => {
+    const S4: Card = { suit: 'spades', rank: 4 };
+    const S5: Card = { suit: 'spades', rank: 5 };
+    const players = [basePlayer('p0', [S4, S5, C3]), basePlayer('p1', [C4, C5])];
+    const out = scoreRound(players);
+    expect(out.p0.mostSpades).toBe(2);
+    expect(out.p1.mostSpades).toBe(0);
+  });
+
   it('awards lastCapture only to the given player id', () => {
     const players = [basePlayer('p0', [C3]), basePlayer('p1', [C4, C5])];
     const withBonus = scoreRound(players, 'p0');

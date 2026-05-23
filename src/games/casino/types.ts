@@ -78,7 +78,7 @@ export interface RoundScoreBreakdown {
   littleCasino: number;
   aces: number;
   sweeps: number;
-  /** +1 for the player who made the last capture this round (not last trail). */
+  /** +1 for the player who made the last trick this round (not last trail). */
   lastCapture: number;
   total: number;
 }

@@ -1640,14 +1640,14 @@ describe('runCasinoBotTurn', () => {
       scores: { p0: 3, p1: 2 },
       lastRoundScores: {
         p0: {
-          mostCards: 3,
+          mostCards: 1,
           mostSpades: 0,
           bigCasino: 0,
           littleCasino: 0,
           aces: 0,
           sweeps: 0,
           lastCapture: 0,
-          total: 3,
+          total: 1,
         },
         p1: {
           mostCards: 0,

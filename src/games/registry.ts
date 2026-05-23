@@ -746,7 +746,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
         'Click a card in your hand to select it, then click table cards to select what to take or build with.',
         'Use the action buttons (Take, Build, Trail) that appear based on your selection.',
         'Building groups table cards with your played card into a combined unit — take it later with a matching-value card.',
-        'Score points at round end: most cards (3), most spades (1), 10 of diamonds (2), 2 of spades (1), each Ace (1), each clean table (1).',
+        'Score points at round end: most cards (1), most spades (2), 10 of diamonds (2), 2 of spades (1), each Ace (1), each clean table (1), last trick (1).',
       ],
     },
     icon: Layers,
