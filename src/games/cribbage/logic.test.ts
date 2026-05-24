@@ -277,6 +277,122 @@ describe('cribbage logic', () => {
     expect(s.showAppliedSteps).toBe(1);
   });
 
+  it('hand-end reveal → winning first hand defers game-over until next advance-show', () => {
+    const base = createCribbageState(makePlayers(2)) as CribbageState;
+    const h0: Card[] = [
+      { suit: 'clubs', rank: 2 },
+      { suit: 'diamonds', rank: 3 },
+      { suit: 'hearts', rank: 4 },
+      { suit: 'spades', rank: 6 },
+    ];
+    const h1: Card[] = [
+      { suit: 'clubs', rank: 5 },
+      { suit: 'diamonds', rank: 5 },
+      { suit: 'hearts', rank: 10 },
+      { suit: 'spades', rank: 13 },
+    ];
+    const starter: Card = { suit: 'clubs', rank: 5 };
+    const ponePts = scoreShowHand(h1, starter);
+    expect(ponePts).toBeGreaterThan(0);
+
+    let s: CribbageState = {
+      ...base,
+      phase: 'pegging',
+      dealerIndex: 0,
+      players: base.players.map(p => ({ ...p, hand: [] })),
+      playerScores: [0, base.targetScore - ponePts],
+      teamScores: null,
+      starterCard: starter,
+      holeCards: [h0, h1],
+      cribCards: [],
+      peggingSequence: [],
+      peggingRunningTotal: 0,
+      peggingCurrentIndex: 0,
+      consecutivePeggingPasses: 0,
+      lastPeggingPlayerIndex: 1,
+      peggingGoReveal: null,
+      peggingPointsReveal: null,
+      peggingHandEndReveal: { scorerIndex: 1 },
+      showAppliedSteps: 0,
+      showStep: 0,
+      stock: [],
+      gameOver: false,
+      winners: [],
+      cribSeedCard: null,
+      cribSelections: {},
+      cribConfirmed: {},
+    };
+    for (const p of s.players) {
+      s.cribSelections[p.id] = [];
+      s.cribConfirmed[p.id] = false;
+    }
+
+    s = processCribbageAction(s, { type: 'advance-pegging-hand-end-reveal' }, '') as CribbageState;
+    expect(s.peggingHandEndReveal).toBeNull();
+    expect(s.gameOver).toBe(true);
+    expect(s.phase).toBe('show');
+    expect(s.showAppliedSteps).toBe(1);
+    expect(s.playerScores[1]).toBe(base.targetScore);
+    expect(s.winners).toContain(s.players[1].id);
+
+    s = processCribbageAction(s, { type: 'advance-show' }, '') as CribbageState;
+    expect(s.phase).toBe('game-over');
+  });
+
+  it('pegging 31 on final card → winning first hand defers game-over until next advance-show', () => {
+    const base = cutToPegging2p();
+    const h0: Card[] = [
+      { suit: 'clubs', rank: 2 },
+      { suit: 'diamonds', rank: 3 },
+      { suit: 'hearts', rank: 4 },
+      { suit: 'spades', rank: 6 },
+    ];
+    const h1: Card[] = [
+      { suit: 'clubs', rank: 5 },
+      { suit: 'diamonds', rank: 5 },
+      { suit: 'hearts', rank: 10 },
+      { suit: 'spades', rank: 13 },
+    ];
+    const starter: Card = { suit: 'clubs', rank: 5 };
+    const ponePts = scoreShowHand(h1, starter);
+    expect(ponePts).toBeGreaterThan(0);
+
+    const fiveH: Card = { suit: 'hearts', rank: 5 };
+    let s: CribbageState = {
+      ...base,
+      players: base.players.map((p, i) => (i === 0 ? { ...p, hand: [] } : { ...p, hand: [fiveH] })),
+      starterCard: starter,
+      holeCards: [h0, h1],
+      peggingSequence: [
+        { card: { suit: 'hearts', rank: 10 }, playerIndex: 0 },
+        { card: { suit: 'clubs', rank: 10 }, playerIndex: 1 },
+        { card: { suit: 'diamonds', rank: 14 }, playerIndex: 0 },
+        { card: { suit: 'spades', rank: 5 }, playerIndex: 1 },
+      ],
+      peggingRunningTotal: 26,
+      peggingCurrentIndex: 1,
+      consecutivePeggingPasses: 0,
+      lastPeggingPlayerIndex: 0,
+      peggingGoReveal: null,
+      peggingPointsReveal: null,
+      playerScores: [0, base.targetScore - ponePts - 4],
+    };
+    const p1 = s.players[1].id;
+    s = processCribbageAction(s, { type: 'play-pegging-card', card: fiveH }, p1) as CribbageState;
+    expect(s.peggingPointsReveal?.hit31).toBe(true);
+
+    s = processCribbageAction(s, { type: 'advance-pegging-points-reveal' }, '') as CribbageState;
+    expect(s.peggingPointsReveal).toBeNull();
+    expect(s.gameOver).toBe(true);
+    expect(s.phase).toBe('show');
+    expect(s.showAppliedSteps).toBe(1);
+    expect(s.playerScores[1]).toBe(base.targetScore);
+    expect(s.winners).toContain(s.players[1].id);
+
+    s = processCribbageAction(s, { type: 'advance-show' }, '') as CribbageState;
+    expect(s.phase).toBe('game-over');
+  });
+
   it('show winning hand remains visible until next advance finalizes game-over', () => {
     const base = createCribbageState(makePlayers(2)) as CribbageState;
     const h0: Card[] = [

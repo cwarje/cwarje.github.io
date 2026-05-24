@@ -104,6 +104,9 @@ function computeWinners(state: CribbageState): string[] {
 function withWinCheck(state: CribbageState): CribbageState {
   const winners = computeWinners(state);
   if (winners.length === 0) return state;
+  if (state.phase === 'show') {
+    return { ...state, gameOver: true, winners };
+  }
   return { ...state, gameOver: true, phase: 'game-over', winners };
 }
 
@@ -445,20 +448,12 @@ function applyShowStep(state: CribbageState): CribbageState {
     const playerIndex = (pone + step) % n;
     const pts = scoreShowHand(holes[playerIndex], starter);
     const s = addPoints(state, playerIndex, pts);
-    if (s.gameOver) {
-      // Keep show visible for the winning scoring step; finalize game-over on next advance.
-      return { ...s, phase: 'show', showAppliedSteps: step + 1 };
-    }
     return { ...s, showAppliedSteps: step + 1 };
   }
 
   if (step === n) {
     const pts = scoreCribShow(state.cribCards, starter);
     const s = addPoints(state, state.dealerIndex, pts);
-    if (s.gameOver) {
-      // Keep crib scoring step visible even when it ends the game.
-      return { ...s, phase: 'show', showAppliedSteps: step + 1 };
-    }
     return { ...s, showAppliedSteps: step + 1 };
   }
 
@@ -633,7 +628,7 @@ export function processCribbageAction(state: unknown, action: unknown, playerId:
 }
 
 export function isCribbageOver(state: unknown): boolean {
-  return (state as CribbageState).gameOver;
+  return (state as CribbageState).phase === 'game-over';
 }
 
 export function getCribbageWinners(state: unknown): string[] {

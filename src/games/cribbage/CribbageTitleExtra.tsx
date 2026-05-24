@@ -10,6 +10,8 @@ import { CRIB_HUD_FLIP_DURATION_MS, CribHudFlipCard } from '../shared/CribHudFli
 export default function CribbageTitleExtra({ state }: GameHudProps) {
   const s = state as CribbageState;
 
+  if (s.phase === 'game-over') return null;
+
   const owner = cribbageCribOwnerLabel(s);
   const cribLabel = `${owner}'s crib`;
 
@@ -20,7 +22,6 @@ export default function CribbageTitleExtra({ state }: GameHudProps) {
   const showCribStrip =
     s.cribCards.length > 0 &&
     s.phase !== 'game-over' &&
-    !s.gameOver &&
     (fullCrib || show3pSeed);
 
   const faceUpCrib = s.phase === 'show' && fullCrib && s.showAppliedSteps === n + 1;
