@@ -389,12 +389,19 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
       return isPone ? 'Tap a card in the deck to cut' : `Waiting on ${p?.name ?? 'pone'} to cut`;
     }
     if (s.phase === 'pegging') {
+      const wrapPeggingHud = (body: ReactNode, showCount = true) => (
+        <span className="min-w-0 truncate">
+          {body}
+          {showCount && <span className="tabular-nums">{` (${s.peggingRunningTotal})`}</span>}
+        </span>
+      );
+
       const goReveal = s.peggingGoReveal;
       if (goReveal?.stage === 'announce') {
         const p = s.players[goReveal.passerIndex];
         const label = p?.id === myId ? 'You' : p?.name ?? 'Player';
         const goVerb = label === 'You' ? 'say' : 'says';
-        return (
+        return wrapPeggingHud(
           <span className="min-w-0 truncate">
             <span style={{ color: p ? getPlayerHudTextColor(p.color) : undefined }}>{label}</span> {goVerb} go
           </span>
@@ -402,19 +409,20 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
       }
       if (goReveal?.stage === 'score') {
         if (goReveal.lastCardPoints === 0 || goReveal.lastCardScorerIndex === null) {
-          return 'Count reset';
+          return wrapPeggingHud('Count reset');
         }
         if (isTeam && s.teamScores) {
           const ti = teamIndexForSeat(goReveal.lastCardScorerIndex);
-          return `Team ${ti + 1} +${goReveal.lastCardPoints} (last card)`;
+          return wrapPeggingHud(`Team ${ti + 1} +${goReveal.lastCardPoints} (last card)`, false);
         }
         const sp = s.players[goReveal.lastCardScorerIndex];
         const label = sp?.id === myId ? 'You' : sp?.name ?? 'Player';
-        return (
+        return wrapPeggingHud(
           <span className="min-w-0 truncate">
             <span style={{ color: sp ? getPlayerHudTextColor(sp.color) : undefined }}>{label}</span>
             {` +${goReveal.lastCardPoints} (last card)`}
-          </span>
+          </span>,
+          false
         );
       }
       const pointsReveal = s.peggingPointsReveal;
@@ -424,45 +432,48 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
           const ti = teamIndexForSeat(pointsReveal.scorerIndex);
           const sp = s.players[pointsReveal.scorerIndex];
           const label = sp?.id === myId ? 'You' : sp?.name ?? 'Player';
-          return (
+          return wrapPeggingHud(
             <span className="min-w-0 truncate">
               {`Team ${ti + 1} +${pointsReveal.points} (`}
               <span style={{ color: sp ? getPlayerHudTextColor(sp.color) : undefined }}>{label}</span>
               {`) · ${summary}`}
-            </span>
+            </span>,
+            false
           );
         }
         const sp = s.players[pointsReveal.scorerIndex];
         const label = sp?.id === myId ? 'You' : sp?.name ?? 'Player';
-        return (
+        return wrapPeggingHud(
           <span className="min-w-0 truncate">
             <span style={{ color: sp ? getPlayerHudTextColor(sp.color) : undefined }}>{label}</span>
             {` +${pointsReveal.points} (${summary})`}
-          </span>
+          </span>,
+          false
         );
       }
       const handEndReveal = s.peggingHandEndReveal;
       if (handEndReveal) {
         if (isTeam && s.teamScores) {
           const ti = teamIndexForSeat(handEndReveal.scorerIndex);
-          return `Team ${ti + 1} +1 (last card)`;
+          return wrapPeggingHud(`Team ${ti + 1} +1 (last card)`, false);
         }
         const sp = s.players[handEndReveal.scorerIndex];
         const label = sp?.id === myId ? 'You' : sp?.name ?? 'Player';
-        return (
+        return wrapPeggingHud(
           <span className="min-w-0 truncate">
             <span style={{ color: sp ? getPlayerHudTextColor(sp.color) : undefined }}>{label}</span>
             {' +1 (last card)'}
-          </span>
+          </span>,
+          false
         );
       }
       const cur = s.players[s.peggingCurrentIndex];
-      if (!cur) return '\u00a0';
+      if (!cur) return wrapPeggingHud('\u00a0');
       const me = cur.id === myId;
       if (me && peggingLegal.length === 0) {
         return (
           <span className="inline-flex items-center justify-center gap-1.5 flex-nowrap max-w-full">
-            <span className="min-w-0 truncate">Say go — you cannot play</span>
+            {wrapPeggingHud('Your turn')}
             <button
               type="button"
               onClick={passPegging}
@@ -473,7 +484,7 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
           </span>
         );
       }
-      return me ? 'Your turn' : `${cur.name}'s turn · ${s.peggingRunningTotal}`;
+      return wrapPeggingHud(me ? 'Your turn' : `${cur.name}'s turn`);
     }
     if (s.phase === 'show') {
       const starter = s.starterCard;
