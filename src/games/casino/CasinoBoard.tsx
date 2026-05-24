@@ -29,6 +29,7 @@ import {
   PLAYER_COLOR_HEX,
   getPlayerHudTextColor,
 } from '../../networking/playerColors';
+import { useLastDealFlash } from './useLastDealFlash';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
   hearts: '\u2665',
@@ -568,8 +569,13 @@ export default function CasinoBoard({
   const shouldShowVirtualTrailRow = canTrailToPlaceholder && !hasEmptyTableSlot;
   const renderedTableRows = s.tableRows + (shouldShowVirtualTrailRow ? 1 : 0);
   const renderedTableSlotCount = renderedTableRows * CASINO_TABLE_COLUMNS;
+  const lastDealFlashing = useLastDealFlash(s);
 
   const headsUpContent = useMemo((): ReactNode => {
+    if (lastDealFlashing) {
+      return 'Last deal';
+    }
+
     if (s.phase === 'announcement' && s.actionAnnouncement) {
       const ann = s.actionAnnouncement;
       const actor = s.players.find(p => p.id === ann.playerId);
@@ -658,7 +664,7 @@ export default function CasinoBoard({
         {"'s turn"}
       </>
     );
-  }, [s, myId, currentPlayer, isMyTurn, selectedHandCard]);
+  }, [s, myId, currentPlayer, isMyTurn, selectedHandCard, lastDealFlashing]);
 
   const renderSeatPill = (layout: CasinoSeatLayout, shouldMeasure = false) => {
     const player = layout.player;
@@ -857,7 +863,9 @@ export default function CasinoBoard({
       </div>
 
       <div className="casino-headsUp" aria-live="polite">
-        <p className="casino-headsUpText">{headsUpContent ?? '\u00a0'}</p>
+        <p className={`casino-headsUpText${lastDealFlashing ? ' casino-lastDealFlash' : ''}`}>
+          {headsUpContent ?? '\u00a0'}
+        </p>
       </div>
 
       {myPlayer && (

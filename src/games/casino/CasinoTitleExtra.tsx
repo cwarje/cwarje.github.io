@@ -1,5 +1,6 @@
 import type { CasinoState } from './types';
 import type { GameHudProps } from '../registry';
+import { useLastDealFlash } from './useLastDealFlash';
 
 const DEAL_WORDS = [
   'First',
@@ -47,6 +48,7 @@ function possessiveName(name: string): string {
 
 export default function CasinoTitleExtra({ state }: GameHudProps) {
   const s = state as CasinoState;
+  const lastDealFlashing = useLastDealFlash(s);
   const dealer = s.players[s.dealerIndex];
   const dealerLabel = dealer ? possessiveName(dealer.name) : "Someone's";
 
@@ -61,7 +63,7 @@ export default function CasinoTitleExtra({ state }: GameHudProps) {
       <p className="text-xs sm:text-sm text-white/80">
         Round {s.roundNumber} ({dealerLabel} deal)
       </p>
-      <p className="text-xs sm:text-sm text-white/80">
+      <p className={`text-xs sm:text-sm text-white/80${lastDealFlashing ? ' casino-lastDealFlash' : ''}`}>
         {dealLine(s.dealNumberInRound ?? 1, s.gameOver, s.deck.length === 0)}
       </p>
       <p className="text-xs text-white/50">{s.deck.length} cards in deck</p>
