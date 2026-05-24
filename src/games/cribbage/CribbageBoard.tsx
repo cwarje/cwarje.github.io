@@ -755,12 +755,12 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
                 <div className="cribbage-center pointer-events-auto flex max-h-full w-full max-w-xl min-h-[120px] flex-col items-center justify-start gap-2 rounded-2xl bg-transparent p-3">
                   <CribbagePegBoard targetScore={s.targetScore} sides={pegBoardSides} />
                   <div
-                    className="w-full shrink-0 flex flex-col items-center justify-center overflow-visible"
-                    style={{ minHeight: centerFanSlotHeight }}
+                    className="w-full shrink-0 min-h-0 flex flex-col items-center justify-center overflow-hidden"
+                    style={{ height: centerFanSlotHeight }}
                   >
                     {s.phase === 'cut-starter' && s.stock.length > 0 && (
-                      <div className="w-full">
-                        <div className="cribbage-stockFanScroll w-full flex justify-center">
+                      <div className="w-full h-full min-h-0">
+                        <div className="cribbage-stockFanScroll w-full h-full flex justify-center">
                           <div
                             className={`hearts-hand cribbage-stockFanHost ${isHandZoomed ? 'hearts-hand--zoom' : ''}`}
                             style={{ minHeight: 0 }}
@@ -844,8 +844,8 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
                     )}
 
                     {s.phase === 'pegging' && (
-                      <div className="w-full">
-                        <div className="flex justify-center min-h-0 w-full">
+                      <div className="w-full h-full min-h-0">
+                        <div className="flex justify-center min-h-0 h-full w-full">
                           <div
                             className={`hearts-hand cribbage-peggingFanHost ${isHandZoomed ? 'hearts-hand--zoom' : ''}`}
                             style={{ minHeight: 0 }}

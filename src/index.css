@@ -450,22 +450,24 @@
 /* Pegging fan reuses .hearts-hand for zoom typography; avoid tall empty min-height in center. */
 .cribbage-board .cribbage-peggingFanHost.hearts-hand {
   min-height: 0;
+  height: 100%;
   width: auto;
   max-width: 100%;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .cribbage-board .cribbage-stockFanHost.hearts-hand {
   min-height: 0;
+  height: 100%;
   width: auto;
   max-width: 100%;
 }
 
 .cribbage-board .cribbage-stockFanScroll {
   max-width: 100%;
+  height: 100%;
   overflow-x: auto;
-  overflow-y: visible;
-  padding-bottom: 4px;
+  overflow-y: hidden;
 }
 
 .cribbage-board .hearts-card.cribbage-stockCardBack {
