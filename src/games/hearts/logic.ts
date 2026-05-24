@@ -348,6 +348,22 @@ function cardsOfSuit(cards: Card[], suit: Suit): Card[] {
   return cards.filter(card => card.suit === suit);
 }
 
+type SpadePassPolicy = 'keep' | 'shortSuit';
+
+function getSpadePassPolicy(hand: Card[]): SpadePassPolicy {
+  const spades = cardsOfSuit(hand, 'spades');
+  const count = spades.length;
+  if (count >= 3) return 'keep';
+  if (count === 2) return spades.some(s => s.rank >= 12) ? 'shortSuit' : 'keep';
+  if (count === 1) return 'shortSuit';
+  return 'keep';
+}
+
+function canPassSpade(hand: Card[], card: Card): boolean {
+  if (card.suit !== 'spades') return true;
+  return getSpadePassPolicy(hand) === 'shortSuit';
+}
+
 function sortByRankAsc(cards: Card[]): Card[] {
   return [...cards].sort((a, b) => a.rank - b.rank);
 }
@@ -413,17 +429,23 @@ function getHigherUnseenCount(state: HeartsState, hand: Card[], card: Card): num
 }
 
 function getPassCardRisk(state: HeartsState, hand: Card[], card: Card): number {
+  if (card.suit === 'spades' && !canPassSpade(hand, card)) return Number.NEGATIVE_INFINITY;
+
   let risk = rankWeight(card.rank) * 18;
   const suitCounts = countBySuit(hand);
   const isNearEndgame = state.players.some(p => p.totalScore >= 85);
+  const spadePolicy = getSpadePassPolicy(hand);
 
-  if (card.suit === 'spades' && card.rank === 12) risk += 100;
-  if (card.suit === 'spades' && (card.rank === 13 || card.rank === 14) && hasCard(hand, 'spades', 12)) risk += 35;
+  if (card.suit === 'spades' && spadePolicy === 'shortSuit') {
+    if (card.rank === 12) risk += 100;
+    if ((card.rank === 13 || card.rank === 14) && hasCard(hand, 'spades', 12)) risk += 35;
+    risk += 50;
+  }
   if (card.suit === 'hearts') risk += rankWeight(card.rank) * 28;
   if (card.rank >= 11 && card.suit !== 'clubs') risk += 8;
   if (isNearEndgame) risk += cardPoints(card) * 20;
 
-  if (suitCounts[card.suit] <= 2) risk += 6;
+  if (suitCounts[card.suit] <= 2 && !(card.suit === 'spades' && spadePolicy === 'keep')) risk += 6;
   if (card.suit === 'clubs' && card.rank <= 5) risk -= 8;
   if (card.suit === 'diamonds' && card.rank <= 5) risk -= 5;
 
@@ -445,8 +467,10 @@ export function chooseHeartsPassCards(state: HeartsState, playerIndex: number): 
     for (const card of workingHand) {
       let score = getPassCardRisk(state, workingHand, card);
       const postRemovalSuitCount = suitCounts[card.suit] - 1;
-      if (postRemovalSuitCount === 0 && card.suit !== 'clubs') score += 7;
-      if (postRemovalSuitCount === 0 && card.suit === 'clubs' && state.trickNumber <= 3) score -= 4;
+      const voidsSuit = postRemovalSuitCount === 0;
+      if (voidsSuit && card.suit === 'spades' && canPassSpade(workingHand, card)) score += 7;
+      else if (voidsSuit && card.suit !== 'clubs' && card.suit !== 'spades') score += 7;
+      if (voidsSuit && card.suit === 'clubs' && state.trickNumber <= 3) score -= 4;
       if (state.passDirection === 'across') score += rankWeight(card.rank) * 5;
       if (state.passDirection === 'none') score -= 1000;
 

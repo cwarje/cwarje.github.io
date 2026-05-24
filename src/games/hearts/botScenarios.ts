@@ -44,6 +44,19 @@ function baseState(player0Hand: Card[]): HeartsState {
   };
 }
 
+function passState(hand: Card[]): HeartsState {
+  return {
+    ...baseState(hand),
+    phase: 'passing' as const,
+    passDirection: 'left' as const,
+    trickNumber: 1,
+  };
+}
+
+function countPassedSpades(selected: Card[]): number {
+  return selected.filter(c => c.suit === 'spades').length;
+}
+
 function passScenario(): HeartsBotScenarioResult {
   const hand: Card[] = [
     card('spades', 12),
@@ -61,21 +74,149 @@ function passScenario(): HeartsBotScenarioResult {
     card('spades', 7),
   ];
 
-  const state = {
-    ...baseState(hand),
-    phase: 'passing' as const,
-    passDirection: 'left' as const,
-    trickNumber: 1,
-  };
-
-  const selected = chooseHeartsPassCards(state, 0);
-  const hasQos = selected.some(c => c.suit === 'spades' && c.rank === 12);
+  const selected = chooseHeartsPassCards(passState(hand), 0);
+  const spadesPassed = countPassedSpades(selected);
   const hasHighHeart = selected.some(c => c.suit === 'hearts' && c.rank >= 12);
-  const passed = selected.length === 3 && hasQos && hasHighHeart;
+  const passed = selected.length === 3 && spadesPassed === 0 && hasHighHeart;
   return {
     name: 'passing-selects-danger-cards',
     passed,
-    details: passed ? 'Selected 3 cards including Q♠ and high heart.' : `Unexpected pass: ${JSON.stringify(selected)}`,
+    details: passed ? 'Selected 3 cards with no spades and high hearts.' : `Unexpected pass: ${JSON.stringify(selected)}`,
+  };
+}
+
+function passKeepsSpadesWithQueenScenario(): HeartsBotScenarioResult {
+  const hand: Card[] = [
+    card('spades', 12),
+    card('spades', 3),
+    card('spades', 7),
+    card('hearts', 14),
+    card('hearts', 13),
+    card('hearts', 10),
+    card('clubs', 2),
+    card('clubs', 5),
+    card('clubs', 9),
+    card('diamonds', 3),
+    card('diamonds', 7),
+    card('diamonds', 11),
+    card('diamonds', 4),
+  ];
+
+  const selected = chooseHeartsPassCards(passState(hand), 0);
+  const passed = selected.length === 3 && countPassedSpades(selected) === 0;
+  return {
+    name: 'pass-keeps-spades-with-queen',
+    passed,
+    details: passed ? 'Kept all 3 spades with Q♠.' : `Unexpected pass: ${JSON.stringify(selected)}`,
+  };
+}
+
+function passKeepsTwoLowSpadesScenario(): HeartsBotScenarioResult {
+  const hand: Card[] = [
+    card('spades', 3),
+    card('spades', 7),
+    card('hearts', 14),
+    card('hearts', 13),
+    card('hearts', 10),
+    card('clubs', 2),
+    card('clubs', 5),
+    card('clubs', 9),
+    card('diamonds', 3),
+    card('diamonds', 7),
+    card('diamonds', 11),
+    card('diamonds', 4),
+    card('clubs', 8),
+  ];
+
+  const selected = chooseHeartsPassCards(passState(hand), 0);
+  const passed = selected.length === 3 && countPassedSpades(selected) === 0;
+  return {
+    name: 'pass-keeps-two-low-spades',
+    passed,
+    details: passed ? 'Kept both low spades.' : `Unexpected pass: ${JSON.stringify(selected)}`,
+  };
+}
+
+function passBothSpadesWithQueenAndLowScenario(): HeartsBotScenarioResult {
+  const hand: Card[] = [
+    card('spades', 12),
+    card('spades', 3),
+    card('hearts', 14),
+    card('hearts', 13),
+    card('hearts', 10),
+    card('clubs', 2),
+    card('clubs', 5),
+    card('clubs', 9),
+    card('diamonds', 3),
+    card('diamonds', 7),
+    card('diamonds', 11),
+    card('diamonds', 4),
+    card('clubs', 8),
+  ];
+
+  const selected = chooseHeartsPassCards(passState(hand), 0);
+  const hasQos = selected.some(c => c.suit === 'spades' && c.rank === 12);
+  const hasLowSpade = selected.some(c => c.suit === 'spades' && c.rank === 3);
+  const passed = selected.length === 3 && hasQos && hasLowSpade;
+  return {
+    name: 'pass-both-spades-with-queen-and-low',
+    passed,
+    details: passed ? 'Passed both Q♠ and low spade.' : `Unexpected pass: ${JSON.stringify(selected)}`,
+  };
+}
+
+function passBothSpadesKingAceScenario(): HeartsBotScenarioResult {
+  const hand: Card[] = [
+    card('spades', 13),
+    card('spades', 14),
+    card('hearts', 14),
+    card('hearts', 13),
+    card('hearts', 10),
+    card('clubs', 2),
+    card('clubs', 5),
+    card('clubs', 9),
+    card('diamonds', 3),
+    card('diamonds', 7),
+    card('diamonds', 11),
+    card('diamonds', 4),
+    card('clubs', 8),
+  ];
+
+  const selected = chooseHeartsPassCards(passState(hand), 0);
+  const hasKing = selected.some(c => c.suit === 'spades' && c.rank === 13);
+  const hasAce = selected.some(c => c.suit === 'spades' && c.rank === 14);
+  const passed = selected.length === 3 && hasKing && hasAce;
+  return {
+    name: 'pass-both-spades-king-ace',
+    passed,
+    details: passed ? 'Passed both K♠ and A♠.' : `Unexpected pass: ${JSON.stringify(selected)}`,
+  };
+}
+
+function passShortSuitsLoneSpadeScenario(): HeartsBotScenarioResult {
+  const hand: Card[] = [
+    card('spades', 12),
+    card('hearts', 14),
+    card('hearts', 13),
+    card('hearts', 10),
+    card('clubs', 2),
+    card('clubs', 5),
+    card('clubs', 9),
+    card('diamonds', 3),
+    card('diamonds', 7),
+    card('diamonds', 11),
+    card('diamonds', 4),
+    card('clubs', 8),
+    card('clubs', 6),
+  ];
+
+  const selected = chooseHeartsPassCards(passState(hand), 0);
+  const hasQos = selected.some(c => c.suit === 'spades' && c.rank === 12);
+  const passed = selected.length === 3 && hasQos;
+  return {
+    name: 'pass-short-suits-lone-spade',
+    passed,
+    details: passed ? 'Passed lone Q♠ to short suit.' : `Unexpected pass: ${JSON.stringify(selected)}`,
   };
 }
 
@@ -347,6 +488,11 @@ function spadesLowestWinnerWhenQosUnseenScenario(): HeartsBotScenarioResult {
 export function runHeartsBotScenarioChecks(): HeartsBotScenarioResult[] {
   return [
     passScenario(),
+    passKeepsSpadesWithQueenScenario(),
+    passKeepsTwoLowSpadesScenario(),
+    passBothSpadesWithQueenAndLowScenario(),
+    passBothSpadesKingAceScenario(),
+    passShortSuitsLoneSpadeScenario(),
     followSuitAvoidWinScenario(),
     dumpQosWhenSafeScenario(),
     moonDefenseAvoidPointDumpScenario(),
