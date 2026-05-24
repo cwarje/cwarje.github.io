@@ -67,6 +67,10 @@ function cardEquals(a: Card, b: Card): boolean {
   return a.suit === b.suit && a.rank === b.rank;
 }
 
+function cardKey(card: Card): string {
+  return `${card.suit}-${card.rank}`;
+}
+
 function getSeatForPlayerIndex(playerIndex: number, myIndex: number, playerCount: number): Seat {
   const relative = (playerIndex - myIndex + playerCount) % playerCount;
   return SEATS[relative] ?? 'bottom';
@@ -92,6 +96,9 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
   const isMyTurn = state.currentPlayerIndex === myIndex;
   const handContainerRef = useRef<HTMLDivElement>(null);
   const [handWidth, setHandWidth] = useState(360);
+  const handBeforePassRef = useRef<Card[]>([]);
+  const prevPhaseRef = useRef(state.phase);
+  const [receivedCardKeys, setReceivedCardKeys] = useState<Set<string>>(() => new Set());
 
   const selectedPass = state.passSelections[myId] || [];
   const myPassConfirmed = state.passConfirmed[myId] || false;
@@ -132,6 +139,25 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
     resizeObserver.observe(element);
     return () => resizeObserver.disconnect();
   }, []);
+
+  useEffect(() => {
+    const prevPhase = prevPhaseRef.current;
+    prevPhaseRef.current = state.phase;
+
+    if (prevPhase === 'passing' && state.phase === 'playing' && state.passDirection !== 'none') {
+      const before = handBeforePassRef.current;
+      const after = myPlayer?.hand ?? [];
+      const received = after.filter(c => !before.some(b => cardEquals(b, c)));
+      if (received.length > 0) {
+        setReceivedCardKeys(new Set(received.map(cardKey)));
+      }
+    }
+
+    if (state.phase === 'passing') {
+      handBeforePassRef.current = myPlayer?.hand ?? [];
+      setReceivedCardKeys(new Set());
+    }
+  }, [state.phase, state.passDirection, myPlayer?.hand]);
 
   const trickBySeat = useMemo(() => {
     const mapped: Partial<Record<Seat, { playerId: string; card: Card }>> = {};
@@ -254,9 +280,9 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
     );
   };
 
-  const renderCardFace = (card: Card, disabled = false, selected = false, compact = false) => (
+  const renderCardFace = (card: Card, disabled = false, selected = false, compact = false, received = false) => (
     <div
-      className={`hearts-card ${disabled ? 'hearts-card--disabled' : ''} ${selected ? 'hearts-card--selected' : ''} ${compact ? 'hearts-card--compact' : ''}`}
+      className={`hearts-card ${disabled ? 'hearts-card--disabled' : ''} ${selected ? 'hearts-card--selected' : ''} ${compact ? 'hearts-card--compact' : ''} ${received ? 'hearts-card--received' : ''}`}
     >
       <div className="hearts-cardCorner">
         <span className={`hearts-cardRank ${SUIT_COLORS[card.suit]}`}>{rankDisplay(card.rank)}</span>
@@ -384,6 +410,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
                 const isDisabled = !isPassing && !canPlay;
                 const isLast = i === myPlayer.hand.length - 1;
                 const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
+                const isReceived = receivedCardKeys.has(cardKey(card));
 
                 return (
                   <motion.button
@@ -413,7 +440,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
                         transform: isSelectedForPass ? `translateY(-${handLayout.selectedLift}px)` : 'translateY(0px)',
                       }}
                     >
-                      {renderCardFace(card, isDisabled, isSelectedForPass)}
+                      {renderCardFace(card, isDisabled, isSelectedForPass, false, isReceived)}
                     </span>
                   </motion.button>
                 );

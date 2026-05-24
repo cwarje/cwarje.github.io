@@ -576,6 +576,26 @@
   background: #c8c8c8;
 }
 
+.hearts-card--received {
+  animation: heartsCardReceivedBorderFade 10s linear forwards;
+}
+
+@keyframes heartsCardReceivedBorderFade {
+  from {
+    border-color: #fde68a;
+  }
+
+  to {
+    border-color: #111827;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hearts-card--received {
+    animation: none;
+  }
+}
+
 .hearts-cardRank {
   display: block;
   width: 100%;
