@@ -59,26 +59,19 @@ function peggingPairPoints(sequence: PeggingPlay[]): number {
   return 0;
 }
 
-/** Longest strict monotonic run length ending at last card (≥3 to score). */
+/** Longest run length ending at last card (≥3 to score); play order ignored. */
 function peggingRunPoints(sequence: PeggingPlay[]): number {
   const n = sequence.length;
   if (n < 3) return 0;
   let best = 0;
   for (let len = Math.min(n, 7); len >= 3; len--) {
-    const slice = sequence.slice(n - len);
-    const ranks = slice.map(p => rankForRun(p.card.rank));
-    let inc = true;
-    let dec = true;
-    for (let i = 1; i < ranks.length; i++) {
-      const d = ranks[i] - ranks[i - 1];
-      if (d !== 1) inc = false;
-      if (d !== -1) dec = false;
-    }
-    if (!inc && !dec) continue;
-    const sorted = [...ranks].sort((a, b) => a - b);
+    const ranks = sequence
+      .slice(n - len)
+      .map(p => rankForRun(p.card.rank))
+      .sort((a, b) => a - b);
     let consec = true;
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i] !== sorted[i - 1] + 1) {
+    for (let i = 1; i < ranks.length; i++) {
+      if (ranks[i] !== ranks[i - 1] + 1) {
         consec = false;
         break;
       }

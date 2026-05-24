@@ -43,6 +43,25 @@ describe('cribbage rules', () => {
     expect(points).toBe(3);
   });
 
+  it('pegging run of three out of sequence (7-9-8)', () => {
+    const before: PeggingPlay[] = [
+      { card: c('hearts', 7), playerIndex: 0 },
+      { card: c('clubs', 9), playerIndex: 1 },
+    ];
+    const b = peggingPlayScoreBreakdown(before, { card: c('diamonds', 8), playerIndex: 0 });
+    expect(b.points).toBe(3);
+    expect(b.summaryParts).toEqual(['Run of 3 for 3']);
+  });
+
+  it('pegging run of three out of sequence (7-5-6)', () => {
+    const before: PeggingPlay[] = [
+      { card: c('hearts', 7), playerIndex: 0 },
+      { card: c('clubs', 5), playerIndex: 1 },
+    ];
+    const { points } = scorePeggingPlay(before, { card: c('diamonds', 6), playerIndex: 0 });
+    expect(points).toBe(3);
+  });
+
   it('pegging breakdown: 31 plus pair', () => {
     const before: PeggingPlay[] = [
       { card: c('hearts', 10), playerIndex: 0 },
