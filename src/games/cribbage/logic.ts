@@ -654,6 +654,21 @@ export function cribbageCribOwnerLabel(state: CribbageState): string {
   return `${state.players[a].name} & ${state.players[b].name}`;
 }
 
+/** Hands confirmed during show phase, oldest first (pone order). */
+export function getShelvedShowHands(
+  state: CribbageState
+): { seat: number; cards: Card[]; player: CribbagePlayer }[] {
+  if (state.phase !== 'show' || !state.holeCards || state.showAppliedSteps <= 1) return [];
+  const n = state.players.length;
+  const pone = poneIndex(state.dealerIndex, n);
+  const count = Math.min(state.showAppliedSteps - 1, n);
+  return Array.from({ length: count }, (_, i) => {
+    const step = i + 1;
+    const seat = (pone + step - 1) % n;
+    return { seat, cards: state.holeCards![seat], player: state.players[seat] };
+  });
+}
+
 function chooseCribDiscard(state: CribbageState, seat: number): Card[] {
   const need = cribCardsToSelect(state.players.length);
   const hand = [...state.players[seat].hand];

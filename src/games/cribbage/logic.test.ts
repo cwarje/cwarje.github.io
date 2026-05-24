@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Player } from '../../networking/types';
 import type { Card } from '../cross-crib/types';
-import { classifyCribbageSkunk, createCribbageState, getCribbageSkunkThresholds, processCribbageAction } from './logic';
+import { classifyCribbageSkunk, createCribbageState, getCribbageSkunkThresholds, getShelvedShowHands, processCribbageAction } from './logic';
 import { scoreCribShow, scoreShowHand } from './rules';
 import { cribCardsToSelect, cardsDealtPerPlayer, type CribbageState } from './types';
 
@@ -419,6 +419,43 @@ describe('cribbage logic', () => {
     expect(s.phase).toBe('crib-discard');
     expect(s.showAppliedSteps).toBe(0);
     expect(s.dealerIndex).toBe(1);
+  });
+
+  it('getShelvedShowHands returns confirmed hands in pone order', () => {
+    const base = createCribbageState(makePlayers(2)) as CribbageState;
+    const h0: Card[] = [
+      { suit: 'clubs', rank: 2 },
+      { suit: 'diamonds', rank: 3 },
+      { suit: 'hearts', rank: 4 },
+      { suit: 'spades', rank: 5 },
+    ];
+    const h1: Card[] = [
+      { suit: 'clubs', rank: 6 },
+      { suit: 'diamonds', rank: 7 },
+      { suit: 'hearts', rank: 8 },
+      { suit: 'spades', rank: 9 },
+    ];
+    let s: CribbageState = {
+      ...base,
+      phase: 'show',
+      dealerIndex: 0,
+      players: base.players.map(p => ({ ...p, hand: [] })),
+      starterCard: { suit: 'clubs', rank: 10 },
+      holeCards: [h0, h1],
+      cribCards: [],
+      showAppliedSteps: 1,
+    };
+
+    expect(getShelvedShowHands(s)).toEqual([]);
+
+    s = { ...s, showAppliedSteps: 2 };
+    expect(getShelvedShowHands(s)).toEqual([{ seat: 1, cards: h1, player: s.players[1] }]);
+
+    s = { ...s, showAppliedSteps: 3 };
+    expect(getShelvedShowHands(s)).toEqual([
+      { seat: 1, cards: h1, player: s.players[1] },
+      { seat: 0, cards: h0, player: s.players[0] },
+    ]);
   });
 
   it('dev-set-near-win sets only acting player near target in non-team games', () => {
