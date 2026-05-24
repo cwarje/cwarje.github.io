@@ -386,6 +386,10 @@ function getCurrentTrickPoints(state: HeartsState): number {
   return state.currentTrick.reduce((sum, entry) => sum + cardPoints(entry.card), 0);
 }
 
+function isFirstTrickSloughRound(state: HeartsState): boolean {
+  return state.trickNumber === 1 && getCurrentTrickPoints(state) === 0;
+}
+
 /** When we must win the trick (no duck), play high to slough only if the trick is still point-free and spades cannot still pull in Q♠. */
 function shouldSloughHighWhenWinningTrick(state: HeartsState, leadSuit: Suit): boolean {
   if (getCurrentTrickPoints(state) !== 0) return false;
@@ -497,6 +501,10 @@ function chooseFollowSuitCard(state: HeartsState, suitCards: Card[], myPlayer: H
   const currentLeader = getCurrentTrickLeaderId(state);
   const isNearEndgame = myPlayer.totalScore >= 85;
 
+  if (isFirstTrickSloughRound(state)) {
+    return sortedSuitCards[sortedSuitCards.length - 1];
+  }
+
   if (underCards.length > 0) {
     if (moonThreatPlayerId && currentLeader === moonThreatPlayerId && trickPoints > 0 && winningCards.length > 0 && !isNearEndgame) {
       return winningCards[0];
@@ -520,6 +528,10 @@ function chooseDiscardCard(state: HeartsState, validCards: Card[], myPlayer: Hea
   const nonPointCards = validCards.filter(card => cardPoints(card) === 0);
 
   if (shouldAvoidGivingPoints && nonPointCards.length > 0) {
+    return sortByRankDesc(nonPointCards)[0];
+  }
+
+  if (isFirstTrickSloughRound(state) && nonPointCards.length > 0) {
     return sortByRankDesc(nonPointCards)[0];
   }
 

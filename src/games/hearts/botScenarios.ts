@@ -212,6 +212,105 @@ function zeroPointDiamondDumpHighScenario(): HeartsBotScenarioResult {
   };
 }
 
+/** Trick 1, 2♣ led: can duck with 3♣ but should slough highest club (zero-point trick). */
+function trickOneSloughHighClubWhenCanDuckScenario(): HeartsBotScenarioResult {
+  const hand: Card[] = [
+    card('clubs', 3),
+    card('clubs', 13),
+    card('diamonds', 2),
+    card('diamonds', 4),
+    card('diamonds', 6),
+    card('spades', 5),
+    card('spades', 7),
+    card('hearts', 9),
+    card('hearts', 10),
+    card('hearts', 11),
+    card('hearts', 12),
+    card('hearts', 13),
+    card('hearts', 14),
+  ];
+  const state = baseState(hand);
+  state.trickNumber = 1;
+  state.heartsBroken = false;
+  state.currentTrick = [{ playerId: 'p1', card: card('clubs', 2) }];
+  state.currentPlayerIndex = 0;
+
+  const chosen = chooseHeartsPlayCard(state, 0);
+  const expected = card('clubs', 13);
+  const passed = sameCard(chosen, expected);
+  return {
+    name: 'trick-one-sloughs-high-club-when-can-duck',
+    passed,
+    details: passed ? 'Played K♣ instead of ducking with 3♣ on first trick.' : `Expected K♣ but got ${JSON.stringify(chosen)}`,
+  };
+}
+
+/** Trick 1, void in clubs: slough highest spade. */
+function trickOneVoidSloughsHighSpadeScenario(): HeartsBotScenarioResult {
+  const hand: Card[] = [
+    card('spades', 13),
+    card('diamonds', 2),
+    card('diamonds', 4),
+    card('diamonds', 6),
+    card('diamonds', 8),
+    card('diamonds', 10),
+    card('hearts', 5),
+    card('hearts', 6),
+    card('hearts', 7),
+    card('hearts', 8),
+    card('hearts', 9),
+    card('hearts', 10),
+    card('hearts', 11),
+  ];
+  const state = baseState(hand);
+  state.trickNumber = 1;
+  state.heartsBroken = false;
+  state.currentTrick = [{ playerId: 'p1', card: card('clubs', 2) }];
+  state.currentPlayerIndex = 0;
+
+  const chosen = chooseHeartsPlayCard(state, 0);
+  const expected = card('spades', 13);
+  const passed = sameCard(chosen, expected);
+  return {
+    name: 'trick-one-void-sloughs-high-spade',
+    passed,
+    details: passed ? 'Played K♠ while void on first trick.' : `Expected K♠ but got ${JSON.stringify(chosen)}`,
+  };
+}
+
+/** Trick 1, void in clubs: play A♠ not K♠ (Q♠ fear does not apply on first trick). */
+function trickOneVoidSloughsAceSpadeScenario(): HeartsBotScenarioResult {
+  const hand: Card[] = [
+    card('spades', 13),
+    card('spades', 14),
+    card('diamonds', 2),
+    card('diamonds', 4),
+    card('diamonds', 6),
+    card('diamonds', 8),
+    card('hearts', 5),
+    card('hearts', 6),
+    card('hearts', 7),
+    card('hearts', 8),
+    card('hearts', 9),
+    card('hearts', 10),
+    card('hearts', 11),
+  ];
+  const state = baseState(hand);
+  state.trickNumber = 1;
+  state.heartsBroken = false;
+  state.currentTrick = [{ playerId: 'p1', card: card('clubs', 2) }];
+  state.currentPlayerIndex = 0;
+
+  const chosen = chooseHeartsPlayCard(state, 0);
+  const expected = card('spades', 14);
+  const passed = sameCard(chosen, expected);
+  return {
+    name: 'trick-one-void-sloughs-ace-spade',
+    passed,
+    details: passed ? 'Played A♠ on first trick (Q♠ cannot be dumped).' : `Expected A♠ but got ${JSON.stringify(chosen)}`,
+  };
+}
+
 /** Spades led, Q♠ still unseen, players follow after us — keep lowest winner so Q♠ cannot be dumped under our A♠. */
 function spadesLowestWinnerWhenQosUnseenScenario(): HeartsBotScenarioResult {
   const hand: Card[] = [
@@ -253,6 +352,9 @@ export function runHeartsBotScenarioChecks(): HeartsBotScenarioResult[] {
     moonDefenseAvoidPointDumpScenario(),
     moonDefenseTakePointTrickScenario(),
     trickOneSloughHighClubScenario(),
+    trickOneSloughHighClubWhenCanDuckScenario(),
+    trickOneVoidSloughsHighSpadeScenario(),
+    trickOneVoidSloughsAceSpadeScenario(),
     zeroPointDiamondDumpHighScenario(),
     spadesLowestWinnerWhenQosUnseenScenario(),
   ];
