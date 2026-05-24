@@ -10,22 +10,9 @@ import { CRIB_HUD_FLIP_DURATION_MS, CribHudFlipCard } from '../shared/CribHudFli
 export default function CribbageTitleExtra({ state }: GameHudProps) {
   const s = state as CribbageState;
 
-  if (s.phase === 'game-over') return null;
-
-  const owner = cribbageCribOwnerLabel(s);
-  const cribLabel = `${owner}'s crib`;
-
   const n = s.players.length;
   const fullCrib = s.cribCards.length === 4;
-  const show3pSeed = n === 3 && s.phase === 'crib-discard' && s.cribCards.length === 1;
-
-  const showCribStrip =
-    s.cribCards.length > 0 &&
-    s.phase !== 'game-over' &&
-    (fullCrib || show3pSeed);
-
   const faceUpCrib = s.phase === 'show' && fullCrib && s.showAppliedSteps === n + 1;
-  const shelvedHands = getShelvedShowHands(s);
   const [cribShowScoreVisible, setCribShowScoreVisible] = useState(false);
 
   useEffect(() => {
@@ -37,6 +24,19 @@ export default function CribbageTitleExtra({ state }: GameHudProps) {
     const t = window.setTimeout(() => setCribShowScoreVisible(true), CRIB_HUD_FLIP_DURATION_MS);
     return () => clearTimeout(t);
   }, [faceUpCrib]);
+
+  if (s.phase === 'game-over') return null;
+
+  const owner = cribbageCribOwnerLabel(s);
+  const cribLabel = `${owner}'s crib`;
+
+  const show3pSeed = n === 3 && s.phase === 'crib-discard' && s.cribCards.length === 1;
+
+  const showCribStrip =
+    s.cribCards.length > 0 &&
+    (fullCrib || show3pSeed);
+
+  const shelvedHands = getShelvedShowHands(s);
 
   return (
     <div className="mt-1 space-y-1.5">
