@@ -60,6 +60,7 @@ import PokerTitleExtra from './poker/PokerTitleExtra';
 import CrossCribTitleExtra from './cross-crib/CrossCribTitleExtra';
 import CribbageTitleExtra from './cribbage/CribbageTitleExtra';
 import CasinoTitleExtra from './casino/CasinoTitleExtra';
+import CasinoToolbarExtra from './casino/CasinoToolbarExtra';
 import UpRiverToolbarExtra from './up-and-down-the-river/UpRiverToolbarExtra';
 import TwelveTitleExtra from './twelve/TwelveTitleExtra';
 import MobilizationTitleExtra from './mobilization/MobilizationTitleExtra';
@@ -769,6 +770,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     Board: CasinoBoard,
     OptionsPanel: CasinoOptions,
     TitleExtra: CasinoTitleExtra,
+    ToolbarExtra: CasinoToolbarExtra,
     fullBoard: true,
     hasHandZoom: true,
     production: true,
