@@ -525,6 +525,172 @@ function compareCardHighFirst(a: Card, b: Card): number {
   return MOBILIZATION_SUIT_ORDER[b.suit] - MOBILIZATION_SUIT_ORDER[a.suit];
 }
 
+function isKingClubs(card: Card): boolean {
+  return card.suit === 'clubs' && card.rank === 13;
+}
+
+function minRankInSuit(hand: Card[], suit: Card['suit']): number | null {
+  let min: number | null = null;
+  for (const c of hand) {
+    if (c.suit === suit && (min === null || c.rank < min)) min = c.rank;
+  }
+  return min;
+}
+
+function tricksRemaining(state: MobilizationState): number {
+  return state.cardsPerTrickRound - state.trickNumber + 1;
+}
+
+function lowestCardInHand(hand: Card[]): Card {
+  return hand.reduce((best, c) => (compareCardLowFirst(c, best) < 0 ? c : best));
+}
+
+function highestOffSuitCard(hand: Card[], leadSuit: Card['suit']): Card | null {
+  const offSuits = hand.filter(c => c.suit !== leadSuit);
+  if (offSuits.length === 0) return null;
+  return offSuits.reduce((best, c) => (compareCardHighFirst(c, best) < 0 ? c : best));
+}
+
+function simulateMinimalFollowTrick(
+  state: MobilizationState,
+  trick: { playerId: string; card: Card }[],
+  after: number[],
+): { playerId: string; card: Card }[] {
+  const full = [...trick];
+  const leadSuit = trick[0]!.card.suit;
+  for (const pi of after) {
+    const hand = state.players[pi]?.hand ?? [];
+    const minRank = minRankInSuit(hand, leadSuit);
+    if (minRank !== null) {
+      const followCard = hand.find(c => c.suit === leadSuit && c.rank === minRank)!;
+      full.push({ playerId: state.players[pi]!.id, card: followCard });
+    } else {
+      const kingClubs = hand.find(isKingClubs);
+      const offSuit = kingClubs ?? highestOffSuitCard(hand, leadSuit);
+      if (offSuit) full.push({ playerId: state.players[pi]!.id, card: offSuit });
+    }
+  }
+  return full;
+}
+
+function simulateFullTrickWithMinimalFollows(
+  state: MobilizationState,
+  playerIndex: number,
+  card: Card,
+): { playerId: string; card: Card }[] {
+  const playerId = state.players[playerIndex]!.id;
+  const after = playerIndicesAfterCurrentInTrick(state);
+  if (state.currentTrick.length === 0) {
+    return simulateMinimalFollowTrick(state, [{ playerId, card }], after);
+  }
+  return simulateMinimalFollowTrick(state, [...state.currentTrick, { playerId, card }], after);
+}
+
+function filterRound3Candidates(
+  state: MobilizationState,
+  playerIndex: number,
+  valid: Card[],
+): Card[] {
+  const hand = state.players[playerIndex]?.hand ?? [];
+
+  if (state.currentTrick.length === 0) {
+    const nonKingClubs = valid.filter(c => !isKingClubs(c));
+    return nonKingClubs.length > 0 ? nonKingClubs : valid;
+  }
+
+  const leadSuit = state.currentTrick[0]!.card.suit;
+  if (leadSuit === 'clubs' && hand.some(c => c.suit === 'clubs' && !isKingClubs(c))) {
+    const withoutKingClubs = valid.filter(c => !isKingClubs(c));
+    return withoutKingClubs.length > 0 ? withoutKingClubs : valid;
+  }
+
+  return valid;
+}
+
+type Round3CandidateMetrics = { penalty: number; wins: boolean };
+
+function isBetterRound3Candidate(
+  card: Card,
+  best: Card,
+  handLowest: Card,
+  retainLow: boolean,
+  metrics: Round3CandidateMetrics,
+  bestMetrics: Round3CandidateMetrics,
+): boolean {
+  if (metrics.penalty !== bestMetrics.penalty) return metrics.penalty < bestMetrics.penalty;
+
+  if (retainLow && metrics.penalty === 0) {
+    const cardIsLowest = cardEquals(card, handLowest);
+    const bestIsLowest = cardEquals(best, handLowest);
+    if (cardIsLowest !== bestIsLowest) return !cardIsLowest;
+  }
+
+  return compareCardHighFirst(card, best) < 0;
+}
+
+function evaluateRound3Candidate(
+  state: MobilizationState,
+  playerIndex: number,
+  card: Card,
+): Round3CandidateMetrics {
+  const playerId = state.players[playerIndex]!.id;
+  const fullTrick = simulateFullTrickWithMinimalFollows(state, playerIndex, card);
+  const wins = getMobilizationTrickWinnerId(fullTrick) === playerId;
+  const penalty = wins ? trickPenaltyIfWeWin(state, playerIndex, fullTrick) : 0;
+  return { penalty, wins };
+}
+
+function chooseRound3LastSeat(
+  state: MobilizationState,
+  playerIndex: number,
+  candidates: Card[],
+  playerId: string,
+): Card {
+  let best = candidates[0]!;
+  let bestPenalty = (() => {
+    const full = [...state.currentTrick, { playerId, card: best }];
+    const w = getMobilizationTrickWinnerId(full);
+    return w === playerId ? trickPenaltyIfWeWin(state, playerIndex, full) : 0;
+  })();
+
+  for (let i = 1; i < candidates.length; i++) {
+    const card = candidates[i]!;
+    const fullTrick = [...state.currentTrick, { playerId, card }];
+    const winnerId = getMobilizationTrickWinnerId(fullTrick);
+    const penalty = winnerId === playerId ? trickPenaltyIfWeWin(state, playerIndex, fullTrick) : 0;
+    if (penalty < bestPenalty || (penalty === bestPenalty && compareCardLowFirst(card, best) < 0)) {
+      best = card;
+      bestPenalty = penalty;
+    }
+  }
+
+  return best;
+}
+
+function chooseRound3MidTrick(
+  state: MobilizationState,
+  playerIndex: number,
+  candidates: Card[],
+  hand: Card[],
+): Card {
+  const handLowest = lowestCardInHand(hand);
+  const retainLow = tricksRemaining(state) > 1;
+
+  let best = candidates[0]!;
+  let bestMetrics = evaluateRound3Candidate(state, playerIndex, best);
+
+  for (let i = 1; i < candidates.length; i++) {
+    const card = candidates[i]!;
+    const metrics = evaluateRound3Candidate(state, playerIndex, card);
+    if (isBetterRound3Candidate(card, best, handLowest, retainLow, metrics, bestMetrics)) {
+      best = card;
+      bestMetrics = metrics;
+    }
+  }
+
+  return best;
+}
+
 /** Penalty if we win this trick (minimize in rounds 0–3; round 5 uses negative penalty). */
 function trickPenaltyIfWeWin(
   state: MobilizationState,
@@ -640,17 +806,6 @@ function compareSloughDesirable(roundIndex: number, a: Card, b: Card): number {
       if (aq !== bq) return aq - bq;
       return compareCardLowFirst(a, b);
     }
-    case 3: {
-      const tier = (c: Card) => {
-        if (c.suit === 'clubs' && c.rank === 13) return 2;
-        if (c.suit === 'clubs') return 1;
-        return 0;
-      };
-      const ta = tier(a);
-      const tb = tier(b);
-      if (ta !== tb) return tb - ta;
-      return compareCardLowFirst(a, b);
-    }
     default:
       return compareCardLowFirst(a, b);
   }
@@ -663,9 +818,15 @@ function chooseTrickCard(state: MobilizationState, playerIndex: number): Card | 
 
   const playerId = state.players[playerIndex].id;
   const completesTrick = state.currentTrick.length + 1 === state.players.length;
+  const r = state.roundIndex;
+
+  if (r === 3) {
+    const candidates = filterRound3Candidates(state, playerIndex, valid);
+    if (completesTrick) return chooseRound3LastSeat(state, playerIndex, candidates, playerId);
+    return chooseRound3MidTrick(state, playerIndex, candidates, hand);
+  }
 
   if (!completesTrick) {
-    const r = state.roundIndex;
     if (r === 5) {
       let best = valid[0]!;
       for (let i = 1; i < valid.length; i++) {
@@ -674,7 +835,7 @@ function chooseTrickCard(state: MobilizationState, playerIndex: number): Card | 
       }
       return best;
     }
-    if (r >= 0 && r <= 3) {
+    if (r >= 0 && r <= 2) {
       if (r === 1 && state.currentTrick.length > 0) {
         const leadSuit = state.currentTrick[0]!.card.suit;
         const canFollowLead = hand.some(c => c.suit === leadSuit);
