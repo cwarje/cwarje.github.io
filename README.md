@@ -14,7 +14,6 @@ Current game types (from `src/games/registry.ts` and `src/networking/types.ts`):
 - `farkle` (2-6 players; target score 3000, 5000, or 10000)
 - `hearts` (4 players; target score 50 or 100)
 - `battleship` (2 players)
-- `liars-dice` (2-4 players)
 - `poker` (2-8 players)
 - `up-and-down-the-river` (4-6 players; start order `up-down` or `down-up`)
 - `twelve` (2-4 players; UI title **Tolva** — table piles, pile count 3-6)
@@ -23,7 +22,7 @@ Current game types (from `src/games/registry.ts` and `src/networking/types.ts`):
 
 **Production** home page and game picker use `PRODUCTION_GAME_TYPES` in `registry.ts`: mobilization, casino, yahtzee, hearts, twelve, settler, up-and-down-the-river, farkle, cross-crib, poker.
 
-**Dev-only** (`production: false`): battleship and liars-dice.
+**Dev-only** (`production: false`): battleship.
 
 ## Key features
 

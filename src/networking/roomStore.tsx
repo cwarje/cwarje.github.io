@@ -19,7 +19,6 @@ import type {
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor } from './playerColors';
 import { createInitialGameState, processGameAction, checkGameOver, runSingleBotTurn, getGameWinners } from '../games/gameEngine';
 import type { HeartsState } from '../games/hearts/types';
-import type { LiarsDiceState } from '../games/liars-dice/types';
 import type { PokerState } from '../games/poker/types';
 import type { BattleshipState } from '../games/battleship/types';
 import type { YahtzeeState } from '../games/yahtzee/types';
@@ -157,17 +156,6 @@ function applyProfileToGameState(
     }
     case 'battleship': {
       const current = state as BattleshipState;
-      let changed = false;
-      const players = current.players.map((player) => {
-        if (player.id !== playerId) return player;
-        if (player.name === playerName) return player;
-        changed = true;
-        return { ...player, name: playerName };
-      });
-      return changed ? { ...current, players } : current;
-    }
-    case 'liars-dice': {
-      const current = state as LiarsDiceState;
       let changed = false;
       const players = current.players.map((player) => {
         if (player.id !== playerId) return player;
@@ -1145,7 +1133,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   // Clear error
   const clearError = useCallback(() => setError(null), []);
 
-  // --- Bot turn scheduling (host only, Hearts & Liar's Dice & Poker) ---
+  // --- Bot turn scheduling (host only) ---
   const BOT_PLAY_DELAY = 800;   // ms between each bot card play (Hearts)
   const BATTLESHIP_BOT_DELAY = 800; // ms before bot fires in Battleship
   const YAHTZEE_BOT_ROLL_DELAY = 2000;  // ms between each bot roll in Yahtzee
@@ -1156,10 +1144,6 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const FARKLE_BOT_ROLL_DELAY = 2000; // ms before bot re-rolls
   const FARKLE_FARKLE_DISPLAY_DELAY = 5500; // ms to show farkle roll + message before advancing (animation ~1.2s + 4s message)
   const TRICK_DISPLAY_DELAY = 2000; // ms to show completed trick before collecting
-  const LIARS_DICE_BOT_DELAY = 1200; // ms between bot actions in Liar's Dice
-  const LIARS_DICE_REVEAL_DELAY = 2500; // ms to show reveal before revolver
-  const LIARS_DICE_TRIGGER_DELAY = 1500; // ms before bot pulls trigger
-  const LIARS_DICE_NEXT_ROUND_DELAY = 2000; // ms before starting next round
   const UP_RIVER_BOT_DELAY = 900; // ms between bot bid/card play
   const UP_RIVER_ROUND_END_DELAY = 5000; // ms to show bid result borders before next round
   const MOBILIZATION_BOT_DELAY = 900; // ms between Mobilization bot actions
@@ -1849,87 +1833,6 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         }, CASINO_BOT_DELAY);
       }
       return;
-    }
-
-    // ── Liar's Dice bot scheduling ──
-    if (room.gameType === 'liars-dice') {
-      const lds = gameState as LiarsDiceState;
-      if (lds.phase === 'gameOver') return;
-
-      const runBotStep = (delay: number) => {
-        botTimerRef.current = setTimeout(() => {
-          const currentGs = gameStateRef.current;
-          const currentRoom = roomRef.current;
-          if (!currentGs || !currentRoom) return;
-
-          const next = runSingleBotTurn('liars-dice', currentGs);
-          if (next !== currentGs) {
-            setGameState(next);
-            broadcastGameState(next);
-            if (checkGameOver('liars-dice', next)) {
-              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
-              setRoom(finishedRoom);
-              broadcastRoomState(finishedRoom);
-            }
-          }
-        }, delay);
-      };
-
-      // Rolling phase — bot starter auto-rolls
-      if (lds.phase === 'rolling') {
-        const starter = lds.players[lds.roundStarterIndex];
-        if (starter && starter.isBot) {
-          runBotStep(500);
-        }
-        return;
-      }
-
-      // Bidding phase — bot makes bid, calls liar, or spot on
-      if (lds.phase === 'bidding') {
-        const currentPlayer = lds.players[lds.currentPlayerIndex];
-        if (currentPlayer && currentPlayer.isBot && currentPlayer.alive) {
-          runBotStep(LIARS_DICE_BOT_DELAY);
-        }
-        return;
-      }
-
-      // Revealing phase — auto-transition to revolver after delay
-      if (lds.phase === 'revealing') {
-        botTimerRef.current = setTimeout(() => {
-          const currentGs = gameStateRef.current as LiarsDiceState | null;
-          const currentRoom = roomRef.current;
-          if (!currentGs || !currentRoom || currentGs.phase !== 'revealing') return;
-
-          // Transition to revolver phase
-          const next = { ...currentGs, phase: 'revolver' as const };
-          setGameState(next);
-          broadcastGameState(next);
-        }, LIARS_DICE_REVEAL_DELAY);
-        return;
-      }
-
-      // Revolver phase — bots pull trigger, then advance to next round
-      if (lds.phase === 'revolver' && lds.roundResult) {
-        // Check if a bot needs to pull the trigger
-        const botNeedsTrigger = lds.roundResult.triggerPlayerIds.find(pid => {
-          if (lds.roundResult!.pulledTrigger[pid]) return false;
-          const player = lds.players.find(p => p.id === pid);
-          return player && player.isBot;
-        });
-
-        if (botNeedsTrigger) {
-          runBotStep(LIARS_DICE_TRIGGER_DELAY);
-          return;
-        }
-
-        // All triggers pulled — advance to next round
-        const allPulled = lds.roundResult.triggerPlayerIds.every(
-          id => lds.roundResult!.pulledTrigger[id]
-        );
-        if (allPulled) {
-          runBotStep(LIARS_DICE_NEXT_ROUND_DELAY);
-        }
-      }
     }
 
     // ── Poker bot scheduling ──

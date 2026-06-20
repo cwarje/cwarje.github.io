@@ -1,12 +1,11 @@
 import type { LucideIcon } from 'lucide-react';
-import { Dice5, Heart, Ship, Crosshair, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers } from 'lucide-react';
+import { Dice5, Heart, Ship, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers } from 'lucide-react';
 import type { GameType, Player, GameStartOptions, TableEvent, TableEventInput } from '../networking/types';
 
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
 import { createFarkleState, processFarkleAction, isFarkleOver, runFarkleBotTurn, getFarkleWinners } from './farkle/logic';
 import { createHeartsState, processHeartsAction, isHeartsOver, runHeartsBotTurn, getHeartsWinners } from './hearts/logic';
 import { createBattleshipState, processBattleshipAction, isBattleshipOver, runBattleshipBotTurn, getBattleshipWinners } from './battleship/logic';
-import { createLiarsDiceState, processLiarsDiceAction, isLiarsDiceOver, runLiarsDiceBotTurn, getLiarsDiceWinners } from './liars-dice/logic';
 import { createPokerState, processPokerAction, isPokerOver, runPokerBotTurn, getPokerWinners } from './poker/logic';
 import { createUpRiverState, processUpRiverAction, isUpRiverOver, runUpRiverBotTurn, getUpRiverWinners } from './up-and-down-the-river/logic';
 import {
@@ -38,7 +37,6 @@ import YahtzeeBoard from './yahtzee/YahtzeeBoard';
 import FarkleBoard from './farkle/FarkleBoard';
 import HeartsBoard from './hearts/HeartsBoard';
 import BattleshipBoard from './battleship/BattleshipBoard';
-import LiarsDiceBoard from './liars-dice/LiarsDiceBoard';
 import PokerBoard from './poker/PokerBoard';
 import UpAndDownTheRiverBoard from './up-and-down-the-river/UpAndDownTheRiverBoard';
 import MobilizationBoard from './mobilization/MobilizationBoard';
@@ -333,51 +331,6 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     runBotTurn: runBattleshipBotTurn,
     getWinners: getBattleshipWinners,
     Board: BattleshipBoard,
-    production: false,
-  },
-
-  'liars-dice': {
-    title: "Liar's Dice",
-    shortDescription: "Bluff, bid, and call liars. Losers face the revolver. Last player standing wins. Inspired by Liar's Bar.",
-    playersLabel: '2-4 Players',
-    minPlayers: 2,
-    maxPlayers: 4,
-    info: {
-      goal: 'Be the last player standing. Survive by bluffing well and catching others in their lies.',
-      rules: [
-        'Each player starts with a set of dice hidden from other players.',
-        'Players take turns making bids on how many dice of a certain face value are on the table (across ALL players).',
-        'Each bid must be higher than the previous — either a higher quantity or a higher face value at the same quantity.',
-        'Instead of bidding, a player can call "Liar!" on the previous bid.',
-        'When someone calls "Liar!", all dice are revealed. If the bid was correct or exceeded, the caller loses. If the bid was too high, the bidder loses.',
-        'The loser must pull the trigger on a revolver. If the chamber fires, they\'re eliminated.',
-        'Play continues until only one player remains.',
-      ],
-      howToPlay: [
-        'Look at your dice (hidden from others) and decide your bid.',
-        'Use the bid controls to select a quantity and face value, then submit your bid.',
-        'If you think the previous player is bluffing, click "Liar!" to challenge them.',
-        'Losers pull the trigger — survive and keep playing, or get eliminated.',
-        'Last player standing wins!',
-      ],
-    },
-    icon: Crosshair,
-    theme: {
-      gradient: 'from-emerald-500/20 to-green-600/20',
-      cardBorder: 'border-emerald-500/20',
-      hoverBorder: 'hover:border-emerald-500/30',
-      playersTag: 'bg-emerald-500/25 text-emerald-200 border border-emerald-500/30',
-      iconColor: 'text-emerald-400',
-      buttonColors: 'bg-emerald-600 hover:bg-emerald-500',
-      panelBg: 'bg-emerald-950',
-      labelColor: 'text-emerald-200',
-    },
-    createState: createLiarsDiceState,
-    processAction: processLiarsDiceAction,
-    isOver: isLiarsDiceOver,
-    runBotTurn: runLiarsDiceBotTurn,
-    getWinners: getLiarsDiceWinners,
-    Board: LiarsDiceBoard,
     production: false,
   },
 
@@ -792,7 +745,6 @@ export const ALL_GAME_TYPES: GameType[] = [
   'cross-crib',
   'poker',
   'battleship',
-  'liars-dice',
 ];
 
 /** Game types shown in production (homepage order) */

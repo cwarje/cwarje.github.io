@@ -3,7 +3,6 @@ export type GameType =
   | 'farkle'
   | 'hearts'
   | 'battleship'
-  | 'liars-dice'
   | 'poker'
   | 'up-and-down-the-river'
   | 'twelve'
