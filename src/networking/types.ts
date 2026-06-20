@@ -2,7 +2,6 @@ export type GameType =
   | 'yahtzee'
   | 'farkle'
   | 'hearts'
-  | 'battleship'
   | 'poker'
   | 'up-and-down-the-river'
   | 'twelve'

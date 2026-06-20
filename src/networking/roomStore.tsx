@@ -20,7 +20,6 @@ import { DEFAULT_PLAYER_COLOR, normalizePlayerColor } from './playerColors';
 import { createInitialGameState, processGameAction, checkGameOver, runSingleBotTurn, getGameWinners } from '../games/gameEngine';
 import type { HeartsState } from '../games/hearts/types';
 import type { PokerState } from '../games/poker/types';
-import type { BattleshipState } from '../games/battleship/types';
 import type { YahtzeeState } from '../games/yahtzee/types';
 import type { FarkleState } from '../games/farkle/types';
 import type { UpRiverState } from '../games/up-and-down-the-river/types';
@@ -151,17 +150,6 @@ function applyProfileToGameState(
         if (player.name === playerName && player.color === playerColor) return player;
         changed = true;
         return { ...player, name: playerName, color: playerColor };
-      });
-      return changed ? { ...current, players } : current;
-    }
-    case 'battleship': {
-      const current = state as BattleshipState;
-      let changed = false;
-      const players = current.players.map((player) => {
-        if (player.id !== playerId) return player;
-        if (player.name === playerName) return player;
-        changed = true;
-        return { ...player, name: playerName };
       });
       return changed ? { ...current, players } : current;
     }
@@ -1135,7 +1123,6 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
   // --- Bot turn scheduling (host only) ---
   const BOT_PLAY_DELAY = 800;   // ms between each bot card play (Hearts)
-  const BATTLESHIP_BOT_DELAY = 800; // ms before bot fires in Battleship
   const YAHTZEE_BOT_ROLL_DELAY = 2000;  // ms between each bot roll in Yahtzee
   const YAHTZEE_BOT_HOLD_DELAY = 1200;  // ms to show held dice before bot rerolls in Yahtzee
   const YAHTZEE_BOT_SCORE_DELAY = 4000; // ms to show dice before bot scores
@@ -1854,32 +1841,6 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             broadcastGameState(next);
           }
         }, POKER_BOT_DELAY);
-      }
-    }
-
-    // ── Battleship bot scheduling ──
-    if (room.gameType === 'battleship') {
-      const bs = gameState as BattleshipState;
-      if (bs.phase !== 'playing') return;
-
-      const currentPlayer = bs.players[bs.currentPlayerIndex];
-      if (currentPlayer && currentPlayer.isBot) {
-        botTimerRef.current = setTimeout(() => {
-          const currentGs = gameStateRef.current;
-          const currentRoom = roomRef.current;
-          if (!currentGs || !currentRoom) return;
-
-          const next = runSingleBotTurn('battleship', currentGs);
-          if (next !== currentGs) {
-            setGameState(next);
-            broadcastGameState(next);
-            if (checkGameOver('battleship', next)) {
-              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
-              setRoom(finishedRoom);
-              broadcastRoomState(finishedRoom);
-            }
-          }
-        }, BATTLESHIP_BOT_DELAY);
       }
     }
 

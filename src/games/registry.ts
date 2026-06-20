@@ -1,11 +1,10 @@
 import type { LucideIcon } from 'lucide-react';
-import { Dice5, Heart, Ship, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers } from 'lucide-react';
+import { Dice5, Heart, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers } from 'lucide-react';
 import type { GameType, Player, GameStartOptions, TableEvent, TableEventInput } from '../networking/types';
 
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
 import { createFarkleState, processFarkleAction, isFarkleOver, runFarkleBotTurn, getFarkleWinners } from './farkle/logic';
 import { createHeartsState, processHeartsAction, isHeartsOver, runHeartsBotTurn, getHeartsWinners } from './hearts/logic';
-import { createBattleshipState, processBattleshipAction, isBattleshipOver, runBattleshipBotTurn, getBattleshipWinners } from './battleship/logic';
 import { createPokerState, processPokerAction, isPokerOver, runPokerBotTurn, getPokerWinners } from './poker/logic';
 import { createUpRiverState, processUpRiverAction, isUpRiverOver, runUpRiverBotTurn, getUpRiverWinners } from './up-and-down-the-river/logic';
 import {
@@ -36,7 +35,6 @@ import { createCasinoState, processCasinoAction, isCasinoOver, runCasinoBotTurn,
 import YahtzeeBoard from './yahtzee/YahtzeeBoard';
 import FarkleBoard from './farkle/FarkleBoard';
 import HeartsBoard from './hearts/HeartsBoard';
-import BattleshipBoard from './battleship/BattleshipBoard';
 import PokerBoard from './poker/PokerBoard';
 import UpAndDownTheRiverBoard from './up-and-down-the-river/UpAndDownTheRiverBoard';
 import MobilizationBoard from './mobilization/MobilizationBoard';
@@ -289,49 +287,6 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: true,
     production: true,
-  },
-
-  battleship: {
-    title: 'Battleship',
-    shortDescription: 'Place your fleet and hunt down the enemy ships. Strategic naval combat for two.',
-    playersLabel: '2 Players',
-    minPlayers: 2,
-    maxPlayers: 2,
-    info: {
-      goal: 'Sink all of your opponent\'s ships before they sink yours.',
-      rules: [
-        'Each player has a 10x10 grid and a fleet of 5 ships: Carrier (5), Battleship (4), Cruiser (3), Submarine (3), and Destroyer (2).',
-        'Ships are placed horizontally or vertically and cannot overlap.',
-        'Players take turns firing at a coordinate on the opponent\'s grid.',
-        'A hit is marked when a shot lands on a ship; a miss is marked otherwise.',
-        'A ship is sunk when all of its cells have been hit.',
-        'The first player to sink the entire enemy fleet wins.',
-      ],
-      howToPlay: [
-        'During setup, drag or click to place each ship on your grid. Click a ship to rotate it.',
-        'Once both players are ready, the game begins.',
-        'On your turn, click a cell on the opponent\'s grid to fire a shot.',
-        'The result (hit or miss) is shown immediately. Keep firing until all enemy ships are sunk!',
-      ],
-    },
-    icon: Ship,
-    theme: {
-      gradient: 'from-cyan-500/20 to-blue-600/20',
-      cardBorder: 'border-cyan-500/20',
-      hoverBorder: 'hover:border-cyan-500/30',
-      playersTag: 'bg-cyan-500/25 text-cyan-200 border border-cyan-500/30',
-      iconColor: 'text-cyan-400',
-      buttonColors: 'bg-cyan-600 hover:bg-cyan-500',
-      panelBg: 'bg-cyan-950',
-      labelColor: 'text-cyan-200',
-    },
-    createState: createBattleshipState,
-    processAction: processBattleshipAction,
-    isOver: isBattleshipOver,
-    runBotTurn: runBattleshipBotTurn,
-    getWinners: getBattleshipWinners,
-    Board: BattleshipBoard,
-    production: false,
   },
 
   poker: {
@@ -744,7 +699,6 @@ export const ALL_GAME_TYPES: GameType[] = [
   'farkle',
   'cross-crib',
   'poker',
-  'battleship',
 ];
 
 /** Game types shown in production (homepage order) */
