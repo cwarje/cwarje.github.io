@@ -429,7 +429,7 @@ export default function TwelveBoard({
         return (
           <>
             <span style={{ color: getPlayerHudTextColor(player.color) }}>{player.name}</span>
-            {` set trump to ${state.announcement.suit}`}
+            {` set trump to ${state.announcement.suit} +2`}
           </>
         );
       }
@@ -437,7 +437,7 @@ export default function TwelveBoard({
         return (
           <>
             <span style={{ color: getPlayerHudTextColor(player.color) }}>{player.name}</span>
-            {` called tjog in ${state.announcement.suit}`}
+            {` called tjog in ${state.announcement.suit} +1`}
           </>
         );
       }
