@@ -261,6 +261,11 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
     [state.players, state.trickWinner],
   );
 
+  const moonShooterPlayer = useMemo(
+    () => (state.moonShooterId ? state.players.find(p => p.id === state.moonShooterId) ?? null : null),
+    [state.players, state.moonShooterId],
+  );
+
   const trickExitOffset = useMemo(() => {
     if (trickWinnerRelativeSeat === null) return { x: 0, y: 20 };
     const winnerLayout = seatLayouts.find(layout => layout.relativeIndex === trickWinnerRelativeSeat);
@@ -278,6 +283,14 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
   }, [trickWinnerRelativeSeat, seatLayouts]);
 
   const headsUpContent = useMemo((): ReactNode => {
+    if (state.moonShooterId && moonShooterPlayer) {
+      return (
+        <>
+          <span style={{ color: getPlayerHudTextColor(moonShooterPlayer.color) }}>{moonShooterPlayer.name}</span>
+          {' shot the moon!'}
+        </>
+      );
+    }
     if (state.phase === 'passing') {
       if (myPassConfirmed) {
         const waitingOn = state.players.filter(p => !p.isBot && !state.passConfirmed[p.id]);
@@ -312,6 +325,8 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
     }
     return null;
   }, [
+    state.moonShooterId,
+    moonShooterPlayer,
     state.phase,
     state.passDirection,
     selectedPass.length,
@@ -348,7 +363,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
   const renderSeatPill = (seatLayout: HeartsSeatLayout, shouldMeasure = false) => {
     const player = seatLayout.player;
     const isCurrentTurn =
-      state.phase === 'playing' && !state.trickWinner && state.players[state.currentPlayerIndex]?.id === player.id;
+      state.phase === 'playing' && !state.trickWinner && !state.moonShooterId && state.players[state.currentPlayerIndex]?.id === player.id;
     const isMe = player.id === myId;
     const activeSeatPillClass =
       isCurrentTurn && showActiveSeatPill
@@ -498,7 +513,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
       </div>
 
       <div className="hearts-headsUp" aria-live="polite">
-        <p className="hearts-headsUpText">
+        <p className={`hearts-headsUpText ${state.moonShooterId ? 'hearts-headsUpText--moonShot' : ''}`}>
           {headsUpContent ?? '\u00a0'}
         </p>
       </div>
@@ -516,7 +531,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
             >
               {myPlayer.hand.map((card, i) => {
                 const isSelectedForPass = selectedPass.some(c => cardEquals(c, card));
-                const canPlay = state.phase === 'playing' && isMyTurn && !state.trickWinner && isValidHeartsPlay(state, myIndex, card);
+                const canPlay = state.phase === 'playing' && isMyTurn && !state.trickWinner && !state.moonShooterId && isValidHeartsPlay(state, myIndex, card);
                 const isPassing = state.phase === 'passing' && !myPassConfirmed;
                 const isDisabled = !isPassing && !canPlay;
                 const isLast = i === myPlayer.hand.length - 1;

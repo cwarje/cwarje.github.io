@@ -26,28 +26,22 @@ function createBotPlayers(): Player[] {
   ];
 }
 
-function computeRoundResultFromFinalTrick(state: HeartsState): { adjustedRoundScores: Record<string, number>; shooterId: string | null } {
-  const winnerId = state.trickWinner;
-  const trickPoints = state.currentTrick.reduce((sum, entry) => {
-    if (entry.card.suit === 'hearts') return sum + 1;
-    if (entry.card.suit === 'spades' && entry.card.rank === 12) return sum + 13;
-    return sum;
-  }, 0);
+function applyRoundMetrics(
+  before: HeartsState,
+  after: HeartsState,
+  metrics: HeartsBotValidationMetrics,
+  totalRoundPoints: { value: number },
+): void {
+  const roundEnded = after.roundNumber > before.roundNumber || (after.gameOver && !before.gameOver);
+  if (!roundEnded) return;
 
-  const rawRoundScores: Record<string, number> = {};
-  for (const p of state.players) {
-    rawRoundScores[p.id] = p.roundScore + (p.id === winnerId ? trickPoints : 0);
+  metrics.roundsPlayed++;
+  for (const p of after.players) {
+    const prev = before.players.find(x => x.id === p.id);
+    if (prev) {
+      totalRoundPoints.value += p.totalScore - prev.totalScore;
+    }
   }
-
-  const shooter = state.players.find(p => rawRoundScores[p.id] === 26);
-  if (!shooter) return { adjustedRoundScores: rawRoundScores, shooterId: null };
-
-  const adjustedRoundScores: Record<string, number> = {};
-  for (const p of state.players) {
-    adjustedRoundScores[p.id] = p.id === shooter.id ? 0 : 26;
-  }
-
-  return { adjustedRoundScores, shooterId: shooter.id };
 }
 
 export function runHeartsBotValidation(gameCount = 40): HeartsBotValidationMetrics {
@@ -63,7 +57,7 @@ export function runHeartsBotValidation(gameCount = 40): HeartsBotValidationMetri
     winsByPlayerId,
   };
 
-  let totalRoundPoints = 0;
+  const totalRoundPoints = { value: 0 };
 
   for (let gameNumber = 0; gameNumber < gameCount; gameNumber++) {
     let state = createHeartsState(createBotPlayers());
@@ -71,6 +65,13 @@ export function runHeartsBotValidation(gameCount = 40): HeartsBotValidationMetri
 
     while (!state.gameOver && safety < 20000) {
       safety++;
+
+      if (state.moonShooterId) {
+        const before = state;
+        state = processHeartsAction(state, { type: 'finish-moon-shot' }, state.players[0]?.id ?? '') as HeartsState;
+        applyRoundMetrics(before, state, metrics, totalRoundPoints);
+        continue;
+      }
 
       if (state.phase === 'playing' && state.trickWinner) {
         const winnerBeforeResolve = state.players.find(p => p.id === state.trickWinner);
@@ -88,17 +89,13 @@ export function runHeartsBotValidation(gameCount = 40): HeartsBotValidationMetri
           metrics.lateGamePointsTaken += trickPoints;
         }
 
-        if (state.trickNumber === 13) {
-          const result = computeRoundResultFromFinalTrick(state);
-          metrics.roundsPlayed++;
-          const roundPoints = Object.values(result.adjustedRoundScores).reduce((sum, pts) => sum + pts, 0);
-          totalRoundPoints += roundPoints;
-          if (result.shooterId) {
-            metrics.moonRoundsObserved++;
-          }
-        }
-
+        const before = state;
         state = processHeartsAction(state, { type: 'resolve-trick' }, state.players[0]?.id ?? '') as HeartsState;
+        if (state.moonShooterId) {
+          metrics.moonRoundsObserved++;
+        } else {
+          applyRoundMetrics(before, state, metrics, totalRoundPoints);
+        }
         continue;
       }
 
@@ -120,7 +117,7 @@ export function runHeartsBotValidation(gameCount = 40): HeartsBotValidationMetri
   }
 
   if (metrics.roundsPlayed > 0) {
-    metrics.averagePointsPerRound = totalRoundPoints / metrics.roundsPlayed;
+    metrics.averagePointsPerRound = totalRoundPoints.value / metrics.roundsPlayed;
   }
   metrics.moonShootsPrevented = Math.max(0, metrics.roundsPlayed - metrics.moonRoundsObserved);
 

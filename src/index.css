@@ -257,6 +257,13 @@
   text-overflow: ellipsis;
 }
 
+.hearts-headsUpText--moonShot {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.35;
+}
+
 .hearts-table {
   position: relative;
   width: 100%;

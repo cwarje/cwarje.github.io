@@ -37,10 +37,12 @@ export interface HeartsState {
   gameOver: boolean;
   winners: string[];
   trickWinner: string | null; // playerId of trick winner, set when trick is complete but not yet resolved
+  moonShooterId: string | null; // playerId of moon shooter, set after resolve-trick when roundScore hits 26
 }
 
 export type HeartsAction =
   | { type: 'select-pass'; cards: Card[] }
   | { type: 'confirm-pass' }
   | { type: 'play-card'; card: Card }
-  | { type: 'resolve-trick' };
+  | { type: 'resolve-trick' }
+  | { type: 'finish-moon-shot' };

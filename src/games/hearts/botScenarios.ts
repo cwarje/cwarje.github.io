@@ -41,6 +41,7 @@ function baseState(player0Hand: Card[]): HeartsState {
     gameOver: false,
     winners: [],
     trickWinner: null,
+    moonShooterId: null,
   };
 }
 

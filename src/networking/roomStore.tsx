@@ -1132,6 +1132,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const FARKLE_BOT_ROLL_DELAY = 2000; // ms before bot re-rolls
   const FARKLE_FARKLE_DISPLAY_DELAY = 5500; // ms to show farkle roll + message before advancing (animation ~1.2s + 4s message)
   const TRICK_DISPLAY_DELAY = 2000; // ms to show completed trick before collecting
+  const HEARTS_MOON_DISPLAY_DELAY = 4000; // ms to show shoot-the-moon announcement before round ends
   const UP_RIVER_BOT_DELAY = 900; // ms between bot bid/card play
   const UP_RIVER_ROUND_END_DELAY = 5000; // ms to show bid result borders before next round
   const MOBILIZATION_BOT_DELAY = 900; // ms between Mobilization bot actions
@@ -1191,6 +1192,26 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
           }
         }, TRICK_DISPLAY_DELAY);
+        return;
+      }
+
+      if (hs.moonShooterId) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as HeartsState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || !currentGs.moonShooterId) return;
+
+          const next = processGameAction('hearts', currentGs, { type: 'finish-moon-shot' }, '');
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('hearts', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, HEARTS_MOON_DISPLAY_DELAY);
         return;
       }
 

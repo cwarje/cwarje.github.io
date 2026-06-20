@@ -120,6 +120,7 @@ export function createHeartsState(players: Player[], options?: { targetScore?: 5
     gameOver: false,
     winners: [],
     trickWinner: null,
+    moonShooterId: null,
   };
 }
 
@@ -198,6 +199,7 @@ export function processHeartsAction(state: unknown, action: unknown, playerId: s
 
     case 'play-card': {
       if (s.phase !== 'playing') return state;
+      if (s.moonShooterId) return state;
       if (s.trickWinner) return state; // Trick awaiting resolution
       const playerIndex = s.players.findIndex(p => p.id === playerId);
       if (playerIndex === -1 || playerIndex !== s.currentPlayerIndex) return state;
@@ -244,7 +246,7 @@ export function processHeartsAction(state: unknown, action: unknown, playerId: s
     }
 
     case 'resolve-trick': {
-      if (s.phase !== 'playing' || !s.trickWinner) return state;
+      if (s.phase !== 'playing' || !s.trickWinner || s.moonShooterId) return state;
 
       const winnerIndex = s.players.findIndex(p => p.id === s.trickWinner);
       if (winnerIndex === -1) return state;
@@ -259,11 +261,22 @@ export function processHeartsAction(state: unknown, action: unknown, playerId: s
         roundScore: newPlayers[winnerIndex].roundScore + trickPoints,
       };
 
+      const shooter = newPlayers.find(p => p.roundScore === 26);
+      if (shooter) {
+        return {
+          ...s,
+          players: newPlayers,
+          currentTrick: [],
+          trickWinner: null,
+          moonShooterId: shooter.id,
+        };
+      }
+
       const nextTrick = s.trickNumber + 1;
 
       // Round over when all hands are empty.
       if (newPlayers.every(p => p.hand.length === 0)) {
-        return endRound({ ...s, players: newPlayers, heartsBroken: s.heartsBroken, trickWinner: null });
+        return endRound({ ...s, players: newPlayers, heartsBroken: s.heartsBroken, trickWinner: null, moonShooterId: null });
       }
 
       return {
@@ -276,6 +289,11 @@ export function processHeartsAction(state: unknown, action: unknown, playerId: s
         trickWinner: null,
       };
     }
+
+    case 'finish-moon-shot': {
+      if (!s.moonShooterId) return state;
+      return endRound({ ...s, moonShooterId: null });
+    }
   }
 
   return state;
@@ -283,7 +301,9 @@ export function processHeartsAction(state: unknown, action: unknown, playerId: s
 
 function endRound(s: HeartsState): HeartsState {
   // Check for shoot the moon
-  const shooter = s.players.find(p => p.roundScore === 26);
+  const shooter = s.moonShooterId
+    ? s.players.find(p => p.id === s.moonShooterId)
+    : s.players.find(p => p.roundScore === 26);
 
   const newPlayers = s.players.map(p => {
     let roundPts = p.roundScore;
@@ -309,6 +329,7 @@ function endRound(s: HeartsState): HeartsState {
       gameOver: true,
       winners,
       trickWinner: null,
+      moonShooterId: null,
     };
   }
 
@@ -342,6 +363,7 @@ function endRound(s: HeartsState): HeartsState {
     gameOver: false,
     winners: [],
     trickWinner: null,
+    moonShooterId: null,
   };
 }
 
@@ -667,8 +689,8 @@ export function runHeartsBotTurn(state: unknown): unknown {
   const currentPlayer = s.players[s.currentPlayerIndex];
   if (!currentPlayer?.isBot) return state;
 
-  // Don't play if trick is awaiting resolution
-  if (s.trickWinner) return state;
+  // Don't play if trick is awaiting resolution or moon announcement pending
+  if (s.trickWinner || s.moonShooterId) return state;
   if (s.phase !== 'playing') return state;
 
   const chosen = chooseHeartsPlayCard(s, s.currentPlayerIndex);
