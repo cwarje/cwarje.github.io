@@ -2348,6 +2348,39 @@
   }
 }
 
+/* Shared round-deal animation (radial seat layouts) */
+.deal-animLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.deal-animStack {
+  position: absolute;
+  width: 64px;
+  height: 90px;
+}
+
+.deal-animCard {
+  position: absolute;
+  width: 64px;
+  height: 90px;
+  filter: drop-shadow(0 6px 9px rgba(0, 0, 0, 0.3));
+  transform-origin: center;
+}
+
+.deal-animCard--flight {
+  z-index: 41;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deal-animLayer {
+    display: none;
+  }
+}
+
 .river-resultRow {
   display: flex;
   align-items: center;

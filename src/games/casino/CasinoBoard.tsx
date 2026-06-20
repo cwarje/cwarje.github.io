@@ -30,6 +30,8 @@ import {
   getPlayerHudTextColor,
 } from '../../networking/playerColors';
 import { useLastDealFlash } from './useLastDealFlash';
+import { useDealAnimation, type DealSeat, type DealExtraTarget } from '../shared/useDealAnimation';
+import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
   hearts: '\u2665',
@@ -229,6 +231,7 @@ export default function CasinoBoard({
   const myPlayer = myIndex >= 0 ? s.players[myIndex] : null;
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const isMyTurn = myIndex >= 0 && s.currentPlayerIndex === myIndex && s.phase === 'playing';
+  const boardRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const handContainerRef = useRef<HTMLDivElement>(null);
   const [tableSize, setTableSize] = useState<ElementSize>({ width: 0, height: 0 });
@@ -539,8 +542,41 @@ export default function CasinoBoard({
     }).filter(layout => !!layout.player);
   }, [s.players, anchorIndex, tableSize.width, tableSize.height, seatPillSize.width, seatPillSize.height]);
 
+  const dealSeats = useMemo<DealSeat[]>(
+    () =>
+      seatLayouts.map(layout => ({
+        playerId: layout.player.id,
+        isSelf: layout.relativeIndex === 0,
+        seatLeft: layout.seatLeft,
+        seatTop: layout.seatTop,
+        count: layout.player.hand.length,
+      })),
+    [seatLayouts],
+  );
+
+  const dealExtras = useMemo<DealExtraTarget[]>(() => {
+    if (s.dealNumberInRound !== 1) return [];
+    return Array.from({ length: 4 }, (_, i) => ({
+      id: `casino-table-${i}`,
+      seatLeft: 50 + (i - 1.5) * 8,
+      seatTop: 50,
+      faceUp: true,
+    }));
+  }, [s.dealNumberInRound]);
+
+  const deal = useDealAnimation({
+    boardRef,
+    tableRef,
+    dealKey: `${s.roundNumber}-${s.dealNumberInRound}`,
+    seats: dealSeats,
+    extraTargets: dealExtras,
+  });
+
+  const myRevealCount = deal.revealedFor(myId, myPlayer?.hand.length ?? 0);
+  const visibleHand = myPlayer ? myPlayer.hand.slice(0, myRevealCount) : [];
+
   const handLayout = useMemo(() => {
-    const cardCount = myPlayer?.hand.length ?? 0;
+    const cardCount = visibleHand.length;
     const available = Math.max(handWidth - 8, 220);
     const maxCardWidth = 84;
     const cardWidth = Math.max(58, Math.min(available * 0.2, maxCardWidth));
@@ -556,7 +592,7 @@ export default function CasinoBoard({
       spreadWidth,
       selectedLift: 14,
     };
-  }, [handWidth, myPlayer?.hand.length]);
+  }, [handWidth, visibleHand.length]);
 
   const currentPlayer = s.players[s.currentPlayerIndex];
   const hasEmptyTableSlot = s.tableSlots.some(slot => slot == null);
@@ -797,7 +833,8 @@ export default function CasinoBoard({
   }
 
   return (
-    <div className={`casino-board casino-board--players-${s.players.length} space-y-3 sm:space-y-4`}>
+    <div ref={boardRef} className={`casino-board casino-board--players-${s.players.length} relative space-y-3 sm:space-y-4`}>
+      <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
       <div ref={tableRef} className={`casino-table casino-table--players-${s.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
@@ -815,6 +852,11 @@ export default function CasinoBoard({
               {Array.from({ length: renderedTableSlotCount }, (_, slotIndex) => {
                 const slotKey = `table-slot-${slotIndex}`;
                 const item = s.tableSlots[slotIndex] ?? null;
+                const tableCardHidden =
+                  deal.isDealing && s.dealNumberInRound === 1 && !deal.isExtraRevealed(`casino-table-${slotIndex}`);
+                if (tableCardHidden) {
+                  return <div key={slotKey} className="casino-tableSlot" aria-hidden="true" />;
+                }
                 const isSelected = selectedTableIndices.includes(slotIndex);
                 const isPreviewTarget =
                   !!s.pendingCapturePreview && s.pendingCapturePreview.capturedSlotIndices.includes(slotIndex);
@@ -879,16 +921,16 @@ export default function CasinoBoard({
                 transition: 'width 0.16s ease',
               }}
             >
-              {myPlayer.hand.map((card, i) => {
+              {visibleHand.map((card, i) => {
                 const isSelected = selectedHandCard !== null && cardEquals(selectedHandCard, card);
-                const isLast = i === myPlayer.hand.length - 1;
+                const isLast = i === visibleHand.length - 1;
                 const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
                 return (
                   <motion.button
                     key={`${card.suit}-${card.rank}`}
-                    initial={{ y: 50, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: i * 0.02 }}
+                    initial={deal.isDealing ? { scale: 0.6, opacity: 0 } : { y: 50, opacity: 0 }}
+                    animate={deal.isDealing ? { scale: 1, opacity: 1 } : { y: 0, opacity: 1 }}
+                    transition={deal.isDealing ? { duration: 0.2, ease: [0.22, 1, 0.36, 1] } : { delay: i * 0.02 }}
                     onClick={() => handleHandCardClick(card)}
                     disabled={!isMyTurn}
                     className="casino-handHitbox"

@@ -84,6 +84,23 @@ sequenceDiagram
 - Game logic is isolated per game module and orchestrated through `src/games/gameEngine.ts`, which dispatches via `src/games/registry.ts`.
 - Bots run on the host side and follow the same action pipeline as humans.
 
+### Radial deal animation
+
+Eight card games with a radial seat layout (local player at the bottom) play a **client-side dealing animation** at round setup. Cards fly face-down from a center stack to each destination; the local hand fills in sorted order as cards arrive at the bottom seat. Table and pile cards show empty placeholders first, then reveal one at a time when each flight lands. **Table/extra cards are always dealt before hand cards.**
+
+The animation is cosmetic and local to each browser — authoritative state arrives from the host immediately, and boards gate visibility until each card "lands." The host pauses bot turns and auto-advances for a deterministic duration (`dealTiming.ts`) so gameplay does not start mid-deal.
+
+| Module | Role |
+|--------|------|
+| `src/games/shared/useDealAnimation.ts` | Plans flights, reveal timers, `isDealing` / `revealedFor` / `isExtraRevealed` |
+| `src/games/shared/DealAnimationLayer.tsx` | Center stack + framer-motion flying card backs |
+| `src/games/shared/dealTiming.ts` | Shared timing used by boards and `roomStore` deal hold |
+| `src/networking/roomStore.tsx` (`getRoundDealInfo`) | Host-side hold until animation duration elapses |
+
+Games: Hearts, Casino (4 table slots on first deal), Cross Crib (starter), Tolva/Twelve (front piles), Cribbage, Up and Down the River, Mobilization, Poker (hole cards only). Respects `prefers-reduced-motion`.
+
+See [`src/games/shared/README.md`](src/games/shared/README.md) for integration details, per-game `dealKey` values, and a checklist for wiring new boards.
+
 ## How the project works
 
 ### App shell and routing
@@ -134,6 +151,7 @@ src/
   games/             # Game registry, engine, and per-game modules
     registry.ts      # Single source of truth for all game definitions
     gameEngine.ts    # Orchestrates logic via registry lookups
+    shared/          # Cross-board utilities (deal animation, seat name fit, etc.)
     <game-name>/     # Per-game types, logic, board, and optional options/HUD
   networking/        # Peer/network state and messaging
   pages/             # Route-level pages (Home/GamePage)
@@ -251,6 +269,7 @@ Use this map to find where changes should go quickly:
 - Game rule bugs/features -> `src/games/<game>/logic.ts` and `src/games/<game>/types.ts`
 - Cross-game orchestration -> `src/games/gameEngine.ts`
 - Game metadata, themes, and discoverability -> `src/games/registry.ts`
+- Radial deal animation -> `src/games/shared/useDealAnimation.ts`, `DealAnimationLayer.tsx`, `dealTiming.ts`, and per-board wiring; host hold in `roomStore.tsx` (`getRoundDealInfo`)
 
 Recommended implementation workflow:
 

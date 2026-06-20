@@ -11,6 +11,8 @@ import {
   isValidMobilizationTrickPlay,
 } from './rules';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
+import { useDealAnimation, type DealSeat } from '../shared/useDealAnimation';
+import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
   hearts: '\u2665',
@@ -124,6 +126,7 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const myPlayer = myIndex >= 0 ? state.players[myIndex] : null;
   const isMyTurn = myIndex >= 0 && state.currentPlayerIndex === myIndex;
+  const boardRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const handContainerRef = useRef<HTMLDivElement>(null);
   const [handWidth, setHandWidth] = useState(360);
@@ -178,6 +181,28 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
       };
     }).filter(layout => !!layout.player);
   }, [state.players, anchorIndex, tableSize.width, tableSize.height, seatPillSize.width, seatPillSize.height]);
+
+  const dealSeats = useMemo<DealSeat[]>(
+    () =>
+      seatLayouts.map(layout => ({
+        playerId: layout.player.id,
+        isSelf: layout.relativeIndex === 0,
+        seatLeft: layout.seatLeft,
+        seatTop: layout.seatTop,
+        count: layout.player.hand.length,
+      })),
+    [seatLayouts],
+  );
+
+  const deal = useDealAnimation({
+    boardRef,
+    tableRef,
+    dealKey: String(state.roundIndex),
+    seats: dealSeats,
+  });
+
+  const myRevealCount = deal.revealedFor(myId, myPlayer?.hand.length ?? 0);
+  const visibleHand = myPlayer ? myPlayer.hand.slice(0, myRevealCount) : [];
 
   const trickByRelativeSeat = useMemo(() => {
     const mapped: Partial<Record<number, { playerId: string; card: Card }>> = {};
@@ -365,7 +390,7 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
   }, []);
 
   const handLayout = useMemo(() => {
-    const cardCount = myPlayer?.hand.length ?? 0;
+    const cardCount = visibleHand.length;
     const available = Math.max(handWidth - 8, 220);
     const cardWidth = Math.max(58, Math.min(available * 0.2, available < 420 ? 72 : 84));
     const cardHeight = Math.round(cardWidth * 1.45);
@@ -374,7 +399,7 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
     const step = cardCount > 1 ? Math.max(8, Math.min(defaultStep, fitStep)) : defaultStep;
     const spreadWidth = cardCount > 1 ? cardWidth + step * (cardCount - 1) : cardWidth;
     return { cardWidth, cardHeight, step, spreadWidth, selectedLift: 14 };
-  }, [handWidth, myPlayer?.hand.length]);
+  }, [handWidth, visibleHand.length]);
 
   const renderCardFace = (card: Card, disabled = false, compact = false) => (
     <div className={`river-card ${disabled ? 'river-card--disabled' : ''} ${compact ? 'river-card--compact' : ''}`}>
@@ -575,7 +600,8 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
   };
 
   return (
-    <div className={`river-board river-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
+    <div ref={boardRef} className={`river-board river-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
+      <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
       {devJumpToolbar}
       <div ref={tableRef} className={`river-table river-table--players-${state.players.length}`}>
         {seatLayouts.map((layout) => (
@@ -669,7 +695,7 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
                 transition: 'width 0.16s ease',
               }}
             >
-              {myPlayer.hand.map((card, i) => {
+              {visibleHand.map((card, i) => {
                 const isTrick =
                   state.phase === 'playing'
                   && isMyTurn
@@ -686,16 +712,16 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
                     : state.phase === 'solitaire'
                       ? !legalSol
                       : true;
-                const isLast = i === myPlayer.hand.length - 1;
+                const isLast = i === visibleHand.length - 1;
                 const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
 
                 return (
                   <motion.button
                     key={`${card.suit}-${card.rank}`}
                     type="button"
-                    initial={{ y: 50, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: i * 0.02 }}
+                    initial={deal.isDealing ? { scale: 0.6, opacity: 0 } : { y: 50, opacity: 0 }}
+                    animate={deal.isDealing ? { scale: 1, opacity: 1 } : { y: 0, opacity: 1 }}
+                    transition={deal.isDealing ? { duration: 0.2, ease: [0.22, 1, 0.36, 1] } : { delay: i * 0.02 }}
                     onClick={() => {
                       if (state.phase === 'playing') playTrickCard(card);
                       else if (state.phase === 'solitaire') solitaireSelectOrPlay(card);

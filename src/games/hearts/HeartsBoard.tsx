@@ -6,6 +6,8 @@ import { isValidHeartsPlay } from './rules';
 import { getHeartsPassCount } from './logic';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 import { AutoFitSeatName } from '../shared/AutoFitSeatName';
+import { useDealAnimation, type DealSeat } from '../shared/useDealAnimation';
+import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
   hearts: '\u2665',
@@ -110,6 +112,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
   const myPlayer = state.players[myIndex];
   const isMyTurn = state.currentPlayerIndex === myIndex;
   const passCount = getHeartsPassCount(state.players.length);
+  const boardRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const handContainerRef = useRef<HTMLDivElement>(null);
   const [handWidth, setHandWidth] = useState(360);
@@ -237,6 +240,28 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
     }).filter(layout => !!layout.player);
   }, [state.players, anchorIndex, tableSize.width, tableSize.height, seatPillSize.width, seatPillSize.height]);
 
+  const dealSeats = useMemo<DealSeat[]>(
+    () =>
+      seatLayouts.map(layout => ({
+        playerId: layout.player.id,
+        isSelf: layout.relativeIndex === 0,
+        seatLeft: layout.seatLeft,
+        seatTop: layout.seatTop,
+        count: layout.player.hand.length,
+      })),
+    [seatLayouts],
+  );
+
+  const deal = useDealAnimation({
+    boardRef,
+    tableRef,
+    dealKey: String(state.roundNumber),
+    seats: dealSeats,
+  });
+
+  const myRevealCount = deal.revealedFor(myId, myPlayer?.hand.length ?? 0);
+  const visibleHand = myPlayer ? myPlayer.hand.slice(0, myRevealCount) : [];
+
   const trickByRelativeSeat = useMemo(() => {
     const mapped: Partial<Record<number, { playerId: string; card: Card }>> = {};
     const playerCount = state.players.length;
@@ -340,7 +365,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
   ]);
 
   const handLayout = useMemo(() => {
-    const cardCount = myPlayer?.hand.length ?? 0;
+    const cardCount = visibleHand.length;
     const available = Math.max(handWidth - 8, 220);
     const cardWidth = Math.max(58, Math.min(available * 0.2, available < 420 ? 72 : 84));
     const cardHeight = Math.round(cardWidth * 1.45);
@@ -356,7 +381,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
       spreadWidth,
       selectedLift: 14,
     };
-  }, [handWidth, myPlayer?.hand.length]);
+  }, [handWidth, visibleHand.length]);
 
   const showActiveSeatPill = state.players.length > 1;
 
@@ -442,7 +467,8 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
   }
 
   return (
-    <div className={`hearts-board hearts-board--players-${state.players.length} space-y-4 sm:space-y-5`}>
+    <div ref={boardRef} className={`hearts-board hearts-board--players-${state.players.length} relative space-y-4 sm:space-y-5`}>
+      <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
       <div ref={tableRef} className={`hearts-table hearts-table--players-${state.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
@@ -529,21 +555,21 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
                 transition: 'width 0.16s ease',
               }}
             >
-              {myPlayer.hand.map((card, i) => {
+              {visibleHand.map((card, i) => {
                 const isSelectedForPass = selectedPass.some(c => cardEquals(c, card));
                 const canPlay = state.phase === 'playing' && isMyTurn && !state.trickWinner && !state.moonShooterId && isValidHeartsPlay(state, myIndex, card);
                 const isPassing = state.phase === 'passing' && !myPassConfirmed;
                 const isDisabled = !isPassing && !canPlay;
-                const isLast = i === myPlayer.hand.length - 1;
+                const isLast = i === visibleHand.length - 1;
                 const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
                 const isReceived = receivedCardKeys.has(cardKey(card));
 
                 return (
                   <motion.button
                     key={`${card.suit}-${card.rank}`}
-                    initial={{ y: 50, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: i * 0.02 }}
+                    initial={deal.isDealing ? { scale: 0.6, opacity: 0 } : { y: 50, opacity: 0 }}
+                    animate={deal.isDealing ? { scale: 1, opacity: 1 } : { y: 0, opacity: 1 }}
+                    transition={deal.isDealing ? { duration: 0.2, ease: [0.22, 1, 0.36, 1] } : { delay: i * 0.02 }}
                     onClick={() => {
                       if (isPassing) togglePassCard(card);
                       else if (canPlay) playCard(card);

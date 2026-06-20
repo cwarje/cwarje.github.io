@@ -36,6 +36,7 @@ import type { CrossCribState } from '../games/cross-crib/types';
 import { cribCardsToSelect } from '../games/cross-crib/types';
 import type { CribbageState } from '../games/cribbage/types';
 import type { CasinoState } from '../games/casino/types';
+import { dealHoldDurationMs, registerDealHoldExtender } from '../games/shared/dealTiming';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 import { shouldBotBank } from '../games/farkle/logic';
 import { GAME_REGISTRY } from '../games/registry';
@@ -78,6 +79,74 @@ function isCasinoStartNextRoundAction(payload: unknown): boolean {
 function isCribbageAdvanceShowAction(payload: unknown): boolean {
   if (typeof payload !== 'object' || payload === null) return false;
   return (payload as { type?: unknown }).type === 'advance-show';
+}
+
+/**
+ * For radial-seat card games, identifies the current deal and how many cards it
+ * animates so the host can pause turn scheduling until the dealing animation
+ * (see useDealAnimation) has finished. The `signature` must change exactly when
+ * a fresh deal occurs and mirrors each board's `dealKey`. Returns null for games
+ * without a deal animation.
+ */
+function getRoundDealInfo(gameType: GameType | null, state: unknown): { signature: string; cardCount: number } | null {
+  const sumHand = (players: { hand: { length: number }[] | { length: number } }[]): number =>
+    players.reduce((total, p) => total + (Array.isArray(p.hand) ? p.hand.length : 0), 0);
+
+  switch (gameType) {
+    case 'hearts': {
+      const s = state as HeartsState;
+      return { signature: `hearts-${s.roundNumber}`, cardCount: sumHand(s.players) };
+    }
+    case 'up-and-down-the-river': {
+      const s = state as UpRiverState;
+      return { signature: `river-${s.roundIndex}`, cardCount: sumHand(s.players) };
+    }
+    case 'mobilization': {
+      const s = state as MobilizationState;
+      if (s.phase === 'round-end') return null;
+      const dealSize =
+        s.players.length > 0 && s.cardsPerTrickRound > 0
+          ? s.players.length * s.cardsPerTrickRound
+          : sumHand(s.players);
+      if (dealSize <= 0) return null;
+      // Signature is round-only so playing cards mid-round does not re-trigger the deal hold.
+      return { signature: `mob-${s.roundIndex}`, cardCount: dealSize };
+    }
+    case 'cribbage': {
+      const s = state as CribbageState;
+      return { signature: `crib-${s.dealerIndex}`, cardCount: sumHand(s.players) };
+    }
+    case 'cross-crib': {
+      const s = state as CrossCribState;
+      return {
+        signature: `xcrib-${s.roundNumber}`,
+        cardCount: sumHand(s.players) + (s.starterCard ? 1 : 0),
+      };
+    }
+    case 'casino': {
+      const s = state as CasinoState;
+      return {
+        signature: `casino-${s.roundNumber}-${s.dealNumberInRound}`,
+        cardCount: sumHand(s.players) + (s.dealNumberInRound === 1 ? 4 : 0),
+      };
+    }
+    case 'twelve': {
+      const s = state as TwelveState;
+      const pileCards = s.players.reduce(
+        (total, p) =>
+          total + p.frontPiles.reduce((sum, pile) => sum + (pile.bottomCard ? 1 : 0) + (pile.topCard ? 1 : 0), 0),
+        0,
+      );
+      return { signature: `twelve-${s.roundNumber}`, cardCount: sumHand(s.players) + pileCards };
+    }
+    case 'poker': {
+      const s = state as PokerState;
+      const holeCards = s.players.reduce((total, p) => total + p.holeCards.length, 0);
+      return { signature: `poker-${s.handNumber}`, cardCount: holeCards };
+    }
+    default:
+      return null;
+  }
 }
 
 function shouldTransitionRoomToFinished(gameType: GameType, state: unknown): boolean {
@@ -1155,6 +1224,30 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const CASINO_TABLE_REMNANT_DELAY = 3000; // ms to show who takes remaining table cards before scoring
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settlerIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dealSignatureRef = useRef<string | null>(null);
+  const dealHoldUntilRef = useRef<number>(0);
+  const [dealHoldTick, setDealHoldTick] = useState(0);
+
+  useEffect(() => {
+    if (!isHost) {
+      registerDealHoldExtender(null);
+      return;
+    }
+    registerDealHoldExtender((untilMs) => {
+      if (untilMs > dealHoldUntilRef.current) {
+        dealHoldUntilRef.current = untilMs;
+        setDealHoldTick(tick => tick + 1);
+      }
+    });
+    return () => registerDealHoldExtender(null);
+  }, [isHost]);
+
+  useEffect(() => {
+    if (!gameState) {
+      dealSignatureRef.current = null;
+      dealHoldUntilRef.current = 0;
+    }
+  }, [gameState]);
 
   useEffect(() => {
     // Clear any pending timer when state changes
@@ -1168,6 +1261,21 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!isHost || !room || room.phase !== 'playing' || !gameState) return;
+
+    // Hold turn scheduling until the client-side deal animation has finished, so
+    // bots and auto round-advances don't start playing mid-deal.
+    const dealInfo = getRoundDealInfo(room.gameType, gameState);
+    if (dealInfo && dealInfo.cardCount > 0) {
+      if (dealInfo.signature !== dealSignatureRef.current) {
+        dealSignatureRef.current = dealInfo.signature;
+        dealHoldUntilRef.current = Date.now() + dealHoldDurationMs(dealInfo.cardCount);
+      }
+      const remainingHold = dealHoldUntilRef.current - Date.now();
+      if (remainingHold > 0) {
+        botTimerRef.current = setTimeout(() => setDealHoldTick(tick => tick + 1), remainingHold + 250);
+        return;
+      }
+    }
 
     // ── Hearts bot scheduling ──
     if (room.gameType === 'hearts') {
@@ -2024,7 +2132,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         }, SETTLER_BOT_DELAY);
       }
     }
-  }, [gameState, isHost, room, broadcastGameState, broadcastRoomState]);
+  }, [gameState, isHost, room, broadcastGameState, broadcastRoomState, dealHoldTick]);
 
   // Cleanup on unmount
   useEffect(() => {

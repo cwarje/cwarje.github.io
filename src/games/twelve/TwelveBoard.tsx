@@ -6,6 +6,8 @@ import type { Card, Suit, TwelvePlayer, TwelveState } from './types';
 import { cardPointValue, getPilePlayableCard, isLegalPlay, rankDisplay, suitsWithRoyalPair } from './rules';
 import { getTeamRoundCardPoints } from './logic';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
+import { useDealAnimation, type DealSeat, type DealExtraTarget } from '../shared/useDealAnimation';
+import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
   hearts: '\u2665',
@@ -257,6 +259,54 @@ export default function TwelveBoard({
       };
     }).filter(layout => !!layout.player);
   }, [state.players, anchorIndex, tableSize.width, tableSize.height, seatPillSize.width, seatPillSize.height]);
+
+  const dealSeats = useMemo<DealSeat[]>(
+    () =>
+      seatLayouts.map(layout => ({
+        playerId: layout.player.id,
+        isSelf: layout.relativeIndex === 0,
+        seatLeft: layout.seatLeft,
+        seatTop: layout.seatTop,
+        count: layout.player.hand.length,
+      })),
+    [seatLayouts],
+  );
+
+  const dealExtras = useMemo<DealExtraTarget[]>(() => {
+    const extras: DealExtraTarget[] = [];
+    for (const layout of seatLayouts) {
+      layout.player.frontPiles.forEach((pile, pileIndex) => {
+        if (pile.bottomCard) {
+          extras.push({
+            id: `${layout.player.id}-pile-${pileIndex}-bottom`,
+            seatLeft: layout.seatLeft,
+            seatTop: layout.seatTop,
+            faceUp: false,
+          });
+        }
+        if (pile.topCard) {
+          extras.push({
+            id: `${layout.player.id}-pile-${pileIndex}-top`,
+            seatLeft: layout.seatLeft,
+            seatTop: layout.seatTop,
+            faceUp: false,
+          });
+        }
+      });
+    }
+    return extras;
+  }, [seatLayouts]);
+
+  const deal = useDealAnimation({
+    boardRef,
+    tableRef,
+    dealKey: String(state.roundNumber),
+    seats: dealSeats,
+    extraTargets: dealExtras,
+  });
+
+  const myRevealCount = deal.revealedFor(myId, myPlayer?.hand.length ?? 0);
+  const visibleHand = myPlayer ? myPlayer.hand.slice(0, myRevealCount) : [];
 
   const trickByRelativeSeat = useMemo(() => {
     const mapped: Partial<Record<number, { playerId: string; card: Card }>> = {};
@@ -572,7 +622,7 @@ export default function TwelveBoard({
   }, []);
 
   const handLayout = useMemo(() => {
-    const cardCount = myPlayer?.hand.length ?? 0;
+    const cardCount = visibleHand.length;
     const available = Math.max(handWidth - 8, 220);
     const cardWidth = Math.max(58, Math.min(available * 0.2, available < 420 ? 72 : 84));
     const cardHeight = Math.round(cardWidth * 1.45);
@@ -581,7 +631,7 @@ export default function TwelveBoard({
     const step = cardCount > 1 ? Math.max(8, Math.min(defaultStep, fitStep)) : defaultStep;
     const spreadWidth = cardCount > 1 ? cardWidth + step * (cardCount - 1) : cardWidth;
     return { cardWidth, cardHeight, step, spreadWidth, selectedLift: 14 };
-  }, [handWidth, myPlayer?.hand.length]);
+  }, [handWidth, visibleHand.length]);
 
   const myRoyalSuits = myPlayer ? suitsWithRoyalPair(myPlayer) : [];
   const myTjogSuits = myPlayer
@@ -829,7 +879,8 @@ export default function TwelveBoard({
   }
 
   const renderOpponentHandFan = (player: TwelvePlayer) => {
-    const cardCount = player.hand.length;
+    const fullCount = player.hand.length;
+    const cardCount = deal.revealedFor(player.id, fullCount);
     if (cardCount === 0) return null;
 
     const layout = getOpponentHandLayout(cardCount);
@@ -837,7 +888,7 @@ export default function TwelveBoard({
     return (
       <div
         className="twelve-opponentHandSpread"
-        aria-label={`${player.name}, ${cardCount} cards in hand`}
+        aria-label={`${player.name}, ${fullCount} cards in hand`}
         style={{
           width: `${layout.spreadWidth}px`,
           height: `${layout.cardHeight}px`,
@@ -925,6 +976,7 @@ export default function TwelveBoard({
 
   return (
     <div ref={boardRef} className={`twelve-board river-board river-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
+      <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
       {showDevBestCardsButton && (
         <button
           type="button"
@@ -1074,6 +1126,10 @@ export default function TwelveBoard({
                     !!playable &&
                     myIndex >= 0 &&
                     isLegalPlay(state, myIndex, playable.card, 'pile', pileIndex);
+                  const bottomShown =
+                    !!pile.bottomCard && deal.isExtraRevealed(`${layout.player.id}-pile-${pileIndex}-bottom`);
+                  const topShown =
+                    !!pile.topCard && deal.isExtraRevealed(`${layout.player.id}-pile-${pileIndex}-top`);
                   return (
                     <button
                       key={`${layout.player.id}-pile-${pileIndex}`}
@@ -1084,15 +1140,15 @@ export default function TwelveBoard({
                       aria-label={`Pile ${pileIndex + 1}`}
                     >
                       <div className="twelve-pileBottom">
-                        {pile.bottomCard ? (
-                          <PokerFlipCard card={pile.bottomCard} faceDown={!pile.bottomFaceUp} disabled={!canPlayPile} />
+                        {bottomShown ? (
+                          <PokerFlipCard card={pile.bottomCard!} faceDown={!pile.bottomFaceUp} disabled={!canPlayPile} />
                         ) : (
                           <div className="twelve-pilePlaceholder" />
                         )}
                       </div>
-                      {pile.topCard && (
-                        <div className={`twelve-pileTop ${pile.bottomCard ? 'twelve-pileTop--stacked' : ''}`}>
-                          {renderCardFace(pile.topCard, !canPlayPile, true)}
+                      {topShown && (
+                        <div className={`twelve-pileTop ${bottomShown ? 'twelve-pileTop--stacked' : ''}`}>
+                          {renderCardFace(pile.topCard!, !canPlayPile, true)}
                         </div>
                       )}
                     </button>
@@ -1247,21 +1303,21 @@ export default function TwelveBoard({
                 transition: 'width 0.16s ease',
               }}
             >
-              {myPlayer.hand.map((card, i) => {
+              {visibleHand.map((card, i) => {
                 const canPlay =
                   canUseActionButtons &&
                   myIndex >= 0 &&
                   isLegalPlay(state, myIndex, card, 'hand');
                 const isDisabled = !canPlay;
-                const isLast = i === myPlayer.hand.length - 1;
+                const isLast = i === visibleHand.length - 1;
                 const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
                 return (
                   <motion.button
                     key={`${card.suit}-${card.rank}`}
                     type="button"
-                    initial={{ y: 50, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: i * 0.02 }}
+                    initial={deal.isDealing ? { scale: 0.6, opacity: 0 } : { y: 50, opacity: 0 }}
+                    animate={deal.isDealing ? { scale: 1, opacity: 1 } : { y: 0, opacity: 1 }}
+                    transition={deal.isDealing ? { duration: 0.2, ease: [0.22, 1, 0.36, 1] } : { delay: i * 0.02 }}
                     onClick={() => playHandCard(card)}
                     disabled={isDisabled}
                     className="river-handHitbox"

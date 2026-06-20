@@ -16,6 +16,8 @@ import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHu
 import { AutoFitSeatName } from '../shared/AutoFitSeatName';
 import { CRIB_HUD_FLIP_DURATION_MS } from '../shared/CribHudFlipCard';
 import CribbagePegBoard from './CribbagePegBoard';
+import { useDealAnimation, type DealSeat } from '../shared/useDealAnimation';
+import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 
 const RIVER_SEAT_EDGE_GAP_PX = 8;
 
@@ -134,6 +136,7 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
 
   const handContainerRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
   const [handWidth, setHandWidth] = useState(360);
   const [tableSize, setTableSize] = useState<ElementSize>({ width: 0, height: 0 });
   const [seatPillElement, setSeatPillElement] = useState<HTMLDivElement | null>(null);
@@ -599,6 +602,28 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
     }).filter(layout => !!layout.player);
   }, [s.players, anchorIndex, tableSize.width, tableSize.height, seatPillSize.width, seatPillSize.height]);
 
+  const dealSeats = useMemo<DealSeat[]>(
+    () =>
+      seatLayouts.map(layout => ({
+        playerId: layout.player.id,
+        isSelf: layout.relativeIndex === 0,
+        seatLeft: layout.seatLeft,
+        seatTop: layout.seatTop,
+        count: layout.player.hand.length,
+      })),
+    [seatLayouts],
+  );
+
+  const deal = useDealAnimation({
+    boardRef,
+    tableRef,
+    dealKey: String(s.dealerIndex),
+    seats: dealSeats,
+  });
+
+  const myHandRevealCount = deal.revealedFor(myId, myPlayer?.hand.length ?? 0);
+  const visibleStripCards = isShowHandStrip ? stripCards : stripCards.slice(0, myHandRevealCount);
+
   const showActiveSeatPill = n > 1;
 
   const pegBoardSides = useMemo(() => {
@@ -724,7 +749,8 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
   }
 
   return (
-    <div className="river-board cribbage-board relative flex flex-col h-full min-h-0 text-white">
+    <div ref={boardRef} className="river-board cribbage-board relative flex flex-col h-full min-h-0 text-white">
+      <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
       {showDevScoreShortcut && (
         <button
           type="button"
@@ -975,7 +1001,7 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
                 </motion.div>
               </AnimatePresence>
             ) : (
-              stripCards.map((card, i) => {
+              visibleStripCards.map((card, i) => {
                   const isSelectedForCrib = selectedCrib.some(c => cardEquals(c, card));
                   const isCribSelecting = s.phase === 'crib-discard' && !myCribConfirmed;
                   const canPegThisCard =
@@ -984,15 +1010,15 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
                     myIndex === s.peggingCurrentIndex &&
                     peggingLegal.some(c => cardEquals(c, card));
                   const isDisabled = !isCribSelecting && !canPegThisCard;
-                  const isLast = i === stripCards.length - 1;
+                  const isLast = i === visibleStripCards.length - 1;
                   const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
 
                   return (
                     <motion.button
                       key={`${card.suit}-${card.rank}`}
-                      initial={{ y: 50, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      transition={{ delay: i * 0.02 }}
+                      initial={deal.isDealing ? { scale: 0.6, opacity: 0 } : { y: 50, opacity: 0 }}
+                      animate={deal.isDealing ? { scale: 1, opacity: 1 } : { y: 0, opacity: 1 }}
+                      transition={deal.isDealing ? { duration: 0.2, ease: [0.22, 1, 0.36, 1] } : { delay: i * 0.02 }}
                       onClick={() => {
                         if (isCribSelecting) toggleCribCard(card);
                         else if (canPegThisCard) playPegging(card);

@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { Trophy, ChevronUp, ChevronDown, Play, LogOut } from 'lucide-react';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor, normalizePlayerColor } from '../../networking/playerColors';
 import type { PokerState, PokerAction, Card, PokerPlayer } from './types';
+import { useDealAnimation, type DealSeat } from '../shared/useDealAnimation';
+import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 
 // ────────────────────────────────────────────
 // Card display helpers
@@ -95,6 +97,7 @@ interface PokerBoardProps {
 
 export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isHandZoomed = false }: PokerBoardProps) {
   const [raiseAmount, setRaiseAmount] = useState<number>(0);
+  const boardRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const handContainerRef = useRef<HTMLDivElement>(null);
   const [handWidth, setHandWidth] = useState(180);
@@ -153,6 +156,25 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
     });
   }, [state.players, anchorIndex]);
 
+  const dealSeats = useMemo<DealSeat[]>(
+    () =>
+      seatLayouts.map(layout => ({
+        playerId: layout.player.id,
+        isSelf: layout.relativeIndex === 0,
+        seatLeft: layout.seatLeft,
+        seatTop: layout.seatTop,
+        count: layout.player.holeCards.length,
+      })),
+    [seatLayouts],
+  );
+
+  const deal = useDealAnimation({
+    boardRef,
+    tableRef,
+    dealKey: String(state.handNumber),
+    seats: dealSeats,
+  });
+
   const headsUpContent = useMemo((): ReactNode => {
     if (state.gameOver && state.winners.length > 0) {
       const winnerPlayers = state.winners
@@ -196,9 +218,11 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
     return '\u00a0';
   }, [state.gameOver, state.sessionOver, state.winners, state.players, state.street, currentPlayer, myId]);
 
-  const visibleHandCards = me?.holeCards.length ? me.holeCards : [undefined, undefined];
+  const fullHandCards = me?.holeCards.length ? me.holeCards : [undefined, undefined];
+  const myHoleRevealCount = deal.revealedFor(myId, fullHandCards.length);
+  const visibleHandCards = deal.isDealing ? fullHandCards.slice(0, myHoleRevealCount) : fullHandCards;
   const handLayout = useMemo(() => {
-    const cardCount = visibleHandCards.length;
+    const cardCount = fullHandCards.length;
     const available = Math.max(handWidth - 8, 150);
     const maxCardWidth = 80;
     const cardWidth = Math.max(52, Math.min(available * 0.42, maxCardWidth));
@@ -215,7 +239,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
       spreadWidth,
       hoverLift: 14,
     };
-  }, [handWidth, visibleHandCards.length]);
+  }, [handWidth, fullHandCards.length]);
 
   const renderSeatPill = (layout: PokerSeatLayout) => {
     const { player } = layout;
@@ -271,7 +295,8 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
 
   // Main playing view: table + heads-up + contextual bottom section
   return (
-    <div className="poker-board space-y-3 sm:space-y-4">
+    <div ref={boardRef} className="poker-board relative space-y-3 sm:space-y-4">
+      <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
       <div ref={tableRef} className={`poker-table poker-table--players-${state.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
@@ -405,7 +430,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
 
           {me && (
             <div className="poker-actionRow">
-              {isMyTurn && !me.folded && !me.allIn && (
+              {isMyTurn && !me.folded && !me.allIn && !deal.isDealing && (
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'contents' }}>
                   <button type="button" onClick={() => sendAction({ type: 'fold' })} className="poker-actionButton bg-gray-700 border-black text-white hover:bg-gray-600">
                     Fold
