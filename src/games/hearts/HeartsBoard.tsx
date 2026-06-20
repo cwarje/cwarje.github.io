@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { HeartsState, Card, Suit, HeartsPlayer } from './types';
 import { isValidHeartsPlay } from './rules';
+import { getHeartsPassCount } from './logic';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 import { AutoFitSeatName } from '../shared/AutoFitSeatName';
 
@@ -36,31 +37,56 @@ function placementLabel(position: number): string {
   return `${position}th`;
 }
 
-type Seat = 'bottom' | 'left' | 'top' | 'right';
+interface HeartsSeatLayout {
+  relativeIndex: number;
+  playerIndex: number;
+  player: HeartsPlayer;
+  seatLeft: number;
+  seatTop: number;
+}
+
 interface TrickSlotPlacement {
-  row: number;
-  col: number;
+  row: 1 | 2;
+  col: 1 | 2 | 3;
   dx: string;
   dy: string;
 }
 
-const SEATS: Seat[] = ['bottom', 'left', 'top', 'right'];
-const TRICK_EXIT_OFFSETS: Record<Seat, { x: number; y: number }> = {
-  top: { x: 0, y: -72 },
-  left: { x: -72, y: 0 },
-  right: { x: 72, y: 0 },
-  bottom: { x: 0, y: 72 },
-};
-const TRICK_SLOT_PLACEMENTS: Record<Seat, TrickSlotPlacement> = {
-  bottom: { row: 2, col: 2, dx: '0px', dy: '0px' },
-  left: { row: 2, col: 1, dx: '0px', dy: 'calc(var(--hearts-slot-h) * -0.5)' },
-  top: { row: 1, col: 2, dx: '0px', dy: '0px' },
-  right: { row: 2, col: 3, dx: '0px', dy: 'calc(var(--hearts-slot-h) * -0.5)' },
+interface ElementSize {
+  width: number;
+  height: number;
+}
+
+const HEARTS_SEAT_EDGE_GAP_PX = 8;
+const TRICK_EXIT_DISTANCE_PX = 72;
+
+function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
+  if (playerCount >= 5) {
+    return { seatRadiusX: 37, seatRadiusY: 32 };
+  }
+  return { seatRadiusX: 35, seatRadiusY: 30 };
+}
+
+const TRICK_SLOT_PLACEMENTS: Record<number, TrickSlotPlacement[]> = {
+  4: [
+    { row: 2, col: 2, dx: '0px', dy: '0px' },
+    { row: 2, col: 1, dx: '0px', dy: 'calc(var(--hearts-slot-h) * -0.5)' },
+    { row: 1, col: 2, dx: '0px', dy: '0px' },
+    { row: 2, col: 3, dx: '0px', dy: 'calc(var(--hearts-slot-h) * -0.5)' },
+  ],
+  5: [
+    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--hearts-slot-h) * 0.25)' },
+    { row: 2, col: 1, dx: '0px', dy: '0px' },
+    { row: 1, col: 1, dx: 'calc(var(--hearts-slot-w) * 0.5)', dy: '0px' },
+    { row: 1, col: 3, dx: 'calc(var(--hearts-slot-w) * -0.5)', dy: '0px' },
+    { row: 2, col: 3, dx: '0px', dy: '0px' },
+  ],
 };
 
-function getTrickExitOffset(winnerSeat: Seat | null): { x: number; y: number } {
-  if (!winnerSeat) return { x: 0, y: 20 };
-  return TRICK_EXIT_OFFSETS[winnerSeat];
+function getTrickSlotPlacement(playerCount: number, relativeIndex: number): TrickSlotPlacement {
+  const layout = TRICK_SLOT_PLACEMENTS[playerCount]?.[relativeIndex];
+  if (layout) return layout;
+  return { row: 2, col: 2, dx: '0px', dy: '0px' };
 }
 
 function cardEquals(a: Card, b: Card): boolean {
@@ -69,18 +95,6 @@ function cardEquals(a: Card, b: Card): boolean {
 
 function cardKey(card: Card): string {
   return `${card.suit}-${card.rank}`;
-}
-
-function getSeatForPlayerIndex(playerIndex: number, myIndex: number, playerCount: number): Seat {
-  const relative = (playerIndex - myIndex + playerCount) % playerCount;
-  return SEATS[relative] ?? 'bottom';
-}
-
-function getSeatPlayer(state: HeartsState, myIndex: number, seat: Seat): { player: HeartsPlayer | null; index: number } {
-  const targetRelative = SEATS.indexOf(seat);
-  if (targetRelative === -1) return { player: null, index: -1 };
-  const index = (myIndex + targetRelative) % state.players.length;
-  return { player: state.players[index] ?? null, index };
 }
 
 interface HeartsBoardProps {
@@ -92,10 +106,16 @@ interface HeartsBoardProps {
 
 export default function HeartsBoard({ state, myId, onAction, isHandZoomed = false }: HeartsBoardProps) {
   const myIndex = state.players.findIndex(p => p.id === myId);
+  const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const myPlayer = state.players[myIndex];
   const isMyTurn = state.currentPlayerIndex === myIndex;
+  const passCount = getHeartsPassCount(state.players.length);
+  const tableRef = useRef<HTMLDivElement>(null);
   const handContainerRef = useRef<HTMLDivElement>(null);
   const [handWidth, setHandWidth] = useState(360);
+  const [tableSize, setTableSize] = useState<ElementSize>({ width: 0, height: 0 });
+  const [seatPillElement, setSeatPillElement] = useState<HTMLDivElement | null>(null);
+  const [seatPillSize, setSeatPillSize] = useState<ElementSize>({ width: 0, height: 0 });
   const handBeforePassRef = useRef<Card[]>([]);
   const prevPhaseRef = useRef(state.phase);
   const [receivedCardKeys, setReceivedCardKeys] = useState<Set<string>>(() => new Set());
@@ -110,14 +130,14 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
     if (isSelected) {
       newSelection = selectedPass.filter(c => !cardEquals(c, card));
     } else {
-      if (selectedPass.length >= 3) return;
+      if (selectedPass.length >= passCount) return;
       newSelection = [...selectedPass, card];
     }
     onAction({ type: 'select-pass', cards: newSelection });
   };
 
   const confirmPass = () => {
-    if (selectedPass.length === 3) {
+    if (selectedPass.length === passCount) {
       onAction({ type: 'confirm-pass' });
     }
   };
@@ -141,6 +161,29 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
   }, []);
 
   useEffect(() => {
+    const element = tableRef.current;
+    if (!element) return;
+
+    const updateSize = () => setTableSize({ width: element.clientWidth, height: element.clientHeight });
+    updateSize();
+
+    const resizeObserver = new ResizeObserver(() => updateSize());
+    resizeObserver.observe(element);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!seatPillElement) return;
+
+    const updateSize = () => setSeatPillSize({ width: seatPillElement.clientWidth, height: seatPillElement.clientHeight });
+    updateSize();
+
+    const resizeObserver = new ResizeObserver(() => updateSize());
+    resizeObserver.observe(seatPillElement);
+    return () => resizeObserver.disconnect();
+  }, [seatPillElement]);
+
+  useEffect(() => {
     const prevPhase = prevPhaseRef.current;
     prevPhaseRef.current = state.phase;
 
@@ -159,29 +202,80 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
     }
   }, [state.phase, state.passDirection, myPlayer?.hand]);
 
-  const trickBySeat = useMemo(() => {
-    const mapped: Partial<Record<Seat, { playerId: string; card: Card }>> = {};
+  const seatLayouts = useMemo<HeartsSeatLayout[]>(() => {
+    const playerCount = state.players.length;
+    if (playerCount === 0) return [];
+    const fallbackRadii = getLayoutRadii(playerCount);
+    const canUseMeasuredRadii =
+      tableSize.width > 0 &&
+      tableSize.height > 0 &&
+      seatPillSize.width > 0 &&
+      seatPillSize.height > 0;
+    const radii = canUseMeasuredRadii
+      ? (() => {
+          const usableHalfWidth = tableSize.width / 2 - seatPillSize.width / 2 - HEARTS_SEAT_EDGE_GAP_PX;
+          const usableHalfHeight = tableSize.height / 2 - seatPillSize.height / 2 - HEARTS_SEAT_EDGE_GAP_PX;
+          return {
+            seatRadiusX: Math.max(0, Math.min(50, (usableHalfWidth / tableSize.width) * 100)),
+            seatRadiusY: Math.max(0, Math.min(50, (usableHalfHeight / tableSize.height) * 100)),
+          };
+        })()
+      : fallbackRadii;
+
+    return Array.from({ length: playerCount }, (_, relativeIndex) => {
+      const playerIndex = (anchorIndex + relativeIndex) % playerCount;
+      const player = state.players[playerIndex];
+      const angle = 90 + (360 * relativeIndex) / playerCount;
+      const angleInRadians = (angle * Math.PI) / 180;
+      return {
+        relativeIndex,
+        playerIndex,
+        player,
+        seatLeft: 50 + radii.seatRadiusX * Math.cos(angleInRadians),
+        seatTop: 50 + radii.seatRadiusY * Math.sin(angleInRadians),
+      };
+    }).filter(layout => !!layout.player);
+  }, [state.players, anchorIndex, tableSize.width, tableSize.height, seatPillSize.width, seatPillSize.height]);
+
+  const trickByRelativeSeat = useMemo(() => {
+    const mapped: Partial<Record<number, { playerId: string; card: Card }>> = {};
+    const playerCount = state.players.length;
     state.currentTrick.forEach((entry) => {
       const index = state.players.findIndex(p => p.id === entry.playerId);
       if (index === -1) return;
-      const seat = getSeatForPlayerIndex(index, myIndex, state.players.length);
-      mapped[seat] = entry;
+      const relative = (index - anchorIndex + playerCount) % playerCount;
+      mapped[relative] = entry;
     });
     return mapped;
-  }, [state.currentTrick, state.players, myIndex]);
+  }, [state.currentTrick, state.players, anchorIndex]);
 
-  const trickWinnerSeat = useMemo(() => {
+  const trickWinnerRelativeSeat = useMemo(() => {
     if (!state.trickWinner) return null;
     const winnerIndex = state.players.findIndex(p => p.id === state.trickWinner);
     if (winnerIndex === -1) return null;
-    return getSeatForPlayerIndex(winnerIndex, myIndex, state.players.length);
-  }, [state.trickWinner, state.players, myIndex]);
+    return (winnerIndex - anchorIndex + state.players.length) % state.players.length;
+  }, [state.trickWinner, state.players, anchorIndex]);
 
   const trickWinnerPlayer = useMemo(
     () => (state.trickWinner ? state.players.find(p => p.id === state.trickWinner) ?? null : null),
     [state.players, state.trickWinner],
   );
-  const trickExitOffset = useMemo(() => getTrickExitOffset(trickWinnerSeat), [trickWinnerSeat]);
+
+  const trickExitOffset = useMemo(() => {
+    if (trickWinnerRelativeSeat === null) return { x: 0, y: 20 };
+    const winnerLayout = seatLayouts.find(layout => layout.relativeIndex === trickWinnerRelativeSeat);
+    if (!winnerLayout) return { x: 0, y: 20 };
+
+    const deltaX = winnerLayout.seatLeft - 50;
+    const deltaY = winnerLayout.seatTop - 50;
+    const distance = Math.hypot(deltaX, deltaY);
+    if (distance < 0.001) return { x: 0, y: 20 };
+
+    return {
+      x: (deltaX / distance) * TRICK_EXIT_DISTANCE_PX,
+      y: (deltaY / distance) * TRICK_EXIT_DISTANCE_PX,
+    };
+  }, [trickWinnerRelativeSeat, seatLayouts]);
 
   const headsUpContent = useMemo((): ReactNode => {
     if (state.phase === 'passing') {
@@ -203,7 +297,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
         }
         return 'All players confirmed. Starting round...';
       }
-      return `Pass 3 cards ${state.passDirection} · Selected ${selectedPass.length}/3`;
+      return `Pass ${passCount} cards ${state.passDirection} · Selected ${selectedPass.length}/${passCount}`;
     }
     if (state.trickWinner && trickWinnerPlayer) {
       return (
@@ -227,6 +321,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
     state.trickWinner,
     trickWinnerPlayer,
     isMyTurn,
+    passCount,
   ]);
 
   const handLayout = useMemo(() => {
@@ -250,10 +345,8 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
 
   const showActiveSeatPill = state.players.length > 1;
 
-  const renderSeatPill = (seat: Seat) => {
-    const { player } = getSeatPlayer(state, myIndex, seat);
-    if (!player) return null;
-
+  const renderSeatPill = (seatLayout: HeartsSeatLayout, shouldMeasure = false) => {
+    const player = seatLayout.player;
     const isCurrentTurn =
       state.phase === 'playing' && !state.trickWinner && state.players[state.currentPlayerIndex]?.id === player.id;
     const isMe = player.id === myId;
@@ -267,6 +360,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
     return (
       <div
+        ref={shouldMeasure ? setSeatPillElement : undefined}
         className={`hearts-seatPill ${activeSeatPillClass} ${isMe ? 'hearts-seatPill--me' : ''}`}
       >
         <div className="hearts-seatPillTop" style={{ backgroundColor: seatColor }}>
@@ -333,23 +427,40 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
   }
 
   return (
-    <div className="hearts-board space-y-4 sm:space-y-5">
-      <div className="hearts-table">
-        <div className="hearts-seat hearts-seat--top">{renderSeatPill('top')}</div>
-        <div className="hearts-seat hearts-seat--left">{renderSeatPill('left')}</div>
-        <div className="hearts-seat hearts-seat--right">{renderSeatPill('right')}</div>
-        <div className="hearts-seat hearts-seat--bottom">{renderSeatPill('bottom')}</div>
+    <div className={`hearts-board hearts-board--players-${state.players.length} space-y-4 sm:space-y-5`}>
+      <div ref={tableRef} className={`hearts-table hearts-table--players-${state.players.length}`}>
+        {seatLayouts.map((layout) => (
+          <div
+            key={`seat-${layout.player.id}`}
+            className={`hearts-seat ${layout.relativeIndex === 0 ? 'hearts-seat--self' : ''}`}
+            style={{
+              left: `${layout.seatLeft}%`,
+              top: `${layout.seatTop}%`,
+            }}
+          >
+            {renderSeatPill(layout, layout.relativeIndex === 0)}
+          </div>
+        ))}
 
         <div className={`hearts-center ${isHandZoomed ? 'hearts-center--zoom' : ''}`}>
           <div className="hearts-centerGrid">
-            {(['top', 'left', 'right', 'bottom'] as Seat[]).map((seat) => {
-              const trickEntry = trickBySeat[seat];
-              const isWinningCard = trickWinnerSeat === seat && !!state.trickWinner;
-              const placement = TRICK_SLOT_PLACEMENTS[seat];
-              const trickEntryOffset = TRICK_EXIT_OFFSETS[seat];
+            {seatLayouts.map((layout) => {
+              const trickEntry = trickByRelativeSeat[layout.relativeIndex];
+              const isWinningCard = trickWinnerRelativeSeat === layout.relativeIndex && !!state.trickWinner;
+              const placement = getTrickSlotPlacement(state.players.length, layout.relativeIndex);
+              const trickEntryOffset = (() => {
+                const deltaX = layout.seatLeft - 50;
+                const deltaY = layout.seatTop - 50;
+                const distance = Math.hypot(deltaX, deltaY);
+                if (distance < 0.001) return { x: 0, y: 12 };
+                return {
+                  x: (deltaX / distance) * TRICK_EXIT_DISTANCE_PX,
+                  y: (deltaY / distance) * TRICK_EXIT_DISTANCE_PX,
+                };
+              })();
               return (
                 <div
-                  key={seat}
+                  key={`slot-${layout.player.id}`}
                   className={`hearts-slot ${trickEntry ? 'hearts-slot--filled' : 'hearts-slot--empty'}`}
                   style={{
                     gridColumn: placement.col,
@@ -376,7 +487,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
                         </div>
                       </motion.div>
                     ) : (
-                      <div key={`placeholder-${seat}`} className="hearts-slotPlaceholder" />
+                      <div key={`placeholder-${layout.relativeIndex}`} className="hearts-slotPlaceholder" />
                     )}
                   </AnimatePresence>
                 </div>
@@ -449,7 +560,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
           </div>
 
           <div className="min-h-[56px] sm:min-h-[62px] flex items-start justify-center pt-[12px] sm:pt-[18px]">
-            {state.phase === 'passing' && selectedPass.length === 3 && !myPassConfirmed && (
+            {state.phase === 'passing' && selectedPass.length === passCount && !myPassConfirmed && (
               <button onClick={confirmPass} className="hearts-actionButton">
                 Confirm Pass
               </button>

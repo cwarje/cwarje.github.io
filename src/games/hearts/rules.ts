@@ -11,9 +11,10 @@ export function isValidHeartsPlay(state: HeartsState, playerIndex: number, card:
   if (!player) return false;
   const hand = player.hand;
 
-  // First trick first lead must be 2 of clubs.
+  // First trick first lead must be the starting club (2 of clubs for 4 players, 3 of clubs for 5).
   if (state.trickNumber === 1 && state.currentTrick.length === 0) {
-    return card.suit === 'clubs' && card.rank === 2;
+    const startRank = state.players.length === 5 ? 3 : 2;
+    return card.suit === 'clubs' && card.rank === startRank;
   }
 
   // Must follow lead suit if possible.

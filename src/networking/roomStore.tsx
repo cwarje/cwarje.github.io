@@ -19,6 +19,7 @@ import type {
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor } from './playerColors';
 import { createInitialGameState, processGameAction, checkGameOver, runSingleBotTurn, getGameWinners } from '../games/gameEngine';
 import type { HeartsState } from '../games/hearts/types';
+import { getHeartsPassCount } from '../games/hearts/logic';
 import type { PokerState } from '../games/poker/types';
 import type { YahtzeeState } from '../games/yahtzee/types';
 import type { FarkleState } from '../games/farkle/types';
@@ -1195,7 +1196,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
       // During passing phase, run bot selections (bots pass simultaneously, no visible delay needed)
       if (hs.phase === 'passing') {
-        const botsNeedToAct = hs.players.some(p => p.isBot && (!hs.passSelections[p.id] || hs.passSelections[p.id].length < 3 || !hs.passConfirmed[p.id]));
+        const passCount = getHeartsPassCount(hs.players.length);
+        const botsNeedToAct = hs.players.some(p => p.isBot && (!hs.passSelections[p.id] || hs.passSelections[p.id].length < passCount || !hs.passConfirmed[p.id]));
         if (botsNeedToAct) {
           botTimerRef.current = setTimeout(() => {
             const currentGs = gameStateRef.current;

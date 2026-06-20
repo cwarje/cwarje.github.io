@@ -244,22 +244,22 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
   hearts: {
     title: 'Hearts',
     shortDescription: 'Avoid tricks with hearts and the dreaded Queen of Spades. Or shoot the moon!',
-    playersLabel: '4 Players',
+    playersLabel: '4-5 Players',
     minPlayers: 4,
-    maxPlayers: 4,
+    maxPlayers: 5,
     info: {
       goal: 'Have the fewest points when any player reaches 100. Hearts are worth 1 point each, and the Queen of Spades is worth 13.',
       rules: [
-        'Played with a standard 52-card deck among 4 players.',
-        'Each round, players pass 3 cards to another player (left, right, across, then no pass — rotating each round).',
-        'The player with the 2 of Clubs leads the first trick.',
+        'With 4 players, a standard 52-card deck is dealt 13 cards each. With 5 players, the 2 of Clubs and 2 of Diamonds are removed and 10 cards are dealt to each player.',
+        'Each round, players pass cards to another player (left, right, across, then no pass — rotating each round). Pass 3 cards with 4 players, or 2 cards with 5 players.',
+        'The player with the lowest club leads the first trick: the 2 of Clubs with 4 players, or the 3 of Clubs with 5 players.',
         'You must follow the lead suit if you can. If you can\'t, you may play any card.',
         'Hearts cannot be led until a heart has been "broken" (played on a previous trick).',
         'The player who plays the highest card of the lead suit takes the trick and all its point cards.',
         'If one player takes ALL hearts and the Queen of Spades in a round, they "Shoot the Moon" — they score 0 and everyone else gets 26 points.',
       ],
       howToPlay: [
-        'Select 3 cards to pass at the start of each round, then click Pass.',
+        'Select the cards to pass at the start of each round (3 with 4 players, 2 with 5 players), then click Pass.',
         'When it\'s your turn, click a valid card from your hand to play it.',
         'Try to avoid winning tricks that contain hearts or the Queen of Spades.',
         'The round ends when all cards are played. A new round begins until someone hits 100 points.',

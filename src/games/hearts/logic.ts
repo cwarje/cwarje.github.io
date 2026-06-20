@@ -5,10 +5,37 @@ import { isValidHeartsPlay } from './rules';
 const SUITS: Suit[] = ['clubs', 'diamonds', 'spades', 'hearts'];
 const RANKS: Rank[] = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 
-function createDeck(): Card[] {
+interface HeartsConfig {
+  cardsPerPlayer: number;
+  passCount: number;
+  startRank: Rank;
+  removed: Card[];
+}
+
+function heartsConfig(playerCount: number): HeartsConfig {
+  if (playerCount === 5) {
+    return {
+      cardsPerPlayer: 10,
+      passCount: 2,
+      startRank: 3,
+      removed: [
+        { suit: 'clubs', rank: 2 },
+        { suit: 'diamonds', rank: 2 },
+      ],
+    };
+  }
+  return { cardsPerPlayer: 13, passCount: 3, startRank: 2, removed: [] };
+}
+
+export function getHeartsPassCount(playerCount: number): number {
+  return heartsConfig(playerCount).passCount;
+}
+
+function createDeck(removed: Card[] = []): Card[] {
   const deck: Card[] = [];
   for (const suit of SUITS) {
     for (const rank of RANKS) {
+      if (removed.some(r => r.suit === suit && r.rank === rank)) continue;
       deck.push({ suit, rank });
     }
   }
@@ -58,22 +85,24 @@ function getPassTargetIndex(fromIndex: number, direction: PassDirection, playerC
 }
 
 export function createHeartsState(players: Player[], options?: { targetScore?: 50 | 100 }): HeartsState {
-  // Hearts needs exactly 4 players
-  const gamePlayers = players.slice(0, 4);
-  const deck = shuffle(createDeck());
+  // Hearts supports 4 or 5 players
+  const gamePlayers = players.slice(0, 5);
+  const cfg = heartsConfig(gamePlayers.length);
+  const deck = shuffle(createDeck(cfg.removed));
 
   const heartsPlayers: HeartsPlayer[] = gamePlayers.map((p, i) => ({
     id: p.id,
     name: p.name,
     color: p.color,
     isBot: p.isBot,
-    hand: sortHand(deck.slice(i * 13, (i + 1) * 13)),
+    hand: sortHand(deck.slice(i * cfg.cardsPerPlayer, (i + 1) * cfg.cardsPerPlayer)),
     tricksTaken: [],
     roundScore: 0,
     totalScore: 0,
   }));
 
   const passDir = getPassDirection(1);
+  const startIdx = findStartingCardHolder(heartsPlayers, cfg.startRank);
 
   return {
     players: heartsPlayers,
@@ -83,8 +112,8 @@ export function createHeartsState(players: Player[], options?: { targetScore?: 5
     passSelections: {},
     passConfirmed: {},
     currentTrick: [],
-    currentPlayerIndex: findTwoOfClubs(heartsPlayers),
-    leadPlayerIndex: findTwoOfClubs(heartsPlayers),
+    currentPlayerIndex: startIdx,
+    leadPlayerIndex: startIdx,
     heartsBroken: false,
     trickNumber: 1,
     roundNumber: 1,
@@ -94,9 +123,9 @@ export function createHeartsState(players: Player[], options?: { targetScore?: 5
   };
 }
 
-function findTwoOfClubs(players: HeartsPlayer[]): number {
+function findStartingCardHolder(players: HeartsPlayer[], startRank: Rank): number {
   for (let i = 0; i < players.length; i++) {
-    if (players[i].hand.some(c => c.suit === 'clubs' && c.rank === 2)) return i;
+    if (players[i].hand.some(c => c.suit === 'clubs' && c.rank === startRank)) return i;
   }
   return 0;
 }
@@ -110,15 +139,17 @@ export function processHeartsAction(state: unknown, action: unknown, playerId: s
   switch (a.type) {
     case 'select-pass': {
       if (s.phase !== 'passing') return state;
-      if (a.cards.length > 3) return state;
+      const passCount = getHeartsPassCount(s.players.length);
+      if (a.cards.length > passCount) return state;
       return { ...s, passSelections: { ...s.passSelections, [playerId]: a.cards } };
     }
 
     case 'confirm-pass': {
       if (s.phase !== 'passing') return state;
-      // Verify this player has selected 3 cards
+      const passCount = getHeartsPassCount(s.players.length);
+      // Verify this player has selected the required number of cards
       const mySelection = s.passSelections[playerId];
-      if (!mySelection || mySelection.length !== 3) return state;
+      if (!mySelection || mySelection.length !== passCount) return state;
       // Already confirmed? No-op
       if (s.passConfirmed[playerId]) return state;
 
@@ -152,7 +183,7 @@ export function processHeartsAction(state: unknown, action: unknown, playerId: s
         return { ...p, hand: newHand };
       });
 
-      const startIdx = findTwoOfClubs(updatedPlayers);
+      const startIdx = findStartingCardHolder(updatedPlayers, heartsConfig(s.players.length).startRank);
 
       return {
         ...s,
@@ -230,8 +261,8 @@ export function processHeartsAction(state: unknown, action: unknown, playerId: s
 
       const nextTrick = s.trickNumber + 1;
 
-      // Round over?
-      if (nextTrick > 13) {
+      // Round over when all hands are empty.
+      if (newPlayers.every(p => p.hand.length === 0)) {
         return endRound({ ...s, players: newPlayers, heartsBroken: s.heartsBroken, trickWinner: null });
       }
 
@@ -283,16 +314,17 @@ function endRound(s: HeartsState): HeartsState {
 
   // Start new round
   const nextRound = s.roundNumber + 1;
-  const deck = shuffle(createDeck());
+  const cfg = heartsConfig(newPlayers.length);
+  const deck = shuffle(createDeck(cfg.removed));
   const dealtPlayers = newPlayers.map((p, i) => ({
     ...p,
-    hand: sortHand(deck.slice(i * 13, (i + 1) * 13)),
+    hand: sortHand(deck.slice(i * cfg.cardsPerPlayer, (i + 1) * cfg.cardsPerPlayer)),
     tricksTaken: [],
     roundScore: 0,
   }));
 
   const passDir = getPassDirection(nextRound);
-  const startIdx = findTwoOfClubs(dealtPlayers);
+  const startIdx = findStartingCardHolder(dealtPlayers, cfg.startRank);
 
   return {
     ...s,
@@ -456,10 +488,11 @@ export function chooseHeartsPassCards(state: HeartsState, playerIndex: number): 
   const player = state.players[playerIndex];
   if (!player) return [];
 
+  const passCount = getHeartsPassCount(state.players.length);
   const selected: Card[] = [];
   const workingHand = [...player.hand];
 
-  while (selected.length < 3 && workingHand.length > 0) {
+  while (selected.length < passCount && workingHand.length > 0) {
     const suitCounts = countBySuit(workingHand);
     let bestCard = workingHand[0];
     let bestScore = Number.NEGATIVE_INFINITY;
@@ -604,16 +637,17 @@ export function runHeartsBotTurn(state: unknown): unknown {
 
   // During passing phase, all players select simultaneously -- iterate all bots
   if (s.phase === 'passing') {
+    const passCount = getHeartsPassCount(s.players.length);
     let current = s;
     let changed = false;
 
     for (let i = 0; i < current.players.length; i++) {
       const botPlayer = current.players[i];
       if (!botPlayer.isBot) continue;
-      if (current.passSelections[botPlayer.id]?.length === 3) continue;
+      if (current.passSelections[botPlayer.id]?.length === passCount) continue;
 
       const selected = chooseHeartsPassCards(current, i);
-      current = processHeartsAction(current, { type: 'select-pass', cards: selected.slice(0, 3) }, botPlayer.id) as HeartsState;
+      current = processHeartsAction(current, { type: 'select-pass', cards: selected.slice(0, passCount) }, botPlayer.id) as HeartsState;
       changed = true;
     }
 
@@ -621,7 +655,7 @@ export function runHeartsBotTurn(state: unknown): unknown {
     for (const botPlayer of current.players) {
       if (!botPlayer.isBot) continue;
       if (current.passConfirmed[botPlayer.id]) continue;
-      if (current.passSelections[botPlayer.id]?.length === 3) {
+      if (current.passSelections[botPlayer.id]?.length === passCount) {
         current = processHeartsAction(current, { type: 'confirm-pass' }, botPlayer.id) as HeartsState;
         changed = true;
       }

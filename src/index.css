@@ -258,26 +258,26 @@
 }
 
 .hearts-table {
-  display: grid;
-  grid-template-columns: minmax(72px, 120px) 1fr minmax(72px, 120px);
-  grid-template-rows: auto 1fr auto;
-  gap: 8px;
-  align-items: center;
+  position: relative;
+  width: 100%;
+  min-height: 320px;
+  isolation: isolate;
   flex: 1;
   min-height: 0;
 }
 
 .hearts-seat {
+  position: absolute;
   display: flex;
   justify-content: center;
-  position: relative;
+  width: max-content;
+  transform: translate(-50%, -50%);
   z-index: 3;
 }
 
-.hearts-seat--top { grid-column: 2; grid-row: 1; }
-.hearts-seat--left { grid-column: 1; grid-row: 2; }
-.hearts-seat--right { grid-column: 3; grid-row: 2; }
-.hearts-seat--bottom { grid-column: 2; grid-row: 3; }
+.hearts-seat--self {
+  z-index: 4;
+}
 
 .hearts-seatPill {
   width: min(100%, 132px);
@@ -290,6 +290,10 @@
   display: grid;
   grid-template-rows: 1fr 1fr;
   overflow: hidden;
+}
+
+.hearts-table--players-5 .hearts-seatPill {
+  width: min(100%, 120px);
 }
 
 .hearts-seatPill--activeSelf {
@@ -468,18 +472,12 @@
 }
 
 .hearts-center {
-  grid-column: 2;
-  grid-row: 2;
-  position: relative;
+  position: absolute;
+  inset: 0;
   z-index: 1;
   --hearts-slot-w: 72px;
   --hearts-slot-h: 104px;
   --hearts-slot-gap: 6px;
-  width: min(52vw, 260px);
-  height: min(46vw, 220px);
-  min-width: 180px;
-  min-height: 158px;
-  margin: 0 auto;
 }
 
 .hearts-centerGrid {
@@ -603,9 +601,17 @@
 }
 
 @media (max-width: 639px) {
+  .hearts-table {
+    min-height: 300px;
+  }
+
   .hearts-center {
     --hearts-slot-w: 58px;
     --hearts-slot-h: 84px;
+  }
+
+  .hearts-table--players-5 .hearts-seatPill {
+    width: min(100%, 106px);
   }
 
   .hearts-center .hearts-cardRank {
