@@ -296,6 +296,49 @@ export default function TwelveBoard({
       const roundCardPoints = state.roundCardPoints;
       const isTeam = state.players.length === 4;
 
+      if (state.roundBonusesSkipped) {
+        if (isTeam) {
+          const teamPoints = getTeamRoundCardPoints(state.players, roundCardPoints);
+          const renderTeam = (teamIdx: 0 | 1) => {
+            const p1 = state.players[teamIdx === 0 ? 0 : 1];
+            const p2 = state.players[teamIdx === 0 ? 2 : 3];
+            return (
+              <>
+                <span style={{ color: getPlayerHudTextColor(p1.color) }}>{p1.name}</span>
+                {' & '}
+                <span style={{ color: getPlayerHudTextColor(p2.color) }}>{p2.name}</span>
+              </>
+            );
+          };
+          const pointsChunks = [
+            <span key="team0">{renderTeam(0)}{`: ${teamPoints[0]}`}</span>,
+            <span key="team1">{renderTeam(1)}{`: ${teamPoints[1]}`}</span>,
+          ];
+          const pointsLine = pointsChunks.reduce<ReactNode[]>((acc, node, i) => (i === 0 ? [node] : [...acc, ' · ', node]), []);
+          return (
+            <>
+              {'Half man ended the round — only bid points counted · '}
+              {pointsLine}
+              {' (card points not scored)'}
+            </>
+          );
+        }
+
+        const pointsChunks = state.players.map((player) => (
+          <span key={player.id} style={{ color: getPlayerHudTextColor(player.color) }}>
+            {player.name}: {roundCardPoints[player.id] ?? 0}
+          </span>
+        ));
+        const pointsLine = pointsChunks.reduce<ReactNode[]>((acc, node, i) => (i === 0 ? [node] : [...acc, ' · ', node]), []);
+        return (
+          <>
+            {'Half man ended the round — only bid points counted · '}
+            {pointsLine}
+            {' (card points not scored)'}
+          </>
+        );
+      }
+
       if (isTeam) {
         const teamPoints = getTeamRoundCardPoints(state.players, roundCardPoints);
         const renderTeam = (teamIdx: 0 | 1) => {

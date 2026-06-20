@@ -325,17 +325,32 @@ function startRound(
     winners: [],
     manBid: null,
     postAnnouncement: null,
+    roundBonusesSkipped: false,
   };
 }
 
-function endRound(state: TwelveState): TwelveState {
+function buildHalfManRoundSummary(players: TwelvePlayer[], roundCardPoints: Record<string, number>): string {
+  if (players.length === 4) {
+    const teamPoints = getTeamRoundCardPoints(players, roundCardPoints);
+    const team0Names = `${players[0].name} & ${players[2].name}`;
+    const team1Names = `${players[1].name} & ${players[3].name}`;
+    return `Half man — bid points only · ${team0Names}: ${teamPoints[0]} · ${team1Names}: ${teamPoints[1]} (not scored)`;
+  }
+  const chunks = players.map(player => `${player.name}: ${roundCardPoints[player.id] ?? 0}`);
+  return `Half man — bid points only · ${chunks.join(' · ')} (not scored)`;
+}
+
+function endRound(state: TwelveState, options?: { skipRoundBonuses?: boolean }): TwelveState {
   const roundCardPoints = getRoundCardPoints(state.players);
+  const skipRoundBonuses = options?.skipRoundBonuses ?? false;
   const isTeam = state.players.length === 4;
 
   let gotMostPoint: string | null = null;
   let updatedPlayers: TwelvePlayer[];
 
-  if (isTeam) {
+  if (skipRoundBonuses) {
+    updatedPlayers = state.players;
+  } else if (isTeam) {
     const teamPoints = getTeamRoundCardPoints(state.players, roundCardPoints);
     if (teamPoints[0] > teamPoints[1]) {
       gotMostPoint = state.players[0].id;
@@ -381,7 +396,9 @@ function endRound(state: TwelveState): TwelveState {
     players: updatedPlayers,
     phase: 'round-end',
     roundCardPoints,
-    roundSummary: buildRoundSummary(updatedPlayers, roundCardPoints, gotMostPoint, state.lastTrickWinnerId),
+    roundSummary: skipRoundBonuses
+      ? buildHalfManRoundSummary(updatedPlayers, roundCardPoints)
+      : buildRoundSummary(updatedPlayers, roundCardPoints, gotMostPoint, state.lastTrickWinnerId),
     gameOver: winners.length > 0,
     winners,
     trickWinner: null,
@@ -389,6 +406,7 @@ function endRound(state: TwelveState): TwelveState {
     pendingFlip: [],
     manBid: null,
     postAnnouncement: null,
+    roundBonusesSkipped: skipRoundBonuses,
   };
 }
 
@@ -556,12 +574,14 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
 
     case 'finish-announcement': {
       if (s.phase !== 'announcement') return state;
-      if (s.postAnnouncement === 'end-round') {
+      if (s.postAnnouncement === 'end-round' || s.postAnnouncement === 'end-round-half-man') {
         return endRound({
           ...s,
           phase: 'playing',
           announcement: null,
           postAnnouncement: null,
+        }, {
+          skipRoundBonuses: s.postAnnouncement === 'end-round-half-man',
         });
       }
       return {
@@ -701,7 +721,7 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
               phase: 'announcement',
               announcement: { kind: 'man-outcome', playerId: declarerId, outcome: 'half-fail-streak' },
               manBid: null,
-              postAnnouncement: roundIsOver ? 'end-round' : null,
+              postAnnouncement: 'end-round-half-man',
             };
           }
           if (s.trickNumber === 6) {
@@ -713,7 +733,7 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
                 phase: 'announcement',
                 announcement: { kind: 'man-outcome', playerId: declarerId, outcome: 'half-success' },
                 manBid: null,
-                postAnnouncement: roundIsOver ? 'end-round' : null,
+                postAnnouncement: 'end-round-half-man',
               };
             }
             return {
@@ -722,7 +742,7 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
               phase: 'announcement',
               announcement: { kind: 'man-outcome', playerId: declarerId, outcome: 'half-fail-points' },
               manBid: null,
-              postAnnouncement: roundIsOver ? 'end-round' : null,
+              postAnnouncement: 'end-round-half-man',
             };
           }
         } else {

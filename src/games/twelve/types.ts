@@ -77,7 +77,8 @@ export interface TwelveState {
   gameOver: boolean;
   winners: string[];
   manBid: TwelveManBid | null;
-  postAnnouncement: 'end-round' | null;
+  postAnnouncement: 'end-round' | 'end-round-half-man' | null;
+  roundBonusesSkipped: boolean;
 }
 
 export type TwelveAction =

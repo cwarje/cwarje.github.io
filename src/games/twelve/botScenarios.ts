@@ -64,6 +64,7 @@ function makeState(players: TwelvePlayer[], currentPlayerIndex: number): TwelveS
     winners: [],
     manBid: null,
     postAnnouncement: null,
+    roundBonusesSkipped: false,
   };
 }
 
@@ -399,6 +400,43 @@ function teamBonusCountedOnceScenario(): TwelveBotScenarioResult {
   };
 }
 
+/** Half man failure ends the round immediately with only bid points (+3 to opponents). */
+function halfManFailEndsRoundScenario(): TwelveBotScenarioResult {
+  const declarer = makePlayer('p0', false, [card('clubs', 6)], []);
+  const opponent = makePlayer('p1', false, [card('clubs', 14)], []);
+  declarer.capturedCards = [card('hearts', 10), card('diamonds', 11)];
+  opponent.capturedCards = [card('spades', 12)];
+
+  const state = makeState([declarer, opponent], 1);
+  state.manBid = { kind: 'half', playerId: 'p0' };
+  state.trickNumber = 4;
+  state.trickWinner = 'p1';
+  state.currentTrick = [
+    { playerId: 'p0', card: card('clubs', 6), source: 'hand' },
+    { playerId: 'p1', card: card('clubs', 14), source: 'hand' },
+  ];
+
+  const scoresBefore = state.players.map(p => p.totalScore);
+  const afterResolve = processTwelveAction(state, { type: 'resolve-trick' }, 'p0') as TwelveState;
+  const afterFinish = processTwelveAction(afterResolve, { type: 'finish-announcement' }, 'p0') as TwelveState;
+
+  const declarerScoreDelta = afterFinish.players[0].totalScore - scoresBefore[0];
+  const opponentScoreDelta = afterFinish.players[1].totalScore - scoresBefore[1];
+  const passed = afterFinish.phase === 'round-end'
+    && afterFinish.roundBonusesSkipped
+    && declarerScoreDelta === 0
+    && opponentScoreDelta === 3
+    && afterFinish.postAnnouncement === null;
+
+  return {
+    name: 'half-man-fail-ends-round',
+    passed,
+    details: passed
+      ? 'Half man failure awarded +3 to opponent and ended round with no other bonuses.'
+      : `phase=${afterFinish.phase}, roundBonusesSkipped=${afterFinish.roundBonusesSkipped}, declarerDelta=${declarerScoreDelta}, opponentDelta=${opponentScoreDelta}`,
+  };
+}
+
 /** Opponent led 10 in suit; bot must win with ace instead of ducking with a low card. */
 function aceOverLedTenScenario(): TwelveBotScenarioResult {
   const bot = makePlayer('p0', true, [card('hearts', 14), card('hearts', 6)], []);
@@ -432,6 +470,7 @@ export function runTwelveBotScenarioChecks(): TwelveBotScenarioResult[] {
     teamTrumpScoreSyncScenario(),
     teamWinnerResolutionScenario(),
     teamBonusCountedOnceScenario(),
+    halfManFailEndsRoundScenario(),
     aceOverLedTenScenario(),
   ];
 }
