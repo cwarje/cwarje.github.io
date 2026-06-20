@@ -225,6 +225,15 @@ Use this checklist when extending the platform. The game registry centralizes al
 
 All other wiring (GamePage, Home, GameCard, GameEngine) is derived from the registry automatically.
 
+### New game badge
+
+When you launch a new game, you can highlight it on the homepage game picker with a small amber **New** ribbon on its card.
+
+1. Set `showNewBadge: true` on that game's entry in `GAME_REGISTRY` (`src/games/registry.ts`).
+2. Remove `showNewBadge` from any other game that had it — only one game should wear the badge at a time.
+
+No other changes are needed: `GameCard` renders the badge from the registry flag, and the sheen animation lives in `src/index.css` (`.new-badge-text-sheen`). The badge appears on homepage cards only, not in the in-room HUD.
+
 ### Conventions to follow
 
 - Treat game state as immutable.

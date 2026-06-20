@@ -137,7 +137,7 @@ export interface GameDefinition {
   hasHandZoom?: boolean;
   production?: boolean;
   hudTitleLines?: string[];
-  /** Homepage card: small “New” ribbon */
+  /** Homepage card ribbon. Set on one game at a time; see README "New game badge". */
   showNewBadge?: boolean;
   /** If set, only these total player counts (humans + bots) are valid. */
   allowedPlayerCounts?: number[];
@@ -627,7 +627,6 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: true,
     production: true,
-    showNewBadge: true,
     hudTitleLines: ['Cribbage'],
   },
 
