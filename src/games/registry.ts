@@ -693,10 +693,10 @@ export const ALL_GAME_TYPES: GameType[] = [
   'yahtzee',
   'hearts',
   'twelve',
-  'settler',
   'up-and-down-the-river',
   'farkle',
   'cross-crib',
+  'settler',
   'poker',
 ];
 
@@ -708,9 +708,9 @@ export const PRODUCTION_GAME_TYPES: GameType[] = [
   'yahtzee',
   'hearts',
   'twelve',
-  'settler',
   'up-and-down-the-river',
   'farkle',
   'cross-crib',
+  'settler',
   'poker',
 ];
