@@ -286,10 +286,55 @@
   z-index: 4;
 }
 
+/* Standard seat pill — shared radii for flush inner corners */
+:root {
+  --seat-pill-radius: 14px;
+  --seat-pill-border-width: 3px;
+  --seat-pill-inner-radius: calc(var(--seat-pill-radius) - var(--seat-pill-border-width));
+}
+
+.hearts-seatPillTop,
+.cribbage-seatPillTop,
+.casino-seatPillTop,
+.river-seatPillTop,
+.poker-seatPillTop {
+  border-top-left-radius: var(--seat-pill-inner-radius);
+  border-top-right-radius: var(--seat-pill-inner-radius);
+}
+
+.hearts-seatPillRound {
+  border-bottom-left-radius: var(--seat-pill-inner-radius);
+}
+
+.hearts-seatPillTotal {
+  border-bottom-right-radius: var(--seat-pill-inner-radius);
+}
+
+.cribbage-seatPillScore {
+  border-bottom-left-radius: var(--seat-pill-inner-radius);
+  border-bottom-right-radius: var(--seat-pill-inner-radius);
+}
+
+.river-seatPillValues > :first-child {
+  border-bottom-left-radius: var(--seat-pill-inner-radius);
+}
+
+.river-seatPillValues > :last-child {
+  border-bottom-right-radius: var(--seat-pill-inner-radius);
+}
+
+.poker-seatPillBody > :nth-child(3) {
+  border-bottom-left-radius: var(--seat-pill-inner-radius);
+}
+
+.poker-seatPillBody > :last-child {
+  border-bottom-right-radius: var(--seat-pill-inner-radius);
+}
+
 .hearts-seatPill {
   width: min(100%, 132px);
   min-width: 84px;
-  background: #f3f4f6;
+  background: transparent;
   border: 3px solid #111827;
   border-radius: 14px;
   font-size: 0.75rem;
@@ -312,7 +357,7 @@
 }
 
 .hearts-seatPill--me {
-  background: #dbeafe;
+  background: transparent;
 }
 
 @keyframes heartsSeatPillBorderBlink {
@@ -372,7 +417,7 @@
 .cribbage-seatPill {
   width: min(100%, 132px);
   min-width: 84px;
-  background: #f3f4f6;
+  background: transparent;
   border: 3px solid #111827;
   border-radius: 14px;
   font-size: 0.75rem;
@@ -391,7 +436,7 @@
 }
 
 .cribbage-seatPill--me {
-  background: #dbeafe;
+  background: transparent;
 }
 
 @keyframes cribbageSeatPillBorderBlink {
@@ -1013,7 +1058,7 @@
 .casino-seatPill {
   width: min(100%, 132px);
   min-width: 84px;
-  background: #f3f4f6;
+  background: transparent;
   border: 3px solid #111827;
   border-radius: 14px;
   font-size: 0.75rem;
@@ -1032,7 +1077,7 @@
 }
 
 .casino-seatPill--me {
-  background: #dbeafe;
+  background: transparent;
 }
 
 @keyframes casinoSeatPillBorderBlink {
@@ -1531,7 +1576,7 @@
 .river-seatPill {
   width: min(100%, 132px);
   min-width: 84px;
-  background: #f3f4f6;
+  background: transparent;
   border: 3px solid #111827;
   border-radius: 14px;
   font-size: 0.75rem;
@@ -1570,7 +1615,7 @@
 }
 
 .river-seatPill--me {
-  background: #dbeafe;
+  background: transparent;
 }
 
 .twelve-seatPillButton {
@@ -2837,7 +2882,7 @@
 .poker-seatPill {
   width: min(100%, 128px);
   min-width: 80px;
-  background: #f3f4f6;
+  background: transparent;
   border: 3px solid #111827;
   border-radius: 14px;
   font-size: 0.75rem;
@@ -2856,7 +2901,7 @@
 }
 
 .poker-seatPill--me {
-  background: #dbeafe;
+  background: transparent;
 }
 
 .poker-seatPill--folded {
