@@ -3025,6 +3025,54 @@
   text-overflow: ellipsis;
 }
 
+.pong-headsUp {
+  position: absolute;
+  inset-inline: 0;
+  top: 3.5rem;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+@media (min-width: 640px) {
+  .pong-headsUp {
+    top: 4rem;
+  }
+}
+
+.pong-headsUpText {
+  width: 100%;
+  max-width: min(90vw, 40rem);
+  padding-inline: 1rem;
+  text-align: center;
+  font-size: 1.2rem;
+  color: #fff;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pong-countdown {
+  position: absolute;
+  inset-inline: 0;
+  top: clamp(5rem, 18vh, 8rem);
+  z-index: 15;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.pong-countdownNumber {
+  font-size: clamp(4rem, 18vw, 8rem);
+  font-weight: 900;
+  color: #fff;
+  line-height: 1;
+  text-shadow: 0 0 40px rgba(255, 255, 255, 0.35);
+}
+
 .poker-center {
   position: absolute;
   inset: 0;

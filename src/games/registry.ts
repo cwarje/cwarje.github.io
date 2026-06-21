@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Dice5, Heart, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers } from 'lucide-react';
+import { Dice5, Heart, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers, Circle } from 'lucide-react';
 import type { GameType, Player, GameStartOptions, TableEvent, TableEventInput } from '../networking/types';
 
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
@@ -31,6 +31,7 @@ import {
   getCribbageWinners,
 } from './cribbage/logic';
 import { createCasinoState, processCasinoAction, isCasinoOver, runCasinoBotTurn, getCasinoWinners } from './casino/logic';
+import { createPongState, processPongAction, isPongOver, runPongBotTurn, getPongWinners } from './pong/logic';
 
 import YahtzeeBoard from './yahtzee/YahtzeeBoard';
 import FarkleBoard from './farkle/FarkleBoard';
@@ -43,6 +44,7 @@ import SettlerBoard from './settler/SettlerBoard';
 import CrossCribBoard from './cross-crib/CrossCribBoard';
 import CribbageBoard from './cribbage/CribbageBoard';
 import CasinoBoard from './casino/CasinoBoard';
+import PongBoard from './pong/PongBoard';
 
 import HeartsOptions from './hearts/HeartsOptions';
 import FarkleOptions from './farkle/FarkleOptions';
@@ -137,6 +139,8 @@ export interface GameDefinition {
   hasHandZoom?: boolean;
   production?: boolean;
   hudTitleLines?: string[];
+  /** When true, the floating HUD title is hidden until `isOver(state)` is true. */
+  hideHudTitleDuringPlay?: boolean;
   /** Homepage card ribbon. Set on one game at a time; see README "New game badge". */
   showNewBadge?: boolean;
   /** If set, only these total player counts (humans + bots) are valid. */
@@ -683,10 +687,58 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     production: true,
     hudTitleLines: ['Casino'],
   },
+
+  pong: {
+    title: 'Pong',
+    shortDescription: 'Guard your stretch of the border. Save the ball with your paddle or lose a life — last player standing wins.',
+    playersLabel: '2-12 Players',
+    minPlayers: 2,
+    maxPlayers: 12,
+    info: {
+      goal: 'Be the last player with lives remaining by blocking the ball with your paddle.',
+      rules: [
+        'The screen border is split into equal colored zones — one per player.',
+        'Each player has a paddle that slides along their zone.',
+        'The ball launches from the center and travels in a straight line until it hits the border.',
+        'If your paddle blocks the ball, it deflects away — a save.',
+        'If the ball hits your zone without your paddle, you lose a life.',
+        'Everyone starts with 2 lives. When eliminated, your zone is redistributed among survivors.',
+        'The game ends when only one player has lives left.',
+      ],
+      howToPlay: [
+        'Use ← → arrow keys (or A / D) to move your paddle along your zone.',
+        'On mobile, use the on-screen arrow buttons.',
+        'Keep your paddle between the ball and your zone to survive.',
+      ],
+    },
+    icon: Circle,
+    theme: {
+      gradient: 'from-zinc-500/20 to-zinc-800/20',
+      cardBorder: 'border-zinc-500/20',
+      hoverBorder: 'hover:border-zinc-400/30',
+      playersTag: 'bg-zinc-500/25 text-zinc-200 border border-zinc-500/30',
+      iconColor: 'text-zinc-300',
+      buttonColors: 'bg-zinc-600 hover:bg-zinc-500',
+      panelBg: 'bg-zinc-950',
+      labelColor: 'text-zinc-200',
+    },
+    createState: createPongState,
+    processAction: processPongAction,
+    isOver: isPongOver,
+    runBotTurn: runPongBotTurn,
+    getWinners: getPongWinners,
+    Board: PongBoard,
+    fullBoard: true,
+    production: true,
+    showNewBadge: true,
+    hudTitleLines: ['Pong'],
+    hideHudTitleDuringPlay: true,
+  },
 };
 
 /** All registered game types */
 export const ALL_GAME_TYPES: GameType[] = [
+  'pong',
   'cribbage',
   'mobilization',
   'casino',
@@ -702,6 +754,7 @@ export const ALL_GAME_TYPES: GameType[] = [
 
 /** Game types shown in production (homepage order) */
 export const PRODUCTION_GAME_TYPES: GameType[] = [
+  'pong',
   'cribbage',
   'mobilization',
   'casino',

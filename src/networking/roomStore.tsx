@@ -27,6 +27,8 @@ import type { UpRiverState } from '../games/up-and-down-the-river/types';
 import { isMobilizationDevJumpAction, type MobilizationState } from '../games/mobilization/types';
 import type { TwelveState } from '../games/twelve/types';
 import type { SettlerState } from '../games/settler/types';
+import type { PongState } from '../games/pong/types';
+import { assignPongBotColors } from '../games/pong/logic';
 import {
   applySettlerIdleTimeout,
   reconcileSettlerTurnDeadlineAfterAction,
@@ -1051,6 +1053,10 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    if (gameType === 'pong') {
+      players = assignPongBotColors(players);
+    }
+
     const gs = createInitialGameState(gameType, players, options);
     const startedRoom = { ...room, players, gameType, phase: 'playing' as const };
     setRoom(startedRoom);
@@ -1224,6 +1230,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const CASINO_TABLE_REMNANT_DELAY = 3000; // ms to show who takes remaining table cards before scoring
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settlerIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pongTickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const PONG_TICK_MS = 33;
   const dealSignatureRef = useRef<string | null>(null);
   const dealHoldUntilRef = useRef<number>(0);
   const [dealHoldTick, setDealHoldTick] = useState(0);
@@ -2134,6 +2142,37 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     }
   }, [gameState, isHost, room, broadcastGameState, broadcastRoomState, dealHoldTick]);
 
+  // Pong real-time tick — separate effect so gameState updates don't restart the interval.
+  useEffect(() => {
+    if (!isHost || !room || room.phase !== 'playing' || room.gameType !== 'pong') {
+      return;
+    }
+
+    pongTickIntervalRef.current = setInterval(() => {
+      const currentGs = gameStateRef.current as PongState | null;
+      const currentRoom = roomRef.current;
+      if (!currentGs || !currentRoom || currentRoom.gameType !== 'pong' || currentGs.gameOver) return;
+
+      const next = processGameAction('pong', currentGs, { type: 'tick', dt: PONG_TICK_MS }, '');
+      if (next !== currentGs) {
+        setGameState(next);
+        broadcastGameState(next);
+        if (checkGameOver('pong', next)) {
+          const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+          setRoom(finishedRoom);
+          broadcastRoomState(finishedRoom);
+        }
+      }
+    }, PONG_TICK_MS);
+
+    return () => {
+      if (pongTickIntervalRef.current) {
+        clearInterval(pongTickIntervalRef.current);
+        pongTickIntervalRef.current = null;
+      }
+    };
+  }, [isHost, room?.phase, room?.gameType, room?.roomCode, broadcastGameState, broadcastRoomState]);
+
   // Cleanup on unmount
   useEffect(() => {
     const connections = connectionsRef.current;
@@ -2142,6 +2181,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     return () => {
       if (botTimerRef.current) clearTimeout(botTimerRef.current);
       if (settlerIdleTimerRef.current) clearTimeout(settlerIdleTimerRef.current);
+      if (pongTickIntervalRef.current) clearInterval(pongTickIntervalRef.current);
       disconnectTimers.forEach(timer => clearTimeout(timer));
       disconnectTimers.clear();
       reconnectingRef.current = false;

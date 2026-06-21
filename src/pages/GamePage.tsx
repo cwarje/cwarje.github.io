@@ -79,6 +79,8 @@ export default function GamePage() {
     isFinished || (gameState as Record<string, unknown>)?.sessionOver === true
   );
 
+  const showHudTitle = !gameDef?.hideHudTitleDuringPlay || (gameDef?.isOver(gameState) ?? false);
+
   const handleLeave = () => {
     leaveRoom();
     toast('Left the table.', 'info');
@@ -107,23 +109,25 @@ export default function GamePage() {
       </AnimatePresence>
 
       {/* Floating game HUD (no layout height) */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex items-start justify-between p-3 sm:p-4 pointer-events-none">
-        <div className="pointer-events-none">
-          <h1 className="text-xl sm:text-2xl font-bold text-white">
-            {gameDef?.hudTitleLines
-              ? gameDef.hudTitleLines.map((line, i) => (
-                  <span key={i}>{i > 0 && <br />}{line}</span>
-                ))
-              : gameDef?.title ?? 'Game'}
-          </h1>
-          {gameDef?.TitleExtra && (
-            <gameDef.TitleExtra
-              state={gameState}
-              isHandZoomed={gameDef?.hasHandZoom ? isHandZoomed : undefined}
-            />
-          )}
-        </div>
-        <div className="pointer-events-auto flex items-center gap-2">
+      <div className="absolute top-0 left-0 right-0 z-40 flex items-start justify-between p-3 sm:p-4 pointer-events-none">
+        {showHudTitle && (
+          <div className="pointer-events-none">
+            <h1 className="text-xl sm:text-2xl font-bold text-white">
+              {gameDef?.hudTitleLines
+                ? gameDef.hudTitleLines.map((line, i) => (
+                    <span key={i}>{i > 0 && <br />}{line}</span>
+                  ))
+                : gameDef?.title ?? 'Game'}
+            </h1>
+            {gameDef?.TitleExtra && (
+              <gameDef.TitleExtra
+                state={gameState}
+                isHandZoomed={gameDef?.hasHandZoom ? isHandZoomed : undefined}
+              />
+            )}
+          </div>
+        )}
+        <div className={`pointer-events-auto flex items-center gap-2 ${showHudTitle ? '' : 'ml-auto'}`}>
           {gameDef?.ToolbarExtra && <gameDef.ToolbarExtra state={gameState} isHandZoomed={gameDef?.hasHandZoom ? isHandZoomed : undefined} />}
           {showBackToLobby && (
             <motion.button
@@ -153,7 +157,7 @@ export default function GamePage() {
       </div>
 
       {error && (
-        <div className="absolute top-4 left-1/2 z-20 w-[min(90vw,40rem)] -translate-x-1/2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+        <div className="absolute top-4 left-1/2 z-40 w-[min(90vw,40rem)] -translate-x-1/2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
           {error}
         </div>
       )}
