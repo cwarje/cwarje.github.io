@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Copy, X, LogOut, Loader2, Settings, StopCircle } from 'lucide-react';
+import { Users, Copy, X, LogOut, Loader2, Settings, StopCircle, RotateCcw } from 'lucide-react';
 import PlayerList from './PlayerList';
 import { useRoomContext } from '../networking/roomStore';
 import { useToast } from './Toast';
@@ -22,6 +22,7 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
 
   const playerCount = room?.players.length ?? 0;
   const hasRoom = !!room;
+  const isOnlyHumanInLobby = hasRoom && room.players.filter((p) => !p.isBot).length === 1;
   const isLobbyPhase = room?.phase === 'lobby';
   const gameInProgress = room?.phase === 'playing' || room?.phase === 'finished';
   const canManagePlayers = isHost && isLobbyPhase;
@@ -64,7 +65,12 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
   const handleLeave = () => {
     setOpen(false);
     leaveRoom();
-    toast(isHost ? 'Lobby closed.' : 'Left lobby.', 'info');
+    const leaveMessage = !isHost
+      ? 'Left lobby.'
+      : isOnlyHumanInLobby
+        ? 'Lobby reset.'
+        : 'Lobby closed.';
+    toast(leaveMessage, 'info');
     navigate('/');
   };
 
@@ -264,8 +270,14 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                         onClick={handleLeave}
                         className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer bg-red-500 border border-red-500 text-white hover:bg-red-400 hover:border-red-400"
                       >
-                        {isHost ? <X className="w-4 h-4" /> : <LogOut className="w-4 h-4" />}
-                        <span className="font-medium">{isHost ? 'Close Lobby' : 'Leave Lobby'}</span>
+                        {isHost ? (
+                          isOnlyHumanInLobby ? <RotateCcw className="w-4 h-4" /> : <X className="w-4 h-4" />
+                        ) : (
+                          <LogOut className="w-4 h-4" />
+                        )}
+                        <span className="font-medium">
+                          {isHost ? (isOnlyHumanInLobby ? 'Reset Lobby' : 'Close Lobby') : 'Leave Lobby'}
+                        </span>
                       </button>
                     )}
                   </div>
