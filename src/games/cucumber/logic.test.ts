@@ -114,6 +114,23 @@ describe('cucumber logic', () => {
     expect(state.eliminationThreshold).toBe(ELIMINATION_THRESHOLD);
   });
 
+  it('sorts dealt hands by rank first, then suit', () => {
+    const suitOrder: Record<Card['suit'], number> = { clubs: 0, diamonds: 1, spades: 2, hearts: 3 };
+    const state = createCucumberState(makePlayers(4)) as CucumberState;
+
+    for (const player of state.players) {
+      for (let i = 1; i < player.hand.length; i++) {
+        const prev = player.hand[i - 1];
+        const curr = player.hand[i];
+        if (prev.rank !== curr.rank) {
+          expect(prev.rank).toBeLessThan(curr.rank);
+        } else {
+          expect(suitOrder[prev.suit]).toBeLessThan(suitOrder[curr.suit]);
+        }
+      }
+    }
+  });
+
   it('uses 50-point elimination threshold when configured', () => {
     const state = createCucumberState(makePlayers(3), { cucumberEliminationThreshold: 50 }) as CucumberState;
     expect(state.eliminationThreshold).toBe(50);

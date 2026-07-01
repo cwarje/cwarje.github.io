@@ -33,12 +33,7 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 function sortHand(hand: Card[]): Card[] {
-  return [...hand].sort((a, b) => {
-    if (SUIT_SORT_ORDER[a.suit] !== SUIT_SORT_ORDER[b.suit]) {
-      return SUIT_SORT_ORDER[a.suit] - SUIT_SORT_ORDER[b.suit];
-    }
-    return a.rank - b.rank;
-  });
+  return sortCardsByRank(hand);
 }
 
 function getActiveCount(players: CucumberPlayer[]): number {
