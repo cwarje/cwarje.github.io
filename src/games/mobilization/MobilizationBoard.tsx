@@ -11,7 +11,7 @@ import {
   isValidMobilizationTrickPlay,
 } from './rules';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
-import { useDealAnimation, type DealSeat } from '../shared/useDealAnimation';
+import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
@@ -194,7 +194,7 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
     [seatLayouts],
   );
 
-  const deal = useDealAnimation({
+  const deal = useDealerDealAnimation({
     boardRef,
     tableRef,
     dealKey: String(state.roundIndex),

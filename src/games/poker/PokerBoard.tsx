@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Trophy, ChevronUp, ChevronDown, Play, LogOut } from 'lucide-react';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor, normalizePlayerColor } from '../../networking/playerColors';
 import type { PokerState, PokerAction, Card, PokerPlayer } from './types';
-import { useDealAnimation, type DealSeat } from '../shared/useDealAnimation';
+import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 
 // ────────────────────────────────────────────
@@ -168,7 +168,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
     [seatLayouts],
   );
 
-  const deal = useDealAnimation({
+  const deal = useDealerDealAnimation({
     boardRef,
     tableRef,
     dealKey: String(state.handNumber),

@@ -15,6 +15,7 @@ import type {
   GameStartOptions,
   TableEvent,
   TableEventInput,
+  DealerSpeed,
 } from './types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor } from './playerColors';
 import { createInitialGameState, processGameAction, checkGameOver, runSingleBotTurn, getGameWinners } from '../games/gameEngine';
@@ -774,6 +775,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         phase: 'lobby',
         hostId: deviceId,
         wins: {},
+        dealerSpeed: 'medium',
       };
 
       setRoom(newRoom);
@@ -957,6 +959,14 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       }
     });
   }, [myId, isHost, broadcastGameState, broadcastRoomState]);
+
+  const setDealerSpeed = useCallback((speed: DealerSpeed) => {
+    if (!isHost || !room) return;
+    if (room.dealerSpeed === speed) return;
+    const updatedRoom = { ...room, dealerSpeed: speed };
+    setRoom(updatedRoom);
+    broadcastRoomState(updatedRoom);
+  }, [isHost, room, broadcastRoomState]);
 
   // Leave room
   const leaveRoom = useCallback(() => {
@@ -1293,7 +1303,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     if (dealInfo && dealInfo.cardCount > 0) {
       if (dealInfo.signature !== dealSignatureRef.current) {
         dealSignatureRef.current = dealInfo.signature;
-        dealHoldUntilRef.current = Date.now() + dealHoldDurationMs(dealInfo.cardCount);
+        dealHoldUntilRef.current = Date.now() + dealHoldDurationMs(dealInfo.cardCount, room.dealerSpeed ?? 'medium');
       }
       const remainingHold = dealHoldUntilRef.current - Date.now();
       if (remainingHold > 0) {
@@ -2299,6 +2309,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         lastTableEvent,
         returnToLobby,
         endGame,
+        setDealerSpeed,
         error,
         clearError,
         connecting,

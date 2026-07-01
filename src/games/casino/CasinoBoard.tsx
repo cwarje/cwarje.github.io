@@ -30,7 +30,7 @@ import {
   getPlayerHudTextColor,
 } from '../../networking/playerColors';
 import { useLastDealFlash } from './useLastDealFlash';
-import { useDealAnimation, type DealSeat, type DealExtraTarget } from '../shared/useDealAnimation';
+import { useDealerDealAnimation, type DealSeat, type DealExtraTarget } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
@@ -564,7 +564,7 @@ export default function CasinoBoard({
     }));
   }, [s.dealNumberInRound]);
 
-  const deal = useDealAnimation({
+  const deal = useDealerDealAnimation({
     boardRef,
     tableRef,
     dealKey: `${s.roundNumber}-${s.dealNumberInRound}`,

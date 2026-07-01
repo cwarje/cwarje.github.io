@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { useReducedMotion } from 'framer-motion';
+import type { DealerSpeed } from '../../networking/types';
 import {
   DEAL_ANIMATION_TAIL_MS,
   DEAL_FLIGHT_DURATION_MS,
@@ -54,7 +55,7 @@ interface DealRuntime {
   revealedExtras: Record<string, true>;
 }
 
-interface UseDealAnimationOptions {
+export interface UseDealAnimationOptions {
   boardRef: RefObject<HTMLElement | null>;
   tableRef: RefObject<HTMLElement | null>;
   /** Changes whenever a fresh deal occurs (e.g. round number). */
@@ -65,6 +66,8 @@ interface UseDealAnimationOptions {
   totalDealMs?: number;
   minStepMs?: number;
   maxStepMs?: number;
+  /** Used for host deal-hold sync; does not retrigger mid-deal. */
+  dealerSpeed?: DealerSpeed;
 }
 
 export interface DealAnimationResult {
@@ -93,6 +96,7 @@ export function useDealAnimation(options: UseDealAnimationOptions): DealAnimatio
     totalDealMs = DEAL_TOTAL_DEAL_MS,
     minStepMs = DEAL_MIN_STEP_MS,
     maxStepMs = DEAL_MAX_STEP_MS,
+    dealerSpeed = 'medium',
   } = options;
 
   const reduceMotion = useReducedMotion();
@@ -225,7 +229,7 @@ export function useDealAnimation(options: UseDealAnimationOptions): DealAnimatio
     }));
 
     setRuntime({ key: dealKey, active: true, flights, dealCenter, revealCounts: {}, revealedExtras: {} });
-    notifyDealAnimationStarted(planned.length);
+    notifyDealAnimationStarted(planned.length, dealerSpeed);
 
     planned.forEach((plan, index) => {
       if (!plan.playerId && !plan.extraId) return;

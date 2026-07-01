@@ -16,7 +16,7 @@ import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHu
 import { AutoFitSeatName } from '../shared/AutoFitSeatName';
 import { CRIB_HUD_FLIP_DURATION_MS } from '../shared/CribHudFlipCard';
 import CribbagePegBoard from './CribbagePegBoard';
-import { useDealAnimation, type DealSeat } from '../shared/useDealAnimation';
+import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 
 const RIVER_SEAT_EDGE_GAP_PX = 8;
@@ -614,7 +614,7 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
     [seatLayouts],
   );
 
-  const deal = useDealAnimation({
+  const deal = useDealerDealAnimation({
     boardRef,
     tableRef,
     dealKey: String(s.dealerIndex),

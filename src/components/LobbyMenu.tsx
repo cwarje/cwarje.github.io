@@ -5,13 +5,19 @@ import PlayerList from './PlayerList';
 import { useRoomContext } from '../networking/roomStore';
 import { useToast } from './Toast';
 import { useNavigate } from 'react-router-dom';
-import type { PlayerColor } from '../networking/types';
+import type { PlayerColor, DealerSpeed } from '../networking/types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 
 type LobbyMenuProps = { variant?: 'default' | 'icon' };
 
+const DEALER_SPEED_OPTIONS: { value: DealerSpeed; label: string }[] = [
+  { value: 'slow', label: 'Slow' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'fast', label: 'Fast' },
+];
+
 export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
-  const { room, myId, myPlayer, isHost, removeBot, removePlayer, leaveRoom, endGame, updateProfile, connecting } = useRoomContext();
+  const { room, myId, myPlayer, isHost, removeBot, removePlayer, leaveRoom, endGame, updateProfile, setDealerSpeed, connecting } = useRoomContext();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -202,6 +208,36 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                       </button>
                     </div>
                     <p className="text-[11px] text-gray-500">Share this code with friends to invite them</p>
+                  </div>
+
+                  {/* Dealer speed section */}
+                  <div className="px-5 py-4 space-y-2">
+                    <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Dealer speed</p>
+                    {isHost ? (
+                      <div className="flex gap-2">
+                        {DEALER_SPEED_OPTIONS.map(({ value, label }) => {
+                          const currentSpeed = room.dealerSpeed ?? 'medium';
+                          return (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => setDealerSpeed(value)}
+                              className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                                currentSpeed === value
+                                  ? 'bg-primary-600 text-white'
+                                  : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-300 capitalize">
+                        {(room.dealerSpeed ?? 'medium')} (set by host)
+                      </p>
+                    )}
                   </div>
 
                   {/* Players section */}

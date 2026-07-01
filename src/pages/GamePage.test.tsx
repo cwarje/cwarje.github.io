@@ -31,6 +31,7 @@ function createRoomState(overrides: Partial<RoomState> = {}): RoomState {
     phase: 'playing',
     hostId: 'host-1',
     wins: {},
+    dealerSpeed: 'medium',
     ...overrides,
   };
 }
@@ -54,6 +55,7 @@ function createRoomContext(overrides: Partial<RoomContextValue> = {}): RoomConte
     sendAction: vi.fn(),
     returnToLobby: vi.fn(),
     endGame: vi.fn(),
+    setDealerSpeed: vi.fn(),
     error: null,
     clearError: vi.fn(),
     connecting: false,
