@@ -38,6 +38,7 @@ import type { CrossCribState } from '../games/cross-crib/types';
 import { cribCardsToSelect } from '../games/cross-crib/types';
 import type { CribbageState } from '../games/cribbage/types';
 import type { CasinoState } from '../games/casino/types';
+import type { CucumberState } from '../games/cucumber/types';
 import { dealHoldDurationMs, registerDealHoldExtender } from '../games/shared/dealTiming';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 import { shouldBotBank } from '../games/farkle/logic';
@@ -146,6 +147,11 @@ function getRoundDealInfo(gameType: GameType | null, state: unknown): { signatur
       const holeCards = s.players.reduce((total, p) => total + p.holeCards.length, 0);
       return { signature: `poker-${s.handNumber}`, cardCount: holeCards };
     }
+    case 'cucumber': {
+      const s = state as CucumberState;
+      if (s.phase === 'hand-end' && s.gameOver) return null;
+      return { signature: `cucumber-${s.handNumber}`, cardCount: sumHand(s.players) };
+    }
     default:
       return null;
   }
@@ -205,6 +211,17 @@ function applyProfileToGameState(
     }
     case 'up-and-down-the-river': {
       const current = state as UpRiverState;
+      let changed = false;
+      const players = current.players.map((player) => {
+        if (player.id !== playerId) return player;
+        if (player.name === playerName && player.color === playerColor) return player;
+        changed = true;
+        return { ...player, name: playerName, color: playerColor };
+      });
+      return changed ? { ...current, players } : current;
+    }
+    case 'cucumber': {
+      const current = state as CucumberState;
       let changed = false;
       const players = current.players.map((player) => {
         if (player.id !== playerId) return player;
@@ -1428,6 +1445,74 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             setGameState(next);
             broadcastGameState(next);
             if (checkGameOver('up-and-down-the-river', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, UP_RIVER_BOT_DELAY);
+      }
+      return;
+    }
+
+    // ── Cucumber bot scheduling ──
+    if (room.gameType === 'cucumber') {
+      const cs = gameState as CucumberState;
+      if (cs.gameOver) return;
+
+      if (cs.phase === 'playing' && cs.trickWinner) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as CucumberState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'playing' || !currentGs.trickWinner) return;
+
+          const resolved = processGameAction('cucumber', currentGs, { type: 'resolve-trick' }, '');
+          if (resolved !== currentGs) {
+            setGameState(resolved);
+            broadcastGameState(resolved);
+            if (checkGameOver('cucumber', resolved)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, TRICK_DISPLAY_DELAY);
+        return;
+      }
+
+      if (cs.phase === 'hand-end') {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as CucumberState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'hand-end' || currentGs.gameOver) return;
+
+          const next = processGameAction('cucumber', currentGs, { type: 'start-next-hand' }, '');
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('cucumber', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, UP_RIVER_ROUND_END_DELAY);
+        return;
+      }
+
+      const currentPlayerId = cs.handPlayerIds[cs.currentPlayerIndex];
+      const currentPlayer = cs.players.find(player => player.id === currentPlayerId);
+      if (currentPlayer?.isBot) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom) return;
+
+          const next = runSingleBotTurn('cucumber', currentGs);
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('cucumber', next)) {
               const finishedRoom = { ...currentRoom, phase: 'finished' as const };
               setRoom(finishedRoom);
               broadcastRoomState(finishedRoom);

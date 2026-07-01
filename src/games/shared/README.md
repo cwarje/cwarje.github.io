@@ -20,6 +20,7 @@ These boards use the deal animation (all use a radial seat layout with the local
 | Up and Down the River | `UpAndDownTheRiverBoard.tsx` | `roundIndex` | All hands | — (trump lives in toolbar) |
 | Mobilization | `MobilizationBoard.tsx` | `roundIndex` | All hands | — |
 | Poker | `PokerBoard.tsx` | `handNumber` | Hole cards only | — (community cards are mid-hand) |
+| Cucumber | `CucumberBoard.tsx` | `handNumber` | All hands (active players only) | — |
 
 ### Module layout
 

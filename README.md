@@ -8,18 +8,21 @@ This project runs fully peer-to-peer in the browser: one player hosts a lobby an
 
 Current game types (from `src/games/registry.ts` and `src/networking/types.ts`):
 
+- `cucumber` (3-7 players; avoid the last trick, elimination at 30 penalty points)
+- `pong` (2-12 players)
+- `cribbage` (2-4 players; target score 61 or 121)
 - `mobilization` (4-6 players)
 - `casino` (2-4 players; optional `casinoMatchLength` in start options: `to11`, `to21`, or `eachDealerOnce` — default `to21`)
 - `yahtzee` (1-4 players)
 - `farkle` (2-6 players; target score 3000, 5000, or 10000)
-- `hearts` (4 players; target score 50 or 100)
+- `hearts` (4-5 players; target score 50 or 100)
 - `poker` (2-8 players)
 - `up-and-down-the-river` (4-6 players; start order `up-down` or `down-up`)
 - `twelve` (2-4 players; UI title **Tolva** — table piles, pile count 3-6)
 - `settler` (3-4 players)
 - `cross-crib` (2 or 4 players only)
 
-**Production** home page and game picker use `PRODUCTION_GAME_TYPES` in `registry.ts`: mobilization, casino, yahtzee, hearts, twelve, settler, up-and-down-the-river, farkle, cross-crib, poker.
+**Production** home page and game picker use `PRODUCTION_GAME_TYPES` in `registry.ts` (see that file for the current ordered list).
 
 ## Key features
 
@@ -97,7 +100,7 @@ The animation is cosmetic and local to each browser — authoritative state arri
 | `src/games/shared/dealTiming.ts` | Shared timing used by boards and `roomStore` deal hold |
 | `src/networking/roomStore.tsx` (`getRoundDealInfo`) | Host-side hold until animation duration elapses |
 
-Games: Hearts, Casino (4 table slots on first deal), Cross Crib (starter), Tolva/Twelve (front piles), Cribbage, Up and Down the River, Mobilization, Poker (hole cards only). Respects `prefers-reduced-motion`.
+Games: Hearts, Casino (4 table slots on first deal), Cross Crib (starter), Tolva/Twelve (front piles), Cribbage, Up and Down the River, Mobilization, Poker (hole cards only), **Cucumber**. Respects `prefers-reduced-motion`.
 
 See [`src/games/shared/README.md`](src/games/shared/README.md) for integration details, per-game `dealKey` values, and a checklist for wiring new boards.
 
@@ -223,42 +226,143 @@ Deployment:
 
 ## Adding a new game
 
-Use this checklist when extending the platform. The game registry centralizes all per-game configuration, so adding a game requires edits in only three places.
+Use this checklist when extending the platform. The game registry centralizes discoverability and engine dispatch, but several other files must stay in sync.
 
-1. **Add type** in `src/networking/types.ts`
-   - Extend the `GameType` union with your game key (e.g. `'my-game'`).
-   - Add any new game-start options to `GameStartOptions` if needed.
+### 1. Add type (`src/networking/types.ts`)
 
-2. **Create game module** `src/games/<game-name>/`
-   - `types.ts` — state and action types
-   - `logic.ts` — `createState`, `processAction`, `isOver`, `runBotTurn`, `getWinners`
-   - `<GameName>Board.tsx` — React board component
-   - (optional) `rules.ts` — rule helpers
-   - (optional) `*Options.tsx` — start options panel (e.g. Hearts target, Twelve pile count)
-   - (optional) `*TitleExtra.tsx` / `*ToolbarExtra.tsx` — HUD content
+- Extend the `GameType` union with your game key (e.g. `'my-game'`).
+- Add any new game-start options to `GameStartOptions` if needed.
 
-3. **Register the game** in `src/games/registry.ts`
-   - Add one entry to `GAME_REGISTRY` with metadata, theme, logic functions, Board component, and optional OptionsPanel/HUD components.
-   - Set `production: true` to include it in production builds, or `false` for dev-only.
+### 2. Create game module (`src/games/<game-name>/`)
 
-All other wiring (GamePage, Home, GameCard, GameEngine) is derived from the registry automatically.
+| File | Required | Purpose |
+|------|----------|---------|
+| `types.ts` | yes | State, action, and player types |
+| `logic.ts` | yes | Five exports (see below) |
+| `<GameName>Board.tsx` | yes | React board; props match `BoardProps` in `registry.ts` |
+| `rules.ts` | recommended | Pure validation helpers (keeps `logic.ts` readable) |
+| `logic.test.ts` | recommended | Rule and reducer tests |
+| `*Options.tsx` | optional | Lobby start options panel |
+| `*TitleExtra.tsx` / `*ToolbarExtra.tsx` | optional | Extra HUD content below the title |
+
+**Required logic exports** (wired through `GameDefinition`):
+
+```ts
+createXState(players: Player[], options?: GameStartOptions): unknown
+processXAction(state: unknown, action: unknown, playerId: string): unknown
+isXOver(state: unknown): boolean
+runXBotTurn(state: unknown): unknown
+getXWinners(state: unknown): string[]
+```
+
+**Logic conventions:**
+
+- Treat state as **immutable**; invalid actions return **unchanged state** (never throw).
+- Validate the acting player inside `processAction`.
+- `runBotTurn` performs **one** bot action per call; the host loops in `roomStore`.
+- Keep engine-facing types as `unknown`; cast inside your module.
+
+### 3. Register the game (`src/games/registry.ts`)
+
+Add one entry to `GAME_REGISTRY` with:
+
+- Metadata: `title`, `shortDescription`, `playersLabel`, `minPlayers`, `maxPlayers`
+- Optional `allowedPlayerCounts` when only specific totals are valid (e.g. cross-crib: 2 or 4 only — not every integer in the min–max range)
+- `info`: `{ goal, rules[], howToPlay[] }` for the homepage info modal
+- `theme`: Tailwind classes for homepage card and lobby panel
+- Logic functions + `Board` (+ optional `OptionsPanel`, `TitleExtra`, `ToolbarExtra`)
+- Flags: `fullBoard`, `hasHandZoom`, `production`, `showNewBadge`, `hudTitleLines`, `hideHudTitleDuringPlay`
+
+Also append your key to **`ALL_GAME_TYPES`** (display order + contract tests). If shipping on the homepage, add to **`PRODUCTION_GAME_TYPES`**.
+
+TypeScript requires **every** `GameType` to have a `GAME_REGISTRY` entry — missing either side fails the build.
+
+### 4. Wire host behavior (`src/networking/roomStore.tsx`)
+
+The registry alone does **not** schedule bots or deal holds. For most new games you must add:
+
+| Location | When needed |
+|----------|-------------|
+| `getRoundDealInfo()` | Radial deal animation — return `{ signature, cardCount }` matching the board's `dealKey` and total dealt cards |
+| Bot scheduler block (~`scheduleBotTurns` effect) | Bots, delayed auto-advances, trick resolution pauses |
+| `applyProfileToGameState()` | Player rename / color change mid-game |
+
+Search for an existing similar game (e.g. `up-and-down-the-river`, `hearts`, `cucumber`) and mirror its block.
+
+### 5. Tests and verification
+
+These run automatically once the game is registered:
+
+- `src/games/registry.contract.test.ts` — required handlers exist; unknown actions do not throw
+- `src/games/gameEngine.test.ts` — `runSingleBotTurn` does not throw
+
+Add game-specific coverage in `src/games/<game-name>/logic.test.ts`.
+
+Run before finishing:
+
+```bash
+npm run lint && npm run typecheck && npm run test && npm run build
+```
+
+### Reference implementations by shape
+
+| Game shape | Copy from |
+|------------|-----------|
+| Radial trick-taking (play → pause → resolve trick) | `up-and-down-the-river/`, `hearts/`, **`cucumber/`** |
+| Radial seats + deal animation wiring | `UpAndDownTheRiverBoard.tsx`, `CucumberBoard.tsx` |
+| Seat pill / trick slot layout (3–7 players) | `.river-*` classes in `index.css`; extend `TRICK_SLOT_PLACEMENTS` per player count |
+| Turn-based with phases | `mobilization/`, `twelve/` |
+| Real-time / non-card | `pong/` |
+
+### Trick-taking pattern (Hearts / Up River / Cucumber)
+
+Many card games split **playing a card** from **resolving a completed trick** so the UI can animate:
+
+1. `play-card` — append to `currentTrick`; when the trick is full, set `trickWinner` but **do not** clear the trick yet.
+2. Host scheduler — after `TRICK_DISPLAY_DELAY`, call `processAction` with `{ type: 'resolve-trick' }` and an **empty** `playerId`.
+3. `resolve-trick` — award the trick, advance leader, or end the hand/round.
+4. Optional `{ type: 'start-next-hand' }` / `{ type: 'start-next-round' }` — host-only, also with empty `playerId`, often after a hand-end delay.
+
+Boards dispatch only player actions (`play-card`, bids, etc.). Never call resolve/advance actions from the client UI.
+
+### HUD title (top-left during play)
+
+- Set `hudTitleLines: ['My', 'Game']` for a multi-line title on `GamePage`.
+- **`hideHudTitleDuringPlay: true`** hides the title until `isOver(state)` — omit this flag (or set `false`) if the title should stay visible during play, like Casino or Cucumber.
+- `TitleExtra` renders **below** the title (scores, round info).
+
+### Radial deal animation
+
+If your board uses `useDealAnimation`:
+
+1. Board: stable `dealKey`, `DealAnimationLayer`, gate hand on `deal.revealedFor`, disable actions while `deal.isDealing`.
+2. `roomStore.getRoundDealInfo`: same signature string and total card count as the board.
+3. See [`src/games/shared/README.md`](src/games/shared/README.md).
+
+### Styling
+
+- Reuse existing board CSS where possible (e.g. Cucumber reuses `.river-*` for cards, seats, and trick grid).
+- Add game-specific overrides under a `.my-game-*` prefix in `src/index.css`.
+- Seat pills often use a colored name row + white value row; see `.river-seatPillTop` and `.river-seatCell--*` for the Up River pattern.
 
 ### New game badge
 
-When you launch a new game, you can highlight it on the homepage game picker with a small amber **New** ribbon on its card.
+When you launch a new game, highlight it on the homepage with an amber **New** ribbon:
 
-1. Set `showNewBadge: true` on that game's entry in `GAME_REGISTRY` (`src/games/registry.ts`).
-2. Remove `showNewBadge` from any other game that had it — only one game should wear the badge at a time.
+1. Set `showNewBadge: true` on that game's `GAME_REGISTRY` entry.
+2. Remove `showNewBadge` from any other game — **only one** game should wear the badge at a time.
 
-No other changes are needed: `GameCard` renders the badge from the registry flag, and the sheen animation lives in `src/index.css` (`.new-badge-text-sheen`). The badge appears on homepage cards only, not in the in-room HUD.
+No other changes needed: `GameCard` reads the flag; sheen animation is in `src/index.css` (`.new-badge-text-sheen`).
 
-### Conventions to follow
+### Common pitfalls (for AI agents)
 
-- Treat game state as immutable.
-- Invalid actions should return unchanged state.
-- Validate current player before applying an action.
-- Keep bot logic idempotent and host-driven.
-- Keep engine-level interfaces generic (`unknown`) and cast inside game modules.
+1. **Forgetting `ALL_GAME_TYPES`** — game builds but never appears in tests/homepage order.
+2. **Forgetting `roomStore` bot scheduler** — bots never play, or tricks never resolve after animation.
+3. **`getRoundDealInfo` mismatch** — bots start before the deal animation finishes.
+4. **Calling resolve/advance from the board** — must be host-scheduled with empty `playerId`.
+5. **Setting `hideHudTitleDuringPlay` by default** — title disappears during play unless that is intentional.
+6. **Sparse player counts** — use `allowedPlayerCounts: [2, 4]`, not just `minPlayers`/`maxPlayers`.
+7. **No `logic.test.ts`** — contract tests pass but game rules are untested.
 
 ## Contributor playbook
 
@@ -270,6 +374,7 @@ Use this map to find where changes should go quickly:
 - Cross-game orchestration -> `src/games/gameEngine.ts`
 - Game metadata, themes, and discoverability -> `src/games/registry.ts`
 - Radial deal animation -> `src/games/shared/useDealAnimation.ts`, `DealAnimationLayer.tsx`, `dealTiming.ts`, and per-board wiring; host hold in `roomStore.tsx` (`getRoundDealInfo`)
+- Host bot scheduling and delayed auto-advances -> `roomStore.tsx` (search for your `gameType` or copy from a similar game)
 
 Recommended implementation workflow:
 

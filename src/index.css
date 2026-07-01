@@ -3471,3 +3471,60 @@
     width: 1.8em;
   }
 }
+
+/* ── Cucumber ── */
+.cucumber-board {
+  --cucumber-accent: rgb(74 222 128);
+}
+
+.cucumber-seatPill {
+  position: relative;
+  grid-template-rows: auto auto;
+}
+
+.cucumber-seatScoreRow {
+  background: #ffffff;
+  color: #111827;
+  text-align: center;
+  padding: 4px 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  border-bottom-left-radius: calc(var(--seat-pill-inner-radius, 11px));
+  border-bottom-right-radius: calc(var(--seat-pill-inner-radius, 11px));
+}
+
+@media (min-width: 640px) {
+  .cucumber-seatScoreRow {
+    font-size: 1rem;
+    padding: 5px 8px;
+  }
+}
+
+.cucumber-seatPill--eliminated {
+  opacity: 0.55;
+  filter: grayscale(0.35);
+}
+
+.cucumber-seatPill--eliminated .river-seatName {
+  text-decoration: line-through;
+}
+
+.cucumber-eliminatedTag {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 9999px;
+  background: rgb(127 29 29 / 0.9);
+  color: rgb(254 226 226);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cucumber-headsUpText--handEnd {
+  color: var(--cucumber-accent);
+}
+

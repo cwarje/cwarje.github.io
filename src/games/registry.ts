@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Dice5, Heart, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers, Circle } from 'lucide-react';
+import { Dice5, Heart, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers, Circle, Leaf } from 'lucide-react';
 import type { GameType, Player, GameStartOptions, TableEvent, TableEventInput } from '../networking/types';
 
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
@@ -32,6 +32,13 @@ import {
 } from './cribbage/logic';
 import { createCasinoState, processCasinoAction, isCasinoOver, runCasinoBotTurn, getCasinoWinners } from './casino/logic';
 import { createPongState, processPongAction, isPongOver, runPongBotTurn, getPongWinners } from './pong/logic';
+import {
+  createCucumberState,
+  processCucumberAction,
+  isCucumberOver,
+  runCucumberBotTurn,
+  getCucumberWinners,
+} from './cucumber/logic';
 
 import YahtzeeBoard from './yahtzee/YahtzeeBoard';
 import FarkleBoard from './farkle/FarkleBoard';
@@ -45,6 +52,7 @@ import CrossCribBoard from './cross-crib/CrossCribBoard';
 import CribbageBoard from './cribbage/CribbageBoard';
 import CasinoBoard from './casino/CasinoBoard';
 import PongBoard from './pong/PongBoard';
+import CucumberBoard from './cucumber/CucumberBoard';
 
 import HeartsOptions from './hearts/HeartsOptions';
 import FarkleOptions from './farkle/FarkleOptions';
@@ -62,6 +70,7 @@ import CasinoToolbarExtra from './casino/CasinoToolbarExtra';
 import UpRiverToolbarExtra from './up-and-down-the-river/UpRiverToolbarExtra';
 import TwelveTitleExtra from './twelve/TwelveTitleExtra';
 import MobilizationTitleExtra from './mobilization/MobilizationTitleExtra';
+import CucumberTitleExtra from './cucumber/CucumberTitleExtra';
 import { PigIcon } from '../components/icons/PigIcon';
 import { CribbagePegHolesIcon } from '../components/icons/CribbagePegHolesIcon';
 
@@ -730,14 +739,61 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     Board: PongBoard,
     fullBoard: true,
     production: true,
-    showNewBadge: true,
     hudTitleLines: ['Pong'],
     hideHudTitleDuringPlay: true,
+  },
+
+  cucumber: {
+    title: 'Cucumber',
+    shortDescription: 'Avoid the last trick — or get pickled at 30 points.',
+    playersLabel: '3–7 Players',
+    minPlayers: 3,
+    maxPlayers: 7,
+    info: {
+      goal: 'Be the last player under 30 penalty points.',
+      rules: [
+        'Each hand deals 7 cards. Suits do not matter — only rank.',
+        'On each trick you must play a card equal to or higher than the highest card in the trick, or your lowest card if you cannot beat it.',
+        'If an Ace is led, every player must play their lowest card.',
+        'The highest card wins the trick; tied ranks go to the last card played.',
+        'Only the 7th trick scores: the winner takes penalty points equal to their card (Ace = 14).',
+        'Reach 30 penalty points and you are eliminated. Last player standing wins.',
+      ],
+      howToPlay: [
+        'Play high cards early so you can keep a low card for the final trick.',
+        'Watch the penalty scores — players near 30 become desperate to dump the last trick.',
+        'When an Ace is led, everyone must sacrifice their lowest card.',
+      ],
+    },
+    icon: Leaf,
+    theme: {
+      gradient: 'from-green-500/20 to-emerald-900/20',
+      cardBorder: 'border-green-500/20',
+      hoverBorder: 'hover:border-green-400/30',
+      playersTag: 'bg-green-500/25 text-green-200 border border-green-500/30',
+      iconColor: 'text-green-400',
+      buttonColors: 'bg-green-600 hover:bg-green-500',
+      panelBg: 'bg-green-950',
+      labelColor: 'text-green-200',
+    },
+    createState: createCucumberState,
+    processAction: processCucumberAction,
+    isOver: isCucumberOver,
+    runBotTurn: runCucumberBotTurn,
+    getWinners: getCucumberWinners,
+    Board: CucumberBoard,
+    TitleExtra: CucumberTitleExtra,
+    fullBoard: true,
+    hasHandZoom: true,
+    production: true,
+    showNewBadge: true,
+    hudTitleLines: ['Cucumber'],
   },
 };
 
 /** All registered game types */
 export const ALL_GAME_TYPES: GameType[] = [
+  'cucumber',
   'pong',
   'cribbage',
   'mobilization',
@@ -754,6 +810,7 @@ export const ALL_GAME_TYPES: GameType[] = [
 
 /** Game types shown in production (homepage order) */
 export const PRODUCTION_GAME_TYPES: GameType[] = [
+  'cucumber',
   'pong',
   'cribbage',
   'mobilization',

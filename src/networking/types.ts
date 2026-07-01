@@ -10,7 +10,8 @@ export type GameType =
   | 'cribbage'
   | 'mobilization'
   | 'casino'
-  | 'pong';
+  | 'pong'
+  | 'cucumber';
 export type PlayerColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet' | 'dark-purple';
 export type HeartsTargetScore = 50 | 100;
 export type FarkleTargetScore = 3000 | 5000 | 10000;
