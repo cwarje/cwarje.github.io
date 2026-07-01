@@ -2399,8 +2399,24 @@
   overflow: visible;
 }
 
-.deal-animStack {
+.deal-animCenter {
   position: absolute;
+  z-index: 40;
+}
+
+.deal-animDealer {
+  position: absolute;
+  z-index: 42;
+  display: block;
+  height: 72px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+}
+
+.deal-animStack {
+  position: relative;
   width: 64px;
   height: 90px;
 }

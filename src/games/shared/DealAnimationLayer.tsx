@@ -21,18 +21,24 @@ export function DealAnimationLayer({ flights, dealCenter, remaining }: DealAnima
     <div className="deal-animLayer" aria-hidden="true">
       {stackCount > 0 && (
         <div
-          className="deal-animStack"
-          style={{ left: dealCenter.x - CARD_HALF_WIDTH, top: dealCenter.y - CARD_HALF_HEIGHT }}
+          className="deal-animCenter"
+          style={{
+            left: dealCenter.x,
+            top: dealCenter.y - CARD_HALF_HEIGHT,
+            transform: 'translate(-50%, 0)',
+          }}
         >
-          {Array.from({ length: stackCount }, (_, i) => (
-            <div
-              key={`deal-stack-${i}`}
-              className="deal-animCard"
-              style={{ transform: `translate(${i * -1.5}px, ${i * -1.5}px)` }}
-            >
-              <div className="twelve-cardBackFace" />
-            </div>
-          ))}
+          <div className="deal-animStack">
+            {Array.from({ length: stackCount }, (_, i) => (
+              <div
+                key={`deal-stack-${i}`}
+                className="deal-animCard"
+                style={{ transform: `translate(${i * -1.5}px, ${i * -1.5}px)` }}
+              >
+                <div className="twelve-cardBackFace" />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -66,6 +72,19 @@ export function DealAnimationLayer({ flights, dealCenter, remaining }: DealAnima
           );
         })}
       </AnimatePresence>
+
+      {stackCount > 0 && (
+        <img
+          src="/dealer.png"
+          alt=""
+          className="deal-animDealer"
+          style={{
+            left: dealCenter.x,
+            top: dealCenter.y - CARD_HALF_HEIGHT - 6,
+            transform: 'translate(-50%, -100%) translateX(-6px)',
+          }}
+        />
+      )}
     </div>
   );
 }
