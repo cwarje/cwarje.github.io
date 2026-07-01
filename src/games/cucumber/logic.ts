@@ -280,21 +280,34 @@ function nonReservedCards(hand: Card[], legal: Card[]): Card[] {
   return sortCardsByRank(legal.filter(c => c.rank > low));
 }
 
-function canDuckWithLowest(
+function canSloughWithoutAnchor(
   hand: Card[],
   legal: Card[],
   trick: { playerId: string; card: Card }[],
 ): boolean {
   if (trick.some(e => e.card.rank === 14)) return false;
-  const low = lowestRankInHand(hand);
-  if (!legal.some(c => c.rank === low)) return false;
-  if (hand.length > 1 && legal.some(c => c.rank > low)) return true;
-  return hand.length === 1;
+  if (hand.length === 1) return true;
+  return nonReservedCards(hand, legal).length > 0;
 }
 
-function duckCard(hand: Card[], legal: Card[]): Card {
-  const low = lowestRankInHand(hand);
-  return sortCardsByRank(legal.filter(c => c.rank === low))[0];
+function sloughCard(
+  hand: Card[],
+  legal: Card[],
+  trick: { playerId: string; card: Card }[],
+): Card {
+  const anchor = lowestRankInHand(hand);
+  const sloughable = nonReservedCards(hand, legal);
+  if (sloughable.length > 0) {
+    const highest = trick.length > 0 ? highestRankInTrick(trick) : 0;
+    const nonWinning = sloughable.filter(c => c.rank < highest);
+    if (nonWinning.length > 0) return nonWinning[0];
+    const anchorLegal = sortCardsByRank(legal.filter(c => c.rank === anchor));
+    if (anchorLegal.length > 0 && anchor < highest) return anchorLegal[0];
+    return sloughable[0];
+  }
+  const anchorLegal = sortCardsByRank(legal.filter(c => c.rank === anchor));
+  if (anchorLegal.length > 0) return anchorLegal[0];
+  return sortCardsByRank(legal)[0];
 }
 
 function countSparePremium(hand: Card[], exclude?: Card): number {
@@ -346,17 +359,17 @@ function shouldSpendAce(
   if (!ace) return false;
 
   const beating = legalBeatingCards(hand, trick, legal);
-  const canDuck = canDuckWithLowest(hand, legal, trick);
-  if (beating.length === 1 && cardEquals(beating[0], ace) && !canDuck) return true;
+  const canSlough = canSloughWithoutAnchor(hand, legal, trick);
+  if (beating.length === 1 && cardEquals(beating[0], ace) && !canSlough) return true;
 
   if (remainingCount < MIN_FORCE_TARGETS) return false;
 
   switch (profile.shape) {
     case 'top-heavy':
     case 'balanced':
-      return true;
+      return countSparePremium(hand) >= 1;
     case 'bottom-heavy':
-      return true;
+      return countSparePremium(hand) >= 2;
   }
 }
 
@@ -399,20 +412,27 @@ function chooseConservativeFollow(
 ): Card {
   const sorted = sortCardsByRank(legal);
   const beating = legalBeatingCards(hand, trick, legal);
-  const canDuck = canDuckWithLowest(hand, legal, trick);
+  const canSlough = canSloughWithoutAnchor(hand, legal, trick);
 
-  if (canDuck) {
+  if (canSlough) {
     if (profile.shape === 'bottom-heavy' || profile.shape === 'balanced') {
-      return duckCard(hand, legal);
+      return sloughCard(hand, legal, trick);
     }
     if (profile.shape === 'top-heavy' && beating.length > 0) {
-      const midHighBeat = beating.find(c => c.rank >= 10 && c.rank <= 11);
-      if (midHighBeat && profile.premiumCount >= 2) return midHighBeat;
+      const anchor = lowestRankInHand(hand);
+      if (anchor >= 9) {
+        const midHighBeat = beating.find(c => c.rank >= 10 && c.rank <= 11);
+        if (midHighBeat && profile.premiumCount >= 2) return midHighBeat;
+      }
     }
-    return duckCard(hand, legal);
+    return sloughCard(hand, legal, trick);
   }
 
-  if (beating.length > 0) return beating[0];
+  if (beating.length > 0) {
+    const nonReservedBeating = nonReservedCards(hand, beating);
+    if (nonReservedBeating.length > 0) return nonReservedBeating[0];
+    return beating[0];
+  }
   return sorted[0];
 }
 
@@ -440,18 +460,7 @@ function chooseLeadCard(
   const force = pickForceCard(profile, hand, [], pool, remainingCount);
   if (force) return force;
 
-  switch (profile.shape) {
-    case 'top-heavy':
-      if (remainingCount === 1) {
-        const withoutAce = pool.filter(c => c.rank < 14);
-        return withoutAce.length > 0 ? withoutAce[withoutAce.length - 1] : pool[pool.length - 1];
-      }
-      return pool[0];
-
-    case 'bottom-heavy':
-    case 'balanced':
-      return pool[0];
-  }
+  return pool[0];
 }
 
 function getRemainingPlayerIds(state: CucumberState): string[] {
