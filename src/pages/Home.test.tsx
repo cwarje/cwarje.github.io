@@ -98,4 +98,142 @@ describe('Home', () => {
 
     expect(createLobby).not.toHaveBeenCalled();
   });
+
+  it('shows personalized waiting heading for non-host in lobby', () => {
+    mockUseRoomContext.mockReturnValue(
+      createRoomContext({
+        isHost: false,
+        myId: 'player-2',
+        room: createRoomState({
+          players: [
+            {
+              id: 'player-1',
+              name: 'Cam',
+              color: 'blue',
+              isBot: false,
+              isHost: true,
+              connected: true,
+            },
+            {
+              id: 'player-2',
+              name: 'Alex',
+              color: 'green',
+              isBot: false,
+              isHost: false,
+              connected: true,
+            },
+          ],
+        }),
+      }),
+    );
+
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Waiting for Cam to pick a game' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('The host will pick a game to start.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Waiting for the host to pick a game...')).not.toBeInTheDocument();
+  });
+
+  it('shows singular waiting message for host with one other player', () => {
+    mockUseRoomContext.mockReturnValue(
+      createRoomContext({
+        room: createRoomState({
+          players: [
+            {
+              id: 'player-1',
+              name: 'Cam',
+              color: 'blue',
+              isBot: false,
+              isHost: true,
+              connected: true,
+            },
+            {
+              id: 'player-2',
+              name: 'Alex',
+              color: 'green',
+              isBot: false,
+              isHost: false,
+              connected: true,
+            },
+          ],
+        }),
+      }),
+    );
+
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Alex is waiting for you to pick a game' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('ROOM CODE')).not.toBeInTheDocument();
+  });
+
+  it('shows plural waiting message for host with multiple other players', () => {
+    mockUseRoomContext.mockReturnValue(
+      createRoomContext({
+        room: createRoomState({
+          players: [
+            {
+              id: 'player-1',
+              name: 'Cam',
+              color: 'blue',
+              isBot: false,
+              isHost: true,
+              connected: true,
+            },
+            {
+              id: 'player-2',
+              name: 'Alex',
+              color: 'green',
+              isBot: false,
+              isHost: false,
+              connected: true,
+            },
+            {
+              id: 'player-3',
+              name: 'Sam',
+              color: 'red',
+              isBot: false,
+              isHost: false,
+              connected: true,
+            },
+          ],
+        }),
+      }),
+    );
+
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Alex, Sam are waiting for you to pick a game' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('ROOM CODE')).not.toBeInTheDocument();
+  });
+
+  it('shows join bar for host alone in lobby', () => {
+    mockUseRoomContext.mockReturnValue(createRoomContext());
+
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByPlaceholderText('ROOM CODE')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /waiting for you to pick a game/i })).not.toBeInTheDocument();
+  });
 });

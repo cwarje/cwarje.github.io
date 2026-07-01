@@ -6,11 +6,23 @@ import GameCard from '../components/GameCard';
 import GameStartOptionsPanel from '../components/GameStartOptionsPanel';
 import RoomCodeInput from '../components/RoomCodeInput';
 import { useRoomContext } from '../networking/roomStore';
-import type { GameStartOptions, GameType, PlayerColor } from '../networking/types';
+import type { GameStartOptions, GameType, Player, PlayerColor } from '../networking/types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 import { GAME_REGISTRY, ALL_GAME_TYPES, PRODUCTION_GAME_TYPES } from '../games/registry';
 
 const gameTypesToShow = import.meta.env.DEV ? ALL_GAME_TYPES : PRODUCTION_GAME_TYPES;
+
+function playerTextColor(color: PlayerColor): string {
+  return PLAYER_COLOR_HEX[normalizePlayerColor(color)] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
+}
+
+function ColoredPlayerName({ player }: { player: Player }) {
+  return (
+    <span style={{ color: playerTextColor(player.color) }}>
+      {player.name}
+    </span>
+  );
+}
 
 export default function Home() {
   const navigate = useNavigate();
@@ -129,41 +141,40 @@ export default function Home() {
   };
 
   const playerCount = room?.players.length ?? 0;
+  const hostPlayer = room?.players.find((p) => p.id === room.hostId);
+  const waitingPlayers = room ? room.players.filter((p) => p.id !== room.hostId) : [];
+
+  const showNonHostLobbyMessage = room && !isHost;
+  const showHostLobbyMessage = room && isHost && waitingPlayers.length > 0;
 
   return (
     <div className="space-y-10">
-      {/* Hero Section */}
+      {/* Join bar or waiting message — fixed height so game cards don't shift */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="text-center space-y-4"
+        transition={{ delay: 0.15 }}
+        className="flex flex-col sm:flex-row items-center justify-center gap-3 h-[8.25rem] sm:h-[6rem]"
       >
-        {room && !isHost && (
-          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">
-            <span className="bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
-              Waiting for Host
-            </span>
+        {showNonHostLobbyMessage ? (
+          <h1 className="text-center text-xl sm:text-2xl font-extrabold tracking-tight px-4 max-w-2xl text-white">
+            Waiting for {hostPlayer ? <ColoredPlayerName player={hostPlayer} /> : 'the host'} to pick a game
           </h1>
-        )}
-        {room && !isHost && (
-          <p className="text-gray-400 text-lg max-w-md mx-auto">
-            The host will pick a game to start.
-          </p>
+        ) : showHostLobbyMessage ? (
+          <h1 className="text-center text-xl sm:text-2xl font-extrabold tracking-tight px-4 max-w-2xl text-white">
+            {waitingPlayers.map((player, index) => (
+              <span key={player.id}>
+                {index > 0 && ', '}
+                <ColoredPlayerName player={player} />
+              </span>
+            ))}
+            {waitingPlayers.length === 1 ? ' is ' : ' are '}
+            waiting for you to pick a game
+          </h1>
+        ) : (
+          <RoomCodeInput onJoin={handleJoinRoom} loading={connecting} />
         )}
       </motion.div>
-
-      {/* Join Room Bar — hidden when player has joined someone else's lobby */}
-      {(!room || isHost) && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-3"
-        >
-          <RoomCodeInput onJoin={handleJoinRoom} loading={connecting} />
-        </motion.div>
-      )}
 
       {/* Error */}
       {error && (
@@ -223,13 +234,6 @@ export default function Home() {
           })}
         </div>
       </motion.div>
-
-      {/* Non-host notice */}
-      {room && !isHost && room.phase === 'lobby' && (
-        <div className="text-center py-2">
-          <p className="text-gray-500 text-sm">Waiting for the host to pick a game...</p>
-        </div>
-      )}
 
       {/* Game Info Modal */}
       <AnimatePresence>
