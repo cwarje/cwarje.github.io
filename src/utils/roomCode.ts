@@ -1,4 +1,4 @@
-const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed confusing chars: I, O, 0, 1
+const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // Removed confusing chars: I, O
 
 export function generateRoomCode(): string {
   let code = '';
@@ -9,7 +9,7 @@ export function generateRoomCode(): string {
 }
 
 export function validateRoomCode(code: string): boolean {
-  return /^[A-Z0-9]{4}$/.test(code.toUpperCase());
+  return /^[A-Z]{4}$/.test(code.toUpperCase());
 }
 
 export function peerIdFromRoom(roomCode: string): string {

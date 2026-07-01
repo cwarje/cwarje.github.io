@@ -24,7 +24,7 @@ export default function RoomCodeInput({ onJoin, loading }: RoomCodeInputProps) {
         <input
           type="text"
           value={code}
-          onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4))}
+          onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4))}
           placeholder="ROOM CODE"
           maxLength={4}
           className="w-52 sm:w-64 pl-12 pr-4 py-4 rounded-2xl bg-white/10 border border-white/20 text-white text-lg font-mono tracking-[0.35em] placeholder:text-gray-500 placeholder:tracking-[0.2em] focus:outline-none focus:border-primary-400/70 focus:ring-2 focus:ring-primary-500/30 transition-all shadow-lg shadow-black/20"
