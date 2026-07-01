@@ -19,6 +19,7 @@ export type UpRiverStartMode = 'up-down' | 'down-up';
 export type TwelvePileCount = 3 | 4 | 5 | 6;
 export type CasinoMatchLength = 'to11' | 'to21' | 'eachDealerOnce';
 export type CribbageTargetScore = 61 | 121;
+export type CucumberEliminationThreshold = 30 | 50;
 export interface GameStartOptions {
   targetScore?: HeartsTargetScore;
   farkleTargetScore?: FarkleTargetScore;
@@ -26,6 +27,7 @@ export interface GameStartOptions {
   pileCount?: TwelvePileCount;
   casinoMatchLength?: CasinoMatchLength;
   cribbageTargetScore?: CribbageTargetScore;
+  cucumberEliminationThreshold?: CucumberEliminationThreshold;
   botCount?: number;
 }
 

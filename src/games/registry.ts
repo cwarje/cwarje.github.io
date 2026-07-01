@@ -71,6 +71,7 @@ import UpRiverToolbarExtra from './up-and-down-the-river/UpRiverToolbarExtra';
 import TwelveTitleExtra from './twelve/TwelveTitleExtra';
 import MobilizationTitleExtra from './mobilization/MobilizationTitleExtra';
 import CucumberTitleExtra from './cucumber/CucumberTitleExtra';
+import CucumberOptions from './cucumber/CucumberOptions';
 import { PigIcon } from '../components/icons/PigIcon';
 import { CribbagePegHolesIcon } from '../components/icons/CribbagePegHolesIcon';
 import { CucumberIcon } from '../components/icons/CucumberIcon';
@@ -749,24 +750,24 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
 
   cucumber: {
     title: 'Cucumber',
-    shortDescription: 'Avoid the last trick — or get pickled at 30 points.',
+    shortDescription: 'Avoid the last trick — or get pickled at 30 or 50 points.',
     playersLabel: '3–6 Players',
     minPlayers: 3,
     maxPlayers: 6,
     info: {
-      goal: 'Be the last player under 30 penalty points.',
+      goal: 'Be the last player under the elimination threshold (30 or 50 penalty points).',
       rules: [
         'Each hand deals 7 cards. Suits do not matter — only rank.',
-        'On each trick you must play a card equal to or higher than the highest card in the trick, or your lowest card if you cannot beat it.',
-        'If an Ace is led, every player must play their lowest card.',
+        'On each trick you must play a card equal to or higher than the highest card in the trick, or your lowest card. You can always choose to play your lowest card.',
+        'When an Ace is in the trick, every following player must play their lowest card — you cannot put an Ace on an Ace.',
         'The highest card wins the trick; tied ranks go to the last card played.',
-        'Only the 7th trick scores: the winner takes penalty points equal to their card (Ace = 14).',
-        'Reach 30 penalty points and you are eliminated. Last player standing wins.',
+        'Only the 7th trick scores: the winner takes penalty points for their card (Ace = 14, face cards = 10, number cards = face value).',
+        'Reach the elimination threshold and you are out. Last player standing wins.',
       ],
       howToPlay: [
         'Play high cards early so you can keep a low card for the final trick.',
-        'Watch the penalty scores — players near 30 become desperate to dump the last trick.',
-        'When an Ace is led, everyone must sacrifice their lowest card.',
+        'Watch the penalty scores — players near elimination become desperate to dump the last trick.',
+        'When an Ace is played, everyone after must sacrifice their lowest card.',
       ],
     },
     icon: CucumberIcon,
@@ -786,6 +787,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     runBotTurn: runCucumberBotTurn,
     getWinners: getCucumberWinners,
     Board: CucumberBoard,
+    OptionsPanel: CucumberOptions,
     TitleExtra: CucumberTitleExtra,
     fullBoard: true,
     hasHandZoom: true,

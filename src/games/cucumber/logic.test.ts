@@ -49,12 +49,14 @@ describe('cucumber rules', () => {
     expect(listLegalPlays(hand, [])).toHaveLength(2);
   });
 
-  it('requires beating highest card when possible', () => {
+  it('allows beating highest or always playing lowest', () => {
     const hand = [card('hearts', 10), card('clubs', 9), card('spades', 7)];
     const trick = [{ playerId: 'a', card: card('diamonds', 8) }];
     const legal = listLegalPlays(hand, trick);
-    expect(legal).toHaveLength(2);
-    expect(legal.every(c => c.rank >= 8)).toBe(true);
+    expect(legal).toHaveLength(3);
+    expect(legal.some(c => c.rank === 7)).toBe(true);
+    expect(legal.some(c => c.rank === 9)).toBe(true);
+    expect(legal.some(c => c.rank === 10)).toBe(true);
   });
 
   it('forces lowest card when unable to beat', () => {
@@ -65,9 +67,20 @@ describe('cucumber rules', () => {
     expect(legal[0].rank).toBe(3);
   });
 
-  it('forces lowest card when ace is led', () => {
+  it('forces lowest card when ace is in the trick', () => {
     const hand = [card('hearts', 3), card('clubs', 14), card('spades', 7)];
     const trick = [{ playerId: 'a', card: card('diamonds', 14) }];
+    const legal = listLegalPlays(hand, trick);
+    expect(legal).toHaveLength(1);
+    expect(legal[0].rank).toBe(3);
+  });
+
+  it('forces lowest card when ace is played mid-trick', () => {
+    const hand = [card('hearts', 3), card('clubs', 14), card('spades', 7)];
+    const trick = [
+      { playerId: 'a', card: card('diamonds', 8) },
+      { playerId: 'b', card: card('hearts', 14) },
+    ];
     const legal = listLegalPlays(hand, trick);
     expect(legal).toHaveLength(1);
     expect(legal[0].rank).toBe(3);
@@ -81,9 +94,13 @@ describe('cucumber rules', () => {
     expect(getTrickWinnerPlayerId(trick)).toBe('b');
   });
 
-  it('scores ace as 14 penalty points', () => {
+  it('scores ace as 14 and face cards as 10 penalty points', () => {
     expect(rankValue(14)).toBe(14);
-    expect(rankValue(11)).toBe(11);
+    expect(rankValue(11)).toBe(10);
+    expect(rankValue(12)).toBe(10);
+    expect(rankValue(13)).toBe(10);
+    expect(rankValue(9)).toBe(9);
+    expect(rankValue(8)).toBe(8);
   });
 });
 
@@ -94,6 +111,12 @@ describe('cucumber logic', () => {
     expect(state.handPlayerIds).toHaveLength(4);
     expect(state.players.every(p => p.hand.length === 7)).toBe(true);
     expect(state.trickNumber).toBe(1);
+    expect(state.eliminationThreshold).toBe(ELIMINATION_THRESHOLD);
+  });
+
+  it('uses 50-point elimination threshold when configured', () => {
+    const state = createCucumberState(makePlayers(3), { cucumberEliminationThreshold: 50 }) as CucumberState;
+    expect(state.eliminationThreshold).toBe(50);
   });
 
   it('rejects illegal plays', () => {
@@ -123,6 +146,7 @@ describe('cucumber logic', () => {
       lastHandPenalty: null,
       gameOver: false,
       winners: [],
+      eliminationThreshold: 30,
     };
 
     let state = processCucumberAction(base, { type: 'play-card', card: card('hearts', 5) }, 'a') as CucumberState;
@@ -154,6 +178,7 @@ describe('cucumber logic', () => {
       lastHandPenalty: { playerId: 'b', points: 14 },
       gameOver: false,
       winners: [],
+      eliminationThreshold: 30,
     };
 
     const withEliminated = {
@@ -184,11 +209,48 @@ describe('cucumber logic', () => {
       lastHandPenalty: null,
       gameOver: false,
       winners: [],
+      eliminationThreshold: 30,
     };
 
     const next = processCucumberAction(state, { type: 'start-next-hand' }, '') as CucumberState;
     expect(isCucumberOver(next)).toBe(true);
     expect(getCucumberWinners(next)).toEqual(['a']);
+  });
+
+  it('eliminates players at 50 points when configured', () => {
+    const players = [
+      playerState('a', [], 10),
+      playerState('b', [], 49),
+      playerState('c', [], 5),
+    ];
+    const state: CucumberState = {
+      players,
+      phase: 'hand-end',
+      handNumber: 2,
+      dealerIndex: 0,
+      handPlayerIds: ['a', 'c'],
+      currentPlayerIndex: 0,
+      currentTrick: [],
+      trickNumber: 7,
+      trickWinner: null,
+      lastHandPenalty: { playerId: 'b', points: 1 },
+      gameOver: false,
+      winners: [],
+      eliminationThreshold: 50,
+    };
+
+    const next = processCucumberAction(
+      {
+        ...state,
+        players: state.players.map(p =>
+          p.id === 'b' ? { ...p, penaltyScore: 50, eliminated: true } : p,
+        ),
+      },
+      { type: 'start-next-hand' },
+      '',
+    ) as CucumberState;
+    expect(next.players.find(p => p.id === 'b')?.eliminated).toBe(true);
+    expect(next.eliminationThreshold).toBe(50);
   });
 
   it('validates play through isValidCucumberPlay', () => {

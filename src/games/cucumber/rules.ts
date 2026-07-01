@@ -5,7 +5,19 @@ export function cardEquals(a: Card, b: Card): boolean {
 }
 
 export function rankValue(rank: Card['rank']): number {
+  if (rank === 14) return 14;
+  if (rank >= 11 && rank <= 13) return 10;
   return rank;
+}
+
+function dedupeCards(cards: Card[]): Card[] {
+  const result: Card[] = [];
+  for (const card of cards) {
+    if (!result.some(existing => cardEquals(existing, card))) {
+      result.push(card);
+    }
+  }
+  return result;
 }
 
 export function highestRankInTrick(trick: { playerId: string; card: Card }[]): number {
@@ -27,15 +39,15 @@ export function listLegalPlays(hand: Card[], trick: { playerId: string; card: Ca
   if (hand.length === 0) return [];
   if (trick.length === 0) return [...hand];
 
-  if (trick[0].card.rank === 14) {
+  if (trick.some(entry => entry.card.rank === 14)) {
     return cardsAtLowestRank(hand);
   }
 
   const highest = highestRankInTrick(trick);
   const beating = hand.filter(card => card.rank >= highest);
-  if (beating.length > 0) return beating;
+  const lowest = cardsAtLowestRank(hand);
 
-  return cardsAtLowestRank(hand);
+  return dedupeCards([...beating, ...lowest]);
 }
 
 export function isValidCucumberPlay(state: CucumberState, playerId: string, card: Card): boolean {

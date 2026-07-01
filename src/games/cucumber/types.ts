@@ -34,6 +34,7 @@ export interface CucumberState {
   lastHandPenalty: { playerId: string; points: number } | null;
   gameOver: boolean;
   winners: string[];
+  eliminationThreshold: 30 | 50;
 }
 
 export type CucumberAction =

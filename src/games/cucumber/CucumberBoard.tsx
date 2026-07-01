@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Card, CucumberPlayer, CucumberState, Suit } from './types';
-import { ELIMINATION_THRESHOLD } from './types';
 import { isValidCucumberPlay } from './rules';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 import { useDealAnimation, type DealSeat } from '../shared/useDealAnimation';
@@ -118,7 +117,7 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
   const [seatPillElement, setSeatPillElement] = useState<HTMLDivElement | null>(null);
   const [seatPillSize, setSeatPillSize] = useState<ElementSize>({ width: 0, height: 0 });
 
-  const aceLed = state.currentTrick.length > 0 && state.currentTrick[0].card.rank === 14;
+  const aceInTrick = state.currentTrick.some(entry => entry.card.rank === 14);
 
   const seatLayouts = useMemo<SeatLayout[]>(() => {
     const playerCount = state.players.length;
@@ -236,8 +235,8 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
       );
     }
 
-    if (state.phase === 'playing' && aceLed) {
-      return 'Ace led — play your lowest card';
+    if (state.phase === 'playing' && aceInTrick) {
+      return 'Ace played — play your lowest card';
     }
 
     if (state.phase === 'playing' && isMyTurn) {
@@ -257,7 +256,7 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
     }
 
     return null;
-  }, [state, isMyTurn, myId, aceLed, currentPlayerId]);
+  }, [state, isMyTurn, myId, aceInTrick, currentPlayerId]);
 
   useEffect(() => {
     const element = tableRef.current;
@@ -325,7 +324,7 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
         : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
-    const dangerClass = player.penaltyScore >= ELIMINATION_THRESHOLD - 7 ? 'cucumber-seatScore--danger' : '';
+    const dangerClass = player.penaltyScore >= state.eliminationThreshold - 7 ? 'cucumber-seatScore--danger' : '';
 
     return (
       <div
@@ -336,7 +335,7 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
           <span className="river-seatName">{isMe ? 'You' : player.name}</span>
         </div>
         <div className={`cucumber-seatScoreRow ${dangerClass}`}>
-          {player.penaltyScore}/{ELIMINATION_THRESHOLD}
+          {player.penaltyScore}/{state.eliminationThreshold}
         </div>
         {player.eliminated && <span className="cucumber-eliminatedTag">Out</span>}
       </div>
