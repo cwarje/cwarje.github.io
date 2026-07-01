@@ -11,6 +11,7 @@ import {
   processCucumberAction,
   isCucumberOver,
   getCucumberWinners,
+  chooseCucumberPlayCard,
 } from './logic';
 import type { Card, CucumberPlayer, CucumberState } from './types';
 import { ELIMINATION_THRESHOLD } from './types';
@@ -39,6 +40,43 @@ function playerState(id: string, hand: Card[], penaltyScore = 0): CucumberPlayer
     isBot: false,
     hand,
     penaltyScore,
+  };
+}
+
+function botPlayState(
+  botId: string,
+  hand: Card[],
+  options: {
+    trickNumber: number;
+    currentTrick?: { playerId: string; card: Card }[];
+    handPlayerIds?: string[];
+    currentPlayerIndex?: number;
+    opponents?: { id: string; hand: Card[] }[];
+    penaltyScore?: number;
+  },
+): CucumberState {
+  const opponents = options.opponents ?? [];
+  const players = [
+    playerState(botId, hand, options.penaltyScore ?? 0),
+    ...opponents.map(o => playerState(o.id, o.hand)),
+  ];
+  const handPlayerIds = options.handPlayerIds ?? [botId, ...opponents.map(o => o.id)];
+  const currentPlayerIndex = options.currentPlayerIndex ?? handPlayerIds.indexOf(botId);
+
+  return {
+    players,
+    phase: 'playing',
+    handNumber: 1,
+    dealerIndex: 0,
+    handPlayerIds,
+    currentPlayerIndex,
+    currentTrick: options.currentTrick ?? [],
+    trickNumber: options.trickNumber,
+    trickWinner: null,
+    lastHandPenalty: null,
+    gameOver: false,
+    winners: [],
+    eliminationThreshold: 30,
   };
 }
 
@@ -340,5 +378,86 @@ describe('cucumber logic', () => {
     const actorId = state.players[0].id;
     state = processCucumberAction(state, { type: 'dev-set-near-loss' }, actorId) as CucumberState;
     expect(state.players.find(p => p.id === actorId)?.penaltyScore).toBe(49);
+  });
+});
+
+describe('cucumber bot strategy', () => {
+  it('plays lowest beating card when following in tricks 1-5', () => {
+    const state = botPlayState('bot', [card('clubs', 7), card('hearts', 9), card('spades', 10)], {
+      trickNumber: 3,
+      currentTrick: [{ playerId: 'a', card: card('diamonds', 8) }],
+      handPlayerIds: ['a', 'bot', 'c'],
+      currentPlayerIndex: 1,
+      opponents: [
+        { id: 'a', hand: [card('diamonds', 2)] },
+        { id: 'c', hand: [card('hearts', 3)] },
+      ],
+    });
+
+    const chosen = chooseCucumberPlayCard(state, 'bot');
+    expect(chosen?.rank).toBe(9);
+  });
+
+  it('avoids winning trick 6 when a losing card is available', () => {
+    const state = botPlayState('bot', [card('clubs', 3), card('hearts', 13)], {
+      trickNumber: 6,
+      currentTrick: [{ playerId: 'a', card: card('diamonds', 8) }],
+      handPlayerIds: ['a', 'bot'],
+      currentPlayerIndex: 1,
+      opponents: [{ id: 'a', hand: [card('diamonds', 2)] }],
+    });
+
+    const chosen = chooseCucumberPlayCard(state, 'bot');
+    expect(chosen?.rank).toBe(3);
+  });
+
+  it('plays lowest non-winner on trick 7 when bot is last', () => {
+    const state = botPlayState('bot', [card('clubs', 3), card('hearts', 8), card('spades', 10)], {
+      trickNumber: 7,
+      currentTrick: [
+        { playerId: 'a', card: card('diamonds', 5) },
+        { playerId: 'c', card: card('hearts', 9) },
+      ],
+      handPlayerIds: ['a', 'c', 'bot'],
+      currentPlayerIndex: 2,
+      opponents: [
+        { id: 'a', hand: [card('diamonds', 2)] },
+        { id: 'c', hand: [card('hearts', 4)] },
+      ],
+    });
+
+    const chosen = chooseCucumberPlayCard(state, 'bot');
+    expect(chosen?.rank).toBe(3);
+  });
+
+  it('avoids winning trick 7 when bot is not last and a safe card exists', () => {
+    const state = botPlayState('bot', [card('clubs', 3), card('hearts', 14)], {
+      trickNumber: 7,
+      currentTrick: [{ playerId: 'a', card: card('diamonds', 5) }],
+      handPlayerIds: ['a', 'bot', 'c'],
+      currentPlayerIndex: 1,
+      opponents: [
+        { id: 'a', hand: [card('diamonds', 2)] },
+        { id: 'c', hand: [card('hearts', 10)] },
+      ],
+    });
+
+    const chosen = chooseCucumberPlayCard(state, 'bot');
+    expect(chosen?.rank).toBe(3);
+  });
+
+  it('leads high while reserving the lowest card in hand', () => {
+    const state = botPlayState('bot', [card('clubs', 2), card('hearts', 5), card('spades', 14)], {
+      trickNumber: 5,
+      handPlayerIds: ['bot', 'a', 'c'],
+      currentPlayerIndex: 0,
+      opponents: [
+        { id: 'a', hand: [card('diamonds', 4)] },
+        { id: 'c', hand: [card('hearts', 6)] },
+      ],
+    });
+
+    const chosen = chooseCucumberPlayCard(state, 'bot');
+    expect(chosen?.rank).toBe(14);
   });
 });
