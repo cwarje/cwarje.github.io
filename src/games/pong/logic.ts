@@ -151,7 +151,7 @@ function checkWin(state: PongState): PongState {
 }
 
 function getBoardAspect(state: PongState): number {
-  return PONG_BOARD_ASPECT;
+  return state.boardAspect;
 }
 
 function movePaddles(state: PongState, dt: number): PongPlayer[] {
