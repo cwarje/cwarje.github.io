@@ -36,27 +36,23 @@ function sortHand(hand: Card[]): Card[] {
   return sortCardsByRank(hand);
 }
 
-function getActiveCount(players: CucumberPlayer[]): number {
-  return players.filter(player => !player.eliminated).length;
-}
-
-function nextActiveDealerIndex(players: CucumberPlayer[], currentDealerIndex: number): number {
-  const total = players.length;
-  for (let step = 1; step <= total; step++) {
-    const index = (currentDealerIndex + step) % total;
-    if (!players[index].eliminated) return index;
-  }
-  return currentDealerIndex;
-}
-
 function buildHandPlayerIds(players: CucumberPlayer[], dealerIndex: number): string[] {
   const total = players.length;
   const ids: string[] = [];
   for (let step = 1; step <= total; step++) {
     const index = (dealerIndex + step) % total;
-    if (!players[index].eliminated) ids.push(players[index].id);
+    ids.push(players[index].id);
   }
   return ids;
+}
+
+function hasReachedLossThreshold(players: CucumberPlayer[], threshold: 30 | 50): boolean {
+  return players.some(p => p.penaltyScore >= threshold);
+}
+
+function getLowestScoreWinners(players: CucumberPlayer[]): string[] {
+  const min = Math.min(...players.map(p => p.penaltyScore));
+  return players.filter(p => p.penaltyScore === min).map(p => p.id);
 }
 
 function startHand(
@@ -70,9 +66,6 @@ function startHand(
 
   let cardOffset = 0;
   const dealtPlayers = players.map((player) => {
-    if (player.eliminated) {
-      return { ...player, hand: [] as Card[] };
-    }
     const hand = deck.slice(cardOffset, cardOffset + CARDS_PER_HAND);
     cardOffset += CARDS_PER_HAND;
     return { ...player, hand: sortHand(hand) };
@@ -96,8 +89,6 @@ function startHand(
 }
 
 function finishGame(players: CucumberPlayer[], eliminationThreshold: 30 | 50): CucumberState {
-  const survivors = players.filter(player => !player.eliminated);
-  const winnerIds = survivors.map(player => player.id);
   return {
     players,
     phase: 'game-over',
@@ -110,35 +101,26 @@ function finishGame(players: CucumberPlayer[], eliminationThreshold: 30 | 50): C
     trickWinner: null,
     lastHandPenalty: null,
     gameOver: true,
-    winners: winnerIds,
+    winners: getLowestScoreWinners(players),
     eliminationThreshold,
   };
 }
 
-function applyEliminations(players: CucumberPlayer[], eliminationThreshold: 30 | 50): CucumberPlayer[] {
-  return players.map(player => ({
-    ...player,
-    eliminated: player.eliminated || player.penaltyScore >= eliminationThreshold,
-  }));
-}
-
 function endHand(state: CucumberState, penaltyPlayerId: string, penaltyPoints: number): CucumberState {
-  const updatedPlayers = applyEliminations(
-    state.players.map(player =>
-      player.id === penaltyPlayerId
-        ? { ...player, penaltyScore: player.penaltyScore + penaltyPoints }
-        : player,
-    ),
-    state.eliminationThreshold,
+  const updatedPlayers = state.players.map(player =>
+    player.id === penaltyPlayerId
+      ? { ...player, penaltyScore: player.penaltyScore + penaltyPoints }
+      : player,
   );
 
-  const activeCount = getActiveCount(updatedPlayers);
-  if (activeCount <= 1) {
+  const lastHandPenalty = { playerId: penaltyPlayerId, points: penaltyPoints };
+
+  if (hasReachedLossThreshold(updatedPlayers, state.eliminationThreshold)) {
     return {
       ...finishGame(updatedPlayers, state.eliminationThreshold),
       handNumber: state.handNumber,
       dealerIndex: state.dealerIndex,
-      lastHandPenalty: { playerId: penaltyPlayerId, points: penaltyPoints },
+      lastHandPenalty,
     };
   }
 
@@ -148,7 +130,7 @@ function endHand(state: CucumberState, penaltyPlayerId: string, penaltyPoints: n
     phase: 'hand-end',
     currentTrick: [],
     trickWinner: null,
-    lastHandPenalty: { playerId: penaltyPlayerId, points: penaltyPoints },
+    lastHandPenalty,
   };
 }
 
@@ -163,7 +145,6 @@ export function createCucumberState(players: Player[], options?: GameStartOption
     isBot: player.isBot,
     hand: [],
     penaltyScore: 0,
-    eliminated: false,
   }));
 
   const dealerIndex = 0;
@@ -234,13 +215,21 @@ export function processCucumberAction(state: unknown, action: unknown, playerId:
     case 'start-next-hand': {
       if (s.phase !== 'hand-end' || s.gameOver) return state;
 
-      const activeCount = getActiveCount(s.players);
-      if (activeCount <= 1) {
+      if (hasReachedLossThreshold(s.players, s.eliminationThreshold)) {
         return finishGame(s.players, s.eliminationThreshold);
       }
 
-      const nextDealer = nextActiveDealerIndex(s.players, s.dealerIndex);
+      const nextDealer = (s.dealerIndex + 1) % s.players.length;
       return startHand(s.players, s.handNumber + 1, nextDealer, s.eliminationThreshold);
+    }
+
+    case 'dev-set-near-loss': {
+      const pIndex = s.players.findIndex(p => p.id === playerId);
+      if (pIndex === -1) return state;
+      const nearLoss = s.eliminationThreshold - 1;
+      const newPlayers = [...s.players];
+      newPlayers[pIndex] = { ...newPlayers[pIndex], penaltyScore: nearLoss };
+      return { ...s, players: newPlayers };
     }
   }
 

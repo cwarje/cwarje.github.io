@@ -3559,29 +3559,6 @@
   }
 }
 
-.cucumber-seatPill--eliminated {
-  opacity: 0.55;
-  filter: grayscale(0.35);
-}
-
-.cucumber-seatPill--eliminated .river-seatName {
-  text-decoration: line-through;
-}
-
-.cucumber-eliminatedTag {
-  position: absolute;
-  top: -0.35rem;
-  right: -0.35rem;
-  padding: 0.1rem 0.35rem;
-  border-radius: 9999px;
-  background: rgb(127 29 29 / 0.9);
-  color: rgb(254 226 226);
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
 .cucumber-headsUpText--handEnd {
   color: var(--cucumber-accent);
 }

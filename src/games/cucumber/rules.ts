@@ -52,7 +52,7 @@ export function listLegalPlays(hand: Card[], trick: { playerId: string; card: Ca
 
 export function isValidCucumberPlay(state: CucumberState, playerId: string, card: Card): boolean {
   const player = state.players.find(p => p.id === playerId);
-  if (!player || player.eliminated) return false;
+  if (!player) return false;
   if (!player.hand.some(c => cardEquals(c, card))) return false;
   if (state.phase !== 'playing' || state.trickWinner !== null) return false;
   if (state.handPlayerIds[state.currentPlayerIndex] !== playerId) return false;

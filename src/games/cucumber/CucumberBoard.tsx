@@ -161,7 +161,7 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
         isSelf: layout.relativeIndex === 0,
         seatLeft: layout.seatLeft,
         seatTop: layout.seatTop,
-        count: layout.player.eliminated ? 0 : layout.player.hand.length,
+        count: layout.player.hand.length,
       })),
     [seatLayouts],
   );
@@ -315,13 +315,11 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
     const player = seatLayout.player;
     const isCurrentTurn = currentPlayerId === player.id && !state.trickWinner && state.phase === 'playing';
     const isMe = player.id === myId;
-    const seatPillStateClass = player.eliminated
-      ? 'cucumber-seatPill--eliminated'
-      : isCurrentTurn
-        ? isMe
-          ? 'river-seatPill--activeSelf'
-          : 'river-seatPill--activeOther'
-        : '';
+    const seatPillStateClass = isCurrentTurn
+      ? isMe
+        ? 'river-seatPill--activeSelf'
+        : 'river-seatPill--activeOther'
+      : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
     const dangerClass = player.penaltyScore >= state.eliminationThreshold - 7 ? 'cucumber-seatScore--danger' : '';
@@ -337,7 +335,6 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
         <div className={`cucumber-seatScoreRow ${dangerClass}`}>
           {player.penaltyScore}/{state.eliminationThreshold}
         </div>
-        {player.eliminated && <span className="cucumber-eliminatedTag">Out</span>}
       </div>
     );
   };
@@ -348,8 +345,18 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
     onAction({ type: 'play-card', card: cardFace });
   };
 
+  const showDevNearLoss = import.meta.env.DEV && !!myPlayer;
+
   if (state.gameOver) {
-    const winner = state.players.find(p => state.winners.includes(p.id));
+    const winners = state.players.filter(p => state.winners.includes(p.id));
+    const winnerLabel = winners.length === 0
+      ? null
+      : winners.some(p => p.id === myId)
+        ? 'You win!'
+        : winners.length === 1
+          ? `${winners[0].name} wins!`
+          : `${winners.map(p => p.name).join(', ')} win!`;
+
     return (
       <motion.div
         initial={{ opacity: 0 }}
@@ -358,10 +365,8 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
       >
         <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
         <h2 className="text-3xl font-extrabold text-white">Game Over</h2>
-        {winner && (
-          <p className="text-xl text-white/90">
-            {winner.id === myId ? 'You win!' : `${winner.name} wins!`}
-          </p>
+        {winnerLabel && (
+          <p className="text-xl text-white/90">{winnerLabel}</p>
         )}
         <div className="space-y-3 w-full max-w-2xl">
           {[...state.players]
@@ -370,9 +375,7 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
               <div key={player.id} className="river-resultRow">
                 <div className="flex items-center gap-3">
                   <span className="text-lg font-bold">#{i + 1}</span>
-                  <span className={`font-semibold ${player.eliminated ? 'line-through opacity-60' : ''}`}>
-                    {player.name}
-                  </span>
+                  <span className="font-semibold">{player.name}</span>
                 </div>
                 <span className="text-xl font-bold">{player.penaltyScore} pts</span>
               </div>
@@ -385,6 +388,15 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
   return (
     <div ref={boardRef} className={`cucumber-board river-board river-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
+      {showDevNearLoss && (
+        <button
+          type="button"
+          onClick={() => onAction({ type: 'dev-set-near-loss' })}
+          className="absolute right-3 top-3 z-20 rounded-md border border-amber-300/60 bg-amber-500/20 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/30 cursor-pointer"
+        >
+          Dev: near loss
+        </button>
+      )}
       <div ref={tableRef} className={`river-table river-table--players-${state.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
@@ -453,7 +465,7 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
         </p>
       </div>
 
-      {myPlayer && !myPlayer.eliminated && (
+      {myPlayer && (
         <div className="space-y-3">
           <div ref={handContainerRef} className={`river-hand ${isHandZoomed ? 'river-hand--zoom' : ''}`}>
             <div

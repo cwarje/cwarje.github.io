@@ -13,7 +13,7 @@ export default function CucumberOptions({ onChange, labelClass }: GameOptionsPan
 
   return (
     <div className="space-y-2">
-      <p className={`text-sm font-semibold uppercase tracking-wider ${labelClass}`}>Elimination at</p>
+      <p className={`text-sm font-semibold uppercase tracking-wider ${labelClass}`}>Game ends at</p>
       <div className="flex gap-2">
         {THRESHOLD_OPTIONS.map((value) => (
           <button

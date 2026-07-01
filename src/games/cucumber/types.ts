@@ -15,7 +15,6 @@ export interface CucumberPlayer {
   isBot: boolean;
   hand: Card[];
   penaltyScore: number;
-  eliminated: boolean;
 }
 
 export type CucumberPhase = 'playing' | 'hand-end' | 'game-over';
@@ -40,7 +39,8 @@ export interface CucumberState {
 export type CucumberAction =
   | { type: 'play-card'; card: Card }
   | { type: 'resolve-trick' }
-  | { type: 'start-next-hand' };
+  | { type: 'start-next-hand' }
+  | { type: 'dev-set-near-loss' };
 
 export const ELIMINATION_THRESHOLD = 30;
 export const CARDS_PER_HAND = 7;
