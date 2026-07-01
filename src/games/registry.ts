@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Dice5, Heart, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers, Circle, Leaf } from 'lucide-react';
+import { Dice5, Heart, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers, Circle } from 'lucide-react';
 import type { GameType, Player, GameStartOptions, TableEvent, TableEventInput } from '../networking/types';
 
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
@@ -73,6 +73,7 @@ import MobilizationTitleExtra from './mobilization/MobilizationTitleExtra';
 import CucumberTitleExtra from './cucumber/CucumberTitleExtra';
 import { PigIcon } from '../components/icons/PigIcon';
 import { CribbagePegHolesIcon } from '../components/icons/CribbagePegHolesIcon';
+import { CucumberIcon } from '../components/icons/CucumberIcon';
 
 // ---------------------------------------------------------------------------
 // Shared types
@@ -152,6 +153,8 @@ export interface GameDefinition {
   hideHudTitleDuringPlay?: boolean;
   /** Homepage card ribbon. Set on one game at a time; see README "New game badge". */
   showNewBadge?: boolean;
+  /** Homepage card ribbon for beta games. Rainbow sheen; may coexist with showNewBadge on other games. */
+  showBetaBadge?: boolean;
   /** If set, only these total player counts (humans + bots) are valid. */
   allowedPlayerCounts?: number[];
 }
@@ -739,6 +742,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     Board: PongBoard,
     fullBoard: true,
     production: true,
+    showBetaBadge: true,
     hudTitleLines: ['Pong'],
     hideHudTitleDuringPlay: true,
   },
@@ -746,9 +750,9 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
   cucumber: {
     title: 'Cucumber',
     shortDescription: 'Avoid the last trick — or get pickled at 30 points.',
-    playersLabel: '3–7 Players',
+    playersLabel: '3–6 Players',
     minPlayers: 3,
-    maxPlayers: 7,
+    maxPlayers: 6,
     info: {
       goal: 'Be the last player under 30 penalty points.',
       rules: [
@@ -765,7 +769,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
         'When an Ace is led, everyone must sacrifice their lowest card.',
       ],
     },
-    icon: Leaf,
+    icon: CucumberIcon,
     theme: {
       gradient: 'from-green-500/20 to-emerald-900/20',
       cardBorder: 'border-green-500/20',

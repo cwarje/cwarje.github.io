@@ -93,15 +93,6 @@ const TRICK_SLOT_PLACEMENTS: Record<number, TrickSlotPlacement[]> = {
     { row: 1, col: 3, dx: '0px', dy: '0px' },
     { row: 2, col: 3, dx: '0px', dy: '0px' },
   ],
-  7: [
-    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--river-slot-h) * 0.25)' },
-    { row: 2, col: 1, dx: '0px', dy: '0px' },
-    { row: 1, col: 1, dx: '0px', dy: '0px' },
-    { row: 1, col: 2, dx: '0px', dy: 'calc(var(--river-slot-h) * -0.35)' },
-    { row: 1, col: 3, dx: '0px', dy: '0px' },
-    { row: 2, col: 3, dx: '0px', dy: '0px' },
-    { row: 1, col: 2, dx: '0px', dy: 'calc(var(--river-slot-h) * -0.75)' },
-  ],
 };
 
 function getTrickSlotPlacement(playerCount: number, relativeIndex: number): TrickSlotPlacement {

@@ -271,7 +271,7 @@ Add one entry to `GAME_REGISTRY` with:
 - `info`: `{ goal, rules[], howToPlay[] }` for the homepage info modal
 - `theme`: Tailwind classes for homepage card and lobby panel
 - Logic functions + `Board` (+ optional `OptionsPanel`, `TitleExtra`, `ToolbarExtra`)
-- Flags: `fullBoard`, `hasHandZoom`, `production`, `showNewBadge`, `hudTitleLines`, `hideHudTitleDuringPlay`
+- Flags: `fullBoard`, `hasHandZoom`, `production`, `showNewBadge`, `showBetaBadge`, `hudTitleLines`, `hideHudTitleDuringPlay`
 
 Also append your key to **`ALL_GAME_TYPES`** (display order + contract tests). If shipping on the homepage, add to **`PRODUCTION_GAME_TYPES`**.
 
@@ -353,6 +353,20 @@ When you launch a new game, highlight it on the homepage with an amber **New** r
 2. Remove `showNewBadge` from any other game — **only one** game should wear the badge at a time.
 
 No other changes needed: `GameCard` reads the flag; sheen animation is in `src/index.css` (`.new-badge-text-sheen`).
+
+### Beta game badge
+
+Use a rainbow **Beta** ribbon for games that are playable on the homepage but still rough around the edges:
+
+1. Set `showBetaBadge: true` on that game's `GAME_REGISTRY` entry.
+2. Remove `showBetaBadge` from any other game — **only one** game should wear the badge at a time.
+
+Unlike **New**, **Beta** can appear on a different game at the same time (e.g. Cucumber **New** + Pong **Beta**).
+
+No other changes needed: `GameCard` reads the flag. Styles are in `src/index.css`:
+
+- `.beta-badge-bg` — static rainbow pill background
+- `.beta-badge-text-sheen` — black label with the same gold sheen sweep as **New** (reuses the `newBadgeTextSheen` keyframes so both badges stay in sync)
 
 ### Common pitfalls (for AI agents)
 

@@ -109,6 +109,48 @@
   }
 }
 
+/* “Beta” game card — static rainbow pill, animated gold sheen on black label text (L→R) */
+.beta-badge-bg {
+  background-image: linear-gradient(
+    105deg,
+    #ef4444 0%,
+    #f97316 16%,
+    #eab308 32%,
+    #22c55e 48%,
+    #3b82f6 64%,
+    #8b5cf6 80%,
+    #ec4899 100%
+  );
+}
+
+.beta-badge-text-sheen {
+  background-image: linear-gradient(
+    105deg,
+    #000000 0%,
+    #000000 42%,
+    #fff7d6 50%,
+    #000000 58%,
+    #000000 100%
+  );
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: newBadgeTextSheen 2.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .beta-badge-text-sheen {
+    animation: none;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+    background-image: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
+  }
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

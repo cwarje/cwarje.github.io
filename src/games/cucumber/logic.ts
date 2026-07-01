@@ -154,7 +154,7 @@ function endHand(state: CucumberState, penaltyPlayerId: string, penaltyPoints: n
 }
 
 export function createCucumberState(players: Player[]): CucumberState {
-  const gamePlayers: CucumberPlayer[] = players.slice(0, 7).map(player => ({
+  const gamePlayers: CucumberPlayer[] = players.slice(0, 6).map(player => ({
     id: player.id,
     name: player.name,
     color: player.color,
