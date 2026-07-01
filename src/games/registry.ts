@@ -729,7 +729,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     getWinners: getPongWinners,
     Board: PongBoard,
     fullBoard: true,
-    production: false,
+    production: true,
     showNewBadge: true,
     hudTitleLines: ['Pong'],
     hideHudTitleDuringPlay: true,
@@ -754,6 +754,7 @@ export const ALL_GAME_TYPES: GameType[] = [
 
 /** Game types shown in production (homepage order) */
 export const PRODUCTION_GAME_TYPES: GameType[] = [
+  'pong',
   'cribbage',
   'mobilization',
   'casino',
