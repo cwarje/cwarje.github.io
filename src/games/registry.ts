@@ -761,7 +761,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
         'On each trick you must play a card equal to or higher than the highest card in the trick, or your lowest card. You can always choose to play your lowest card.',
         'When an Ace is in the trick, every following player must play their lowest card — you cannot put an Ace on an Ace.',
         'The highest card wins the trick; tied ranks go to the last card played.',
-        'Only the 7th trick scores: the winner takes penalty points for their card (Ace = 14, face cards = 10, number cards = face value).',
+        'Only the 7th trick scores: penalty points equal the card rank (Ace = 14, King = 13, Queen = 12, Jack = 11, number cards = face value).',
         'The game ends when any player reaches 30 or 50 penalty points. Lowest score wins.',
       ],
       howToPlay: [

@@ -131,11 +131,11 @@ describe('cucumber rules', () => {
     expect(getTrickWinnerPlayerId(trick)).toBe('b');
   });
 
-  it('scores ace as 14 and face cards as 10 penalty points', () => {
+  it('scores penalty points equal to card rank', () => {
     expect(rankValue(14)).toBe(14);
-    expect(rankValue(11)).toBe(10);
-    expect(rankValue(12)).toBe(10);
-    expect(rankValue(13)).toBe(10);
+    expect(rankValue(13)).toBe(13);
+    expect(rankValue(12)).toBe(12);
+    expect(rankValue(11)).toBe(11);
     expect(rankValue(9)).toBe(9);
     expect(rankValue(8)).toBe(8);
   });

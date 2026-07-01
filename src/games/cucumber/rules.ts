@@ -5,8 +5,6 @@ export function cardEquals(a: Card, b: Card): boolean {
 }
 
 export function rankValue(rank: Card['rank']): number {
-  if (rank === 14) return 14;
-  if (rank >= 11 && rank <= 13) return 10;
   return rank;
 }
 
