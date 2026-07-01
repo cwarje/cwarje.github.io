@@ -5,16 +5,11 @@ import PlayerList from './PlayerList';
 import { useRoomContext } from '../networking/roomStore';
 import { useToast } from './Toast';
 import { useNavigate } from 'react-router-dom';
-import type { PlayerColor, DealerSpeed } from '../networking/types';
+import type { PlayerColor } from '../networking/types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
+import { DEALER_SPEED_OPTIONS } from '../networking/dealerSpeed';
 
 type LobbyMenuProps = { variant?: 'default' | 'icon' };
-
-const DEALER_SPEED_OPTIONS: { value: DealerSpeed; label: string }[] = [
-  { value: 'slow', label: 'Slow' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'fast', label: 'Fast' },
-];
 
 export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
   const { room, myId, myPlayer, isHost, removeBot, removePlayer, leaveRoom, endGame, updateProfile, setDealerSpeed, connecting } = useRoomContext();
@@ -210,10 +205,9 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                     <p className="text-[11px] text-surface-500">Share this code with friends to invite them</p>
                   </div>
 
-                  {/* Dealer speed section */}
-                  <div className="px-5 py-4 space-y-2">
-                    <p className="text-[11px] font-medium text-surface-500 uppercase tracking-wider">Dealer speed</p>
-                    {isHost ? (
+                  {isHost && (
+                    <div className="px-5 py-4 space-y-2">
+                      <p className="text-[11px] font-medium text-surface-500 uppercase tracking-wider">Dealer speed</p>
                       <div className="flex gap-2">
                         {DEALER_SPEED_OPTIONS.map(({ value, label }) => {
                           const currentSpeed = room.dealerSpeed ?? 'medium';
@@ -233,12 +227,8 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                           );
                         })}
                       </div>
-                    ) : (
-                      <p className="text-sm text-surface-700 capitalize">
-                        {(room.dealerSpeed ?? 'medium')} (set by host)
-                      </p>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {/* Players section */}
                   <div className="px-5 py-4 space-y-3">

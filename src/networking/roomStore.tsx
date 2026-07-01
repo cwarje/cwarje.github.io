@@ -17,6 +17,7 @@ import type {
   TableEventInput,
   DealerSpeed,
 } from './types';
+import { readStoredDealerSpeed, normalizeDealerSpeed } from './dealerSpeed';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor } from './playerColors';
 import { createInitialGameState, processGameAction, checkGameOver, runSingleBotTurn, getGameWinners } from '../games/gameEngine';
 import type { HeartsState } from '../games/hearts/types';
@@ -775,7 +776,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         phase: 'lobby',
         hostId: deviceId,
         wins: {},
-        dealerSpeed: 'medium',
+        dealerSpeed: readStoredDealerSpeed(),
       };
 
       setRoom(newRoom);
@@ -961,9 +962,12 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   }, [myId, isHost, broadcastGameState, broadcastRoomState]);
 
   const setDealerSpeed = useCallback((speed: DealerSpeed) => {
+    const normalized = normalizeDealerSpeed(speed);
+    localStorage.setItem('dealerSpeed', normalized);
+
     if (!isHost || !room) return;
-    if (room.dealerSpeed === speed) return;
-    const updatedRoom = { ...room, dealerSpeed: speed };
+    if (room.dealerSpeed === normalized) return;
+    const updatedRoom = { ...room, dealerSpeed: normalized };
     setRoom(updatedRoom);
     broadcastRoomState(updatedRoom);
   }, [isHost, room, broadcastRoomState]);

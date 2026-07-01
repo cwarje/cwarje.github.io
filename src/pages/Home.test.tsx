@@ -80,6 +80,7 @@ describe('Home', () => {
   it('prompts for player name when no room and no saved profile', async () => {
     window.localStorage.removeItem('playerName');
     window.localStorage.removeItem('playerColor');
+    window.localStorage.removeItem('dealerSpeed');
 
     const createLobby = vi.fn().mockResolvedValue('ABCD');
     mockUseRoomContext.mockReturnValue(
