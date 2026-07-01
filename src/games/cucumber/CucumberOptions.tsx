@@ -13,7 +13,7 @@ export default function CucumberOptions({ onChange, labelClass }: GameOptionsPan
 
   return (
     <div className="space-y-2">
-      <p className={`text-sm font-semibold uppercase tracking-wider ${labelClass}`}>Game ends at</p>
+      <p className={`text-sm font-semibold uppercase tracking-wider ${labelClass}`}>Game to</p>
       <div className="flex gap-2">
         {THRESHOLD_OPTIONS.map((value) => (
           <button
@@ -26,7 +26,7 @@ export default function CucumberOptions({ onChange, labelClass }: GameOptionsPan
                 : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10'
             }`}
           >
-            {value} pts
+            {value}
           </button>
         ))}
       </div>
