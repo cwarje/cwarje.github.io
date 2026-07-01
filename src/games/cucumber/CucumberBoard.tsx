@@ -460,7 +460,7 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
       </div>
 
       <div className="river-headsUp" aria-live="polite">
-        <p className={`river-headsUpText ${state.phase === 'hand-end' ? 'cucumber-headsUpText--handEnd' : ''}`}>
+        <p className="river-headsUpText">
           {headsUpContent ?? '\u00a0'}
         </p>
       </div>

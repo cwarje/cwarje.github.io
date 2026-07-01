@@ -3531,10 +3531,6 @@
 }
 
 /* ── Cucumber ── */
-.cucumber-board {
-  --cucumber-accent: rgb(74 222 128);
-}
-
 .cucumber-seatPill {
   position: relative;
   grid-template-rows: auto auto;
@@ -3557,9 +3553,5 @@
     font-size: 1rem;
     padding: 5px 8px;
   }
-}
-
-.cucumber-headsUpText--handEnd {
-  color: var(--cucumber-accent);
 }
 
