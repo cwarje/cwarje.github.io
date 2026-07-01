@@ -143,19 +143,19 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 top-full mt-2 w-80 bg-gray-900 border border-white/10 rounded-2xl shadow-2xl shadow-black/40 z-50 overflow-hidden"
+            className="absolute right-0 top-full mt-2 w-80 bg-white border border-surface-200 rounded-2xl shadow-2xl shadow-black/15 z-50 overflow-hidden"
           >
-            <div className="divide-y divide-white/5">
+            <div className="divide-y divide-surface-200">
               {/* Profile section */}
               <div className="px-5 py-4 space-y-3">
-                <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Profile</p>
+                <p className="text-[11px] font-medium text-surface-500 uppercase tracking-wider">Profile</p>
                 <div className="flex items-center gap-2 min-w-0">
                   <input
                     type="text"
                     value={nameInput}
                     onChange={(e) => setNameInput(e.target.value)}
                     maxLength={24}
-                    className="min-w-0 flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary-500"
+                    className="min-w-0 flex-1 px-3 py-2 rounded-lg bg-surface-50 border border-surface-300 text-sm text-surface-900 placeholder-surface-400 focus:outline-none focus:border-primary-500"
                     placeholder="Your name"
                   />
                   <button
@@ -170,7 +170,7 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                     <button
                       key={option.value}
                       onClick={() => handleSelectColor(option.value)}
-                      className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${colorInput === option.value ? 'border-white scale-105' : 'border-transparent hover:border-white/50'}`}
+                      className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${colorInput === option.value ? 'border-surface-900 scale-105' : 'border-transparent hover:border-surface-400'}`}
                       style={{ backgroundColor: PLAYER_COLOR_HEX[option.value] }}
                       title={option.label}
                       aria-label={`Set color to ${option.label}`}
@@ -183,36 +183,36 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                 <div className="px-5 py-8 text-center space-y-2">
                   {connecting ? (
                     <>
-                      <Loader2 className="w-5 h-5 animate-spin text-gray-400 mx-auto" />
-                      <p className="text-sm text-gray-400">Creating lobby...</p>
+                      <Loader2 className="w-5 h-5 animate-spin text-surface-400 mx-auto" />
+                      <p className="text-sm text-surface-600">Creating lobby...</p>
                     </>
                   ) : (
-                    <p className="text-sm text-gray-500">No active lobby</p>
+                    <p className="text-sm text-surface-600">No active lobby</p>
                   )}
                 </div>
               ) : (
                 <>
                   {/* Lobby code section */}
                   <div className="px-5 py-4 space-y-2">
-                    <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Lobby Code</p>
+                    <p className="text-[11px] font-medium text-surface-500 uppercase tracking-wider">Lobby Code</p>
                     <div className="flex items-center justify-between">
-                      <span className="text-2xl font-extrabold tracking-[0.3em] text-white font-mono">
+                      <span className="text-2xl font-extrabold tracking-[0.3em] text-surface-900 font-mono">
                         {room.roomCode}
                       </span>
                       <button
                         onClick={copyCode}
-                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
+                        className="w-8 h-8 rounded-lg bg-surface-100 border border-surface-200 hover:bg-surface-200 flex items-center justify-center transition-colors cursor-pointer"
                         title="Copy lobby code"
                       >
-                        <Copy className="w-4 h-4 text-gray-400" />
+                        <Copy className="w-4 h-4 text-surface-600" />
                       </button>
                     </div>
-                    <p className="text-[11px] text-gray-500">Share this code with friends to invite them</p>
+                    <p className="text-[11px] text-surface-500">Share this code with friends to invite them</p>
                   </div>
 
                   {/* Dealer speed section */}
                   <div className="px-5 py-4 space-y-2">
-                    <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Dealer speed</p>
+                    <p className="text-[11px] font-medium text-surface-500 uppercase tracking-wider">Dealer speed</p>
                     {isHost ? (
                       <div className="flex gap-2">
                         {DEALER_SPEED_OPTIONS.map(({ value, label }) => {
@@ -225,7 +225,7 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                               className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
                                 currentSpeed === value
                                   ? 'bg-primary-600 text-white'
-                                  : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10'
+                                  : 'bg-surface-100 text-surface-700 hover:bg-surface-200 border border-surface-200'
                               }`}
                             >
                               {label}
@@ -234,7 +234,7 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                         })}
                       </div>
                     ) : (
-                      <p className="text-sm text-gray-300 capitalize">
+                      <p className="text-sm text-surface-700 capitalize">
                         {(room.dealerSpeed ?? 'medium')} (set by host)
                       </p>
                     )}
@@ -243,7 +243,7 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                   {/* Players section */}
                   <div className="px-5 py-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-medium text-gray-400">
+                      <h3 className="text-xs font-medium text-surface-600">
                         Players ({playerCount})
                       </h3>
                     </div>
@@ -264,18 +264,18 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                     {isHost && gameInProgress ? (
                       <button
                         onClick={handleEndGame}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/30 transition-all duration-200 cursor-pointer"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer bg-red-500 border border-red-500 text-white hover:bg-red-400 hover:border-red-400"
                       >
                         <StopCircle className="w-4 h-4" />
-                        <span className="text-sm font-medium">End Game</span>
+                        <span className="font-medium">End Game</span>
                       </button>
                     ) : (
                       <button
                         onClick={handleLeave}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/30 transition-all duration-200 cursor-pointer"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer bg-red-500 border border-red-500 text-white hover:bg-red-400 hover:border-red-400"
                       >
                         {isHost ? <X className="w-4 h-4" /> : <LogOut className="w-4 h-4" />}
-                        <span className="text-sm font-medium">{isHost ? 'Close Lobby' : 'Leave Lobby'}</span>
+                        <span className="font-medium">{isHost ? 'Close Lobby' : 'Leave Lobby'}</span>
                       </button>
                     )}
                   </div>

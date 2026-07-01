@@ -19,7 +19,7 @@ export default function PlayerList({ players, hostId, isHost, onRemoveBot, onRem
         return (
         <div
           key={player.id}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl glass-light"
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-50 border border-surface-200"
         >
           <div className="w-7 h-7 flex items-center justify-center flex-shrink-0">
             {player.isBot ? (
@@ -30,12 +30,12 @@ export default function PlayerList({ players, hostId, isHost, onRemoveBot, onRem
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-white truncate">{player.name}</span>
+              <span className="text-sm font-medium text-surface-900 truncate">{player.name}</span>
               {player.id === hostId && (
-                <Crown className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                <Crown className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
               )}
               {wins && wins[player.id] > 0 && (
-                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-400 tracking-wider">
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 tracking-wider">
                   {wins[player.id]} {wins[player.id] === 1 ? 'win' : 'wins'}
                 </span>
               )}
@@ -45,28 +45,28 @@ export default function PlayerList({ players, hostId, isHost, onRemoveBot, onRem
             {!player.isBot && (
               <div className="w-6 h-6 flex items-center justify-center">
                 {player.connected ? (
-                  <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+                  <Wifi className="w-3.5 h-3.5 text-emerald-600" />
                 ) : (
-                  <WifiOff className="w-3.5 h-3.5 text-red-400" />
+                  <WifiOff className="w-3.5 h-3.5 text-red-500" />
                 )}
               </div>
             )}
             {isHost && player.isBot && onRemoveBot && (
               <button
                 onClick={() => onRemoveBot(player.id)}
-                className="w-6 h-6 rounded-md hover:bg-red-500/20 flex items-center justify-center transition-colors cursor-pointer"
+                className="w-6 h-6 rounded-md hover:bg-red-100 flex items-center justify-center transition-colors cursor-pointer"
                 title="Remove bot"
               >
-                <X className="w-3.5 h-3.5 text-red-400" />
+                <X className="w-3.5 h-3.5 text-red-500" />
               </button>
             )}
             {isHost && !player.isBot && !player.connected && player.id !== hostId && onRemovePlayer && (
               <button
                 onClick={() => onRemovePlayer(player.id)}
-                className="w-6 h-6 rounded-md hover:bg-red-500/20 flex items-center justify-center transition-colors cursor-pointer"
+                className="w-6 h-6 rounded-md hover:bg-red-100 flex items-center justify-center transition-colors cursor-pointer"
                 title="Remove disconnected player"
               >
-                <X className="w-3.5 h-3.5 text-red-400" />
+                <X className="w-3.5 h-3.5 text-red-500" />
               </button>
             )}
           </div>
