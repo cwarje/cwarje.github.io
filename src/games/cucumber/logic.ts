@@ -366,28 +366,6 @@ function expectedPenaltyIfPlay(
     : 0;
 }
 
-function botWouldWinTrick(
-  card: Card,
-  state: CucumberState,
-  playerId: string,
-): boolean {
-  const remaining = getRemainingPlayerIds(state);
-
-  if (remaining.length === 0) {
-    return wouldWinTrickAsPlayer(card, state.currentTrick, playerId);
-  }
-
-  const trickAfterPlay = [...state.currentTrick, { playerId, card }];
-  const result = simulateTrickOutcome(
-    trickAfterPlay,
-    remaining,
-    state.players,
-    state.trickNumber,
-  );
-
-  return result?.winnerId === playerId;
-}
-
 function chooseTrick7Card(
   state: CucumberState,
   playerId: string,
@@ -419,13 +397,7 @@ function chooseTrick6Card(
   }
 
   const sorted = sortCardsByRank(legal);
-  const nonWinning = sorted.filter(card => !botWouldWinTrick(card, state, playerId));
-
-  if (nonWinning.length > 0) {
-    return nonWinning[nonWinning.length - 1];
-  }
-
-  return sorted[0];
+  return sorted[sorted.length - 1];
 }
 
 function chooseLeadCard(hand: Card[], legal: Card[]): Card {

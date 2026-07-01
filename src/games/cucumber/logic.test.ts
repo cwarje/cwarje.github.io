@@ -398,7 +398,7 @@ describe('cucumber bot strategy', () => {
     expect(chosen?.rank).toBe(9);
   });
 
-  it('avoids winning trick 6 when a losing card is available', () => {
+  it('plays highest card on trick 6 to keep lowest for trick 7', () => {
     const state = botPlayState('bot', [card('clubs', 3), card('hearts', 13)], {
       trickNumber: 6,
       currentTrick: [{ playerId: 'a', card: card('diamonds', 8) }],
@@ -408,7 +408,38 @@ describe('cucumber bot strategy', () => {
     });
 
     const chosen = chooseCucumberPlayCard(state, 'bot');
-    expect(chosen?.rank).toBe(3);
+    expect(chosen?.rank).toBe(13);
+  });
+
+  it('plays Jack over matching 8 on trick 6 when keeping the 8 for trick 7', () => {
+    const state = botPlayState('bot', [card('clubs', 8), card('hearts', 11)], {
+      trickNumber: 6,
+      currentTrick: [{ playerId: 'a', card: card('diamonds', 8) }],
+      handPlayerIds: ['a', 'bot', 'c'],
+      currentPlayerIndex: 1,
+      opponents: [
+        { id: 'a', hand: [card('diamonds', 2)] },
+        { id: 'c', hand: [card('spades', 3)] },
+      ],
+    });
+
+    const chosen = chooseCucumberPlayCard(state, 'bot');
+    expect(chosen?.rank).toBe(11);
+  });
+
+  it('leads highest card on trick 6 to keep lowest for trick 7', () => {
+    const state = botPlayState('bot', [card('clubs', 8), card('hearts', 11)], {
+      trickNumber: 6,
+      handPlayerIds: ['bot', 'a', 'c'],
+      currentPlayerIndex: 0,
+      opponents: [
+        { id: 'a', hand: [card('diamonds', 2)] },
+        { id: 'c', hand: [card('spades', 3)] },
+      ],
+    });
+
+    const chosen = chooseCucumberPlayCard(state, 'bot');
+    expect(chosen?.rank).toBe(11);
   });
 
   it('plays lowest non-winner on trick 7 when bot is last', () => {
