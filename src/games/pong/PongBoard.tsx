@@ -4,8 +4,10 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { PongPlayer, PongState, PongZone } from './types';
 import {
   BALL_RADIUS,
+  PONG_BOARD_ASPECT,
   PONG_TICK_MS,
   TRACK_WIDTH,
+  fitSquareBoard,
   hitTToZoneOffset,
   normalizeT,
   paddleArcBounds,
@@ -28,7 +30,6 @@ interface PongBoardProps {
   state: PongState;
   myId: string;
   onAction: (action: unknown) => void;
-  isHost?: boolean;
 }
 
 function mixHexWithWhite(hex: string, whitePercent: number): string {
@@ -123,7 +124,7 @@ function drawZoneLabel(
   const angle = perimeterTangentAngle(t, aspect);
   const px = p.x * width;
   const py = p.y * height;
-  const maxWidth = zoneArcLengthPx(zone, width, height) * 0.85;
+  const maxWidth = zoneArcLengthPx(zone, height) * 0.85;
 
   let fontSize = Math.max(12, trackWidthPx * 0.55);
 
@@ -219,11 +220,10 @@ function interpolateBallPosition(
   };
 }
 
-function trackCacheKey(state: PongState, width: number, height: number): string {
+function trackCacheKey(state: PongState, boardWidth: number, boardHeight: number): string {
   const zones = state.zones.map((z) => `${z.playerId}:${z.startT}:${z.endT}`).join('|');
   const colors = state.players.map((p) => `${p.id}:${p.color}:${p.eliminated}`).join('|');
-  const aspect = width / height;
-  return `${width}x${height}|${aspect}|${zones}|${colors}`;
+  return `${boardWidth}x${boardHeight}|${PONG_BOARD_ASPECT}|${zones}|${colors}`;
 }
 
 function drawTrackLayer(
@@ -244,7 +244,7 @@ function drawTrackLayer(
   }
 }
 
-export default function PongBoard({ state, myId, onAction, isHost = false }: PongBoardProps) {
+export default function PongBoard({ state, myId, onAction }: PongBoardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -253,7 +253,6 @@ export default function PongBoard({ state, myId, onAction, isHost = false }: Pon
   const prevTimeRef = useRef<number>(0);
   const inputRef = useRef<-1 | 0 | 1>(0);
   const myIdRef = useRef(myId);
-  const lastReportedAspectRef = useRef<number>(0);
 
   const me = state.players.find((p) => p.id === myId);
   const canPlay = me && !me.eliminated && me.lives > 0 && !state.gameOver;
@@ -279,14 +278,6 @@ export default function PongBoard({ state, myId, onAction, isHost = false }: Pon
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-
-  useEffect(() => {
-    if (!isHost || size.width <= 0 || size.height <= 0) return;
-    const aspect = size.width / size.height;
-    if (Math.abs(lastReportedAspectRef.current - aspect) < 0.005) return;
-    lastReportedAspectRef.current = aspect;
-    onAction({ type: 'set-board-aspect', aspect });
-  }, [isHost, size.width, size.height, onAction]);
 
   const sendInput = useCallback(
     (direction: -1 | 0 | 1) => {
@@ -342,31 +333,35 @@ export default function PongBoard({ state, myId, onAction, isHost = false }: Pon
     const canvas = canvasRef.current;
     if (!canvas || size.width <= 0 || size.height <= 0) return;
 
+    const { boardWidth, boardHeight, offsetX, offsetY } = fitSquareBoard(size.width, size.height);
+    if (boardWidth <= 0 || boardHeight <= 0) return;
+
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = size.width * dpr;
-    canvas.height = size.height * dpr;
-    canvas.style.width = `${size.width}px`;
-    canvas.style.height = `${size.height}px`;
+    canvas.width = boardWidth * dpr;
+    canvas.height = boardHeight * dpr;
+    canvas.style.width = `${boardWidth}px`;
+    canvas.style.height = `${boardHeight}px`;
+    canvas.style.left = `${offsetX}px`;
+    canvas.style.top = `${offsetY}px`;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     let raf = 0;
-    const trackWidthPx = Math.max(8, Math.min(size.width, size.height) * TRACK_WIDTH);
+    const trackWidthPx = Math.max(8, boardWidth * TRACK_WIDTH);
     const trackCanvas = document.createElement('canvas');
     const trackCtx = trackCanvas.getContext('2d');
     let cachedTrackKey = '';
 
     const ensureTrackCache = (current: PongState) => {
       if (!trackCtx) return;
-      const renderAspect = size.width / size.height;
-      const key = trackCacheKey(current, size.width, size.height);
+      const key = trackCacheKey(current, boardWidth, boardHeight);
       if (key === cachedTrackKey) return;
 
-      trackCanvas.width = size.width * dpr;
-      trackCanvas.height = size.height * dpr;
+      trackCanvas.width = boardWidth * dpr;
+      trackCanvas.height = boardHeight * dpr;
       trackCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      drawTrackLayer(trackCtx, current, size.width, size.height, renderAspect, trackWidthPx);
+      drawTrackLayer(trackCtx, current, boardWidth, boardHeight, PONG_BOARD_ASPECT, trackWidthPx);
       cachedTrackKey = key;
     };
 
@@ -374,15 +369,14 @@ export default function PongBoard({ state, myId, onAction, isHost = false }: Pon
       const now = performance.now();
       const current = stateRef.current;
       const prev = prevStateRef.current;
-      const renderAspect = size.width / size.height;
       ensureTrackCache(current);
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       if (cachedTrackKey) {
-        ctx.drawImage(trackCanvas, 0, 0, size.width, size.height);
+        ctx.drawImage(trackCanvas, 0, 0, boardWidth, boardHeight);
       } else {
         ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, size.width, size.height);
+        ctx.fillRect(0, 0, boardWidth, boardHeight);
       }
 
       const introActive = current.startCountdownTicks > 0;
@@ -397,9 +391,9 @@ export default function PongBoard({ state, myId, onAction, isHost = false }: Pon
           zone,
           player,
           myIdRef.current,
-          size.width,
-          size.height,
-          renderAspect,
+          boardWidth,
+          boardHeight,
+          PONG_BOARD_ASPECT,
           trackWidthPx,
           highlightIntro,
           blinkOnWhite,
@@ -424,9 +418,9 @@ export default function PongBoard({ state, myId, onAction, isHost = false }: Pon
           ctx,
           zone,
           paddleOffset,
-          size.width,
-          size.height,
-          renderAspect,
+          boardWidth,
+          boardHeight,
+          PONG_BOARD_ASPECT,
           hex,
           trackWidthPx,
           highlightIntro,
@@ -434,9 +428,9 @@ export default function PongBoard({ state, myId, onAction, isHost = false }: Pon
         );
       }
 
-      const bx = ballX * size.width;
-      const by = ballY * size.height;
-      const ballPx = Math.max(3, Math.min(size.width, size.height) * BALL_RADIUS);
+      const bx = ballX * boardWidth;
+      const by = ballY * boardHeight;
+      const ballPx = Math.max(3, boardWidth * BALL_RADIUS);
       const touchPlayer = current.lastTouchPlayerId
         ? current.players.find((p) => p.id === current.lastTouchPlayerId)
         : null;
@@ -507,54 +501,56 @@ export default function PongBoard({ state, myId, onAction, isHost = false }: Pon
     .join(', ');
 
   return (
-    <div ref={containerRef} className="relative h-full w-full bg-black overflow-hidden">
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 block"
-        role="img"
-        aria-label={trackAriaLabel || 'Pong game board'}
-      />
+    <div className="flex h-full w-full flex-col bg-black">
+      <div ref={containerRef} className="relative min-h-0 flex-1 overflow-hidden">
+        <canvas
+          ref={canvasRef}
+          className="absolute block"
+          role="img"
+          aria-label={trackAriaLabel || 'Pong game board'}
+        />
 
-      {introActive && (
-        <div className="pong-countdown" aria-live="polite">
-          <motion.span
-            key={countdownSeconds}
-            initial={{ scale: 0.6, opacity: 0.5 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.2 }}
-            className="pong-countdownNumber"
-          >
-            {countdownSeconds}
-          </motion.span>
-        </div>
-      )}
+        {introActive && (
+          <div className="pong-countdown" aria-live="polite">
+            <motion.span
+              key={countdownSeconds}
+              initial={{ scale: 0.6, opacity: 0.5 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.2 }}
+              className="pong-countdownNumber"
+            >
+              {countdownSeconds}
+            </motion.span>
+          </div>
+        )}
 
-      {announcementPlayer && announcement && (
-        <div className="pong-headsUp" aria-live="polite">
-          <p className="pong-headsUpText">
-            {announcementPlayer.id === myId ? (
-              <>
-                <span style={{ color: getPlayerHudTextColor(announcementPlayer.color) }}>You</span>
-                {announcement.eliminated ? ' are eliminated' : ' lost a life'}
-              </>
-            ) : (
-              <>
-                <span style={{ color: getPlayerHudTextColor(announcementPlayer.color) }}>
-                  {announcementPlayer.name}
-                </span>
-                {announcement.eliminated ? ' is eliminated' : ' lost a life'}
-              </>
-            )}
-          </p>
-        </div>
-      )}
+        {announcementPlayer && announcement && (
+          <div className="pong-headsUp" aria-live="polite">
+            <p className="pong-headsUpText">
+              {announcementPlayer.id === myId ? (
+                <>
+                  <span style={{ color: getPlayerHudTextColor(announcementPlayer.color) }}>You</span>
+                  {announcement.eliminated ? ' are eliminated' : ' lost a life'}
+                </>
+              ) : (
+                <>
+                  <span style={{ color: getPlayerHudTextColor(announcementPlayer.color) }}>
+                    {announcementPlayer.name}
+                  </span>
+                  {announcement.eliminated ? ' is eliminated' : ' lost a life'}
+                </>
+              )}
+            </p>
+          </div>
+        )}
+      </div>
 
       {canPlay && (
-        <div className="absolute inset-x-0 bottom-0 z-10 flex h-[45dvh] gap-2 px-2 pb-2 touch-none sm:hidden">
+        <div className="flex h-[45dvh] flex-shrink-0 gap-2 px-2 pb-2 touch-none sm:hidden">
           <button
             type="button"
             aria-label="Move paddle left"
-            className="flex flex-1 h-full items-center justify-center rounded-2xl bg-white/10 text-white active:bg-white/25"
+            className="flex h-full flex-1 items-center justify-center rounded-2xl bg-white/10 text-white active:bg-white/25"
             onTouchStart={() => sendInput(-1)}
             onTouchEnd={() => sendInput(0)}
             onTouchCancel={() => sendInput(0)}
@@ -567,7 +563,7 @@ export default function PongBoard({ state, myId, onAction, isHost = false }: Pon
           <button
             type="button"
             aria-label="Move paddle right"
-            className="flex flex-1 h-full items-center justify-center rounded-2xl bg-white/10 text-white active:bg-white/25"
+            className="flex h-full flex-1 items-center justify-center rounded-2xl bg-white/10 text-white active:bg-white/25"
             onTouchStart={() => sendInput(1)}
             onTouchEnd={() => sendInput(0)}
             onTouchCancel={() => sendInput(0)}

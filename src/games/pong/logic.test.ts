@@ -3,6 +3,7 @@ import type { Player } from '../../networking/types';
 import {
   BALL_SPEED,
   BOT_ONLY_BALL_SPEED_MULTIPLIER,
+  fitSquareBoard,
   findZoneOwner,
   hitTToZoneOffset,
   hitToPerimeterT,
@@ -10,6 +11,7 @@ import {
   paddleCenterT,
   paddleCoversHit,
   paddleHalfWidthT,
+  PONG_BOARD_ASPECT,
   preservePaddleOffsets,
   perimeterPoint,
   perimeterTangentAngle,
@@ -159,21 +161,46 @@ describe('pong geometry', () => {
     }
   });
 
-  it('assigns equal pixel zone and paddle lengths on a wide rectangle', () => {
-    const width = 1600;
-    const height = 800;
+  it('assigns equal pixel zone and paddle lengths on a square board', () => {
+    const boardPx = 800;
     const { zones } = fourPlayerSetup();
     const paddleWidthsPx = zones.map((z) => {
       const halfT = paddleHalfWidthT(z);
-      return halfT * 2 * zoneArcLengthPx(z, width, height) / zoneLength(z);
+      return halfT * 2 * zoneArcLengthPx(z, boardPx) / zoneLength(z);
     });
     for (const w of paddleWidthsPx) {
       expect(w).toBeCloseTo(paddleWidthsPx[0], 5);
     }
-    const zonePx = zones.map((z) => zoneArcLengthPx(z, width, height));
+    const zonePx = zones.map((z) => zoneArcLengthPx(z, boardPx));
     for (const len of zonePx) {
       expect(len).toBeCloseTo(zonePx[0], 5);
     }
+  });
+
+  it('fitSquareBoard letterboxes wide and tall containers', () => {
+    const wide = fitSquareBoard(1600, 800);
+    expect(wide.boardWidth).toBe(800);
+    expect(wide.boardHeight).toBe(800);
+    expect(wide.offsetX).toBe(400);
+    expect(wide.offsetY).toBe(0);
+
+    const tall = fitSquareBoard(600, 1200);
+    expect(tall.boardWidth).toBe(600);
+    expect(tall.boardHeight).toBe(600);
+    expect(tall.offsetX).toBe(0);
+    expect(tall.offsetY).toBe(300);
+
+    const square = fitSquareBoard(500, 500);
+    expect(square.boardWidth).toBe(500);
+    expect(square.offsetX).toBe(0);
+    expect(square.offsetY).toBe(0);
+  });
+
+  it('zoneArcLengthPx uses explicit aspect, not container dimensions', () => {
+    const zone = { playerId: 'a', startT: 0, endT: 0.25 };
+    const squareLen = zoneArcLengthPx(zone, 400, PONG_BOARD_ASPECT);
+    const wideLen = zoneArcLengthPx(zone, 400, 2);
+    expect(squareLen).not.toBeCloseTo(wideLen);
   });
 
   it('detects paddle coverage within a zone', () => {
@@ -331,14 +358,6 @@ describe('pong logic', () => {
     }
     expect(zones.reduce((sum, z) => sum + zoneLength(z), 0)).toBeCloseTo(1);
     expect(zones[0].startT).toBeCloseTo(normalizeT(anchorT + 1 / 4));
-  });
-
-  it('updates board aspect from host action', () => {
-    const state = createPongState([makePlayer('p1', 'One'), makePlayer('p2', 'Two')]) as PongState;
-    const next = processPongAction(state, { type: 'set-board-aspect', aspect: 1.6 }, 'p1') as PongState;
-    expect(next.boardAspect).toBeCloseTo(1.6);
-    const same = processPongAction(next, { type: 'set-board-aspect', aspect: 1.601 }, 'p1') as PongState;
-    expect(same).toBe(next);
   });
 
   it('updates input for alive players', () => {

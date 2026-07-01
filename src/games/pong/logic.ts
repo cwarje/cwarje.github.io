@@ -19,6 +19,7 @@ import {
   randomBallVelocity,
   rallySpeedMultiplier,
   createInitialZones,
+  PONG_BOARD_ASPECT,
   redistributeSurvivorZones,
   preservePaddleOffsets,
   reflectVelocity,
@@ -120,7 +121,7 @@ export function createPongState(players: Player[]): PongState {
     zoneAnchorT,
     ball,
     inputs,
-    boardAspect: 1,
+    boardAspect: PONG_BOARD_ASPECT,
     startCountdownTicks: START_COUNTDOWN_TICKS,
     serveHoldTicks: 0,
     rallyTicks: 0,
@@ -150,7 +151,7 @@ function checkWin(state: PongState): PongState {
 }
 
 function getBoardAspect(state: PongState): number {
-  return state.boardAspect ?? 1;
+  return PONG_BOARD_ASPECT;
 }
 
 function movePaddles(state: PongState, dt: number): PongPlayer[] {
@@ -430,11 +431,6 @@ export function processPongAction(state: unknown, action: unknown, playerId: str
       const direction = a.direction === -1 || a.direction === 1 ? a.direction : 0;
       if (s.inputs[playerId] === direction) return state;
       return { ...s, inputs: { ...s.inputs, [playerId]: direction } };
-    }
-    case 'set-board-aspect': {
-      const aspect = Math.max(0.25, Math.min(4, Number(a.aspect) || 1));
-      if (Math.abs(getBoardAspect(s) - aspect) < 0.005) return state;
-      return { ...s, boardAspect: aspect };
     }
     case 'tick': {
       if (playerId !== '' && playerId != null) return state;

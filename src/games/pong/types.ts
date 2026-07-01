@@ -37,7 +37,7 @@ export interface PongState {
   zoneAnchorT: number;
   ball: PongBall;
   inputs: Record<string, PongInputDirection>;
-  /** Board width/height; drives equal pixel-length zone splits along the rectangle border. */
+  /** Fixed at 1 (square board); kept for backward compatibility with in-flight state. */
   boardAspect: number;
   /** Ticks before first serve only; 0 once the opening countdown finishes. */
   startCountdownTicks: number;
@@ -56,5 +56,4 @@ export interface PongState {
 
 export type PongAction =
   | { type: 'set-input'; direction: PongInputDirection }
-  | { type: 'set-board-aspect'; aspect: number }
   | { type: 'tick'; dt: number };

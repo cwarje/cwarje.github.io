@@ -2,6 +2,19 @@ import type { PongPlayer, PongZone } from './types';
 
 export const PONG_TICK_MS = 33;
 
+/** Fixed width/height ratio for all simulation and rendering (square board). */
+export const PONG_BOARD_ASPECT = 1;
+
+export function fitSquareBoard(containerWidth: number, containerHeight: number) {
+  const boardPx = Math.min(containerWidth, containerHeight);
+  return {
+    boardWidth: boardPx,
+    boardHeight: boardPx,
+    offsetX: (containerWidth - boardPx) / 2,
+    offsetY: (containerHeight - boardPx) / 2,
+  };
+}
+
 export const TRACK_WIDTH = 0.04;
 export const BALL_RADIUS = 0.032;
 export const PADDLE_ZONE_FRACTION = 0.22;
@@ -123,10 +136,13 @@ export function zoneLabelT(zone: PongZone): number {
   return normalizeT(zone.startT + len * ZONE_LABEL_INSET);
 }
 
-/** Pixel length of a zone arc on a W×H board (uses full rectangle border). */
-export function zoneArcLengthPx(zone: PongZone, width: number, height: number): number {
-  const aspect = width / height;
-  return zoneLength(zone) * perimeterLen(aspect) * height;
+/** Pixel length of a zone arc on a square board with the given side length. */
+export function zoneArcLengthPx(
+  zone: PongZone,
+  boardHeight: number,
+  aspect: number = PONG_BOARD_ASPECT,
+): number {
+  return zoneLength(zone) * perimeterLen(aspect) * boardHeight;
 }
 
 export function normalizeT(t: number): number {
