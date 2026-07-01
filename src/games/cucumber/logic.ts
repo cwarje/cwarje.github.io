@@ -244,19 +244,214 @@ function sortCardsByRank(cards: Card[]): Card[] {
   });
 }
 
-function wouldWinTrick(card: Card, trick: { playerId: string; card: Card }[]): boolean {
-  if (trick.length === 0) return true;
-  const simulated = [...trick, { playerId: '__sim__', card }];
-  return getTrickWinnerPlayerId(simulated) === '__sim__';
+const HIGH_RANK = 10;
+const LOW_RANK = 7;
+const PREMIUM_RANK = 12;
+const MIN_FORCE_TARGETS = 2;
+
+type HandShape = 'top-heavy' | 'bottom-heavy' | 'balanced';
+
+interface HandProfile {
+  shape: HandShape;
+  highCount: number;
+  lowCount: number;
+  premiumCount: number;
 }
 
-function wouldWinTrickAsPlayer(
-  card: Card,
+function analyzeHandProfile(hand: Card[]): HandProfile {
+  const highCount = hand.filter(c => c.rank >= HIGH_RANK).length;
+  const lowCount = hand.filter(c => c.rank <= LOW_RANK).length;
+  const premiumCount = hand.filter(c => c.rank >= PREMIUM_RANK).length;
+
+  let shape: HandShape = 'balanced';
+  if (highCount >= 4 && lowCount <= 2) shape = 'top-heavy';
+  else if (lowCount >= 4 && highCount <= 2) shape = 'bottom-heavy';
+
+  return { shape, highCount, lowCount, premiumCount };
+}
+
+function lowestRankInHand(hand: Card[]): number {
+  return sortCardsByRank(hand)[0].rank;
+}
+
+function nonReservedCards(hand: Card[], legal: Card[]): Card[] {
+  const low = lowestRankInHand(hand);
+  if (hand.length <= 1) return sortCardsByRank(legal);
+  return sortCardsByRank(legal.filter(c => c.rank > low));
+}
+
+function canDuckWithLowest(
+  hand: Card[],
+  legal: Card[],
   trick: { playerId: string; card: Card }[],
-  playerId: string,
 ): boolean {
-  const simulated = [...trick, { playerId, card }];
-  return getTrickWinnerPlayerId(simulated) === playerId;
+  if (trick.some(e => e.card.rank === 14)) return false;
+  const low = lowestRankInHand(hand);
+  if (!legal.some(c => c.rank === low)) return false;
+  if (hand.length > 1 && legal.some(c => c.rank > low)) return true;
+  return hand.length === 1;
+}
+
+function duckCard(hand: Card[], legal: Card[]): Card {
+  const low = lowestRankInHand(hand);
+  return sortCardsByRank(legal.filter(c => c.rank === low))[0];
+}
+
+function countSparePremium(hand: Card[], exclude?: Card): number {
+  const low = lowestRankInHand(hand);
+  return hand.filter(
+    c => c.rank >= PREMIUM_RANK
+      && c.rank > low
+      && !(exclude && cardEquals(c, exclude)),
+  ).length;
+}
+
+function legalBeatingCards(
+  hand: Card[],
+  trick: { playerId: string; card: Card }[],
+  legal: Card[],
+): Card[] {
+  return lowestBeatingCards(hand, trick).filter(b =>
+    legal.some(l => cardEquals(l, b)),
+  );
+}
+
+function highestLegalBeating(
+  hand: Card[],
+  trick: { playerId: string; card: Card }[],
+  legal: Card[],
+): Card | null {
+  const beating = legalBeatingCards(hand, trick, legal);
+  return beating.length > 0 ? beating[beating.length - 1] : null;
+}
+
+function aceInLegalBeating(
+  hand: Card[],
+  trick: { playerId: string; card: Card }[],
+  legal: Card[],
+): Card | null {
+  const beating = legalBeatingCards(hand, trick, legal);
+  return beating.find(c => c.rank === 14) ?? null;
+}
+
+function shouldSpendAce(
+  profile: HandProfile,
+  remainingCount: number,
+  hand: Card[],
+  legal: Card[],
+  trick: { playerId: string; card: Card }[],
+): boolean {
+  const ace = aceInLegalBeating(hand, trick, legal)
+    ?? (trick.length === 0 ? sortCardsByRank(legal).find(c => c.rank === 14) : null);
+  if (!ace) return false;
+
+  const beating = legalBeatingCards(hand, trick, legal);
+  const canDuck = canDuckWithLowest(hand, legal, trick);
+  if (beating.length === 1 && cardEquals(beating[0], ace) && !canDuck) return true;
+
+  if (remainingCount < MIN_FORCE_TARGETS) return false;
+
+  switch (profile.shape) {
+    case 'top-heavy':
+    case 'balanced':
+      return true;
+    case 'bottom-heavy':
+      return true;
+  }
+}
+
+function pickForceCard(
+  profile: HandProfile,
+  hand: Card[],
+  trick: { playerId: string; card: Card }[],
+  legal: Card[],
+  remainingCount: number,
+): Card | null {
+  if (remainingCount < MIN_FORCE_TARGETS) return null;
+
+  if (shouldSpendAce(profile, remainingCount, hand, legal, trick)) {
+    const ace = trick.length === 0
+      ? nonReservedCards(hand, legal).find(c => c.rank === 14)
+      : aceInLegalBeating(hand, trick, legal);
+    if (ace) return ace;
+  }
+
+  const highest = trick.length === 0
+    ? nonReservedCards(hand, legal).filter(c => c.rank < 14).at(-1) ?? null
+    : highestLegalBeating(hand, trick, legal);
+
+  if (!highest || highest.rank === 14) return null;
+
+  switch (profile.shape) {
+    case 'top-heavy':
+      return highest;
+    case 'bottom-heavy':
+    case 'balanced':
+      return countSparePremium(hand, highest) >= 1 ? highest : null;
+  }
+}
+
+function chooseConservativeFollow(
+  profile: HandProfile,
+  hand: Card[],
+  trick: { playerId: string; card: Card }[],
+  legal: Card[],
+): Card {
+  const sorted = sortCardsByRank(legal);
+  const beating = legalBeatingCards(hand, trick, legal);
+  const canDuck = canDuckWithLowest(hand, legal, trick);
+
+  if (canDuck) {
+    if (profile.shape === 'bottom-heavy' || profile.shape === 'balanced') {
+      return duckCard(hand, legal);
+    }
+    if (profile.shape === 'top-heavy' && beating.length > 0) {
+      const midHighBeat = beating.find(c => c.rank >= 10 && c.rank <= 11);
+      if (midHighBeat && profile.premiumCount >= 2) return midHighBeat;
+    }
+    return duckCard(hand, legal);
+  }
+
+  if (beating.length > 0) return beating[0];
+  return sorted[0];
+}
+
+function chooseFollowCard(
+  hand: Card[],
+  trick: { playerId: string; card: Card }[],
+  legal: Card[],
+  profile: HandProfile,
+  remainingCount: number,
+): Card {
+  const force = pickForceCard(profile, hand, trick, legal, remainingCount);
+  if (force) return force;
+  return chooseConservativeFollow(profile, hand, trick, legal);
+}
+
+function chooseLeadCard(
+  hand: Card[],
+  legal: Card[],
+  profile: HandProfile,
+  remainingCount: number,
+): Card {
+  const playable = nonReservedCards(hand, legal);
+  const pool = playable.length > 0 ? playable : sortCardsByRank(legal);
+
+  const force = pickForceCard(profile, hand, [], pool, remainingCount);
+  if (force) return force;
+
+  switch (profile.shape) {
+    case 'top-heavy':
+      if (remainingCount === 1) {
+        const withoutAce = pool.filter(c => c.rank < 14);
+        return withoutAce.length > 0 ? withoutAce[withoutAce.length - 1] : pool[pool.length - 1];
+      }
+      return pool[0];
+
+    case 'bottom-heavy':
+    case 'balanced':
+      return pool[0];
+  }
 }
 
 function getRemainingPlayerIds(state: CucumberState): string[] {
@@ -275,169 +470,6 @@ function lowestBeatingCards(hand: Card[], trick: { playerId: string; card: Card 
   return sortCardsByRank(hand.filter(c => c.rank >= highest));
 }
 
-function simulateOpponentCard(
-  hand: Card[],
-  trick: { playerId: string; card: Card }[],
-  trickNumber: number,
-): Card | null {
-  const legal = listLegalPlays(hand, trick);
-  if (legal.length === 0) return null;
-
-  const sorted = sortCardsByRank(legal);
-  const avoidWinning = trickNumber >= CARDS_PER_HAND - 1;
-
-  if (avoidWinning) {
-    const nonWinners = sorted.filter(c => !wouldWinTrick(c, trick));
-    if (nonWinners.length > 0) return nonWinners[0];
-    return sorted[0];
-  }
-
-  const beating = lowestBeatingCards(sorted, trick);
-  const hasNonBeating = sorted.some(
-    c => !beating.some(b => cardEquals(b, c)),
-  );
-
-  if (beating.length > 0 && hasNonBeating) {
-    return beating[0];
-  }
-
-  return sorted[0];
-}
-
-interface TrickSimResult {
-  winnerId: string;
-  winningCard: Card;
-}
-
-function simulateTrickOutcome(
-  trick: { playerId: string; card: Card }[],
-  remainingPlayerIds: string[],
-  players: CucumberPlayer[],
-  trickNumber: number,
-): TrickSimResult | null {
-  let currentTrick = [...trick];
-  const simHands = new Map(players.map(p => [p.id, [...p.hand]]));
-
-  for (const oppId of remainingPlayerIds) {
-    const hand = simHands.get(oppId);
-    if (!hand || hand.length === 0) return null;
-
-    const oppCard = simulateOpponentCard(hand, currentTrick, trickNumber);
-    if (!oppCard) return null;
-
-    currentTrick = [...currentTrick, { playerId: oppId, card: oppCard }];
-    simHands.set(oppId, hand.filter(c => !cardEquals(c, oppCard)));
-  }
-
-  const winnerId = getTrickWinnerPlayerId(currentTrick);
-  if (!winnerId) return null;
-
-  const entry = currentTrick.find(e => e.playerId === winnerId);
-  if (!entry) return null;
-
-  return { winnerId, winningCard: entry.card };
-}
-
-function expectedPenaltyIfPlay(
-  card: Card,
-  state: CucumberState,
-  playerId: string,
-): number {
-  const remaining = getRemainingPlayerIds(state);
-
-  if (remaining.length === 0) {
-    return wouldWinTrickAsPlayer(card, state.currentTrick, playerId)
-      ? rankValue(card.rank)
-      : 0;
-  }
-
-  const trickAfterPlay = [...state.currentTrick, { playerId, card }];
-  const result = simulateTrickOutcome(
-    trickAfterPlay,
-    remaining,
-    state.players,
-    state.trickNumber,
-  );
-
-  if (!result) return rankValue(card.rank);
-
-  return result.winnerId === playerId
-    ? rankValue(result.winningCard.rank)
-    : 0;
-}
-
-function chooseTrick7Card(
-  state: CucumberState,
-  playerId: string,
-  legal: Card[],
-): Card {
-  const sorted = sortCardsByRank(legal);
-  let best = sorted[0];
-  let bestPenalty = Infinity;
-
-  for (const candidate of sorted) {
-    const penalty = expectedPenaltyIfPlay(candidate, state, playerId);
-    if (penalty < bestPenalty || (penalty === bestPenalty && candidate.rank < best.rank)) {
-      bestPenalty = penalty;
-      best = candidate;
-    }
-  }
-
-  return best;
-}
-
-function chooseTrick6Card(
-  state: CucumberState,
-  playerId: string,
-  legal: Card[],
-  nearElimination: boolean,
-): Card {
-  if (nearElimination) {
-    return chooseTrick7Card(state, playerId, legal);
-  }
-
-  const sorted = sortCardsByRank(legal);
-  return sorted[sorted.length - 1];
-}
-
-function chooseLeadCard(hand: Card[], legal: Card[]): Card {
-  const sortedLegal = sortCardsByRank(legal);
-  const lowestRankInHand = sortCardsByRank(hand)[0].rank;
-
-  if (hand.length > 1) {
-    const withoutReservedLow = sortedLegal.filter(c => c.rank > lowestRankInHand);
-    if (withoutReservedLow.length > 0) {
-      return withoutReservedLow[withoutReservedLow.length - 1];
-    }
-  }
-
-  return sortedLegal[sortedLegal.length - 1];
-}
-
-function chooseFollowCard(
-  hand: Card[],
-  trick: { playerId: string; card: Card }[],
-  legal: Card[],
-): Card {
-  const sorted = sortCardsByRank(legal);
-  const beating = lowestBeatingCards(hand, trick).filter(b =>
-    legal.some(l => cardEquals(l, b)),
-  );
-  const hasNonBeating = sorted.some(
-    c => !beating.some(b => cardEquals(b, c)),
-  );
-
-  if (beating.length > 0 && hasNonBeating) {
-    return beating[0];
-  }
-
-  if (beating.length > 0) {
-    return beating[0];
-  }
-
-  return sorted[0];
-}
-
 export function chooseCucumberPlayCard(state: CucumberState, playerId: string): Card | null {
   const player = state.players.find(p => p.id === playerId);
   if (!player || player.hand.length === 0) return null;
@@ -445,21 +477,26 @@ export function chooseCucumberPlayCard(state: CucumberState, playerId: string): 
   const legal = listLegalPlays(player.hand, state.currentTrick);
   if (legal.length === 0) return null;
 
-  const nearElimination = player.penaltyScore >= state.eliminationThreshold - 12;
+  const sorted = sortCardsByRank(legal);
 
   if (state.trickNumber >= CARDS_PER_HAND) {
-    return chooseTrick7Card(state, playerId, legal);
+    return sorted[0];
   }
 
   if (state.trickNumber === CARDS_PER_HAND - 1) {
-    return chooseTrick6Card(state, playerId, legal, nearElimination);
+    return sorted[sorted.length - 1];
   }
+
+  const profile = analyzeHandProfile(player.hand);
+  const remainingCount = state.currentTrick.length === 0
+    ? state.handPlayerIds.length - 1
+    : getRemainingPlayerIds(state).length;
 
   if (state.currentTrick.length === 0) {
-    return chooseLeadCard(player.hand, legal);
+    return chooseLeadCard(player.hand, legal, profile, remainingCount);
   }
 
-  return chooseFollowCard(player.hand, state.currentTrick, legal);
+  return chooseFollowCard(player.hand, state.currentTrick, legal, profile, remainingCount);
 }
 
 export function runCucumberBotTurn(state: unknown): unknown {
