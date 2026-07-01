@@ -11,6 +11,7 @@ interface GameStartOptionsPanelProps {
   playerCount: number;
   isHost: boolean;
   onStart: (options?: GameStartOptions) => void;
+  className?: string;
 }
 
 export default function GameStartOptionsPanel({
@@ -18,6 +19,7 @@ export default function GameStartOptionsPanel({
   playerCount,
   isHost,
   onStart,
+  className,
 }: GameStartOptionsPanelProps) {
   const gameDef = GAME_REGISTRY[gameType];
   const { theme } = gameDef;
@@ -66,9 +68,12 @@ export default function GameStartOptionsPanel({
     <motion.div
       initial={{ height: 0, opacity: 0 }}
       animate={{ height: 'auto', opacity: 1 }}
-      exit={{ height: 0, opacity: 0 }}
-      transition={{ duration: 0.25, ease: 'easeInOut' }}
-      className={`w-full min-w-0 -mt-px overflow-hidden rounded-b-2xl border border-t-0 ${theme.cardBorder} ${theme.panelBg}`}
+      transition={{
+        duration: 0.2,
+        ease: 'easeInOut',
+        opacity: { duration: 0.15 },
+      }}
+      className={`w-full min-w-0 -mt-px overflow-hidden rounded-b-2xl border border-t-0 shadow-xl shadow-black/40 ${theme.cardBorder} ${theme.panelBg}${className ? ` ${className}` : ''}`}
       role="region"
       aria-label={`Options for ${gameDef.title}`}
     >

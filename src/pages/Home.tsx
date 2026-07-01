@@ -197,7 +197,7 @@ export default function Home() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 + i * 0.1 }}
-                className="flex flex-col min-w-0 w-full"
+                className={`relative flex flex-col min-w-0 w-full ${isExpanded ? 'z-30' : 'z-0'}`}
               >
                 <GameCard
                   gameType={game}
@@ -210,6 +210,7 @@ export default function Home() {
                   {isExpanded && isHost && room && (
                     <GameStartOptionsPanel
                       key={game}
+                      className="absolute left-0 right-0 top-full z-30"
                       gameType={game}
                       playerCount={playerCount}
                       isHost={isHost}
