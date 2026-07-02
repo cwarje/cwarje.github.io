@@ -7,6 +7,30 @@ export const COLUMN_PAIRS: [number, number][] = [
   [2, 5],
 ];
 
+export const SQUARES: [number, number, number, number][] = [
+  [0, 1, 3, 4],
+  [1, 2, 4, 5],
+];
+
+export const SQUARE_BONUS = -20;
+
+function isSameRankSquare(table: TableSlot[], slots: number[]): boolean {
+  const first = table[slots[0]!];
+  if (!first) return false;
+  const rank = first.card.rank;
+  return slots.every(i => table[i]?.card.rank === rank);
+}
+
+export function squareBonus(table: TableSlot[]): number {
+  let bonus = 0;
+  for (const square of SQUARES) {
+    if (isSameRankSquare(table, square)) {
+      bonus += SQUARE_BONUS;
+    }
+  }
+  return bonus;
+}
+
 export function cardEquals(a: Card, b: Card): boolean {
   return a.suit === b.suit && a.rank === b.rank;
 }
@@ -53,6 +77,7 @@ export function scorePlayerTable(player: GolfPlayer): number {
   for (let i = 0; i < TABLE_SLOT_COUNT; i++) {
     total += slotPointValue(player.table, i);
   }
+  total += squareBonus(player.table);
   return total;
 }
 

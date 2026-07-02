@@ -13,6 +13,7 @@ import {
   COLUMN_PAIRS,
   isSetupPhase,
   rankDisplay,
+  squareBonus,
 } from './rules';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX } from '../../networking/playerColors';
 import { AutoFitSeatName } from '../shared/AutoFitSeatName';
@@ -500,6 +501,14 @@ export default function GolfBoard({ state, myId, onAction, isHost = false }: Gol
                   </div>
                 ))}
               </div>
+              {state.phase === 'hole-end' && squareBonus(layout.player.table) !== 0 && (
+                <div
+                  className="golf-squareBonus"
+                  aria-label="2x2 square bonus"
+                >
+                  {squareBonus(layout.player.table)}
+                </div>
+              )}
             </div>
           </div>
         ))}

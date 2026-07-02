@@ -3609,6 +3609,14 @@
   min-height: 1rem;
 }
 
+.golf-squareBonus {
+  color: #4ade80;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+
 .golf-tableSlot {
   width: var(--golf-slot-w);
   height: var(--golf-slot-h);

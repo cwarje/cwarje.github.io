@@ -14,7 +14,7 @@ import {
   slotPointValue,
   startHole,
 } from './logic';
-import { cardPointValue, columnPairScore, scorePlayerTable as rulesScore } from './rules';
+import { cardPointValue, columnPairScore, scorePlayerTable as rulesScore, squareBonus } from './rules';
 
 function card(rank: Rank, suit: Card['suit'] = 'hearts'): Card {
   return { rank, suit };
@@ -324,6 +324,71 @@ describe('scoring', () => {
     expect(columnPairScore(table, 0)).toBe(0);
     expect(columnPairScore(table, 1)).toBe(7);
     expect(rulesScore(makePlayer('p1', table))).toBe(3 + 9 + 4 + 2);
+  });
+
+  it('applies -20 for a left 2x2 square of the same rank', () => {
+    const table = [
+      slot(card(8, 'hearts')),
+      slot(card(8, 'clubs')),
+      slot(card(9, 'diamonds')),
+      slot(card(8, 'spades')),
+      slot(card(8, 'diamonds')),
+      slot(card(2, 'clubs')),
+    ];
+    expect(squareBonus(table)).toBe(-20);
+    expect(rulesScore(makePlayer('p1', table))).toBe(9 + 2 - 20);
+  });
+
+  it('applies -20 for a right 2x2 square of the same rank', () => {
+    const table = [
+      slot(card(9, 'hearts')),
+      slot(card(5, 'clubs')),
+      slot(card(5, 'diamonds')),
+      slot(card(2, 'spades')),
+      slot(card(5, 'hearts')),
+      slot(card(5, 'spades')),
+    ];
+    expect(squareBonus(table)).toBe(-20);
+    expect(rulesScore(makePlayer('p1', table))).toBe(9 + 2 - 20);
+  });
+
+  it('applies -40 when all six cards share the same rank', () => {
+    const table = [
+      slot(card(7, 'hearts')),
+      slot(card(7, 'clubs')),
+      slot(card(7, 'diamonds')),
+      slot(card(7, 'spades')),
+      slot(card(7, 'hearts')),
+      slot(card(7, 'clubs')),
+    ];
+    expect(squareBonus(table)).toBe(-40);
+    expect(rulesScore(makePlayer('p1', table))).toBe(-40);
+  });
+
+  it('does not apply a bonus when four matching cards do not form a 2x2', () => {
+    const table = [
+      slot(card(7, 'hearts')),
+      slot(card(7, 'clubs')),
+      slot(card(9, 'diamonds')),
+      slot(card(7, 'spades')),
+      slot(card(3, 'hearts')),
+      slot(card(2, 'clubs')),
+    ];
+    expect(squareBonus(table)).toBe(0);
+    expect(rulesScore(makePlayer('p1', table))).toBe(0 + 7 + 9 + 0 + 3 + 2);
+  });
+
+  it('does not apply a bonus for mixed ranks in a 2x2 region', () => {
+    const table = [
+      slot(card(8, 'hearts')),
+      slot(card(7, 'clubs')),
+      slot(card(9, 'diamonds')),
+      slot(card(8, 'spades')),
+      slot(card(7, 'hearts')),
+      slot(card(2, 'clubs')),
+    ];
+    expect(squareBonus(table)).toBe(0);
+    expect(rulesScore(makePlayer('p1', table))).toBe(9 + 2);
   });
 });
 
