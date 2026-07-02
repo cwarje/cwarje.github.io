@@ -31,7 +31,9 @@ export function useGolfDiscardAnimation(options: {
   const animationRef = useRef<GolfDiscardAnimation | null>(null);
   const [animation, setAnimation] = useState<GolfDiscardAnimation | null>(null);
 
-  animationRef.current = animation;
+  useEffect(() => {
+    animationRef.current = animation;
+  }, [animation]);
 
   const completeAnimation = useCallback(() => {
     setAnimation(null);

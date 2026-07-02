@@ -4,7 +4,6 @@ import {
   bestSwapImprovement,
   bestSwapSlot,
   createGolfStateForTest,
-  processGolfAction,
   runGolfBotTurn,
   swapTableScoreImprovement,
 } from './logic';

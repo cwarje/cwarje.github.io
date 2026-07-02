@@ -54,7 +54,9 @@ export function useGolfSwapAnimation(options: {
   const animationRef = useRef<GolfSwapAnimation | null>(null);
   const [animation, setAnimation] = useState<GolfSwapAnimation | null>(null);
 
-  animationRef.current = animation;
+  useLayoutEffect(() => {
+    animationRef.current = animation;
+  }, [animation]);
 
   const completeAnimation = useCallback(() => {
     setAnimation(null);
