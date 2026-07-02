@@ -41,6 +41,7 @@ import { cribCardsToSelect } from '../games/cross-crib/types';
 import type { CribbageState } from '../games/cribbage/types';
 import type { CasinoState } from '../games/casino/types';
 import type { CucumberState } from '../games/cucumber/types';
+import type { GolfState } from '../games/golf/types';
 import { dealHoldDurationMs, registerDealHoldExtender } from '../games/shared/dealTiming';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 import { shouldBotBank } from '../games/farkle/logic';
@@ -154,6 +155,11 @@ function getRoundDealInfo(gameType: GameType | null, state: unknown): { signatur
       if (s.phase === 'hand-end' && s.gameOver) return null;
       return { signature: `cucumber-${s.handNumber}`, cardCount: sumHand(s.players) };
     }
+    case 'golf': {
+      const s = state as GolfState;
+      if (s.phase === 'game-over') return null;
+      return { signature: `golf-${s.holeNumber}`, cardCount: s.players.length * 6 };
+    }
     default:
       return null;
   }
@@ -224,6 +230,17 @@ function applyProfileToGameState(
     }
     case 'cucumber': {
       const current = state as CucumberState;
+      let changed = false;
+      const players = current.players.map((player) => {
+        if (player.id !== playerId) return player;
+        if (player.name === playerName && player.color === playerColor) return player;
+        changed = true;
+        return { ...player, name: playerName, color: playerColor };
+      });
+      return changed ? { ...current, players } : current;
+    }
+    case 'golf': {
+      const current = state as GolfState;
       let changed = false;
       const players = current.players.map((player) => {
         if (player.id !== playerId) return player;
@@ -1527,6 +1544,53 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             setGameState(next);
             broadcastGameState(next);
             if (checkGameOver('cucumber', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, UP_RIVER_BOT_DELAY);
+      }
+      return;
+    }
+
+    // ── Golf bot scheduling ──
+    if (room.gameType === 'golf') {
+      const gs = gameState as GolfState;
+      if (gs.gameOver) return;
+
+      if (gs.phase === 'hole-end') {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as GolfState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'hole-end' || currentGs.gameOver) return;
+
+          const next = processGameAction('golf', currentGs, { type: 'start-next-hole' }, '');
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('golf', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, UP_RIVER_ROUND_END_DELAY);
+        return;
+      }
+
+      const currentPlayer = gs.players[gs.currentPlayerIndex];
+      if (currentPlayer?.isBot) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom) return;
+
+          const next = runSingleBotTurn('golf', currentGs);
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('golf', next)) {
               const finishedRoom = { ...currentRoom, phase: 'finished' as const };
               setRoom(finishedRoom);
               broadcastRoomState(finishedRoom);

@@ -3555,3 +3555,206 @@
   }
 }
 
+/* ── Golf ── */
+.golf-board {
+  --golf-slot-w: 45px;
+  --golf-slot-h: 68px;
+  --golf-slot-gap: 4px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.golf-board .river-table {
+  flex: 1;
+  min-height: 0;
+}
+
+.golf-seatStack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: calc(3 * var(--golf-slot-w) + 2 * var(--golf-slot-gap));
+}
+
+.golf-seatPill {
+  pointer-events: none;
+  width: 100%;
+  min-width: 0;
+  grid-template-rows: auto;
+}
+
+.golf-cardGrid {
+  display: grid;
+  grid-template-columns: repeat(3, var(--golf-slot-w));
+  grid-template-rows: repeat(2, var(--golf-slot-h));
+  gap: var(--golf-slot-gap);
+  place-items: center;
+}
+
+.golf-tableSlot {
+  width: var(--golf-slot-w);
+  height: var(--golf-slot-h);
+  border-radius: 10px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.golf-slotButton {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.golf-slotButton:disabled {
+  cursor: default;
+}
+
+.golf-slotButton .river-card,
+.golf-slotButton .poker-cardFlip,
+.golf-slotButton .poker-card {
+  width: 100%;
+  height: 100%;
+}
+
+.golf-stockArea {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 2;
+}
+
+.golf-stockPile,
+.golf-discardPile {
+  position: relative;
+  width: var(--golf-slot-w);
+  height: var(--golf-slot-h);
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.golf-stockPile:disabled,
+.golf-discardPile:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.golf-stockStack {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.golf-stockCount {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.92);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+.golf-pendingDraw {
+  width: var(--golf-slot-w);
+  height: var(--golf-slot-h);
+  transform: translateY(-8px);
+}
+
+.golf-statusBlock {
+  width: 100%;
+  display: grid;
+  grid-template-rows: 24px 32px;
+  gap: 2px;
+  min-height: 58px;
+  margin-top: clamp(4px, 1.5vh, 12px);
+  align-items: end;
+  justify-items: center;
+  flex-shrink: 0;
+}
+
+.golf-statusBlock .river-headsUp {
+  margin-top: 0;
+  min-height: 24px;
+  height: 24px;
+  width: 100%;
+  align-self: end;
+}
+
+.golf-statusBlock .river-actionRow.golf-actionRow {
+  min-height: 32px;
+  height: 32px;
+  width: 100%;
+  padding-top: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.golf-actionButton {
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.golf-actionButton:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.golf-actionButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (min-width: 640px) {
+  .golf-board {
+    --golf-slot-w: 52px;
+    --golf-slot-h: 78px;
+    --golf-slot-gap: 5px;
+  }
+
+  .golf-statusBlock .river-actionRow.golf-actionRow {
+    min-height: 32px;
+    height: 32px;
+    padding-top: 0;
+  }
+
+  .golf-actionButton {
+    font-size: 0.9rem;
+    padding: 5px 14px;
+  }
+}
+

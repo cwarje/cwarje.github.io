@@ -19,6 +19,7 @@ Current game types (from `src/games/registry.ts` and `src/networking/types.ts`):
 - `poker` (2-8 players)
 - `up-and-down-the-river` (4-6 players; start order `up-down` or `down-up`)
 - `twelve` (2-4 players; UI title **Tolva** — table piles, pile count 3-6)
+- `golf` (2-6 players; six table cards, draw/discard, 9 holes)
 - `settler` (3-4 players)
 - `cross-crib` (2 or 4 players only)
 
@@ -100,7 +101,7 @@ The animation is cosmetic and local to each browser — authoritative state arri
 | `src/games/shared/dealTiming.ts` | Shared timing used by boards and `roomStore` deal hold |
 | `src/networking/roomStore.tsx` (`getRoundDealInfo`) | Host-side hold until animation duration elapses |
 
-Games: Hearts, Casino (4 table slots on first deal), Cross Crib (starter), Tolva/Twelve (front piles), Cribbage, Up and Down the River, Mobilization, Poker (hole cards only), **Cucumber**. Respects `prefers-reduced-motion`.
+Games: Hearts, Casino (4 table slots on first deal), Cross Crib (starter), Tolva/Twelve (front piles), Cribbage, Up and Down the River, Mobilization, Poker (hole cards only), **Cucumber**, **Golf**. Respects `prefers-reduced-motion`.
 
 See [`src/games/shared/README.md`](src/games/shared/README.md) for integration details, per-game `dealKey` values, and a checklist for wiring new boards.
 

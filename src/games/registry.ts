@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Dice5, Heart, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers, Circle } from 'lucide-react';
+import { Dice5, Heart, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers, Circle, Flag } from 'lucide-react';
 import type { GameType, Player, GameStartOptions, TableEvent, TableEventInput } from '../networking/types';
 
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
@@ -39,6 +39,7 @@ import {
   runCucumberBotTurn,
   getCucumberWinners,
 } from './cucumber/logic';
+import { createGolfState, processGolfAction, isGolfOver, runGolfBotTurn, getGolfWinners } from './golf/logic';
 
 import YahtzeeBoard from './yahtzee/YahtzeeBoard';
 import FarkleBoard from './farkle/FarkleBoard';
@@ -53,6 +54,7 @@ import CribbageBoard from './cribbage/CribbageBoard';
 import CasinoBoard from './casino/CasinoBoard';
 import PongBoard from './pong/PongBoard';
 import CucumberBoard from './cucumber/CucumberBoard';
+import GolfBoard from './golf/GolfBoard';
 
 import HeartsOptions from './hearts/HeartsOptions';
 import FarkleOptions from './farkle/FarkleOptions';
@@ -71,6 +73,7 @@ import UpRiverToolbarExtra from './up-and-down-the-river/UpRiverToolbarExtra';
 import TwelveTitleExtra from './twelve/TwelveTitleExtra';
 import MobilizationTitleExtra from './mobilization/MobilizationTitleExtra';
 import CucumberTitleExtra from './cucumber/CucumberTitleExtra';
+import GolfTitleExtra from './golf/GolfTitleExtra';
 import CucumberOptions from './cucumber/CucumberOptions';
 import { PigIcon } from '../components/icons/PigIcon';
 import { CribbagePegHolesIcon } from '../components/icons/CribbagePegHolesIcon';
@@ -795,11 +798,59 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     showNewBadge: true,
     hudTitleLines: ['Cucumber'],
   },
+
+  golf: {
+    title: 'Golf',
+    shortDescription: 'Six table cards, draw and swap, column pairs cancel — lowest score after 9 holes wins.',
+    playersLabel: '2-6 Players',
+    minPlayers: 2,
+    maxPlayers: 6,
+    info: {
+      goal: 'Finish 9 holes with the lowest total score on your six table cards.',
+      rules: [
+        'Each player has six cards arranged in two rows of three on the table — no hand of cards.',
+        'At the start of each hole, the bottom row is dealt face up; the top row stays face down until flipped by a swap.',
+        'On your turn, draw from the stock or take the top discard. After drawing from stock, either discard that card or swap it with one of your table cards (the replaced card goes to the discard pile). After taking the discard, you must swap it with a table card.',
+        'Matching ranks in the same column score zero for that column (e.g. two 7s in one column). Otherwise: Ace = 1, 2–10 = face value, Jack/Queen = 10, King = 0.',
+        'When one player has all six cards face up, every other player gets one final turn, then the hole is scored.',
+        'Play nine holes; lowest cumulative total wins.',
+      ],
+      howToPlay: [
+        'Tap Draw or Take discard in the bottom HUD on your turn.',
+        'After drawing, tap a table card to swap, or Discard drawn if you drew from stock.',
+        'Watch the running totals in the title bar and seat pills.',
+      ],
+    },
+    icon: Flag,
+    theme: {
+      gradient: 'from-orange-500/50 to-orange-700/50',
+      cardBorder: 'border-orange-500/50',
+      hoverBorder: 'hover:border-orange-400/60',
+      playersTag: 'bg-orange-500/30 text-orange-100 border border-orange-400/40',
+      iconColor: 'text-orange-400',
+      buttonColors: 'bg-orange-600 hover:bg-orange-500',
+      panelBg: 'bg-orange-950',
+      labelColor: 'text-orange-100',
+    },
+    createState: createGolfState,
+    processAction: processGolfAction,
+    isOver: isGolfOver,
+    runBotTurn: runGolfBotTurn,
+    getWinners: getGolfWinners,
+    Board: GolfBoard,
+    TitleExtra: GolfTitleExtra,
+    fullBoard: true,
+    hasHandZoom: false,
+    production: true,
+    showNewBadge: true,
+    hudTitleLines: ['Golf'],
+  },
 };
 
 /** All registered game types */
 export const ALL_GAME_TYPES: GameType[] = [
   'cucumber',
+  'golf',
   'pong',
   'cribbage',
   'mobilization',
@@ -817,6 +868,7 @@ export const ALL_GAME_TYPES: GameType[] = [
 /** Game types shown in production (homepage order) */
 export const PRODUCTION_GAME_TYPES: GameType[] = [
   'cucumber',
+  'golf',
   'pong',
   'cribbage',
   'mobilization',
