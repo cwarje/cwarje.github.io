@@ -146,6 +146,7 @@ export default function Home() {
 
   const showNonHostLobbyMessage = room && !isHost;
   const showHostLobbyMessage = room && isHost && waitingPlayers.length > 0;
+  const infoGameDef = infoGameType ? GAME_REGISTRY[infoGameType] : null;
 
   return (
     <div className="space-y-10">
@@ -237,7 +238,7 @@ export default function Home() {
 
       {/* Game Info Modal */}
       <AnimatePresence>
-        {infoGameType && (
+        {infoGameDef && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -246,49 +247,49 @@ export default function Home() {
             onClick={closeInfo}
             role="dialog"
             aria-modal="true"
-            aria-label={`About ${GAME_REGISTRY[infoGameType].title}`}
+            aria-label={`About ${infoGameDef.title}`}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-md max-h-[80vh] overflow-y-auto space-y-5"
+              className={`bg-gradient-to-br ${infoGameDef.theme.gradient} backdrop-blur-md border ${infoGameDef.theme.cardBorder} rounded-2xl shadow-2xl shadow-black/40 p-6 w-full max-w-md max-h-[80vh] overflow-y-auto space-y-5`}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-white">{GAME_REGISTRY[infoGameType].title}</h2>
+                <h2 className="text-xl font-bold text-white">{infoGameDef.title}</h2>
                 <button
                   onClick={closeInfo}
-                  className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 hover:border-white/25 flex items-center justify-center transition-colors cursor-pointer"
                   aria-label="Close"
                 >
-                  <X className="w-4 h-4 text-gray-400" />
+                  <X className="w-4 h-4 text-gray-400 hover:text-white transition-colors" />
                 </button>
               </div>
 
               {/* Goal */}
               <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-primary-400 uppercase tracking-wider">Goal</h3>
-                <p className="text-sm text-gray-300 leading-relaxed">{GAME_REGISTRY[infoGameType].info.goal}</p>
+                <h3 className={`text-sm font-semibold uppercase tracking-wider ${infoGameDef.theme.labelColor}`}>Goal</h3>
+                <p className="text-sm text-white/80 leading-relaxed">{infoGameDef.info.goal}</p>
               </div>
 
               {/* How to Play */}
               <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-primary-400 uppercase tracking-wider">How to Play</h3>
+                <h3 className={`text-sm font-semibold uppercase tracking-wider ${infoGameDef.theme.labelColor}`}>How to Play</h3>
                 <ol className="space-y-1.5 list-decimal list-inside">
-                  {GAME_REGISTRY[infoGameType].info.howToPlay.map((step, i) => (
-                    <li key={i} className="text-sm text-gray-300 leading-relaxed">{step}</li>
+                  {infoGameDef.info.howToPlay.map((step, i) => (
+                    <li key={i} className="text-sm text-white/80 leading-relaxed">{step}</li>
                   ))}
                 </ol>
               </div>
 
               {/* Rules */}
               <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-primary-400 uppercase tracking-wider">Rules</h3>
+                <h3 className={`text-sm font-semibold uppercase tracking-wider ${infoGameDef.theme.labelColor}`}>Rules</h3>
                 <ul className="space-y-1.5 list-disc list-inside">
-                  {GAME_REGISTRY[infoGameType].info.rules.map((rule, i) => (
-                    <li key={i} className="text-sm text-gray-300 leading-relaxed">{rule}</li>
+                  {infoGameDef.info.rules.map((rule, i) => (
+                    <li key={i} className="text-sm text-white/80 leading-relaxed">{rule}</li>
                   ))}
                 </ul>
               </div>
