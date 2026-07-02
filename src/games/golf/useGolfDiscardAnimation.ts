@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type MutableRefObject, type R
 import { useReducedMotion } from 'framer-motion';
 import type { Card, GolfState } from './types';
 import { cardEquals } from './rules';
-import { FLIP_DURATION_MS, FLY_DURATION_MS, getElementMetrics, type Point } from './golfAnimMetrics';
+import { FLIP_DURATION_MS, FLIP_TO_FLY_PAUSE_MS, FLY_DURATION_MS, getElementMetrics, type Point } from './golfAnimMetrics';
 
 export type { Point };
 
@@ -79,7 +79,7 @@ export function useGolfDiscardAnimation(options: {
 
   useEffect(() => {
     if (!animation || animation.phase !== 'flip') return;
-    const timer = setTimeout(advanceToFly, FLIP_DURATION_MS);
+    const timer = setTimeout(advanceToFly, FLIP_DURATION_MS + FLIP_TO_FLY_PAUSE_MS);
     return () => clearTimeout(timer);
   }, [animation, advanceToFly]);
 

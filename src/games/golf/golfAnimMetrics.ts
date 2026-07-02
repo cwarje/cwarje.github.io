@@ -30,4 +30,5 @@ export function getElementMetrics(
 }
 
 export const FLIP_DURATION_MS = 420;
+export const FLIP_TO_FLY_PAUSE_MS = 400;
 export const FLY_DURATION_MS = 450;

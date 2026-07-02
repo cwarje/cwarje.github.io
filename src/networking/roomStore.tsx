@@ -1258,6 +1258,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const HEARTS_MOON_DISPLAY_DELAY = 4000; // ms to show shoot-the-moon announcement before round ends
   const UP_RIVER_BOT_DELAY = 900; // ms between bot bid/card play
   const UP_RIVER_ROUND_END_DELAY = 5000; // ms to show bid result borders before next round
+  const GOLF_BOT_DELAY = 1800; // ms before Golf bot draw/swap/discard steps
   const MOBILIZATION_BOT_DELAY = 900; // ms between Mobilization bot actions
   const MOBILIZATION_SOLITAIRE_REVEAL_DELAY = 3000; // ms to show last Solitaire play / pig pass
   const TWELVE_BOT_DELAY = 900; // ms between bot actions
@@ -1596,7 +1597,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
               broadcastRoomState(finishedRoom);
             }
           }
-        }, UP_RIVER_BOT_DELAY);
+        }, GOLF_BOT_DELAY);
       }
       return;
     }

@@ -37,7 +37,17 @@ export function GolfSwapAnimationLayer({ animation, renderCardFace }: GolfSwapAn
   if (!animation) return null;
 
   if (animation.phase === 'flipSlot') {
-    const { slotFrom, slotWidth, slotHeight, replacedCard } = animation;
+    const {
+      slotFrom,
+      slotWidth,
+      slotHeight,
+      replacedCard,
+      drawnFrom,
+      pileWidth,
+      pileHeight,
+      drawnCard,
+      showDrawnFace,
+    } = animation;
     return (
       <div className="golf-discardAnimLayer" aria-hidden="true">
         <div
@@ -50,6 +60,18 @@ export function GolfSwapAnimationLayer({ animation, renderCardFace }: GolfSwapAn
           }}
         >
           <FlipCard card={replacedCard} renderCardFace={renderCardFace} />
+        </div>
+
+        <div
+          className="golf-discardAnimCard"
+          style={{
+            left: drawnFrom.x - pileWidth / 2,
+            top: drawnFrom.y - pileHeight / 2,
+            width: pileWidth,
+            height: pileHeight,
+          }}
+        >
+          {showDrawnFace ? renderCardFace(drawnCard) : <CardBack />}
         </div>
       </div>
     );

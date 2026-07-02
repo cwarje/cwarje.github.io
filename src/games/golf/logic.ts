@@ -8,7 +8,7 @@ import {
   canSwapWithSlot,
   canTakeDiscard,
   cardEquals,
-  estimatedSlotValue,
+  COLUMN_PAIRS,
   scorePlayerTable,
   slotPointValue,
 } from './rules';
@@ -314,29 +314,126 @@ export function getGolfWinners(state: unknown): string[] {
   return s.winners;
 }
 
-function bestSwapSlot(player: GolfPlayer, drawn: Card): number {
-  let bestIndex = 0;
-  let bestImprovement = -Infinity;
+function estimateOpponentScore(opponent: GolfPlayer): number {
+  let score = 0;
+  let hidden = 0;
   for (let i = 0; i < TABLE_SLOT_COUNT; i++) {
-    const currentValue = estimatedSlotValue(player.table, i);
-    const nextTable = [...player.table];
-    nextTable[i] = { card: drawn, faceUp: true };
-    const nextValue = slotPointValue(nextTable, i);
-    const improvement = currentValue - nextValue;
-    if (improvement > bestImprovement) {
-      bestImprovement = improvement;
-      bestIndex = i;
+    const slot = opponent.table[i];
+    if (!slot) continue;
+    if (slot.faceUp) score += slotPointValue(opponent.table, i);
+    else hidden++;
+  }
+  return score + hidden * 7;
+}
+
+export function swapTableScoreImprovement(player: GolfPlayer, drawn: Card, slotIndex: number): number {
+  const before = scorePlayerTable(player);
+  const nextTable = [...player.table];
+  nextTable[slotIndex] = { card: drawn, faceUp: true };
+  const after = scorePlayerTable({ ...player, table: nextTable });
+  return before - after;
+}
+
+export function discardGiftPenalty(state: GolfState, card: Card, currentBotId: string): number {
+  let penalty = 0;
+  for (const opponent of state.players) {
+    if (opponent.id === currentBotId) continue;
+
+    for (const [top, bottom] of COLUMN_PAIRS) {
+      for (const slotIndex of [top, bottom]) {
+        const slot = opponent.table[slotIndex];
+        if (!slot?.faceUp) continue;
+        if (slot.card.rank === card.rank) {
+          penalty += 4;
+        }
+      }
+    }
+
+    for (let i = 0; i < TABLE_SLOT_COUNT; i++) {
+      const slot = opponent.table[i];
+      if (!slot?.faceUp) continue;
+      if ((card.rank === 11 || card.rank === 12) && slotPointValue(opponent.table, i) >= 8) {
+        penalty += 2;
+      }
     }
   }
+  return penalty;
+}
+
+function getEndgameSlotBonus(player: GolfPlayer, state: GolfState, slotIndex: number, improvement: number): number {
+  const slot = player.table[slotIndex];
+  if (!slot || slot.faceUp) return 0;
+
+  const faceDownCount = player.table.filter(s => !s.faceUp).length;
+  const botScore = scorePlayerTable(player);
+  const opponentScores = state.players
+    .filter(p => p.id !== player.id)
+    .map(estimateOpponentScore);
+  if (opponentScores.length === 0) return 0;
+
+  const bestOpponentScore = Math.min(...opponentScores);
+  const aheadBy = bestOpponentScore - botScore;
+  const behindBy = botScore - bestOpponentScore;
+
+  if (aheadBy >= 3 && faceDownCount <= 2) return 2;
+  if (behindBy >= 5 && faceDownCount === 1 && improvement < 3) return -10;
+  return 0;
+}
+
+export function bestSwapImprovement(player: GolfPlayer, drawn: Card, state?: GolfState): number {
+  let best = -Infinity;
+  for (let i = 0; i < TABLE_SLOT_COUNT; i++) {
+    const improvement = swapTableScoreImprovement(player, drawn, i);
+    let score = improvement;
+    if (state) {
+      score += getEndgameSlotBonus(player, state, i, improvement);
+    }
+    if (score > best) best = score;
+  }
+  return best;
+}
+
+export function bestSwapSlot(player: GolfPlayer, drawn: Card, state?: GolfState): number {
+  const options = Array.from({ length: TABLE_SLOT_COUNT }, (_, slotIndex) => {
+    const improvement = swapTableScoreImprovement(player, drawn, slotIndex);
+    const slot = player.table[slotIndex]!;
+    return {
+      slotIndex,
+      improvement,
+      faceDown: !slot.faceUp,
+      replacedCard: slot.card,
+    };
+  });
+
+  const maxImprovement = Math.max(...options.map(option => option.improvement));
+  const candidates = options.filter(option => option.improvement >= maxImprovement - 1);
+
+  let bestIndex = candidates[0]!.slotIndex;
+  let bestScore = -Infinity;
+
+  for (const candidate of candidates) {
+    let score = candidate.improvement;
+    if (state) {
+      score += getEndgameSlotBonus(player, state, candidate.slotIndex, candidate.improvement);
+      score -= discardGiftPenalty(state, candidate.replacedCard, player.id);
+    }
+    const currentBest = options.find(option => option.slotIndex === bestIndex)!;
+    const preferCandidate =
+      score > bestScore || (score === bestScore && candidate.faceDown && !currentBest.faceDown);
+    if (preferCandidate) {
+      bestScore = score;
+      bestIndex = candidate.slotIndex;
+    }
+  }
+
   return bestIndex;
 }
 
-function discardTakeImprovement(player: GolfPlayer, discardTop: Card): number {
-  const slotIndex = bestSwapSlot(player, discardTop);
-  const currentValue = estimatedSlotValue(player.table, slotIndex);
-  const nextTable = [...player.table];
-  nextTable[slotIndex] = { card: discardTop, faceUp: true };
-  return currentValue - slotPointValue(nextTable, slotIndex);
+function shouldTakeDiscard(player: GolfPlayer, discardTop: Card, state: GolfState): boolean {
+  const improvement = bestSwapImprovement(player, discardTop, state);
+  if (improvement >= 1) return true;
+  const isLowCard = discardTop.rank === 13 || discardTop.rank === 14;
+  return isLowCard && improvement > 0;
 }
 
 export function runGolfBotTurn(state: unknown): unknown {
@@ -348,22 +445,19 @@ export function runGolfBotTurn(state: unknown): unknown {
 
   if (s.pendingDraw) {
     if (s.pendingDrawSource === 'stock') {
-      const slotIndex = bestSwapSlot(current, s.pendingDraw);
-      const currentValue = estimatedSlotValue(current.table, slotIndex);
-      const nextTable = [...current.table];
-      nextTable[slotIndex] = { card: s.pendingDraw, faceUp: true };
-      const nextValue = slotPointValue(nextTable, slotIndex);
-      if (currentValue - nextValue > 0) {
+      const improvement = bestSwapImprovement(current, s.pendingDraw, s);
+      if (improvement > 0) {
+        const slotIndex = bestSwapSlot(current, s.pendingDraw, s);
         return processGolfAction(s, { type: 'swap-with-slot', slotIndex }, current.id);
       }
       return processGolfAction(s, { type: 'discard-drawn' }, current.id);
     }
-    const slotIndex = bestSwapSlot(current, s.pendingDraw);
+    const slotIndex = bestSwapSlot(current, s.pendingDraw, s);
     return processGolfAction(s, { type: 'swap-with-slot', slotIndex }, current.id);
   }
 
   const discardTop = s.discard[s.discard.length - 1];
-  if (discardTop && discardTakeImprovement(current, discardTop) >= 2) {
+  if (discardTop && shouldTakeDiscard(current, discardTop, s)) {
     return processGolfAction(s, { type: 'take-discard' }, current.id);
   }
 

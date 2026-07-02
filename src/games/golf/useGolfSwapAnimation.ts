@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Mutable
 import { useReducedMotion } from 'framer-motion';
 import type { Card, GolfState } from './types';
 import { cardEquals } from './rules';
-import { FLIP_DURATION_MS, FLY_DURATION_MS, getElementMetrics, type Point } from './golfAnimMetrics';
+import { FLIP_DURATION_MS, FLIP_TO_FLY_PAUSE_MS, FLY_DURATION_MS, getElementMetrics, type Point } from './golfAnimMetrics';
 
 export type SwapPhase = 'flipSlot' | 'swapFly';
 
@@ -129,7 +129,9 @@ export function useGolfSwapAnimation(options: {
     if (!animation) return;
 
     const duration =
-      animation.phase === 'flipSlot' ? FLIP_DURATION_MS : FLY_DURATION_MS;
+      animation.phase === 'flipSlot'
+        ? FLIP_DURATION_MS + FLIP_TO_FLY_PAUSE_MS
+        : FLY_DURATION_MS;
 
     const timer = setTimeout(() => {
       if (animation.phase === 'swapFly') {
