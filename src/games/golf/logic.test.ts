@@ -56,6 +56,7 @@ describe('createGolfState', () => {
       expect(player.setupFlipsRemaining).toBe(2);
     }
     expect(state.currentPlayerIndex).toBe(0);
+    expect(state.startingPlayerIndex).toBe(0);
     expect(state.discard).toHaveLength(1);
     expect(state.stock.length).toBeGreaterThan(0);
   });
@@ -128,6 +129,34 @@ describe('setup phase', () => {
     expect(afterFlip.currentPlayerIndex).toBe(0);
 
     const drawn = processGolfAction(afterFlip, { type: 'draw-from-stock' }, 'p1') as typeof state;
+    expect(drawn.pendingDraw).toEqual(card(10, 'spades'));
+  });
+
+  it('starts normal play at starting player after all setup flips when starter is not player 0', () => {
+    const table = buildInitialTable([
+      card(2),
+      card(3),
+      card(4),
+      card(5),
+      card(6),
+      card(7),
+    ]);
+    const players = [
+      makePlayer('p1', table, 0, 0),
+      makePlayer('p2', buildInitialTable([card(8), card(9), card(10), card(11), card(12), card(13)]), 0, 1),
+    ];
+    const state = createGolfStateForTest(players, 1, {
+      currentPlayerIndex: 1,
+      startingPlayerIndex: 1,
+      stock: [card(10, 'spades')],
+      discard: [card(4, 'clubs')],
+    });
+
+    const afterFlip = processGolfAction(state, { type: 'flip-table-slot', slotIndex: 0 }, 'p2') as typeof state;
+    expect(afterFlip.players.every(player => player.setupFlipsRemaining === 0)).toBe(true);
+    expect(afterFlip.currentPlayerIndex).toBe(1);
+
+    const drawn = processGolfAction(afterFlip, { type: 'draw-from-stock' }, 'p2') as typeof state;
     expect(drawn.pendingDraw).toEqual(card(10, 'spades'));
   });
 
@@ -517,6 +546,56 @@ describe('startHole', () => {
     const state = startHole(players, 1);
     const dealt = 6 * 6 + state.stock.length + state.discard.length;
     expect(dealt).toBe(104);
+  });
+
+  it('starts at the given starting player index', () => {
+    const players = [
+      makePlayer('p1', [], 0),
+      makePlayer('p2', [], 0),
+      makePlayer('p3', [], 0),
+    ];
+    const state = startHole(players, 2, 1);
+    expect(state.startingPlayerIndex).toBe(1);
+    expect(state.currentPlayerIndex).toBe(1);
+    expect(state.holeNumber).toBe(2);
+  });
+});
+
+describe('starting player rotation', () => {
+  it('rotates starting player on start-next-hole', () => {
+    const players = [
+      makePlayer('p1', Array.from({ length: 6 }, () => slot(card(2))), 5),
+      makePlayer('p2', Array.from({ length: 6 }, () => slot(card(3))), 8),
+      makePlayer('p3', Array.from({ length: 6 }, () => slot(card(4))), 12),
+    ];
+    const state = createGolfStateForTest(players, 1, {
+      phase: 'hole-end',
+      startingPlayerIndex: 0,
+    });
+
+    const next = processGolfAction(state, { type: 'start-next-hole' }, '') as typeof state;
+    expect(next.holeNumber).toBe(2);
+    expect(next.startingPlayerIndex).toBe(1);
+    expect(next.currentPlayerIndex).toBe(1);
+    expect(next.phase).toBe('playing');
+    expect(next.players.every(player => player.setupFlipsRemaining === 2)).toBe(true);
+  });
+
+  it('wraps starting player index after the last seat', () => {
+    const players = [
+      makePlayer('p1', Array.from({ length: 6 }, () => slot(card(2))), 5),
+      makePlayer('p2', Array.from({ length: 6 }, () => slot(card(3))), 8),
+      makePlayer('p3', Array.from({ length: 6 }, () => slot(card(4))), 12),
+    ];
+    const state = createGolfStateForTest(players, 3, {
+      phase: 'hole-end',
+      startingPlayerIndex: 2,
+    });
+
+    const next = processGolfAction(state, { type: 'start-next-hole' }, '') as typeof state;
+    expect(next.holeNumber).toBe(4);
+    expect(next.startingPlayerIndex).toBe(0);
+    expect(next.currentPlayerIndex).toBe(0);
   });
 });
 

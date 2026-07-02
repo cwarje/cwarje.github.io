@@ -35,6 +35,8 @@ export interface GolfState {
   stock: Card[];
   discard: Card[];
   currentPlayerIndex: number;
+  /** Seat index of the player who leads setup and takes the first turn this hole. */
+  startingPlayerIndex: number;
   holeNumber: number;
   phase: GolfPhase;
   pendingDraw: Card | null;

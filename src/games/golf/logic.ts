@@ -110,7 +110,7 @@ function collectHoleEndFlipSlotIds(players: GolfPlayer[]): string[] {
   return ids;
 }
 
-function startHole(players: GolfPlayer[], holeNumber: number): GolfState {
+function startHole(players: GolfPlayer[], holeNumber: number, startingPlayerIndex = 0): GolfState {
   const deck = buildDeck(players.length);
   let offset = 0;
   const dealtPlayers = players.map(player => {
@@ -132,7 +132,8 @@ function startHole(players: GolfPlayer[], holeNumber: number): GolfState {
     players: dealtPlayers,
     stock,
     discard,
-    currentPlayerIndex: 0,
+    currentPlayerIndex: startingPlayerIndex,
+    startingPlayerIndex,
     holeNumber,
     phase: 'playing',
     pendingDraw: null,
@@ -154,6 +155,7 @@ function finishGame(players: GolfPlayer[]): GolfState {
     stock: [],
     discard: [],
     currentPlayerIndex: 0,
+    startingPlayerIndex: 0,
     holeNumber: TOTAL_HOLES,
     phase: 'game-over',
     pendingDraw: null,
@@ -293,7 +295,7 @@ function applySetupFlip(
   return {
     ...state,
     players: newPlayers,
-    currentPlayerIndex: nextIndex ?? 0,
+    currentPlayerIndex: nextIndex ?? state.startingPlayerIndex,
   };
 }
 
@@ -412,7 +414,8 @@ export function processGolfAction(state: unknown, action: unknown, playerId: str
 
     case 'start-next-hole': {
       if (s.phase !== 'hole-end' || s.gameOver) return state;
-      return startHole(s.players, s.holeNumber + 1);
+      const nextStarter = (s.startingPlayerIndex + 1) % s.players.length;
+      return startHole(s.players, s.holeNumber + 1, nextStarter);
     }
 
     case 'show-final-results': {
@@ -658,6 +661,7 @@ export function createGolfStateForTest(
     stock?: Card[];
     discard?: Card[];
     currentPlayerIndex?: number;
+    startingPlayerIndex?: number;
     pendingDraw?: Card | null;
     pendingDrawSource?: 'stock' | 'discard' | null;
     pendingOptionalFlip?: boolean;
@@ -672,7 +676,8 @@ export function createGolfStateForTest(
     players,
     stock: options?.stock ?? [],
     discard: options?.discard ?? [],
-    currentPlayerIndex: options?.currentPlayerIndex ?? 0,
+    currentPlayerIndex: options?.currentPlayerIndex ?? options?.startingPlayerIndex ?? 0,
+    startingPlayerIndex: options?.startingPlayerIndex ?? 0,
     holeNumber,
     phase: options?.phase ?? 'playing',
     pendingDraw: options?.pendingDraw ?? null,
