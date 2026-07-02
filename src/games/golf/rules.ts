@@ -47,6 +47,7 @@ export function cardPointValue(card: Card): number {
   if (card.rank === 13) return 0;
   if (card.rank === 11 || card.rank === 12) return 10;
   if (card.rank === 14) return 1;
+  if (card.rank === 2) return -2;
   return card.rank;
 }
 

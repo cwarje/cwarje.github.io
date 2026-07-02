@@ -305,6 +305,7 @@ describe('processGolfAction', () => {
 describe('scoring', () => {
   it('scores ranks correctly', () => {
     expect(cardPointValue(card(14))).toBe(1);
+    expect(cardPointValue(card(2))).toBe(-2);
     expect(cardPointValue(card(10))).toBe(10);
     expect(cardPointValue(card(11))).toBe(10);
     expect(cardPointValue(card(13))).toBe(0);
@@ -323,7 +324,22 @@ describe('scoring', () => {
     expect(slotPointValue(table, 3)).toBe(0);
     expect(columnPairScore(table, 0)).toBe(0);
     expect(columnPairScore(table, 1)).toBe(7);
-    expect(rulesScore(makePlayer('p1', table))).toBe(3 + 9 + 4 + 2);
+    expect(rulesScore(makePlayer('p1', table))).toBe(14);
+  });
+
+  it('cancels matching 2s in the same column', () => {
+    const table = [
+      slot(card(2, 'hearts')),
+      slot(card(3, 'clubs')),
+      slot(card(9, 'diamonds')),
+      slot(card(2, 'spades')),
+      slot(card(4, 'hearts')),
+      slot(card(5, 'clubs')),
+    ];
+    expect(slotPointValue(table, 0)).toBe(0);
+    expect(slotPointValue(table, 3)).toBe(0);
+    expect(columnPairScore(table, 0)).toBe(0);
+    expect(rulesScore(makePlayer('p1', table))).toBe(3 + 9 + 4 + 5);
   });
 
   it('applies -20 for a left 2x2 square of the same rank', () => {
@@ -336,7 +352,7 @@ describe('scoring', () => {
       slot(card(2, 'clubs')),
     ];
     expect(squareBonus(table)).toBe(-20);
-    expect(rulesScore(makePlayer('p1', table))).toBe(9 + 2 - 20);
+    expect(rulesScore(makePlayer('p1', table))).toBe(-13);
   });
 
   it('applies -20 for a right 2x2 square of the same rank', () => {
@@ -349,7 +365,7 @@ describe('scoring', () => {
       slot(card(5, 'spades')),
     ];
     expect(squareBonus(table)).toBe(-20);
-    expect(rulesScore(makePlayer('p1', table))).toBe(9 + 2 - 20);
+    expect(rulesScore(makePlayer('p1', table))).toBe(-13);
   });
 
   it('applies -40 when all six cards share the same rank', () => {
@@ -375,7 +391,7 @@ describe('scoring', () => {
       slot(card(2, 'clubs')),
     ];
     expect(squareBonus(table)).toBe(0);
-    expect(rulesScore(makePlayer('p1', table))).toBe(0 + 7 + 9 + 0 + 3 + 2);
+    expect(rulesScore(makePlayer('p1', table))).toBe(17);
   });
 
   it('does not apply a bonus for mixed ranks in a 2x2 region', () => {
@@ -388,7 +404,7 @@ describe('scoring', () => {
       slot(card(2, 'clubs')),
     ];
     expect(squareBonus(table)).toBe(0);
-    expect(rulesScore(makePlayer('p1', table))).toBe(9 + 2);
+    expect(rulesScore(makePlayer('p1', table))).toBe(7);
   });
 });
 

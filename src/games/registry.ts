@@ -811,7 +811,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
         'Each player has six cards arranged in two rows of three on the table — no hand of cards.',
         'At the start of each hole, each player flips two table cards in turn before play begins. Other cards stay face down until flipped by a swap or after discarding a stock draw.',
         'On your turn, draw from the stock or take the top discard. After drawing from stock, either discard that card or swap it with one of your table cards (the replaced card goes to the discard pile). If you discard a stock draw, you may flip one face-down table card before ending your turn. After taking the discard, you must swap it with a table card.',
-        'Matching ranks in the same column score zero for that column (e.g. two 7s in one column). Otherwise: Ace = 1, 2–10 = face value, Jack/Queen = 10, King = 0.',
+        'Matching ranks in the same column score zero for that column (e.g. two 7s in one column). Otherwise: Ace = 1, 2 = -2, 3–10 = face value, Jack/Queen = 10, King = 0. A 2×2 block of four matching ranks scores -20.',
         'When one player has all six cards face up, every other player gets one final turn, then the hole is scored.',
         'Play nine holes; lowest cumulative total wins.',
       ],
