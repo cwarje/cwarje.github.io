@@ -5,8 +5,11 @@ import type { Card, GolfPlayer, GolfState, Suit } from './types';
 import {
   canDiscardDrawn,
   canDrawFromStock,
+  canFlipTableSlot,
+  canSkipOptionalFlip,
   canSwapWithSlot,
   canTakeDiscard,
+  isSetupPhase,
   rankDisplay,
 } from './rules';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX } from '../../networking/playerColors';
@@ -15,8 +18,10 @@ import { useDealerDealAnimation, type DealExtraTarget, type DealSeat } from '../
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 import { GolfDiscardAnimationLayer } from './GolfDiscardAnimationLayer';
 import { GolfSwapAnimationLayer } from './GolfSwapAnimationLayer';
+import { GolfFlipAnimationLayer } from './GolfFlipAnimationLayer';
 import { useGolfDiscardAnimation } from './useGolfDiscardAnimation';
 import { useGolfSwapAnimation } from './useGolfSwapAnimation';
+import { useGolfFlipAnimation } from './useGolfFlipAnimation';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
   hearts: '\u2665',
@@ -208,6 +213,7 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
   const showDrawStock = canUseActions && !state.pendingDraw && canDrawFromStock(state, myId);
   const showTakeDiscard = canUseActions && !state.pendingDraw && canTakeDiscard(state, myId);
   const showDiscardDrawn = canUseActions && canDiscardDrawn(state, myId);
+  const showSkipOptionalFlip = canUseActions && canSkipOptionalFlip(state, myId);
   const canClickDiscard = showTakeDiscard || showDiscardDrawn;
 
   const discardAnim = useGolfDiscardAnimation({
@@ -229,9 +235,19 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
     animationBusyRef,
   });
 
+  const flipAnim = useGolfFlipAnimation({
+    boardRef,
+    slotRefs,
+    state,
+    animationBusyRef,
+  });
+
   useEffect(() => {
-    animationBusyRef.current = discardAnim.animation !== null || swapAnim.animation !== null;
-  }, [discardAnim.animation, swapAnim.animation]);
+    animationBusyRef.current =
+      discardAnim.animation !== null ||
+      swapAnim.animation !== null ||
+      flipAnim.animation !== null;
+  }, [discardAnim.animation, swapAnim.animation, flipAnim.animation]);
 
   const visibleDiscardTop =
     discardAnim.hideDiscardTop || swapAnim.hideDiscardTop
@@ -263,9 +279,32 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
     }
     const current = state.players[state.currentPlayerIndex];
     if (!current) return null;
+    if (isSetupPhase(state)) {
+      if (current.id === myId) {
+        return `Flip two cards to start the hole (${current.setupFlipsRemaining} left)`;
+      }
+      return `${current.name} is flipping cards`;
+    }
+    if (state.pendingOptionalFlip && current.id === myId) {
+      if (showSkipOptionalFlip) {
+        return (
+          <span className="golf-headsUpInline">
+            <span>Tap a face-down card to flip it</span>
+            <button
+              type="button"
+              onClick={() => onAction({ type: 'skip-optional-flip' })}
+              className="twelve-actionButton golf-actionButton"
+            >
+              Skip
+            </button>
+          </span>
+        );
+      }
+      return 'Tap a face-down card to flip it';
+    }
     if (state.pendingDraw && current.id === myId) {
       if (state.pendingDrawSource === 'stock') {
-        return 'Swap the drawn card with a table card, or discard it';
+        return 'Swap the drawn card with a table card, or discard it to flip a hidden card';
       }
       return 'Swap the drawn card with one of your table cards';
     }
@@ -273,7 +312,7 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
       return 'Draw from the stock or take the top discard';
     }
     return `${current.name} is playing`;
-  }, [state, myId]);
+  }, [state, myId, showSkipOptionalFlip, onAction]);
 
   const renderSeatPill = (layout: SeatLayout) => {
     const player = layout.player;
@@ -312,12 +351,19 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
       canUseActions &&
       isMe &&
       canSwapWithSlot(state, myId, slotIndex);
+    const canFlip =
+      canUseActions &&
+      isMe &&
+      canFlipTableSlot(state, myId, slotIndex);
+    const slotEnabled = canSwap || canFlip;
 
     if (!revealed || !slot) {
       return <div key={slotId} className="golf-tableSlot" aria-hidden="true" />;
     }
 
-    const isAnimating = swapAnim.animatingSlotId === slotId;
+    const isAnimating =
+      swapAnim.animatingSlotId === slotId ||
+      flipAnim.animatingSlotId === slotId;
 
     return (
       <div key={slotId} className={`golf-tableSlot ${isAnimating ? 'golf-tableSlot--animating' : ''}`}>
@@ -328,16 +374,19 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
           }}
           type="button"
           className="golf-slotButton"
-          disabled={!canSwap}
-          onClick={() => onAction({ type: 'swap-with-slot', slotIndex })}
+          disabled={!slotEnabled}
+          onClick={() => {
+            if (canFlip) onAction({ type: 'flip-table-slot', slotIndex });
+            else onAction({ type: 'swap-with-slot', slotIndex });
+          }}
           aria-label={`Table card ${slotIndex + 1}`}
         >
           {isAnimating ? (
             <span className="golf-slotButtonPlaceholder" aria-hidden="true" />
           ) : showFace ? (
-            renderCardFace(slot.card, !canSwap)
+            renderCardFace(slot.card, !slotEnabled)
           ) : (
-            <PokerFlipCard card={slot.card} faceDown disabled={!canSwap} />
+            <PokerFlipCard card={slot.card} faceDown disabled={!slotEnabled} />
           )}
         </button>
       </div>
@@ -353,6 +402,10 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
       />
       <GolfSwapAnimationLayer
         animation={swapAnim.animation}
+        renderCardFace={card => renderCardFace(card)}
+      />
+      <GolfFlipAnimationLayer
+        animation={flipAnim.animation}
         renderCardFace={card => renderCardFace(card)}
       />
 
@@ -424,11 +477,12 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
 
       <div className="golf-statusBlock">
         <div className="river-headsUp" aria-live="polite">
-          <p
-            className={`river-headsUpText ${state.phase === 'hole-end' || state.phase === 'game-over' ? 'river-headsUpText--roundEnd' : ''}`}
+          <div
+            role="status"
+            className={`river-headsUpText ${state.phase === 'hole-end' || state.phase === 'game-over' ? 'river-headsUpText--roundEnd' : ''} ${showSkipOptionalFlip ? 'golf-headsUpText--withAction' : ''}`}
           >
             {headsUpContent ?? '\u00a0'}
-          </p>
+          </div>
         </div>
       </div>
     </div>

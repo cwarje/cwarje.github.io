@@ -26,19 +26,20 @@ function slot(c: Card, faceUp = true): TableSlot {
   return { card: c, faceUp };
 }
 
-function makePlayer(id: string, table: TableSlot[], totalScore = 0): GolfPlayer {
+function makePlayer(id: string, table: TableSlot[], totalScore = 0, setupFlipsRemaining = 0): GolfPlayer {
   return {
     id,
     name: id,
     color: 'blue',
     isBot: false,
     table,
+    setupFlipsRemaining,
     totalScore,
   };
 }
 
 describe('createGolfState', () => {
-  it('deals six table cards with bottom row face up and starts discard', () => {
+  it('deals six face-down table cards and starts setup phase', () => {
     const state = createGolfState([
       { id: 'p1', name: 'Alice', color: 'blue', isBot: false, isHost: true, connected: true },
       { id: 'p2', name: 'Bob', color: 'red', isBot: false, isHost: false, connected: true },
@@ -49,11 +50,115 @@ describe('createGolfState', () => {
     expect(state.players).toHaveLength(2);
     for (const player of state.players) {
       expect(player.table).toHaveLength(TABLE_SLOT_COUNT);
-      expect(player.table.slice(0, 3).every(s => !s.faceUp)).toBe(true);
-      expect(player.table.slice(3).every(s => s.faceUp)).toBe(true);
+      expect(player.table.every(s => !s.faceUp)).toBe(true);
+      expect(player.setupFlipsRemaining).toBe(2);
     }
+    expect(state.currentPlayerIndex).toBe(0);
     expect(state.discard).toHaveLength(1);
     expect(state.stock.length).toBeGreaterThan(0);
+  });
+});
+
+describe('setup phase', () => {
+  it('flips a face-down slot and decrements setup counter', () => {
+    const table = buildInitialTable([
+      card(2),
+      card(3),
+      card(4),
+      card(5),
+      card(6),
+      card(7),
+    ]);
+    const players = [
+      makePlayer('p1', table, 0, 2),
+      makePlayer('p2', buildInitialTable([card(8), card(9), card(10), card(11), card(12), card(13)]), 0, 2),
+    ];
+    const state = createGolfStateForTest(players, 1);
+
+    const afterFlip = processGolfAction(state, { type: 'flip-table-slot', slotIndex: 0 }, 'p1') as typeof state;
+    expect(afterFlip.players[0].table[0].faceUp).toBe(true);
+    expect(afterFlip.players[0].setupFlipsRemaining).toBe(1);
+    expect(afterFlip.currentPlayerIndex).toBe(0);
+  });
+
+  it('advances to next player after second setup flip', () => {
+    const table = buildInitialTable([
+      card(2),
+      card(3),
+      card(4),
+      card(5),
+      card(6),
+      card(7),
+    ]);
+    const players = [
+      makePlayer('p1', table, 0, 1),
+      makePlayer('p2', buildInitialTable([card(8), card(9), card(10), card(11), card(12), card(13)]), 0, 2),
+    ];
+    const state = createGolfStateForTest(players, 1);
+
+    const afterFlip = processGolfAction(state, { type: 'flip-table-slot', slotIndex: 1 }, 'p1') as typeof state;
+    expect(afterFlip.players[0].setupFlipsRemaining).toBe(0);
+    expect(afterFlip.currentPlayerIndex).toBe(1);
+    expect(afterFlip.players[1].setupFlipsRemaining).toBe(2);
+  });
+
+  it('starts normal play at player 0 after all setup flips', () => {
+    const table = buildInitialTable([
+      card(2),
+      card(3),
+      card(4),
+      card(5),
+      card(6),
+      card(7),
+    ]);
+    const players = [
+      makePlayer('p1', table, 0, 0),
+      makePlayer('p2', buildInitialTable([card(8), card(9), card(10), card(11), card(12), card(13)]), 0, 1),
+    ];
+    const state = createGolfStateForTest(players, 1, {
+      currentPlayerIndex: 1,
+      stock: [card(10, 'spades')],
+      discard: [card(4, 'clubs')],
+    });
+
+    const afterFlip = processGolfAction(state, { type: 'flip-table-slot', slotIndex: 0 }, 'p2') as typeof state;
+    expect(afterFlip.players.every(player => player.setupFlipsRemaining === 0)).toBe(true);
+    expect(afterFlip.currentPlayerIndex).toBe(0);
+
+    const drawn = processGolfAction(afterFlip, { type: 'draw-from-stock' }, 'p1') as typeof state;
+    expect(drawn.pendingDraw).toEqual(card(10, 'spades'));
+  });
+
+  it('rejects draw during setup phase', () => {
+    const table = buildInitialTable([
+      card(2),
+      card(3),
+      card(4),
+      card(5),
+      card(6),
+      card(7),
+    ]);
+    const players = [makePlayer('p1', table, 0, 2)];
+    const state = createGolfStateForTest(players, 1, { stock: [card(9)] });
+
+    const rejected = processGolfAction(state, { type: 'draw-from-stock' }, 'p1');
+    expect(rejected).toBe(state);
+  });
+
+  it('rejects flip on face-up slot during setup phase', () => {
+    const table = [
+      slot(card(2), true),
+      slot(card(3), false),
+      slot(card(4), false),
+      slot(card(5), false),
+      slot(card(6), false),
+      slot(card(7), false),
+    ];
+    const players = [makePlayer('p1', table, 0, 1)];
+    const state = createGolfStateForTest(players, 1);
+
+    const rejected = processGolfAction(state, { type: 'flip-table-slot', slotIndex: 0 }, 'p1');
+    expect(rejected).toBe(state);
   });
 });
 
@@ -80,8 +185,89 @@ describe('processGolfAction', () => {
 
     const afterDiscard = processGolfAction(drawn, { type: 'discard-drawn' }, 'p1') as typeof state;
     expect(afterDiscard.pendingDraw).toBeNull();
+    expect(afterDiscard.pendingOptionalFlip).toBe(false);
     expect(afterDiscard.discard.at(-1)).toEqual(card(10, 'spades'));
     expect(afterDiscard.currentPlayerIndex).toBe(0);
+  });
+
+  it('enters optional flip phase after stock discard when face-down slots remain', () => {
+    const table = buildInitialTable([
+      card(2),
+      card(3),
+      card(4),
+      card(5),
+      card(6),
+      card(7),
+    ]);
+    const players = [makePlayer('p1', table), makePlayer('p2', Array.from({ length: 6 }, (_, i) => slot(card(rankFromOffset(2, i)))))];
+    const state = createGolfStateForTest(players, 1, {
+      stock: [card(10, 'spades')],
+      discard: [card(4, 'clubs')],
+    });
+
+    const drawn = processGolfAction(state, { type: 'draw-from-stock' }, 'p1') as typeof state;
+    const afterDiscard = processGolfAction(drawn, { type: 'discard-drawn' }, 'p1') as typeof state;
+    expect(afterDiscard.pendingOptionalFlip).toBe(true);
+    expect(afterDiscard.currentPlayerIndex).toBe(0);
+    expect(afterDiscard.pendingDraw).toBeNull();
+  });
+
+  it('flips a face-down slot during optional flip phase', () => {
+    const table = buildInitialTable([
+      card(2),
+      card(3),
+      card(4),
+      card(5),
+      card(6),
+      card(7),
+    ]);
+    const players = [makePlayer('p1', table), makePlayer('p2', Array.from({ length: 6 }, (_, i) => slot(card(rankFromOffset(2, i)))))];
+    const state = createGolfStateForTest(players, 1, {
+      pendingOptionalFlip: true,
+      discard: [card(10, 'spades')],
+    });
+
+    const afterFlip = processGolfAction(state, { type: 'flip-table-slot', slotIndex: 1 }, 'p1') as typeof state;
+    expect(afterFlip.pendingOptionalFlip).toBe(false);
+    expect(afterFlip.players[0].table[1].faceUp).toBe(true);
+    expect(afterFlip.players[0].table[1].card).toEqual(card(3));
+    expect(afterFlip.currentPlayerIndex).toBe(1);
+  });
+
+  it('skips optional flip and advances turn', () => {
+    const table = buildInitialTable([
+      card(2),
+      card(3),
+      card(4),
+      card(5),
+      card(6),
+      card(7),
+    ]);
+    const players = [makePlayer('p1', table), makePlayer('p2', Array.from({ length: 6 }, (_, i) => slot(card(rankFromOffset(2, i)))))];
+    const state = createGolfStateForTest(players, 1, {
+      pendingOptionalFlip: true,
+      discard: [card(10, 'spades')],
+    });
+
+    const afterSkip = processGolfAction(state, { type: 'skip-optional-flip' }, 'p1') as typeof state;
+    expect(afterSkip.pendingOptionalFlip).toBe(false);
+    expect(afterSkip.currentPlayerIndex).toBe(1);
+  });
+
+  it('rejects flip on face-up slot during optional flip phase', () => {
+    const table = [
+      slot(card(2), false),
+      slot(card(3), false),
+      slot(card(4), false),
+      slot(card(5), true),
+      slot(card(6), false),
+      slot(card(7), false),
+    ];
+    const players = [makePlayer('p1', table)];
+    const state = createGolfStateForTest(players, 1, { pendingOptionalFlip: true });
+
+    const rejected = processGolfAction(state, { type: 'flip-table-slot', slotIndex: 3 }, 'p1');
+    expect(rejected).toBe(state);
   });
 
   it('requires swap after taking discard', () => {
@@ -159,7 +345,10 @@ describe('hole end', () => {
       finalTurnsLeft: 0,
     });
 
-    const afterFinalTurn = processGolfAction(state, { type: 'discard-drawn' }, 'p2') as typeof state;
+    const afterDiscard = processGolfAction(state, { type: 'discard-drawn' }, 'p2') as typeof state;
+    expect(afterDiscard.pendingOptionalFlip).toBe(true);
+
+    const afterFinalTurn = processGolfAction(afterDiscard, { type: 'skip-optional-flip' }, 'p2') as typeof state;
     expect(afterFinalTurn.phase).toBe('hole-end');
     expect(afterFinalTurn.holeScores.p1).toBe(scorePlayerTable(players[0]));
     expect(afterFinalTurn.players[0].totalScore).toBeGreaterThan(0);

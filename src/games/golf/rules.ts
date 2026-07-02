@@ -58,22 +58,35 @@ export function isCurrentPlayer(state: GolfState, playerId: string): boolean {
   return current?.id === playerId;
 }
 
+export function hasFaceDownSlots(player: GolfPlayer): boolean {
+  return player.table.some(slot => !slot.faceUp);
+}
+
+export function isSetupPhase(state: GolfState): boolean {
+  return state.players.some(player => player.setupFlipsRemaining > 0);
+}
+
 export function canDrawFromStock(state: GolfState, playerId: string): boolean {
   if (state.phase !== 'playing') return false;
+  if (isSetupPhase(state)) return false;
   if (state.pendingDraw) return false;
+  if (state.pendingOptionalFlip) return false;
   if (!isCurrentPlayer(state, playerId)) return false;
   return state.stock.length > 0 || state.discard.length > 1;
 }
 
 export function canTakeDiscard(state: GolfState, playerId: string): boolean {
   if (state.phase !== 'playing') return false;
+  if (isSetupPhase(state)) return false;
   if (state.pendingDraw) return false;
+  if (state.pendingOptionalFlip) return false;
   if (!isCurrentPlayer(state, playerId)) return false;
   return state.discard.length > 0;
 }
 
 export function canSwapWithSlot(state: GolfState, playerId: string, slotIndex: number): boolean {
   if (state.phase !== 'playing') return false;
+  if (isSetupPhase(state)) return false;
   if (!state.pendingDraw) return false;
   if (!isCurrentPlayer(state, playerId)) return false;
   if (slotIndex < 0 || slotIndex >= TABLE_SLOT_COUNT) return false;
@@ -82,10 +95,32 @@ export function canSwapWithSlot(state: GolfState, playerId: string, slotIndex: n
 
 export function canDiscardDrawn(state: GolfState, playerId: string): boolean {
   if (state.phase !== 'playing') return false;
+  if (isSetupPhase(state)) return false;
   if (!state.pendingDraw) return false;
   if (state.pendingDrawSource !== 'stock') return false;
   if (!isCurrentPlayer(state, playerId)) return false;
   return true;
+}
+
+export function canFlipTableSlot(state: GolfState, playerId: string, slotIndex: number): boolean {
+  if (state.phase !== 'playing') return false;
+  if (!isCurrentPlayer(state, playerId)) return false;
+  if (slotIndex < 0 || slotIndex >= TABLE_SLOT_COUNT) return false;
+  const current = state.players[state.currentPlayerIndex];
+  const slot = current?.table[slotIndex];
+  if (!slot || slot.faceUp) return false;
+
+  if (isSetupPhase(state)) {
+    return (current?.setupFlipsRemaining ?? 0) > 0;
+  }
+
+  return state.pendingOptionalFlip;
+}
+
+export function canSkipOptionalFlip(state: GolfState, playerId: string): boolean {
+  if (state.phase !== 'playing') return false;
+  if (!state.pendingOptionalFlip) return false;
+  return isCurrentPlayer(state, playerId);
 }
 
 export function estimatedSlotValue(table: TableSlot[], slotIndex: number): number {

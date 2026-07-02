@@ -5,12 +5,17 @@ import {
   allTableFaceUp,
   canDiscardDrawn,
   canDrawFromStock,
+  canFlipTableSlot,
+  canSkipOptionalFlip,
   canSwapWithSlot,
   canTakeDiscard,
+  hasFaceDownSlots,
   cardEquals,
   COLUMN_PAIRS,
   scorePlayerTable,
   slotPointValue,
+  isSetupPhase,
+  cardPointValue,
 } from './rules';
 
 const SUITS: Suit[] = ['clubs', 'diamonds', 'spades', 'hearts'];
@@ -62,11 +67,18 @@ function drawFromStock(stock: Card[], discard: Card[]): { stock: Card[]; discard
 }
 
 function buildInitialTable(cards: Card[]): TableSlot[] {
-  const table = cards.map(card => ({ card, faceUp: false }));
-  for (let i = 3; i < TABLE_SLOT_COUNT; i++) {
-    table[i] = { ...table[i]!, faceUp: true };
+  return cards.map(card => ({ card, faceUp: false }));
+}
+
+function findNextPlayerWithSetup(players: GolfPlayer[], startIndex: number): number | null {
+  const playerCount = players.length;
+  for (let i = 0; i < playerCount; i++) {
+    const index = (startIndex + i) % playerCount;
+    if ((players[index]?.setupFlipsRemaining ?? 0) > 0) {
+      return index;
+    }
   }
-  return table;
+  return null;
 }
 
 function getLowestScoreWinners(players: GolfPlayer[]): string[] {
@@ -88,6 +100,7 @@ function startHole(players: GolfPlayer[], holeNumber: number): GolfState {
     return {
       ...player,
       table: buildInitialTable(tableCards),
+      setupFlipsRemaining: 2,
     };
   });
 
@@ -105,6 +118,7 @@ function startHole(players: GolfPlayer[], holeNumber: number): GolfState {
     phase: 'playing',
     pendingDraw: null,
     pendingDrawSource: null,
+    pendingOptionalFlip: false,
     endingRound: false,
     finalTurnsLeft: 0,
     holeScores: {},
@@ -124,6 +138,7 @@ function finishGame(players: GolfPlayer[]): GolfState {
     phase: 'game-over',
     pendingDraw: null,
     pendingDrawSource: null,
+    pendingOptionalFlip: false,
     endingRound: false,
     finalTurnsLeft: 0,
     holeScores: {},
@@ -158,6 +173,7 @@ function endHole(state: GolfState): GolfState {
     phase: 'hole-end',
     pendingDraw: null,
     pendingDrawSource: null,
+    pendingOptionalFlip: false,
     endingRound: false,
     finalTurnsLeft: 0,
     holeScores,
@@ -227,6 +243,69 @@ function applySwap(
   );
 }
 
+function applySetupFlip(
+  state: GolfState,
+  playerIndex: number,
+  slotIndex: number,
+): GolfState {
+  const player = state.players[playerIndex];
+  if (!player || player.setupFlipsRemaining <= 0) return state;
+
+  const slot = player.table[slotIndex];
+  if (!slot || slot.faceUp) return state;
+
+  const newTable = [...player.table];
+  newTable[slotIndex] = { ...slot, faceUp: true };
+
+  const newPlayers = [...state.players];
+  newPlayers[playerIndex] = {
+    ...player,
+    table: newTable,
+    setupFlipsRemaining: player.setupFlipsRemaining - 1,
+  };
+
+  if (newPlayers[playerIndex]!.setupFlipsRemaining > 0) {
+    return {
+      ...state,
+      players: newPlayers,
+    };
+  }
+
+  const nextIndex = findNextPlayerWithSetup(newPlayers, playerIndex + 1);
+  return {
+    ...state,
+    players: newPlayers,
+    currentPlayerIndex: nextIndex ?? 0,
+  };
+}
+
+function applyOptionalFlip(
+  state: GolfState,
+  playerIndex: number,
+  slotIndex: number,
+): GolfState {
+  const player = state.players[playerIndex];
+  if (!player) return state;
+
+  const slot = player.table[slotIndex];
+  if (!slot || slot.faceUp) return state;
+
+  const newTable = [...player.table];
+  newTable[slotIndex] = { ...slot, faceUp: true };
+
+  const newPlayers = [...state.players];
+  newPlayers[playerIndex] = { ...player, table: newTable };
+
+  return advanceTurn(
+    {
+      ...state,
+      players: newPlayers,
+      pendingOptionalFlip: false,
+    },
+    newPlayers,
+  );
+}
+
 export function createGolfState(players: Player[]): GolfState {
   const gamePlayers: GolfPlayer[] = players.slice(0, 6).map(player => ({
     id: player.id,
@@ -234,6 +313,7 @@ export function createGolfState(players: Player[]): GolfState {
     color: player.color,
     isBot: player.isBot,
     table: [],
+    setupFlipsRemaining: 0,
     totalScore: 0,
   }));
 
@@ -283,15 +363,33 @@ export function processGolfAction(state: unknown, action: unknown, playerId: str
       if (!canDiscardDrawn(s, playerId)) return state;
       const drawn = s.pendingDraw;
       if (!drawn) return state;
-      return advanceTurn(
-        {
-          ...s,
-          discard: [...s.discard, drawn],
-          pendingDraw: null,
-          pendingDrawSource: null,
-        },
-        s.players,
-      );
+      const playerIndex = s.players.findIndex(p => p.id === playerId);
+      const player = playerIndex >= 0 ? s.players[playerIndex] : null;
+      const afterDiscard = {
+        ...s,
+        discard: [...s.discard, drawn],
+        pendingDraw: null,
+        pendingDrawSource: null,
+      };
+      if (player && hasFaceDownSlots(player)) {
+        return { ...afterDiscard, pendingOptionalFlip: true };
+      }
+      return advanceTurn(afterDiscard, s.players);
+    }
+
+    case 'flip-table-slot': {
+      if (!canFlipTableSlot(s, playerId, a.slotIndex)) return state;
+      const playerIndex = s.players.findIndex(p => p.id === playerId);
+      if (playerIndex === -1) return state;
+      if (isSetupPhase(s)) {
+        return applySetupFlip(s, playerIndex, a.slotIndex);
+      }
+      return applyOptionalFlip(s, playerIndex, a.slotIndex);
+    }
+
+    case 'skip-optional-flip': {
+      if (!canSkipOptionalFlip(s, playerId)) return state;
+      return advanceTurn({ ...s, pendingOptionalFlip: false }, s.players);
     }
 
     case 'start-next-hole': {
@@ -436,12 +534,66 @@ function shouldTakeDiscard(player: GolfPlayer, discardTop: Card, state: GolfStat
   return isLowCard && improvement > 0;
 }
 
+function bestOptionalFlipSlot(player: GolfPlayer, state: GolfState): number | null {
+  let bestSlot: number | null = null;
+  let bestScore = -Infinity;
+
+  for (let slotIndex = 0; slotIndex < TABLE_SLOT_COUNT; slotIndex++) {
+    const slot = player.table[slotIndex];
+    if (!slot || slot.faceUp) continue;
+    const bonus = getEndgameSlotBonus(player, state, slotIndex, 0);
+    if (bonus > bestScore) {
+      bestScore = bonus;
+      bestSlot = slotIndex;
+    }
+  }
+
+  return bestScore >= 2 ? bestSlot : null;
+}
+
+function bestSetupFlipSlot(player: GolfPlayer): number {
+  let bestSlot = 0;
+  let bestValue = -Infinity;
+
+  for (let slotIndex = 0; slotIndex < TABLE_SLOT_COUNT; slotIndex++) {
+    const slot = player.table[slotIndex];
+    if (!slot || slot.faceUp) continue;
+    const value = cardPointValue(slot.card);
+    if (value > bestValue) {
+      bestValue = value;
+      bestSlot = slotIndex;
+    }
+  }
+
+  return bestSlot;
+}
+
+function resolveOptionalFlip(state: GolfState, playerId: string): GolfState {
+  const current = state.players[state.currentPlayerIndex];
+  if (!current || current.id !== playerId) return state;
+
+  const flipSlot = bestOptionalFlipSlot(current, state);
+  if (flipSlot !== null) {
+    return processGolfAction(state, { type: 'flip-table-slot', slotIndex: flipSlot }, playerId) as GolfState;
+  }
+  return processGolfAction(state, { type: 'skip-optional-flip' }, playerId) as GolfState;
+}
+
 export function runGolfBotTurn(state: unknown): unknown {
   const s = state as GolfState;
   if (s.gameOver || s.phase !== 'playing') return state;
 
   const current = s.players[s.currentPlayerIndex];
   if (!current?.isBot) return state;
+
+  if (current.setupFlipsRemaining > 0) {
+    const flipSlot = bestSetupFlipSlot(current);
+    return processGolfAction(s, { type: 'flip-table-slot', slotIndex: flipSlot }, current.id);
+  }
+
+  if (s.pendingOptionalFlip) {
+    return resolveOptionalFlip(s, current.id);
+  }
 
   if (s.pendingDraw) {
     if (s.pendingDrawSource === 'stock') {
@@ -450,7 +602,11 @@ export function runGolfBotTurn(state: unknown): unknown {
         const slotIndex = bestSwapSlot(current, s.pendingDraw, s);
         return processGolfAction(s, { type: 'swap-with-slot', slotIndex }, current.id);
       }
-      return processGolfAction(s, { type: 'discard-drawn' }, current.id);
+      const afterDiscard = processGolfAction(s, { type: 'discard-drawn' }, current.id) as GolfState;
+      if (afterDiscard.pendingOptionalFlip) {
+        return resolveOptionalFlip(afterDiscard, current.id);
+      }
+      return afterDiscard;
     }
     const slotIndex = bestSwapSlot(current, s.pendingDraw, s);
     return processGolfAction(s, { type: 'swap-with-slot', slotIndex }, current.id);
@@ -482,6 +638,7 @@ export function createGolfStateForTest(
     currentPlayerIndex?: number;
     pendingDraw?: Card | null;
     pendingDrawSource?: 'stock' | 'discard' | null;
+    pendingOptionalFlip?: boolean;
     endingRound?: boolean;
     finalTurnsLeft?: number;
     phase?: GolfState['phase'];
@@ -496,6 +653,7 @@ export function createGolfStateForTest(
     phase: options?.phase ?? 'playing',
     pendingDraw: options?.pendingDraw ?? null,
     pendingDrawSource: options?.pendingDrawSource ?? null,
+    pendingOptionalFlip: options?.pendingOptionalFlip ?? false,
     endingRound: options?.endingRound ?? false,
     finalTurnsLeft: options?.finalTurnsLeft ?? 0,
     holeScores: {},

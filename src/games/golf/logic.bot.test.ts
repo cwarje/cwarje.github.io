@@ -16,24 +16,26 @@ function slot(c: Card, faceUp = true): TableSlot {
   return { card: c, faceUp };
 }
 
-function makeBot(id: string, table: TableSlot[], totalScore = 0): GolfPlayer {
+function makeBot(id: string, table: TableSlot[], totalScore = 0, setupFlipsRemaining = 0): GolfPlayer {
   return {
     id,
     name: id,
     color: 'blue',
     isBot: true,
     table,
+    setupFlipsRemaining,
     totalScore,
   };
 }
 
-function makeHuman(id: string, table: TableSlot[], totalScore = 0): GolfPlayer {
+function makeHuman(id: string, table: TableSlot[], totalScore = 0, setupFlipsRemaining = 0): GolfPlayer {
   return {
     id,
     name: id,
     color: 'red',
     isBot: false,
     table,
+    setupFlipsRemaining,
     totalScore,
   };
 }
@@ -112,6 +114,31 @@ describe('bestSwapSlot', () => {
 });
 
 describe('runGolfBotTurn', () => {
+  it('flips two setup cards before drawing', () => {
+    const bot = makeBot('bot', [
+      slot(card(11, 'hearts'), false),
+      slot(card(2), false),
+      slot(card(13), false),
+      slot(card(10), false),
+      slot(card(3), false),
+      slot(card(4), false),
+    ], 0, 2);
+    const state = createGolfStateForTest([bot], 1, {
+      stock: [card(9, 'diamonds')],
+      discard: [card(4, 'clubs')],
+    });
+
+    const afterFirst = runGolfBotTurn(state) as typeof state;
+    expect(afterFirst.players[0].table[0].faceUp).toBe(true);
+    expect(afterFirst.players[0].setupFlipsRemaining).toBe(1);
+    expect(afterFirst.pendingDraw).toBeNull();
+
+    const afterSecond = runGolfBotTurn(afterFirst) as typeof state;
+    expect(afterSecond.players[0].table[3].faceUp).toBe(true);
+    expect(afterSecond.players[0].setupFlipsRemaining).toBe(0);
+    expect(afterSecond.pendingDraw).toBeNull();
+  });
+
   it('takes a king from discard when it improves the table', () => {
     const bot = makeBot('bot', [
       slot(card(2), true),
@@ -203,7 +230,7 @@ describe('runGolfBotTurn', () => {
     expect(next.players[0].table[5].faceUp).toBe(true);
   });
 
-  it('avoids flipping the last hidden card when far behind unless the swap is strong', () => {
+  it('avoids optional flip after discard when far behind', () => {
     const bot = makeBot('bot', [
       slot(card(8), true),
       slot(card(9), true),
@@ -231,7 +258,41 @@ describe('runGolfBotTurn', () => {
     const next = runGolfBotTurn(state) as typeof state;
     expect(next.players[0].table[5].faceUp).toBe(false);
     expect(next.pendingDraw).toBeNull();
+    expect(next.pendingOptionalFlip).toBe(false);
     expect(next.discard.at(-1)).toEqual(card(11, 'spades'));
+    expect(next.currentPlayerIndex).toBe(1);
+  });
+
+  it('flips the last hidden card after discard when ahead to end the round', () => {
+    const bot = makeBot('bot', [
+      slot(card(13, 'hearts'), true),
+      slot(card(13, 'diamonds'), true),
+      slot(card(13, 'clubs'), true),
+      slot(card(13, 'spades'), true),
+      slot(card(13, 'hearts'), true),
+      slot(card(13, 'clubs'), false),
+    ]);
+    const opponent = makeHuman('human', [
+      slot(card(10), true),
+      slot(card(10, 'diamonds'), true),
+      slot(card(10, 'clubs'), true),
+      slot(card(10, 'spades'), true),
+      slot(card(9), true),
+      slot(card(9, 'diamonds'), true),
+    ]);
+    const state = createGolfStateForTest([bot, opponent], 1, {
+      currentPlayerIndex: 0,
+      stock: [],
+      discard: [card(8, 'clubs')],
+      pendingDraw: card(10, 'spades'),
+      pendingDrawSource: 'stock',
+    });
+
+    const next = runGolfBotTurn(state) as typeof state;
+    expect(next.players[0].table[5].faceUp).toBe(true);
+    expect(next.pendingOptionalFlip).toBe(false);
+    expect(next.discard.at(-1)).toEqual(card(10, 'spades'));
+    expect(next.endingRound).toBe(true);
   });
 
   it('avoids gifting a discard that completes an opponent column pair', () => {

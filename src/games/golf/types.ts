@@ -20,6 +20,8 @@ export interface GolfPlayer {
   isBot: boolean;
   /** Six cards in row-major 2×3 order (indices 0–2 top row, 3–5 bottom row). */
   table: TableSlot[];
+  /** Face-down cards this player still must flip at hole start (2 → 0). */
+  setupFlipsRemaining: number;
   totalScore: number;
 }
 
@@ -37,6 +39,8 @@ export interface GolfState {
   phase: GolfPhase;
   pendingDraw: Card | null;
   pendingDrawSource: 'stock' | 'discard' | null;
+  /** After discarding a stock draw, player may flip one face-down table card. */
+  pendingOptionalFlip: boolean;
   endingRound: boolean;
   finalTurnsLeft: number;
   holeScores: Record<string, number>;
@@ -50,4 +54,6 @@ export type GolfAction =
   | { type: 'take-discard' }
   | { type: 'swap-with-slot'; slotIndex: number }
   | { type: 'discard-drawn' }
+  | { type: 'flip-table-slot'; slotIndex: number }
+  | { type: 'skip-optional-flip' }
   | { type: 'start-next-hole' };
