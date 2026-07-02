@@ -45,6 +45,8 @@ export interface GolfState {
   finalTurnsLeft: number;
   holeScores: Record<string, number>;
   holeSummary: string;
+  /** Slot ids (`playerId-slot-N`) that were face-down when the hole ended and should flip on reveal. */
+  holeEndFlipSlotIds: string[];
   gameOver: boolean;
   winners: string[];
 }
@@ -56,4 +58,5 @@ export type GolfAction =
   | { type: 'discard-drawn' }
   | { type: 'flip-table-slot'; slotIndex: number }
   | { type: 'skip-optional-flip' }
-  | { type: 'start-next-hole' };
+  | { type: 'start-next-hole' }
+  | { type: 'show-final-results' };

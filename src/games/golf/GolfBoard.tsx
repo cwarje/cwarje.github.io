@@ -9,6 +9,8 @@ import {
   canSkipOptionalFlip,
   canSwapWithSlot,
   canTakeDiscard,
+  columnPairScore,
+  COLUMN_PAIRS,
   isSetupPhase,
   rankDisplay,
 } from './rules';
@@ -41,6 +43,7 @@ interface GolfBoardProps {
   state: GolfState;
   myId: string;
   onAction: (action: unknown) => void;
+  isHost?: boolean;
 }
 
 interface SeatLayout {
@@ -92,7 +95,7 @@ function PokerFlipCard({ card, faceDown, disabled = false }: { card?: Card | nul
   );
 }
 
-export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
+export default function GolfBoard({ state, myId, onAction, isHost = false }: GolfBoardProps) {
   const myIndex = state.players.findIndex(player => player.id === myId);
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const isMyTurn = myIndex >= 0 && state.currentPlayerIndex === myIndex && state.phase === 'playing';
@@ -269,13 +272,27 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
   );
 
   const headsUpContent = useMemo((): ReactNode => {
-    if (state.phase === 'game-over') {
-      return state.winners.length > 1
-        ? `Game over — tie between ${state.winners.length} players`
-        : 'Game over';
-    }
     if (state.phase === 'hole-end') {
-      return `Hole ${state.holeNumber} complete · ${state.holeSummary}`;
+      const summary = `Hole ${state.holeNumber} complete · ${state.holeSummary}`;
+      if (isHost) {
+        return (
+          <span className="golf-headsUpInline">
+            <span>{summary}</span>
+            <button
+              type="button"
+              onClick={() => onAction(
+                state.gameOver
+                  ? { type: 'show-final-results' }
+                  : { type: 'start-next-hole' },
+              )}
+              className="twelve-actionButton golf-actionButton"
+            >
+              Continue
+            </button>
+          </span>
+        );
+      }
+      return summary;
     }
     const current = state.players[state.currentPlayerIndex];
     if (!current) return null;
@@ -312,7 +329,7 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
       return 'Draw from the stock or take the top discard';
     }
     return `${current.name} is playing`;
-  }, [state, myId, showSkipOptionalFlip, onAction]);
+  }, [state, myId, showSkipOptionalFlip, onAction, isHost]);
 
   const renderSeatPill = (layout: SeatLayout) => {
     const player = layout.player;
@@ -346,7 +363,8 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
     const slotId = `${layout.player.id}-slot-${slotIndex}`;
     const revealed = slot ? deal.isExtraRevealed(slotId) : !deal.isDealing;
     const isMe = layout.player.id === myId;
-    const showFace = slot?.faceUp ?? false;
+    const needsRevealFlip =
+      state.phase === 'hole-end' && state.holeEndFlipSlotIds.includes(slotId);
     const canSwap =
       canUseActions &&
       isMe &&
@@ -383,7 +401,14 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
         >
           {isAnimating ? (
             <span className="golf-slotButtonPlaceholder" aria-hidden="true" />
-          ) : showFace ? (
+          ) : needsRevealFlip ? (
+            <PokerFlipCard
+              key={`reveal-${state.holeNumber}-${slotId}`}
+              card={slot.card}
+              faceDown={false}
+              disabled={!slotEnabled}
+            />
+          ) : slot.faceUp ? (
             renderCardFace(slot.card, !slotEnabled)
           ) : (
             <PokerFlipCard card={slot.card} faceDown disabled={!slotEnabled} />
@@ -392,6 +417,47 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
       </div>
     );
   };
+
+  if (state.phase === 'game-over') {
+    const winners = state.players.filter(p => state.winners.includes(p.id));
+    const winnerLabel = winners.length === 0
+      ? null
+      : winners.some(p => p.id === myId)
+        ? 'You win!'
+        : winners.length === 1
+          ? `${winners[0].name} wins!`
+          : `${winners.map(p => p.name).join(', ')} win!`;
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="golf-board river-board h-full flex flex-col items-center justify-center space-y-6 text-center"
+      >
+        <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
+        <h2 className="text-3xl font-extrabold text-white">Game Over</h2>
+        {winnerLabel && (
+          <p className="text-xl text-white/90">{winnerLabel}</p>
+        )}
+        <div className="space-y-3 w-full max-w-2xl">
+          {[...state.players]
+            .sort((a, b) => a.totalScore - b.totalScore)
+            .map((player, i) => (
+              <div
+                key={player.id}
+                className={`river-resultRow ${state.winners.includes(player.id) ? 'ring-2 ring-yellow-400' : ''}`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-bold">#{i + 1}</span>
+                  <span className="font-semibold">{player.id === myId ? 'You' : player.name}</span>
+                </div>
+                <span className="text-xl font-bold">{player.totalScore} pts</span>
+              </div>
+            ))}
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <div ref={boardRef} className={`golf-board river-board river-board--players-${state.players.length} relative`}>
@@ -422,7 +488,17 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
             >
               {renderSeatPill(layout)}
               <div className="golf-cardGrid">
-                {Array.from({ length: 6 }, (_, slotIndex) => renderTableSlot(layout, slotIndex))}
+                {COLUMN_PAIRS.map((pair, columnIndex) => (
+                  <div key={columnIndex} className="golf-cardColumn">
+                    {renderTableSlot(layout, pair[0])}
+                    {renderTableSlot(layout, pair[1])}
+                    {state.phase === 'hole-end' && (
+                      <div className="golf-pairScore" aria-label={`Column ${columnIndex + 1} score`}>
+                        {columnPairScore(layout.player.table, columnIndex)}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -479,7 +555,7 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
         <div className="river-headsUp" aria-live="polite">
           <div
             role="status"
-            className={`river-headsUpText ${state.phase === 'hole-end' || state.phase === 'game-over' ? 'river-headsUpText--roundEnd' : ''} ${showSkipOptionalFlip ? 'golf-headsUpText--withAction' : ''}`}
+            className={`river-headsUpText ${state.phase === 'hole-end' ? 'river-headsUpText--roundEnd' : ''} ${showSkipOptionalFlip || (state.phase === 'hole-end' && isHost) ? 'golf-headsUpText--withAction' : ''}`}
           >
             {headsUpContent ?? '\u00a0'}
           </div>

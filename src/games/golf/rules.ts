@@ -41,6 +41,13 @@ export function slotPointValue(table: TableSlot[], slotIndex: number): number {
   return cardPointValue(slot.card);
 }
 
+export function columnPairScore(table: TableSlot[], columnIndex: number): number {
+  const pair = COLUMN_PAIRS[columnIndex];
+  if (!pair) return 0;
+  const [top, bottom] = pair;
+  return slotPointValue(table, top) + slotPointValue(table, bottom);
+}
+
 export function scorePlayerTable(player: GolfPlayer): number {
   let total = 0;
   for (let i = 0; i < TABLE_SLOT_COUNT; i++) {

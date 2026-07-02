@@ -6,13 +6,15 @@ import {
   cardEquals,
   createGolfState,
   createGolfStateForTest,
+  endHole,
   finishGame,
+  isGolfOver,
   processGolfAction,
   scorePlayerTable,
   slotPointValue,
   startHole,
 } from './logic';
-import { cardPointValue, scorePlayerTable as rulesScore } from './rules';
+import { cardPointValue, columnPairScore, scorePlayerTable as rulesScore } from './rules';
 
 function card(rank: Rank, suit: Card['suit'] = 'hearts'): Card {
   return { rank, suit };
@@ -319,6 +321,8 @@ describe('scoring', () => {
     ];
     expect(slotPointValue(table, 0)).toBe(0);
     expect(slotPointValue(table, 3)).toBe(0);
+    expect(columnPairScore(table, 0)).toBe(0);
+    expect(columnPairScore(table, 1)).toBe(7);
     expect(rulesScore(makePlayer('p1', table))).toBe(3 + 9 + 4 + 2);
   });
 });
@@ -352,17 +356,68 @@ describe('hole end', () => {
     expect(afterFinalTurn.phase).toBe('hole-end');
     expect(afterFinalTurn.holeScores.p1).toBe(scorePlayerTable(players[0]));
     expect(afterFinalTurn.players[0].totalScore).toBeGreaterThan(0);
+    expect(afterFinalTurn.players.every(p => p.table.every(slot => slot.faceUp))).toBe(true);
   });
 
-  it('finishes game after hole 9', () => {
+  it('enters hole-end with gameOver on hole 9 before final screen', () => {
+    const hiddenTable = buildInitialTable([
+      card(2),
+      card(3),
+      card(4),
+      card(5),
+      card(6),
+      card(7),
+    ]);
+    const faceUpTable = [
+      slot(card(2), true),
+      slot(card(3), false),
+      slot(card(4), true),
+      slot(card(5), false),
+      slot(card(6), true),
+      slot(card(7), false),
+    ];
+    const players = [
+      makePlayer('p1', hiddenTable, 10),
+      makePlayer('p2', faceUpTable, 15),
+    ];
+    const state = createGolfStateForTest(players, TOTAL_HOLES, { phase: 'playing' });
+    const afterHole = endHole(state) as typeof state;
+
+    expect(afterHole.phase).toBe('hole-end');
+    expect(afterHole.gameOver).toBe(true);
+    expect(afterHole.winners).toEqual(['p1']);
+    expect(isGolfOver(afterHole)).toBe(false);
+    expect(afterHole.players.every(p => p.table.every(slot => slot.faceUp))).toBe(true);
+    expect(afterHole.holeEndFlipSlotIds).toEqual([
+      'p1-slot-0',
+      'p1-slot-1',
+      'p1-slot-2',
+      'p1-slot-3',
+      'p1-slot-4',
+      'p1-slot-5',
+      'p2-slot-1',
+      'p2-slot-3',
+      'p2-slot-5',
+    ]);
+  });
+
+  it('shows final results after hole 9 score phase', () => {
     const players = [
       makePlayer('p1', Array.from({ length: 6 }, () => slot(card(2))), 10),
       makePlayer('p2', Array.from({ length: 6 }, () => slot(card(3))), 15),
     ];
-    const state = createGolfStateForTest(players, TOTAL_HOLES, { phase: 'hole-end' });
-    const next = processGolfAction(state, { type: 'start-next-hole' }, '') as typeof state;
+    const state = createGolfStateForTest(players, TOTAL_HOLES, {
+      phase: 'hole-end',
+      gameOver: true,
+      winners: ['p1'],
+    });
+    const unchanged = processGolfAction(state, { type: 'start-next-hole' }, '') as typeof state;
+    expect(unchanged).toBe(state);
+
+    const next = processGolfAction(state, { type: 'show-final-results' }, '') as typeof state;
     expect(next.phase).toBe('game-over');
     expect(next.winners).toEqual(['p1']);
+    expect(isGolfOver(next)).toBe(true);
   });
 });
 

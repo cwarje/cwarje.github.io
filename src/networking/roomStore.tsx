@@ -82,6 +82,12 @@ function isCasinoStartNextRoundAction(payload: unknown): boolean {
   return (payload as { type?: unknown }).type === 'start-next-round';
 }
 
+function isGolfHostControlAction(payload: unknown): boolean {
+  if (typeof payload !== 'object' || payload === null) return false;
+  const actionType = (payload as { type?: unknown }).type;
+  return actionType === 'start-next-hole' || actionType === 'show-final-results';
+}
+
 function isCribbageAdvanceShowAction(payload: unknown): boolean {
   if (typeof payload !== 'object' || payload === null) return false;
   return (payload as { type?: unknown }).type === 'advance-show';
@@ -170,6 +176,9 @@ function shouldTransitionRoomToFinished(gameType: GameType, state: unknown): boo
   if (gameType === 'cribbage') {
     const cribbageState = state as CribbageState;
     return cribbageState.phase === 'game-over';
+  }
+  if (gameType === 'golf') {
+    return (state as GolfState).phase === 'game-over';
   }
   return true;
 }
@@ -530,6 +539,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           if (
             currentRoom.gameType === 'cribbage'
             && isCribbageAdvanceShowAction(msg.payload)
+            && senderDeviceId !== currentRoom.hostId
+          ) {
+            return;
+          }
+          if (
+            currentRoom.gameType === 'golf'
+            && isGolfHostControlAction(msg.payload)
             && senderDeviceId !== currentRoom.hostId
           ) {
             return;
@@ -1150,6 +1166,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       ) {
         return;
       }
+      if (
+        currentRoom.gameType === 'golf'
+        && isGolfHostControlAction(payload)
+        && myId !== currentRoom.hostId
+      ) {
+        return;
+      }
       const currentGs = gameStateRef.current;
       const wasFinished = currentRoom.phase === 'finished';
       const newGs = processGameAction(currentRoom.gameType, currentGs, payload, myId);
@@ -1558,27 +1581,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     // ── Golf bot scheduling ──
     if (room.gameType === 'golf') {
       const gs = gameState as GolfState;
-      if (gs.gameOver) return;
-
-      if (gs.phase === 'hole-end') {
-        botTimerRef.current = setTimeout(() => {
-          const currentGs = gameStateRef.current as GolfState | null;
-          const currentRoom = roomRef.current;
-          if (!currentGs || !currentRoom || currentGs.phase !== 'hole-end' || currentGs.gameOver) return;
-
-          const next = processGameAction('golf', currentGs, { type: 'start-next-hole' }, '');
-          if (next !== currentGs) {
-            setGameState(next);
-            broadcastGameState(next);
-            if (checkGameOver('golf', next)) {
-              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
-              setRoom(finishedRoom);
-              broadcastRoomState(finishedRoom);
-            }
-          }
-        }, UP_RIVER_ROUND_END_DELAY);
-        return;
-      }
+      if (gs.phase === 'game-over' || gs.phase === 'hole-end') return;
 
       const currentPlayer = gs.players[gs.currentPlayerIndex];
       if (currentPlayer?.isBot) {

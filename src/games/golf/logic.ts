@@ -91,6 +91,25 @@ function formatHoleSummary(holeScores: Record<string, number>, players: GolfPlay
   return parts.join(' · ');
 }
 
+function revealAllTables(players: GolfPlayer[]): GolfPlayer[] {
+  return players.map(player => ({
+    ...player,
+    table: player.table.map(slot => ({ ...slot, faceUp: true })),
+  }));
+}
+
+function collectHoleEndFlipSlotIds(players: GolfPlayer[]): string[] {
+  const ids: string[] = [];
+  for (const player of players) {
+    for (let slotIndex = 0; slotIndex < player.table.length; slotIndex++) {
+      if (!player.table[slotIndex]?.faceUp) {
+        ids.push(`${player.id}-slot-${slotIndex}`);
+      }
+    }
+  }
+  return ids;
+}
+
 function startHole(players: GolfPlayer[], holeNumber: number): GolfState {
   const deck = buildDeck(players.length);
   let offset = 0;
@@ -123,6 +142,7 @@ function startHole(players: GolfPlayer[], holeNumber: number): GolfState {
     finalTurnsLeft: 0,
     holeScores: {},
     holeSummary: '',
+    holeEndFlipSlotIds: [],
     gameOver: false,
     winners: [],
   };
@@ -143,29 +163,24 @@ function finishGame(players: GolfPlayer[]): GolfState {
     finalTurnsLeft: 0,
     holeScores: {},
     holeSummary: '',
+    holeEndFlipSlotIds: [],
     gameOver: true,
     winners: getLowestScoreWinners(players),
   };
 }
 
 function endHole(state: GolfState): GolfState {
+  const holeEndFlipSlotIds = collectHoleEndFlipSlotIds(state.players);
   const holeScores: Record<string, number> = {};
-  const updatedPlayers = state.players.map(player => {
+  const scoredPlayers = state.players.map(player => {
     const holeScore = scorePlayerTable(player);
     holeScores[player.id] = holeScore;
     return { ...player, totalScore: player.totalScore + holeScore };
   });
+  const updatedPlayers = revealAllTables(scoredPlayers);
 
   const holeSummary = formatHoleSummary(holeScores, updatedPlayers);
-
-  if (state.holeNumber >= TOTAL_HOLES) {
-    return {
-      ...finishGame(updatedPlayers),
-      holeNumber: state.holeNumber,
-      holeScores,
-      holeSummary,
-    };
-  }
+  const isFinalHole = state.holeNumber >= TOTAL_HOLES;
 
   return {
     ...state,
@@ -178,6 +193,9 @@ function endHole(state: GolfState): GolfState {
     finalTurnsLeft: 0,
     holeScores,
     holeSummary,
+    holeEndFlipSlotIds,
+    gameOver: isFinalHole,
+    winners: isFinalHole ? getLowestScoreWinners(updatedPlayers) : [],
   };
 }
 
@@ -323,7 +341,7 @@ export function createGolfState(players: Player[]): GolfState {
 export function processGolfAction(state: unknown, action: unknown, playerId: string): unknown {
   const s = state as GolfState;
   const a = action as GolfAction;
-  if (s.gameOver) return state;
+  if (s.gameOver && a.type !== 'show-final-results') return state;
 
   switch (a.type) {
     case 'draw-from-stock': {
@@ -394,8 +412,12 @@ export function processGolfAction(state: unknown, action: unknown, playerId: str
 
     case 'start-next-hole': {
       if (s.phase !== 'hole-end' || s.gameOver) return state;
-      if (s.holeNumber >= TOTAL_HOLES) return finishGame(s.players);
       return startHole(s.players, s.holeNumber + 1);
+    }
+
+    case 'show-final-results': {
+      if (s.phase !== 'hole-end' || !s.gameOver) return state;
+      return { ...s, phase: 'game-over' };
     }
   }
 
@@ -404,7 +426,7 @@ export function processGolfAction(state: unknown, action: unknown, playerId: str
 
 export function isGolfOver(state: unknown): boolean {
   const s = state as GolfState;
-  return s.gameOver;
+  return s.phase === 'game-over';
 }
 
 export function getGolfWinners(state: unknown): string[] {
@@ -642,6 +664,8 @@ export function createGolfStateForTest(
     endingRound?: boolean;
     finalTurnsLeft?: number;
     phase?: GolfState['phase'];
+    gameOver?: boolean;
+    winners?: string[];
   },
 ): GolfState {
   return {
@@ -658,8 +682,9 @@ export function createGolfStateForTest(
     finalTurnsLeft: options?.finalTurnsLeft ?? 0,
     holeScores: {},
     holeSummary: '',
-    gameOver: false,
-    winners: [],
+    holeEndFlipSlotIds: [],
+    gameOver: options?.gameOver ?? false,
+    winners: options?.winners ?? [],
   };
 }
 
