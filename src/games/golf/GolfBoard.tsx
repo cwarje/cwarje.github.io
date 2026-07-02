@@ -13,6 +13,10 @@ import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX } from '../.
 import { AutoFitSeatName } from '../shared/AutoFitSeatName';
 import { useDealerDealAnimation, type DealExtraTarget, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
+import { GolfDiscardAnimationLayer } from './GolfDiscardAnimationLayer';
+import { GolfSwapAnimationLayer } from './GolfSwapAnimationLayer';
+import { useGolfDiscardAnimation } from './useGolfDiscardAnimation';
+import { useGolfSwapAnimation } from './useGolfSwapAnimation';
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
   hearts: '\u2665',
@@ -58,7 +62,7 @@ function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY
 
 function PokerFlipCard({ card, faceDown, disabled = false }: { card?: Card | null; faceDown: boolean; disabled?: boolean }) {
   if (faceDown || !card) {
-    return <div className="poker-card poker-cardBack poker-cardFlip--sm" />;
+    return <div className="twelve-cardBackFace" />;
   }
 
   return (
@@ -69,7 +73,9 @@ function PokerFlipCard({ card, faceDown, disabled = false }: { card?: Card | nul
         animate={{ rotateY: 180 }}
         transition={{ duration: 0.42, ease: 'easeInOut' }}
       >
-        <div className="poker-cardFlipBack" aria-hidden="true" />
+        <div className="poker-cardFlipBack" aria-hidden="true">
+          <div className="twelve-cardBackFace" />
+        </div>
         <div className={`poker-cardFlipFront ${disabled ? 'poker-cardFlipFront--disabled' : ''}`}>
           <div className="poker-cardCorner">
             <span className={`poker-cardRank ${SUIT_COLORS[card.suit]}`}>{rankDisplay(card.rank)}</span>
@@ -87,6 +93,10 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
   const isMyTurn = myIndex >= 0 && state.currentPlayerIndex === myIndex && state.phase === 'playing';
   const boardRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+  const stockPileRef = useRef<HTMLButtonElement>(null);
+  const discardPileRef = useRef<HTMLButtonElement>(null);
+  const slotRefs = useRef(new Map<string, HTMLButtonElement>());
+  const animationBusyRef = useRef(false);
   const [tableSize, setTableSize] = useState<ElementSize>({ width: 0, height: 0 });
   const [seatStackElement, setSeatStackElement] = useState<HTMLDivElement | null>(null);
   const [seatStackSize, setSeatStackSize] = useState<ElementSize>({ width: 0, height: 0 });
@@ -188,10 +198,50 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
   }, [seatStackElement]);
 
   const canUseActions = isMyTurn && !deal.isDealing;
+  const currentPlayerId = state.players[state.currentPlayerIndex]?.id;
+  const isActiveDrawer = currentPlayerId === myId;
+  const hasStockPendingDraw =
+    !!state.pendingDraw && state.pendingDrawSource === 'stock' && state.phase === 'playing';
+  const hasDiscardPendingDraw =
+    !!state.pendingDraw && state.pendingDrawSource === 'discard' && state.phase === 'playing';
   const discardTop = state.discard[state.discard.length - 1] ?? null;
   const showDrawStock = canUseActions && !state.pendingDraw && canDrawFromStock(state, myId);
   const showTakeDiscard = canUseActions && !state.pendingDraw && canTakeDiscard(state, myId);
   const showDiscardDrawn = canUseActions && canDiscardDrawn(state, myId);
+  const canClickDiscard = showTakeDiscard || showDiscardDrawn;
+
+  const discardAnim = useGolfDiscardAnimation({
+    boardRef,
+    stockPileRef,
+    discardPileRef,
+    state,
+    myId,
+    animationBusyRef,
+  });
+
+  const swapAnim = useGolfSwapAnimation({
+    boardRef,
+    stockPileRef,
+    discardPileRef,
+    slotRefs,
+    state,
+    myId,
+    animationBusyRef,
+  });
+
+  useEffect(() => {
+    animationBusyRef.current = discardAnim.animation !== null || swapAnim.animation !== null;
+  }, [discardAnim.animation, swapAnim.animation]);
+
+  const visibleDiscardTop =
+    discardAnim.hideDiscardTop || swapAnim.hideDiscardTop
+      ? (state.discard.length >= 2 ? state.discard[state.discard.length - 2]! : null)
+      : discardTop;
+
+  const handleDiscardPileClick = () => {
+    if (showDiscardDrawn) onAction({ type: 'discard-drawn' });
+    else if (showTakeDiscard) onAction({ type: 'take-discard' });
+  };
 
   const renderCardFace = (card: Card, disabled = false) => (
     <div className={`river-card river-card--compact ${disabled ? 'river-card--disabled' : ''}`}>
@@ -267,16 +317,24 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
       return <div key={slotId} className="golf-tableSlot" aria-hidden="true" />;
     }
 
+    const isAnimating = swapAnim.animatingSlotId === slotId;
+
     return (
-      <div key={slotId} className="golf-tableSlot">
+      <div key={slotId} className={`golf-tableSlot ${isAnimating ? 'golf-tableSlot--animating' : ''}`}>
         <button
+          ref={el => {
+            if (el) slotRefs.current.set(slotId, el);
+            else slotRefs.current.delete(slotId);
+          }}
           type="button"
           className="golf-slotButton"
           disabled={!canSwap}
           onClick={() => onAction({ type: 'swap-with-slot', slotIndex })}
           aria-label={`Table card ${slotIndex + 1}`}
         >
-          {showFace ? (
+          {isAnimating ? (
+            <span className="golf-slotButtonPlaceholder" aria-hidden="true" />
+          ) : showFace ? (
             renderCardFace(slot.card, !canSwap)
           ) : (
             <PokerFlipCard card={slot.card} faceDown disabled={!canSwap} />
@@ -289,6 +347,14 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
   return (
     <div ref={boardRef} className={`golf-board river-board river-board--players-${state.players.length} relative`}>
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
+      <GolfDiscardAnimationLayer
+        animation={discardAnim.animation}
+        renderCardFace={card => renderCardFace(card)}
+      />
+      <GolfSwapAnimationLayer
+        animation={swapAnim.animation}
+        renderCardFace={card => renderCardFace(card)}
+      />
 
       <div ref={tableRef} className={`river-table river-table--players-${state.players.length}`}>
         {seatLayouts.map(layout => (
@@ -311,6 +377,7 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
 
         <div className="golf-stockArea">
           <button
+            ref={stockPileRef}
             type="button"
             className="golf-stockPile"
             disabled={!showDrawStock}
@@ -320,24 +387,38 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
             <div className="golf-stockStack">
               <div className="twelve-cardBackFace" />
             </div>
+            {hasStockPendingDraw && state.pendingDraw && (
+              <div
+                className={`golf-activeDraw ${isActiveDrawer ? '' : 'golf-activeDraw--noFlip'}`}
+                aria-label="Drawn card"
+              >
+                {isActiveDrawer ? (
+                  <PokerFlipCard card={state.pendingDraw} faceDown={false} />
+                ) : (
+                  <div className="twelve-cardBackFace" />
+                )}
+              </div>
+            )}
             <span className="golf-stockCount">{state.stock.length}</span>
           </button>
 
           <button
+            ref={discardPileRef}
             type="button"
             className="golf-discardPile"
-            disabled={!showTakeDiscard}
-            onClick={() => onAction({ type: 'take-discard' })}
-            aria-label="Take top discard"
+            disabled={!canClickDiscard}
+            onClick={handleDiscardPileClick}
+            aria-label={showDiscardDrawn ? 'Discard drawn card' : 'Take top discard'}
           >
-            {discardTop ? renderCardFace(discardTop, !showTakeDiscard) : <div className="golf-tableSlot" aria-hidden="true" />}
+            {visibleDiscardTop
+              ? renderCardFace(visibleDiscardTop, !canClickDiscard)
+              : <div className="golf-tableSlot" aria-hidden="true" />}
+            {hasDiscardPendingDraw && state.pendingDraw && (
+              <div className="golf-activeDraw golf-activeDraw--noFlip" aria-label="Drawn card">
+                {renderCardFace(state.pendingDraw)}
+              </div>
+            )}
           </button>
-
-          {state.pendingDraw && isMyTurn && (
-            <div className="golf-pendingDraw" aria-label="Drawn card">
-              {renderCardFace(state.pendingDraw)}
-            </div>
-          )}
         </div>
       </div>
 
@@ -348,23 +429,6 @@ export default function GolfBoard({ state, myId, onAction }: GolfBoardProps) {
           >
             {headsUpContent ?? '\u00a0'}
           </p>
-        </div>
-        <div className="river-actionRow golf-actionRow">
-          {showDrawStock && (
-            <button type="button" className="golf-actionButton" onClick={() => onAction({ type: 'draw-from-stock' })}>
-              Draw
-            </button>
-          )}
-          {showTakeDiscard && (
-            <button type="button" className="golf-actionButton" onClick={() => onAction({ type: 'take-discard' })}>
-              Take discard
-            </button>
-          )}
-          {showDiscardDrawn && (
-            <button type="button" className="golf-actionButton" onClick={() => onAction({ type: 'discard-drawn' })}>
-              Discard drawn
-            </button>
-          )}
         </div>
       </div>
     </div>
