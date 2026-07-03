@@ -92,6 +92,7 @@ describe('minigolf course generation', () => {
     expect(state.courses).toHaveLength(3);
     expect(state.holeIndex).toBe(0);
     expect(state.phase).toBe('playing');
+    expect(state.ballCollisions).toBe(false);
     for (const p of state.players) {
       expect(p.strokes).toBe(0);
       expect(p.holed).toBe(false);
@@ -99,6 +100,11 @@ describe('minigolf course generation', () => {
       expect(isBallAtRest(p.ball)).toBe(true);
       expect(Math.hypot(p.ball.x - state.courses[0].tee.x, p.ball.y - state.courses[0].tee.y)).toBeLessThan(10);
     }
+  });
+
+  it('respects the ball collisions start option', () => {
+    expect(createMinigolfState(makePlayers(2)).ballCollisions).toBe(false);
+    expect(createMinigolfState(makePlayers(2), { minigolfBallCollisions: true }).ballCollisions).toBe(true);
   });
 
   it('sometimes generates water hazards on reachable holes', () => {
@@ -197,6 +203,60 @@ describe('minigolf physics', () => {
     const p1 = state.players.find((p) => p.id === 'p1')!;
     expect(p1.holed).toBe(true);
     expect(p1.scores[0]).toBe(3);
+  });
+
+  function twoBallCollisionState(ballCollisions: boolean): MinigolfState {
+    const course = openCourse();
+    const state = createMinigolfState(makePlayers(2), { minigolfBallCollisions: ballCollisions });
+    return {
+      ...state,
+      ballCollisions,
+      courses: [course, openCourse(), openCourse()],
+      players: state.players.map((p, i) =>
+        i === 0
+          ? { ...p, ball: { x: 40, y: 50, vx: 3, vy: 0 } }
+          : { ...p, ball: { x: 44, y: 50, vx: 0, vy: 0 } },
+      ),
+    };
+  }
+
+  it('bounces balls off each other when collisions are enabled', () => {
+    let state = twoBallCollisionState(true);
+    state = tick(state);
+    const p1 = state.players.find((p) => p.id === 'p1')!;
+    const p2 = state.players.find((p) => p.id === 'p2')!;
+    expect(p2.ball.vx).toBeGreaterThan(0);
+    expect(p1.ball.vx).toBeLessThan(3);
+  });
+
+  it('lets balls pass through each other when collisions are disabled', () => {
+    let state = twoBallCollisionState(false);
+    state = tick(state);
+    const p1 = state.players.find((p) => p.id === 'p1')!;
+    const p2 = state.players.find((p) => p.id === 'p2')!;
+    expect(p2.ball.vx).toBe(0);
+    expect(p2.ball.vy).toBe(0);
+    expect(p1.ball.vx).toBeGreaterThan(0);
+  });
+
+  it('does not collide with balls still in the starting area', () => {
+    const course = openCourse();
+    const state = createMinigolfState(makePlayers(2), { minigolfBallCollisions: true });
+    const tee = course.tee;
+    let s: MinigolfState = {
+      ...state,
+      ballCollisions: true,
+      courses: [course, openCourse(), openCourse()],
+      players: state.players.map((p, i) =>
+        i === 0
+          ? { ...p, ball: { x: tee.x - 4, y: tee.y, vx: 2, vy: 0 } }
+          : { ...p, ball: { x: tee.x + 4, y: tee.y, vx: 0, vy: 0 } },
+      ),
+    };
+    s = tick(s);
+    const p2 = s.players.find((p) => p.id === 'p2')!;
+    expect(p2.ball.vx).toBe(0);
+    expect(p2.ball.vy).toBe(0);
   });
 });
 

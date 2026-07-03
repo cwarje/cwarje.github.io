@@ -1,7 +1,8 @@
-import type { Player } from '../../networking/types';
+import type { GameStartOptions, Player } from '../../networking/types';
 import {
   BALL_RADIUS,
   CUP_RADIUS,
+  TEE_STARTING_AREA_RADIUS,
   generateCourses,
   type Rng,
 } from './courseGen';
@@ -80,6 +81,139 @@ function collideBallWithRect(ball: MinigolfBall, rect: MinigolfRect): boolean {
     ball.vy -= (1 + RESTITUTION) * dot * normalY;
   }
   return true;
+}
+
+function isBallInStartingArea(ball: MinigolfBall, course: MinigolfCourse): boolean {
+  return Math.hypot(ball.x - course.tee.x, ball.y - course.tee.y) <= TEE_STARTING_AREA_RADIUS;
+}
+
+function collideBallWithBall(a: MinigolfBall, b: MinigolfBall): boolean {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const distSq = dx * dx + dy * dy;
+  const minDist = BALL_RADIUS * 2;
+  if (distSq >= minDist * minDist) return false;
+
+  let normalX: number;
+  let normalY: number;
+  if (distSq > 1e-9) {
+    const dist = Math.sqrt(distSq);
+    normalX = dx / dist;
+    normalY = dy / dist;
+  } else {
+    normalX = 1;
+    normalY = 0;
+  }
+
+  const dist = Math.max(Math.sqrt(distSq), 1e-9);
+  const pad = (minDist - dist) / 2 + 0.01;
+  a.x -= normalX * pad;
+  a.y -= normalY * pad;
+  b.x += normalX * pad;
+  b.y += normalY * pad;
+
+  const vRel = (b.vx - a.vx) * normalX + (b.vy - a.vy) * normalY;
+  if (vRel < 0) {
+    const impulse = (1 + RESTITUTION) * vRel / 2;
+    a.vx += impulse * normalX;
+    a.vy += impulse * normalY;
+    b.vx -= impulse * normalX;
+    b.vy -= impulse * normalY;
+  }
+  return true;
+}
+
+function applyBallFriction(ball: MinigolfBall, dtScale: number): void {
+  const speed = Math.hypot(ball.vx, ball.vy);
+  if (speed <= 0) return;
+
+  const newSpeed = Math.max(0, speed * Math.pow(FRICTION_MULT, dtScale) - FRICTION_LINEAR * dtScale);
+  if (newSpeed < STOP_SPEED) {
+    ball.vx = 0;
+    ball.vy = 0;
+    return;
+  }
+  const scale = newSpeed / speed;
+  ball.vx *= scale;
+  ball.vy *= scale;
+}
+
+function stepBallsWithCollisions(
+  balls: MinigolfBall[],
+  course: MinigolfCourse,
+  dtScale: number,
+): Array<{ holed: boolean; inWater?: boolean }> {
+  const results = balls.map(() => ({ holed: false, inWater: undefined as boolean | undefined }));
+  const done = balls.map(() => false);
+
+  let maxTravel = 0;
+  for (let i = 0; i < balls.length; i++) {
+    applyBallFriction(balls[i], dtScale);
+    maxTravel = Math.max(maxTravel, Math.hypot(balls[i].vx, balls[i].vy) * dtScale);
+  }
+
+  if (maxTravel <= 0) return results;
+
+  const steps = Math.max(1, Math.ceil(maxTravel / (BALL_RADIUS * 0.75)));
+  const stepDt = dtScale / steps;
+
+  for (let step = 0; step < steps; step++) {
+    for (let i = 0; i < balls.length; i++) {
+      if (done[i]) continue;
+      const speed = Math.hypot(balls[i].vx, balls[i].vy);
+      if (speed <= 0) continue;
+      balls[i].x += balls[i].vx * stepDt;
+      balls[i].y += balls[i].vy * stepDt;
+    }
+
+    for (let pass = 0; pass < 3; pass++) {
+      let hitAny = false;
+      for (let i = 0; i < balls.length; i++) {
+        if (done[i]) continue;
+        for (const wall of course.walls) {
+          if (collideBallWithRect(balls[i], wall)) hitAny = true;
+        }
+      }
+      if (!hitAny) break;
+    }
+
+    for (let pass = 0; pass < 3; pass++) {
+      let hitAny = false;
+      for (let i = 0; i < balls.length; i++) {
+        if (done[i]) continue;
+        for (let j = i + 1; j < balls.length; j++) {
+          if (done[j]) continue;
+          if (isBallInStartingArea(balls[i], course) || isBallInStartingArea(balls[j], course)) continue;
+          if (collideBallWithBall(balls[i], balls[j])) hitAny = true;
+        }
+      }
+      if (!hitAny) break;
+    }
+
+    for (let i = 0; i < balls.length; i++) {
+      if (done[i]) continue;
+      const ball = balls[i];
+      const cupDist = Math.hypot(ball.x - course.cup.x, ball.y - course.cup.y);
+      const currentSpeed = Math.hypot(ball.vx, ball.vy);
+      if (cupDist < CUP_RADIUS && currentSpeed < CUP_CAPTURE_SPEED) {
+        ball.x = course.cup.x;
+        ball.y = course.cup.y;
+        ball.vx = 0;
+        ball.vy = 0;
+        results[i].holed = true;
+        done[i] = true;
+        continue;
+      }
+      if (ballInAnyWater(ball, course.waterHazards ?? [])) {
+        ball.vx = 0;
+        ball.vy = 0;
+        results[i].inWater = true;
+        done[i] = true;
+      }
+    }
+  }
+
+  return results;
 }
 
 function isBallInWater(ball: MinigolfBall, water: MinigolfRect): boolean {
@@ -319,6 +453,154 @@ function advanceHole(state: MinigolfState): MinigolfState {
 const BOT_MIN_DELAY_TICKS = Math.round(900 / MINIGOLF_TICK_MS);
 const BOT_MAX_DELAY_TICKS = Math.round(2400 / MINIGOLF_TICK_MS);
 
+function updatePlayerBeforePhysics(
+  p: MinigolfPlayer,
+  playerIndex: number,
+  course: MinigolfCourse,
+  holeIndex: number,
+): { player: MinigolfPlayer; changed: boolean; needsPhysics: boolean } {
+  if (playerDone(p)) return { player: p, changed: false, needsPhysics: false };
+
+  if (p.sinkTicks > 0) {
+    const remaining = p.sinkTicks - 1;
+    if (remaining > 0) {
+      return { player: { ...p, sinkTicks: remaining }, changed: true, needsPhysics: false };
+    }
+    const tee = teePosition(course, playerIndex);
+    return {
+      player: {
+        ...p,
+        ball: { x: tee.x, y: tee.y, vx: 0, vy: 0 },
+        strokes: p.strokes + 1,
+        sinkTicks: 0,
+        botNextStrokeTick: -1,
+      },
+      changed: true,
+      needsPhysics: false,
+    };
+  }
+
+  if (isBallAtRest(p.ball)) {
+    if (p.strokes >= course.par + STROKE_CAP_OVER_PAR) {
+      return {
+        player: withRecordedScore({ ...p, gaveUp: true }, holeIndex, giveUpScore(course.par)),
+        changed: true,
+        needsPhysics: false,
+      };
+    }
+
+    if (p.isBot) {
+      if (p.botNextStrokeTick < 0) {
+        const delay = BOT_MIN_DELAY_TICKS + Math.floor(Math.random() * (BOT_MAX_DELAY_TICKS - BOT_MIN_DELAY_TICKS));
+        return { player: { ...p, botNextStrokeTick: delay }, changed: true, needsPhysics: false };
+      }
+      if (p.botNextStrokeTick > 0) {
+        return { player: { ...p, botNextStrokeTick: p.botNextStrokeTick - 1 }, changed: true, needsPhysics: false };
+      }
+      const { angle, power } = chooseBotStroke(p.ball, course);
+      const { vx, vy } = strokeVelocity(angle, power);
+      return {
+        player: {
+          ...p,
+          ball: { ...p.ball, vx, vy },
+          strokes: p.strokes + 1,
+          botNextStrokeTick: -1,
+        },
+        changed: true,
+        needsPhysics: true,
+      };
+    }
+
+    return { player: p, changed: false, needsPhysics: false };
+  }
+
+  return { player: p, changed: true, needsPhysics: true };
+}
+
+function applyBallPhysicsResult(
+  p: MinigolfPlayer,
+  ball: MinigolfBall,
+  course: MinigolfCourse,
+  holeIndex: number,
+  result: { holed: boolean; inWater?: boolean },
+): MinigolfPlayer {
+  if (result.inWater) {
+    return { ...p, ball, sinkTicks: SINK_TICKS, botNextStrokeTick: -1 };
+  }
+  if (result.holed) {
+    return withRecordedScore({ ...p, ball, holed: true }, holeIndex, p.strokes);
+  }
+  if (isBallAtRest(ball) && p.strokes >= course.par + STROKE_CAP_OVER_PAR) {
+    return withRecordedScore({ ...p, ball, gaveUp: true }, holeIndex, giveUpScore(course.par));
+  }
+  return { ...p, ball };
+}
+
+function ballChanged(before: MinigolfBall, after: MinigolfBall): boolean {
+  return before.x !== after.x || before.y !== after.y || before.vx !== after.vx || before.vy !== after.vy;
+}
+
+function processTickWithCollisions(state: MinigolfState, course: MinigolfCourse, dtScale: number): MinigolfState {
+  let anyChange = false;
+  const prePhysics = state.players.map((p, i) => {
+    const result = updatePlayerBeforePhysics(p, i, course, state.holeIndex);
+    if (result.changed) anyChange = true;
+    return result;
+  });
+  let players = prePhysics.map((r) => r.player);
+
+  const activeIndices: number[] = [];
+  for (let i = 0; i < players.length; i++) {
+    if (!playerDone(players[i]) && players[i].sinkTicks === 0) {
+      activeIndices.push(i);
+    }
+  }
+
+  if (activeIndices.length > 0) {
+    const balls = activeIndices.map((i) => ({ ...players[i].ball }));
+    const beforeBalls = activeIndices.map((i) => players[i].ball);
+    const results = stepBallsWithCollisions(balls, course, dtScale);
+
+    for (let j = 0; j < activeIndices.length; j++) {
+      const i = activeIndices[j];
+      const p = players[i];
+      const ball = balls[j];
+      const result = results[j];
+      if (result.inWater || result.holed || ballChanged(beforeBalls[j], ball)) {
+        players[i] = applyBallPhysicsResult(p, ball, course, state.holeIndex, result);
+        anyChange = true;
+      }
+    }
+  }
+
+  if (!anyChange) return state;
+
+  let next: MinigolfState = { ...state, players, lastTickAt: Date.now() };
+  next = beginSummaryIfDone(next);
+  return next;
+}
+
+function processTickWithoutCollisions(state: MinigolfState, course: MinigolfCourse, dtScale: number): MinigolfState {
+  let anyChange = false;
+
+  const players = state.players.map((p, playerIndex) => {
+    const { player, changed, needsPhysics } = updatePlayerBeforePhysics(p, playerIndex, course, state.holeIndex);
+    if (changed) anyChange = true;
+    if (!needsPhysics) return player;
+
+    anyChange = true;
+    const ball: MinigolfBall = { ...player.ball };
+    const result = stepBall(ball, course, dtScale);
+    return applyBallPhysicsResult(player, ball, course, state.holeIndex, result);
+  });
+
+  if (!anyChange) return state;
+
+  let next: MinigolfState = { ...state, players, lastTickAt: Date.now() };
+  next = beginSummaryIfDone(next);
+  return next;
+}
+
 function processTick(state: MinigolfState, dt: number): MinigolfState {
   if (state.gameOver) return state;
   const dtScale = dt / MINIGOLF_TICK_MS;
@@ -332,85 +614,17 @@ function processTick(state: MinigolfState, dt: number): MinigolfState {
   }
 
   const course = currentCourse(state);
-  let anyChange = false;
-
-  const players = state.players.map((p, playerIndex) => {
-    if (playerDone(p)) return p;
-
-    // Water sink animation — countdown then reset to tee with +1 stroke penalty.
-    if (p.sinkTicks > 0) {
-      anyChange = true;
-      const remaining = p.sinkTicks - 1;
-      if (remaining > 0) {
-        return { ...p, sinkTicks: remaining };
-      }
-      const tee = teePosition(course, playerIndex);
-      return {
-        ...p,
-        ball: { x: tee.x, y: tee.y, vx: 0, vy: 0 },
-        strokes: p.strokes + 1,
-        sinkTicks: 0,
-        botNextStrokeTick: -1,
-      };
-    }
-
-    if (isBallAtRest(p.ball)) {
-      // Stroke cap: too far over par with a resting, un-holed ball scores as a give-up.
-      if (p.strokes >= course.par + STROKE_CAP_OVER_PAR) {
-        anyChange = true;
-        return withRecordedScore({ ...p, gaveUp: true }, state.holeIndex, giveUpScore(course.par));
-      }
-
-      // Bot stroke scheduling while the ball rests.
-      if (p.isBot) {
-        anyChange = true;
-        if (p.botNextStrokeTick < 0) {
-          const delay = BOT_MIN_DELAY_TICKS + Math.floor(Math.random() * (BOT_MAX_DELAY_TICKS - BOT_MIN_DELAY_TICKS));
-          return { ...p, botNextStrokeTick: delay };
-        }
-        if (p.botNextStrokeTick > 0) {
-          return { ...p, botNextStrokeTick: p.botNextStrokeTick - 1 };
-        }
-        const { angle, power } = chooseBotStroke(p.ball, course);
-        const { vx, vy } = strokeVelocity(angle, power);
-        return {
-          ...p,
-          ball: { ...p.ball, vx, vy },
-          strokes: p.strokes + 1,
-          botNextStrokeTick: -1,
-        };
-      }
-
-      return p;
-    }
-
-    anyChange = true;
-    const ball: MinigolfBall = { ...p.ball };
-    const { holed, inWater } = stepBall(ball, course, dtScale);
-    if (inWater) {
-      return { ...p, ball, sinkTicks: SINK_TICKS, botNextStrokeTick: -1 };
-    }
-    if (holed) {
-      return withRecordedScore({ ...p, ball, holed: true }, state.holeIndex, p.strokes);
-    }
-    if (isBallAtRest(ball) && p.strokes >= course.par + STROKE_CAP_OVER_PAR) {
-      return withRecordedScore({ ...p, ball, gaveUp: true }, state.holeIndex, giveUpScore(course.par));
-    }
-    return { ...p, ball };
-  });
-
-  if (!anyChange) return state;
-
-  let next: MinigolfState = { ...state, players, lastTickAt: Date.now() };
-  next = beginSummaryIfDone(next);
-  return next;
+  if (state.ballCollisions) {
+    return processTickWithCollisions(state, course, dtScale);
+  }
+  return processTickWithoutCollisions(state, course, dtScale);
 }
 
 // ---------------------------------------------------------------------------
 // Required engine exports
 // ---------------------------------------------------------------------------
 
-export function createMinigolfState(players: Player[]): MinigolfState {
+export function createMinigolfState(players: Player[], options?: GameStartOptions): MinigolfState {
   const courses = generateCourses(HOLES_PER_GAME);
   const gamePlayers: MinigolfPlayer[] = players.slice(0, 8).map((p, i) => ({
     id: p.id,
@@ -428,6 +642,7 @@ export function createMinigolfState(players: Player[]): MinigolfState {
 
   return {
     players: gamePlayers,
+    ballCollisions: options?.minigolfBallCollisions ?? false,
     courses,
     holeIndex: 0,
     phase: 'playing',

@@ -6,6 +6,8 @@ export const COURSE_H = 140;
 export const WALL_THICKNESS = 3;
 export const BALL_RADIUS = 1.6;
 export const CUP_RADIUS = 2.8;
+/** Radius around the tee where ball-to-ball collisions are ignored. */
+export const TEE_STARTING_AREA_RADIUS = 10;
 
 export type Rng = () => number;
 

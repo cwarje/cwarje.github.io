@@ -70,6 +70,7 @@ import UpRiverOptions from './up-and-down-the-river/UpRiverOptions';
 import TwelveOptions from './twelve/TwelveOptions';
 import CasinoOptions from './casino/CasinoOptions';
 import CribbageOptions from './cribbage/CribbageOptions';
+import MinigolfOptions from './minigolf/MinigolfOptions';
 
 import HeartsTitleExtra from './hearts/HeartsTitleExtra';
 import PokerTitleExtra from './poker/PokerTitleExtra';
@@ -770,7 +771,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
       rules: [
         'Every game generates 3 brand-new holes with walls and obstacles.',
         'Each hole has a par based on how tricky the layout is.',
-        'Everyone putts at the same time — you can see all the other balls, but they pass right through each other.',
+        'Everyone putts at the same time — by default other balls pass through each other; enable ball collisions in game options to bounce off other players.',
         'Sink your ball in the cup to finish the hole; your stroke count is your score.',
         'The next hole starts once every player has finished the hole.',
         'Reaching par + 4 strokes without holing out scores double par for the hole.',
@@ -799,6 +800,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     runBotTurn: runMinigolfBotTurn,
     getWinners: getMinigolfWinners,
     Board: MinigolfBoard,
+    OptionsPanel: MinigolfOptions,
     fullBoard: true,
     production: true,
     showBetaBadge: true,

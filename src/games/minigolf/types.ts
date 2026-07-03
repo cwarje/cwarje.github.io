@@ -51,6 +51,8 @@ export type MinigolfPhase = 'playing' | 'summary' | 'game-over';
 
 export interface MinigolfState {
   players: MinigolfPlayer[];
+  /** When true, active balls bounce off each other; when false, they pass through. */
+  ballCollisions: boolean;
   /** All holes are generated up front so every client renders identical courses. */
   courses: MinigolfCourse[];
   holeIndex: number;

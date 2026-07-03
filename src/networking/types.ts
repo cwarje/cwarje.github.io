@@ -31,6 +31,7 @@ export interface GameStartOptions {
   casinoMatchLength?: CasinoMatchLength;
   cribbageTargetScore?: CribbageTargetScore;
   cucumberEliminationThreshold?: CucumberEliminationThreshold;
+  minigolfBallCollisions?: boolean;
   botCount?: number;
 }
 
