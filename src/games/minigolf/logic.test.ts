@@ -10,6 +10,7 @@ import {
   CUP_CAPTURE_SPEED,
   STROKE_CAP_OVER_PAR,
   SUMMARY_TICKS,
+  SINK_TICKS,
   chooseBotStroke,
   createMinigolfState,
   getMinigolfWinners,
@@ -41,10 +42,15 @@ function openCourse(par = 2): MinigolfCourse {
       { x: 0, y: 0, w: WALL_THICKNESS, h: COURSE_H },
       { x: COURSE_W - WALL_THICKNESS, y: 0, w: WALL_THICKNESS, h: COURSE_H },
     ],
+    waterHazards: [],
     tee: { x: 50, y: COURSE_H - 18 },
     cup: { x: 50, y: 18 },
     par,
   };
+}
+
+function courseWithWater(water: MinigolfCourse['waterHazards'], par = 2): MinigolfCourse {
+  return { ...openCourse(par), waterHazards: water };
 }
 
 function makeState(playerCount = 2, par = 2): MinigolfState {
@@ -89,9 +95,20 @@ describe('minigolf course generation', () => {
     for (const p of state.players) {
       expect(p.strokes).toBe(0);
       expect(p.holed).toBe(false);
+      expect(p.sinkTicks).toBe(0);
       expect(isBallAtRest(p.ball)).toBe(true);
       expect(Math.hypot(p.ball.x - state.courses[0].tee.x, p.ball.y - state.courses[0].tee.y)).toBeLessThan(10);
     }
+  });
+
+  it('sometimes generates water hazards on reachable holes', () => {
+    let withWater = 0;
+    for (let i = 0; i < 50; i++) {
+      const hole = generateHole();
+      expect(pathLengthCells(hole.walls, hole.tee, hole.cup)).not.toBeNull();
+      if (hole.waterHazards.length > 0) withWater++;
+    }
+    expect(withWater).toBeGreaterThan(0);
   });
 });
 
@@ -180,6 +197,59 @@ describe('minigolf physics', () => {
     const p1 = state.players.find((p) => p.id === 'p1')!;
     expect(p1.holed).toBe(true);
     expect(p1.scores[0]).toBe(3);
+  });
+});
+
+describe('minigolf water hazards', () => {
+  it('detects when the ball center enters water and stops it', () => {
+    const water = [{ x: 40, y: 60, w: 20, h: 15 }];
+    const course = courseWithWater(water);
+    const ball: MinigolfBall = { x: 50, y: 58, vx: 0, vy: 3 };
+    const result = stepBall(ball, course, 1);
+    expect(result.inWater).toBe(true);
+    expect(result.holed).toBe(false);
+    expect(ball.vx).toBe(0);
+    expect(ball.vy).toBe(0);
+  });
+
+  it('does not trigger water when the ball passes over the edge', () => {
+    const water = [{ x: 40, y: 60, w: 20, h: 15 }];
+    const course = courseWithWater(water);
+    const ball: MinigolfBall = { x: 35, y: 58, vx: 0, vy: 1 };
+    let inWater = false;
+    for (let i = 0; i < 20 && !inWater; i++) {
+      inWater = stepBall(ball, course, 1).inWater === true;
+    }
+    expect(inWater).toBe(false);
+  });
+
+  it('sinks then resets to tee with a +1 stroke penalty', () => {
+    const water = [{ x: 40, y: 60, w: 20, h: 15 }];
+    const course = courseWithWater(water);
+    let state = makeState(1);
+    state = {
+      ...state,
+      courses: [course, ...state.courses.slice(1)],
+      players: state.players.map((p) =>
+        p.id === 'p1'
+          ? {
+              ...p,
+              ball: { x: 50, y: 65, vx: 0, vy: 0 },
+              strokes: 1,
+              sinkTicks: SINK_TICKS,
+            }
+          : p,
+      ),
+    };
+
+    for (let i = 0; i < SINK_TICKS; i++) {
+      state = tick(state);
+    }
+    const p1 = state.players.find((p) => p.id === 'p1')!;
+    expect(p1.sinkTicks).toBe(0);
+    expect(isBallAtRest(p1.ball)).toBe(true);
+    expect(p1.strokes).toBe(2);
+    expect(Math.hypot(p1.ball.x - course.tee.x, p1.ball.y - course.tee.y)).toBeLessThan(10);
   });
 });
 

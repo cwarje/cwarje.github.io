@@ -154,37 +154,43 @@ export function generateHole(rng: Rng = Math.random): MinigolfCourse {
     const tee: MinigolfVec = { x: randRange(rng, 18, COURSE_W - 18), y: TEE_Y };
     const cup: MinigolfVec = { x: randRange(rng, 18, COURSE_W - 18), y: CUP_Y };
 
-    const obstacles: MinigolfRect[] = [];
+    const solidObstacles: MinigolfRect[] = [];
+    const waterHazards: MinigolfRect[] = [];
     if (rng() < 0.55) {
-      obstacles.push(...makeGateWalls(rng));
+      solidObstacles.push(...makeGateWalls(rng));
     }
-    const blockCount = Math.max(1, randInt(rng, 3, 8 - obstacles.length) - relax * 2);
+    const blockCount = Math.max(1, randInt(rng, 3, 8 - solidObstacles.length) - relax * 2);
     for (let i = 0; i < blockCount; i++) {
       const block = makeBlock(rng);
       if (
         rectClearOfPoint(block, tee, CLEARANCE) &&
         rectClearOfPoint(block, cup, CLEARANCE)
       ) {
-        obstacles.push(block);
+        if (rng() < 0.5) {
+          waterHazards.push(block);
+        } else {
+          solidObstacles.push(block);
+        }
       }
     }
 
-    const gateClearOfEnds = obstacles.every(
+    const allObstacles = [...solidObstacles, ...waterHazards];
+    const gateClearOfEnds = allObstacles.every(
       (o) => rectClearOfPoint(o, tee, CLEARANCE - 3) && rectClearOfPoint(o, cup, CLEARANCE - 3),
     );
     if (!gateClearOfEnds) continue;
 
-    const walls = [...borderWalls(), ...obstacles];
+    const walls = [...borderWalls(), ...solidObstacles];
     const pathCells = pathLengthCells(walls, tee, cup);
     if (pathCells == null) continue;
 
-    return { walls, tee, cup, par: computePar(pathCells, obstacles.length) };
+    return { walls, waterHazards, tee, cup, par: computePar(pathCells, allObstacles.length) };
   }
 
   // Fallback: an empty hole is always playable.
   const tee: MinigolfVec = { x: COURSE_W / 2, y: TEE_Y };
   const cup: MinigolfVec = { x: COURSE_W / 2, y: CUP_Y };
-  return { walls: borderWalls(), tee, cup, par: 2 };
+  return { walls: borderWalls(), waterHazards: [], tee, cup, par: 2 };
 }
 
 export function generateCourses(count: number, rng: Rng = Math.random): MinigolfCourse[] {

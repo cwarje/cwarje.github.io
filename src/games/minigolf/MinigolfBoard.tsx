@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { MinigolfBall, MinigolfCourse, MinigolfState } from './types';
 import { BALL_RADIUS, COURSE_H, COURSE_W, CUP_RADIUS } from './courseGen';
-import { MINIGOLF_TICK_MS, isBallAtRest } from './logic';
+import { MINIGOLF_TICK_MS, SINK_TICKS, isBallAtRest } from './logic';
 import {
   PLAYER_COLOR_HEX,
   getPlayerHudTextColor,
@@ -39,6 +39,9 @@ const GRASS_BASE = '#2e8b45';
 const GRASS_ALT = '#37a04f';
 const WALL_FILL = '#8a6337';
 const WALL_EDGE = '#5f4224';
+const WATER_FILL = '#1e78c8';
+const WATER_EDGE = '#1a5a8a';
+const WATER_HIGHLIGHT = '#4da6e8';
 
 function fitCourse(width: number, height: number): BoardFit {
   const scale = Math.min(width / COURSE_W, height / COURSE_H);
@@ -113,6 +116,24 @@ function drawCourse(ctx: CanvasRenderingContext2D, course: MinigolfCourse, scale
   ctx.closePath();
   ctx.fillStyle = '#ef4444';
   ctx.fill();
+
+  ctx.fill();
+
+  // Water hazards.
+  for (const water of course.waterHazards ?? []) {
+    const x = water.x * scale;
+    const y = water.y * scale;
+    const ww = water.w * scale;
+    const wh = water.h * scale;
+    ctx.fillStyle = WATER_FILL;
+    ctx.fillRect(x, y, ww, wh);
+    const inset = Math.max(1, 0.6 * scale);
+    ctx.fillStyle = WATER_HIGHLIGHT;
+    ctx.fillRect(x + inset, y + inset, Math.max(0, ww - inset * 2), Math.max(0, wh - inset * 2));
+    ctx.strokeStyle = WATER_EDGE;
+    ctx.lineWidth = Math.max(1, 0.4 * scale);
+    ctx.strokeRect(x, y, ww, wh);
+  }
 
   // Walls.
   for (const wall of course.walls) {
@@ -241,7 +262,7 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
   const me = state.players.find((p) => p.id === myId);
   const meDone = !!me && (me.holed || me.gaveUp);
   const canStroke =
-    !!me && state.phase === 'playing' && !meDone && isBallAtRest(me.ball) && !state.gameOver;
+    !!me && state.phase === 'playing' && !meDone && isBallAtRest(me.ball) && me.sinkTicks === 0 && !state.gameOver;
 
   useEffect(() => {
     const el = containerRef.current;
@@ -373,7 +394,6 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
       ctx.drawImage(courseCanvas, 0, 0, fit.boardWidth, fit.boardHeight);
 
       const alpha = Math.min(1, (now - prevTimeRef.current) / MINIGOLF_TICK_MS);
-      const ballPx = Math.max(3, BALL_RADIUS * fit.scale);
 
       // Draw other players first so my ball renders on top.
       const ordered = [...current.players].sort((a, b) => {
@@ -385,19 +405,30 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
       for (const p of ordered) {
         if (p.holed) continue;
         const prevPlayer = prev.players.find((pp) => pp.id === p.id);
-        const pos = interpolateBall(prevPlayer?.ball, p.ball, alpha);
+        const sinking = p.sinkTicks > 0;
+        const pos = sinking
+          ? { x: p.ball.x, y: p.ball.y }
+          : interpolateBall(prevPlayer?.ball, p.ball, alpha);
         const x = pos.x * fit.scale;
         const y = pos.y * fit.scale;
         const isMe = p.id === myIdRef.current;
         const hex = PLAYER_COLOR_HEX[normalizePlayerColor(p.color)];
 
+        const sinkProgress = sinking ? 1 - p.sinkTicks / SINK_TICKS : 0;
+        const ballPx = Math.max(3, BALL_RADIUS * fit.scale * (sinking ? 1 - sinkProgress * 0.85 : 1));
+        const ballAlpha = sinking ? 1 - sinkProgress : 1;
+        const sinkYOffset = sinking ? sinkProgress * ballPx : 0;
+
+        ctx.save();
+        ctx.globalAlpha = ballAlpha;
+
         ctx.beginPath();
-        ctx.arc(x, y + ballPx * 0.35, ballPx * 0.95, 0, Math.PI * 2);
+        ctx.arc(x, y + ballPx * 0.35 + sinkYOffset, ballPx * 0.95, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(0,0,0,0.25)';
         ctx.fill();
 
         ctx.beginPath();
-        ctx.arc(x, y, ballPx, 0, Math.PI * 2);
+        ctx.arc(x, y + sinkYOffset, ballPx, 0, Math.PI * 2);
         ctx.fillStyle = p.gaveUp ? 'rgba(120,120,120,0.6)' : hex;
         ctx.fill();
         if (isMe) {
@@ -405,6 +436,7 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
           ctx.strokeStyle = '#ffffff';
           ctx.stroke();
         }
+        ctx.restore();
 
         if (!isMe) {
           const fontSize = Math.max(10, 3.4 * fit.scale);

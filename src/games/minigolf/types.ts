@@ -15,6 +15,8 @@ export interface MinigolfVec {
 export interface MinigolfCourse {
   /** Axis-aligned wall rectangles, including the four border walls. */
   walls: MinigolfRect[];
+  /** Non-solid hazards — ball sinks and resets to tee when its center enters. */
+  waterHazards: MinigolfRect[];
   tee: MinigolfVec;
   cup: MinigolfVec;
   par: number;
@@ -41,6 +43,8 @@ export interface MinigolfPlayer {
   scores: number[];
   /** Host-side bot pacing: ticks until the bot strokes; -1 = not scheduled. */
   botNextStrokeTick: number;
+  /** Ticks remaining in the water-sink animation; 0 = normal play. */
+  sinkTicks: number;
 }
 
 export type MinigolfPhase = 'playing' | 'summary' | 'game-over';

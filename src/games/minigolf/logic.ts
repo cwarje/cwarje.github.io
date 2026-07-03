@@ -23,6 +23,8 @@ export const CUP_CAPTURE_SPEED = 2.15;
 export const STROKE_CAP_OVER_PAR = 4;
 export const SUMMARY_TICKS = Math.round(5000 / MINIGOLF_TICK_MS);
 
+export const SINK_TICKS = 45;
+
 const FRICTION_MULT = 0.978;
 const FRICTION_LINEAR = 0.003;
 const RESTITUTION = 0.85;
@@ -80,6 +82,22 @@ function collideBallWithRect(ball: MinigolfBall, rect: MinigolfRect): boolean {
   return true;
 }
 
+function isBallInWater(ball: MinigolfBall, water: MinigolfRect): boolean {
+  return (
+    ball.x >= water.x &&
+    ball.x <= water.x + water.w &&
+    ball.y >= water.y &&
+    ball.y <= water.y + water.h
+  );
+}
+
+function ballInAnyWater(ball: MinigolfBall, waterHazards: MinigolfRect[]): boolean {
+  for (const water of waterHazards) {
+    if (isBallInWater(ball, water)) return true;
+  }
+  return false;
+}
+
 /**
  * Advances a ball one tick. Mutates and returns the passed-in ball (callers
  * pass a fresh copy). Returns whether the ball dropped into the cup.
@@ -88,7 +106,7 @@ export function stepBall(
   ball: MinigolfBall,
   course: MinigolfCourse,
   dtScale: number,
-): { holed: boolean } {
+): { holed: boolean; inWater?: boolean } {
   let speed = Math.hypot(ball.vx, ball.vy);
   if (speed <= 0) return { holed: false };
 
@@ -129,6 +147,12 @@ export function stepBall(
       ball.vy = 0;
       return { holed: true };
     }
+
+    if (ballInAnyWater(ball, course.waterHazards ?? [])) {
+      ball.vx = 0;
+      ball.vy = 0;
+      return { holed: false, inWater: true };
+    }
   }
 
   return { holed: false };
@@ -157,8 +181,15 @@ function simulateStroke(
   const { vx, vy } = strokeVelocity(angle, power);
   const ball: MinigolfBall = { x: start.x, y: start.y, vx, vy };
   for (let t = 0; t < BOT_SIM_MAX_TICKS; t++) {
-    const { holed } = stepBall(ball, course, 1);
+    const { holed, inWater } = stepBall(ball, course, 1);
     if (holed) return { holed: true, ticks: t, finalDist: 0 };
+    if (inWater) {
+      return {
+        holed: false,
+        ticks: t,
+        finalDist: Math.hypot(start.x - course.cup.x, start.y - course.cup.y) + 500,
+      };
+    }
     if (isBallAtRest(ball)) {
       return {
         holed: false,
@@ -276,6 +307,7 @@ function advanceHole(state: MinigolfState): MinigolfState {
       holed: false,
       gaveUp: false,
       botNextStrokeTick: -1,
+      sinkTicks: 0,
     })),
   };
 }
@@ -302,8 +334,25 @@ function processTick(state: MinigolfState, dt: number): MinigolfState {
   const course = currentCourse(state);
   let anyChange = false;
 
-  const players = state.players.map((p) => {
+  const players = state.players.map((p, playerIndex) => {
     if (playerDone(p)) return p;
+
+    // Water sink animation — countdown then reset to tee with +1 stroke penalty.
+    if (p.sinkTicks > 0) {
+      anyChange = true;
+      const remaining = p.sinkTicks - 1;
+      if (remaining > 0) {
+        return { ...p, sinkTicks: remaining };
+      }
+      const tee = teePosition(course, playerIndex);
+      return {
+        ...p,
+        ball: { x: tee.x, y: tee.y, vx: 0, vy: 0 },
+        strokes: p.strokes + 1,
+        sinkTicks: 0,
+        botNextStrokeTick: -1,
+      };
+    }
 
     if (isBallAtRest(p.ball)) {
       // Stroke cap: too far over par with a resting, un-holed ball scores as a give-up.
@@ -337,7 +386,10 @@ function processTick(state: MinigolfState, dt: number): MinigolfState {
 
     anyChange = true;
     const ball: MinigolfBall = { ...p.ball };
-    const { holed } = stepBall(ball, course, dtScale);
+    const { holed, inWater } = stepBall(ball, course, dtScale);
+    if (inWater) {
+      return { ...p, ball, sinkTicks: SINK_TICKS, botNextStrokeTick: -1 };
+    }
     if (holed) {
       return withRecordedScore({ ...p, ball, holed: true }, state.holeIndex, p.strokes);
     }
@@ -371,6 +423,7 @@ export function createMinigolfState(players: Player[]): MinigolfState {
     gaveUp: false,
     scores: [],
     botNextStrokeTick: -1,
+    sinkTicks: 0,
   }));
 
   return {
@@ -397,7 +450,7 @@ export function processMinigolfAction(state: unknown, action: unknown, playerId:
       const idx = s.players.findIndex((p) => p.id === playerId);
       if (idx === -1) return state;
       const player = s.players[idx];
-      if (playerDone(player) || !isBallAtRest(player.ball)) return state;
+      if (playerDone(player) || !isBallAtRest(player.ball) || player.sinkTicks > 0) return state;
       if (typeof a.angle !== 'number' || !Number.isFinite(a.angle)) return state;
       if (typeof a.power !== 'number' || !Number.isFinite(a.power) || a.power <= 0) return state;
 
