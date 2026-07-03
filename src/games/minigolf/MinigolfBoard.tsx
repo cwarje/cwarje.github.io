@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { MinigolfBall, MinigolfCourse, MinigolfState } from './types';
+import { getMinigolfTheme, type MinigolfCourseTheme } from './themes';
 import { BALL_RADIUS, COURSE_H, COURSE_W, CUP_RADIUS } from './courseGen';
 import { MINIGOLF_TICK_MS, SINK_TICKS, isBallAtRest } from './logic';
 import {
@@ -35,13 +36,105 @@ interface BoardFit {
 const FULL_POWER_DRAG_UNITS = 55;
 const MIN_POWER = 0.05;
 
-const GRASS_BASE = '#2e8b45';
-const GRASS_ALT = '#37a04f';
-const WALL_FILL = '#8a6337';
-const WALL_EDGE = '#5f4224';
-const WATER_FILL = '#1e78c8';
-const WATER_EDGE = '#1a5a8a';
-const WATER_HIGHLIGHT = '#4da6e8';
+function drawCourse(
+  ctx: CanvasRenderingContext2D,
+  course: MinigolfCourse,
+  scale: number,
+  theme: MinigolfCourseTheme,
+) {
+  const { palette } = getMinigolfTheme(theme);
+  const w = COURSE_W * scale;
+  const h = COURSE_H * scale;
+
+  ctx.fillStyle = palette.fairwayBase;
+  ctx.fillRect(0, 0, w, h);
+
+  // Mowed checker stripes.
+  const cell = 14 * scale;
+  ctx.fillStyle = palette.fairwayAlt;
+  for (let row = 0; row * cell < h; row++) {
+    for (let col = 0; col * cell < w; col++) {
+      if ((row + col) % 2 === 0) continue;
+      ctx.fillRect(col * cell, row * cell, cell, cell);
+    }
+  }
+
+  // Sand traps (desert slow zones).
+  for (const trap of course.sandTraps ?? []) {
+    const x = trap.x * scale;
+    const y = trap.y * scale;
+    const tw = trap.w * scale;
+    const th = trap.h * scale;
+    ctx.fillStyle = palette.sandTrapFill;
+    ctx.fillRect(x, y, tw, th);
+    ctx.strokeStyle = palette.sandTrapEdge;
+    ctx.lineWidth = Math.max(1, 0.4 * scale);
+    ctx.strokeRect(x, y, tw, th);
+  }
+
+  // Tee marker.
+  ctx.beginPath();
+  ctx.arc(course.tee.x * scale, course.tee.y * scale, 4.5 * scale, 0, Math.PI * 2);
+  ctx.strokeStyle = palette.teeStroke;
+  ctx.lineWidth = Math.max(1, 0.7 * scale);
+  ctx.stroke();
+
+  // Cup with rim + flag.
+  const cupX = course.cup.x * scale;
+  const cupY = course.cup.y * scale;
+  const cupR = CUP_RADIUS * scale;
+  ctx.beginPath();
+  ctx.arc(cupX, cupY, cupR, 0, Math.PI * 2);
+  ctx.fillStyle = palette.cupFill;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+  ctx.lineWidth = Math.max(1, 0.5 * scale);
+  ctx.stroke();
+
+  const poleH = 14 * scale;
+  ctx.strokeStyle = '#e5e7eb';
+  ctx.lineWidth = Math.max(1, 0.7 * scale);
+  ctx.beginPath();
+  ctx.moveTo(cupX, cupY);
+  ctx.lineTo(cupX, cupY - poleH);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cupX, cupY - poleH);
+  ctx.lineTo(cupX + 7 * scale, cupY - poleH + 2.5 * scale);
+  ctx.lineTo(cupX, cupY - poleH + 5 * scale);
+  ctx.closePath();
+  ctx.fillStyle = '#ef4444';
+  ctx.fill();
+
+  // Sink hazards (water, quicksand, cracked ice).
+  for (const water of course.waterHazards ?? []) {
+    const x = water.x * scale;
+    const y = water.y * scale;
+    const ww = water.w * scale;
+    const wh = water.h * scale;
+    ctx.fillStyle = palette.hazardFill;
+    ctx.fillRect(x, y, ww, wh);
+    const inset = Math.max(1, 0.6 * scale);
+    ctx.fillStyle = palette.hazardHighlight;
+    ctx.fillRect(x + inset, y + inset, Math.max(0, ww - inset * 2), Math.max(0, wh - inset * 2));
+    ctx.strokeStyle = palette.hazardEdge;
+    ctx.lineWidth = Math.max(1, 0.4 * scale);
+    ctx.strokeRect(x, y, ww, wh);
+  }
+
+  // Walls.
+  for (const wall of course.walls) {
+    const x = wall.x * scale;
+    const y = wall.y * scale;
+    const ww = wall.w * scale;
+    const wh = wall.h * scale;
+    ctx.fillStyle = palette.wallFill;
+    ctx.fillRect(x, y, ww, wh);
+    ctx.strokeStyle = palette.wallEdge;
+    ctx.lineWidth = Math.max(1, 0.4 * scale);
+    ctx.strokeRect(x, y, ww, wh);
+  }
+}
 
 function fitCourse(width: number, height: number): BoardFit {
   const scale = Math.min(width / COURSE_W, height / COURSE_H);
@@ -64,89 +157,6 @@ function interpolateBall(prev: MinigolfBall | undefined, cur: MinigolfBall, alph
     x: prev.x + (cur.x - prev.x) * alpha,
     y: prev.y + (cur.y - prev.y) * alpha,
   };
-}
-
-function drawCourse(ctx: CanvasRenderingContext2D, course: MinigolfCourse, scale: number) {
-  const w = COURSE_W * scale;
-  const h = COURSE_H * scale;
-
-  ctx.fillStyle = GRASS_BASE;
-  ctx.fillRect(0, 0, w, h);
-
-  // Mowed checker stripes.
-  const cell = 14 * scale;
-  ctx.fillStyle = GRASS_ALT;
-  for (let row = 0; row * cell < h; row++) {
-    for (let col = 0; col * cell < w; col++) {
-      if ((row + col) % 2 === 0) continue;
-      ctx.fillRect(col * cell, row * cell, cell, cell);
-    }
-  }
-
-  // Tee marker.
-  ctx.beginPath();
-  ctx.arc(course.tee.x * scale, course.tee.y * scale, 4.5 * scale, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-  ctx.lineWidth = Math.max(1, 0.7 * scale);
-  ctx.stroke();
-
-  // Cup with rim + flag.
-  const cupX = course.cup.x * scale;
-  const cupY = course.cup.y * scale;
-  const cupR = CUP_RADIUS * scale;
-  ctx.beginPath();
-  ctx.arc(cupX, cupY, cupR, 0, Math.PI * 2);
-  ctx.fillStyle = '#10241a';
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-  ctx.lineWidth = Math.max(1, 0.5 * scale);
-  ctx.stroke();
-
-  const poleH = 14 * scale;
-  ctx.strokeStyle = '#e5e7eb';
-  ctx.lineWidth = Math.max(1, 0.7 * scale);
-  ctx.beginPath();
-  ctx.moveTo(cupX, cupY);
-  ctx.lineTo(cupX, cupY - poleH);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(cupX, cupY - poleH);
-  ctx.lineTo(cupX + 7 * scale, cupY - poleH + 2.5 * scale);
-  ctx.lineTo(cupX, cupY - poleH + 5 * scale);
-  ctx.closePath();
-  ctx.fillStyle = '#ef4444';
-  ctx.fill();
-
-  ctx.fill();
-
-  // Water hazards.
-  for (const water of course.waterHazards ?? []) {
-    const x = water.x * scale;
-    const y = water.y * scale;
-    const ww = water.w * scale;
-    const wh = water.h * scale;
-    ctx.fillStyle = WATER_FILL;
-    ctx.fillRect(x, y, ww, wh);
-    const inset = Math.max(1, 0.6 * scale);
-    ctx.fillStyle = WATER_HIGHLIGHT;
-    ctx.fillRect(x + inset, y + inset, Math.max(0, ww - inset * 2), Math.max(0, wh - inset * 2));
-    ctx.strokeStyle = WATER_EDGE;
-    ctx.lineWidth = Math.max(1, 0.4 * scale);
-    ctx.strokeRect(x, y, ww, wh);
-  }
-
-  // Walls.
-  for (const wall of course.walls) {
-    const x = wall.x * scale;
-    const y = wall.y * scale;
-    const ww = wall.w * scale;
-    const wh = wall.h * scale;
-    ctx.fillStyle = WALL_FILL;
-    ctx.fillRect(x, y, ww, wh);
-    ctx.strokeStyle = WALL_EDGE;
-    ctx.lineWidth = Math.max(1, 0.4 * scale);
-    ctx.strokeRect(x, y, ww, wh);
-  }
 }
 
 function drawAim(
@@ -386,7 +396,7 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
 
       if (courseCtx && cachedHoleIndex !== current.holeIndex) {
         courseCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        drawCourse(courseCtx, currentCourse, fit.scale);
+        drawCourse(courseCtx, currentCourse, fit.scale, currentCourse.theme);
         cachedHoleIndex = current.holeIndex;
       }
 
@@ -467,13 +477,16 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
   // Overlays
   // -------------------------------------------------------------------------
 
+  const themeConfig = getMinigolfTheme(course.theme);
+
   if (state.gameOver) {
     const winners = state.players.filter((p) => state.winners.includes(p.id));
     return (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="h-full flex flex-col items-center justify-center space-y-6 text-center bg-emerald-950 px-4"
+        className="h-full flex flex-col items-center justify-center space-y-6 text-center px-4"
+        style={{ background: themeConfig.chrome.boardBg }}
       >
         <span className="text-7xl block mx-auto" aria-hidden>⛳</span>
         <h2 className="text-3xl font-extrabold text-white">Game Over!</h2>
@@ -482,7 +495,13 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
             ? `${winners[0].id === myId ? 'You win' : `${winners[0].name} wins`}!`
             : `Tie: ${winners.map((w) => (w.id === myId ? 'You' : w.name)).join(', ')}`}
         </p>
-        <div className="minigolf-summaryPanel">
+        <div
+          className="minigolf-summaryPanel"
+          style={{
+            background: themeConfig.chrome.summaryPanelBg,
+            borderColor: themeConfig.chrome.summaryPanelBorder,
+          }}
+        >
           <Scorecard state={state} myId={myId} />
         </div>
       </motion.div>
@@ -494,7 +513,7 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
   const waitingOn = state.players.filter((p) => !p.holed && !p.gaveUp);
 
   return (
-    <div className="flex h-full w-full flex-col bg-emerald-950">
+    <div className="flex h-full w-full flex-col" style={{ background: themeConfig.chrome.boardBg }}>
       <div ref={containerRef} className="relative min-h-0 flex-1 overflow-hidden">
         <canvas
           ref={canvasRef}
@@ -563,6 +582,10 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
               initial={{ opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1 }}
               className="minigolf-summaryPanel"
+              style={{
+                background: themeConfig.chrome.summaryPanelBg,
+                borderColor: themeConfig.chrome.summaryPanelBorder,
+              }}
             >
               <h3 className="text-lg font-bold text-white mb-2">
                 Hole {state.holeIndex + 1} complete

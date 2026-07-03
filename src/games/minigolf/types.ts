@@ -1,4 +1,7 @@
 import type { PlayerColor } from '../../networking/types';
+import type { MinigolfCourseTheme, MinigolfThemeOption } from './themes';
+
+export type { MinigolfCourseTheme, MinigolfThemeOption };
 
 export interface MinigolfRect {
   x: number;
@@ -17,9 +20,13 @@ export interface MinigolfCourse {
   walls: MinigolfRect[];
   /** Non-solid hazards — ball sinks and resets to tee when its center enters. */
   waterHazards: MinigolfRect[];
+  /** Desert-only slow zones — ball slows heavily but does not sink. */
+  sandTraps?: MinigolfRect[];
   tee: MinigolfVec;
   cup: MinigolfVec;
   par: number;
+  /** Resolved visual/physics theme for this hole. */
+  theme: MinigolfCourseTheme;
 }
 
 export interface MinigolfBall {

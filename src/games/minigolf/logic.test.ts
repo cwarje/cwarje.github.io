@@ -3,8 +3,10 @@ import {
   COURSE_H,
   COURSE_W,
   WALL_THICKNESS,
+  generateCourses,
   generateHole,
   pathLengthCells,
+  type Rng,
 } from './courseGen';
 import {
   CUP_CAPTURE_SPEED,
@@ -34,7 +36,7 @@ function makePlayers(count: number): Player[] {
   }));
 }
 
-function openCourse(par = 2): MinigolfCourse {
+function openCourse(par = 2, theme: MinigolfCourse['theme'] = 'classic'): MinigolfCourse {
   return {
     walls: [
       { x: 0, y: 0, w: COURSE_W, h: WALL_THICKNESS },
@@ -46,6 +48,7 @@ function openCourse(par = 2): MinigolfCourse {
     tee: { x: 50, y: COURSE_H - 18 },
     cup: { x: 50, y: 18 },
     par,
+    theme,
   };
 }
 
@@ -105,6 +108,49 @@ describe('minigolf course generation', () => {
   it('respects the ball collisions start option', () => {
     expect(createMinigolfState(makePlayers(2)).ballCollisions).toBe(false);
     expect(createMinigolfState(makePlayers(2), { minigolfBallCollisions: true }).ballCollisions).toBe(true);
+  });
+
+  it('defaults to classic theme and respects minigolfTheme option', () => {
+    expect(createMinigolfState(makePlayers(2)).courses.every((c) => c.theme === 'classic')).toBe(true);
+    expect(
+      createMinigolfState(makePlayers(2), { minigolfTheme: 'desert' }).courses.every((c) => c.theme === 'desert'),
+    ).toBe(true);
+    expect(
+      createMinigolfState(makePlayers(2), { minigolfTheme: 'tundra' }).courses.every((c) => c.theme === 'tundra'),
+    ).toBe(true);
+  });
+
+  it('random theme assigns a theme per hole', () => {
+    const seededRng = (seed: number): Rng => {
+      let s = seed >>> 0;
+      return () => {
+        s = (s * 1664525 + 1013904223) >>> 0;
+        return s / 0x100000000;
+      };
+    };
+    const courses = generateCourses(3, seededRng(42), 'random');
+    expect(courses).toHaveLength(3);
+    for (const course of courses) {
+      expect(['classic', 'desert', 'tundra']).toContain(course.theme);
+    }
+    const themes = new Set(courses.map((c) => c.theme));
+    expect(themes.size).toBeGreaterThan(1);
+  });
+
+  it('generates desert sand traps on some holes', () => {
+    const seededRng = (seed: number): Rng => {
+      let s = seed >>> 0;
+      return () => {
+        s = (s * 1664525 + 1013904223) >>> 0;
+        return s / 0x100000000;
+      };
+    };
+    let withSandTraps = 0;
+    for (let i = 0; i < 50; i++) {
+      const hole = generateHole(seededRng(i * 9973 + 1), 'desert');
+      if ((hole.sandTraps?.length ?? 0) > 0) withSandTraps++;
+    }
+    expect(withSandTraps).toBeGreaterThan(0);
   });
 
   it('sometimes generates water hazards on reachable holes', () => {
@@ -258,6 +304,42 @@ describe('minigolf physics', () => {
     expect(p2.ball.vx).toBe(0);
     expect(p2.ball.vy).toBe(0);
   });
+
+  it('tundra balls slide farther than desert balls on the same stroke', () => {
+    const course = openCourse();
+    const start: MinigolfBall = { x: 50, y: 100, vx: 0, vy: -3 };
+    const desertBall = { ...start };
+    const tundraBall = { ...start };
+    for (let i = 0; i < 80; i++) {
+      if (!isBallAtRest(desertBall)) stepBall(desertBall, course, 1, 'desert');
+      if (!isBallAtRest(tundraBall)) stepBall(tundraBall, course, 1, 'tundra');
+    }
+    expect(tundraBall.y).toBeLessThan(desertBall.y);
+  });
+
+  it('sand traps slow the ball without sinking it', () => {
+    const course: MinigolfCourse = {
+      ...openCourse(),
+      sandTraps: [{ x: 40, y: 55, w: 20, h: 30 }],
+    };
+    const inTrap: MinigolfBall = { x: 50, y: 70, vx: 0, vy: -2 };
+    let inWater = false;
+    for (let i = 0; i < 30; i++) {
+      const result = stepBall(inTrap, course, 1, 'desert');
+      if (result.inWater) inWater = true;
+      if (isBallAtRest(inTrap)) break;
+    }
+    expect(inWater).toBe(false);
+
+    const onFairway: MinigolfBall = { x: 50, y: 70, vx: 0, vy: -2 };
+    for (let i = 0; i < 30; i++) {
+      stepBall(onFairway, openCourse(), 1, 'desert');
+      if (isBallAtRest(onFairway)) break;
+    }
+    const trapSpeed = Math.hypot(inTrap.vx, inTrap.vy);
+    const fairwaySpeed = Math.hypot(onFairway.vx, onFairway.vy);
+    expect(trapSpeed).toBeLessThan(fairwaySpeed);
+  });
 });
 
 describe('minigolf water hazards', () => {
@@ -408,7 +490,7 @@ describe('minigolf bots', () => {
     const course = openCourse();
     const start: MinigolfBall = { x: course.tee.x, y: course.tee.y, vx: 0, vy: 0 };
     const initialDist = Math.hypot(start.x - course.cup.x, start.y - course.cup.y);
-    const { angle, power } = chooseBotStroke(start, course, () => 0.5);
+    const { angle, power } = chooseBotStroke(start, course, 'classic', () => 0.5);
     expect(Number.isFinite(angle)).toBe(true);
     expect(power).toBeGreaterThan(0);
     expect(power).toBeLessThanOrEqual(1);

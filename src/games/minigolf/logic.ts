@@ -10,10 +10,12 @@ import type {
   MinigolfAction,
   MinigolfBall,
   MinigolfCourse,
+  MinigolfCourseTheme,
   MinigolfPlayer,
   MinigolfRect,
   MinigolfState,
 } from './types';
+import { getMinigolfTheme } from './themes';
 
 export const MINIGOLF_TICK_MS = 33;
 export const HOLES_PER_GAME = 3;
@@ -26,8 +28,6 @@ export const SUMMARY_TICKS = Math.round(5000 / MINIGOLF_TICK_MS);
 
 export const SINK_TICKS = 45;
 
-const FRICTION_MULT = 0.978;
-const FRICTION_LINEAR = 0.003;
 const RESTITUTION = 0.85;
 
 // ---------------------------------------------------------------------------
@@ -123,11 +123,16 @@ function collideBallWithBall(a: MinigolfBall, b: MinigolfBall): boolean {
   return true;
 }
 
-function applyBallFriction(ball: MinigolfBall, dtScale: number): void {
+function applyBallFriction(
+  ball: MinigolfBall,
+  dtScale: number,
+  frictionMult: number,
+  frictionLinear: number,
+): void {
   const speed = Math.hypot(ball.vx, ball.vy);
   if (speed <= 0) return;
 
-  const newSpeed = Math.max(0, speed * Math.pow(FRICTION_MULT, dtScale) - FRICTION_LINEAR * dtScale);
+  const newSpeed = Math.max(0, speed * Math.pow(frictionMult, dtScale) - frictionLinear * dtScale);
   if (newSpeed < STOP_SPEED) {
     ball.vx = 0;
     ball.vy = 0;
@@ -138,17 +143,43 @@ function applyBallFriction(ball: MinigolfBall, dtScale: number): void {
   ball.vy *= scale;
 }
 
+function isBallInRect(ball: MinigolfBall, rect: MinigolfRect): boolean {
+  return (
+    ball.x >= rect.x &&
+    ball.x <= rect.x + rect.w &&
+    ball.y >= rect.y &&
+    ball.y <= rect.y + rect.h
+  );
+}
+
+function ballInAnySandTrap(ball: MinigolfBall, sandTraps: MinigolfRect[] | undefined): boolean {
+  if (!sandTraps?.length) return false;
+  for (const trap of sandTraps) {
+    if (isBallInRect(ball, trap)) return true;
+  }
+  return false;
+}
+
+function applySandTrapSlowdown(ball: MinigolfBall, course: MinigolfCourse, stepDt: number, sandTrapMult: number): void {
+  if (!ballInAnySandTrap(ball, course.sandTraps)) return;
+  const factor = Math.pow(sandTrapMult, stepDt);
+  ball.vx *= factor;
+  ball.vy *= factor;
+}
+
 function stepBallsWithCollisions(
   balls: MinigolfBall[],
   course: MinigolfCourse,
   dtScale: number,
+  theme: MinigolfCourseTheme,
 ): Array<{ holed: boolean; inWater?: boolean }> {
+  const { friction } = getMinigolfTheme(theme);
   const results = balls.map(() => ({ holed: false, inWater: undefined as boolean | undefined }));
   const done = balls.map(() => false);
 
   let maxTravel = 0;
   for (let i = 0; i < balls.length; i++) {
-    applyBallFriction(balls[i], dtScale);
+    applyBallFriction(balls[i], dtScale, friction.mult, friction.linear);
     maxTravel = Math.max(maxTravel, Math.hypot(balls[i].vx, balls[i].vy) * dtScale);
   }
 
@@ -193,6 +224,9 @@ function stepBallsWithCollisions(
     for (let i = 0; i < balls.length; i++) {
       if (done[i]) continue;
       const ball = balls[i];
+      if (friction.sandTrapMult != null) {
+        applySandTrapSlowdown(ball, course, stepDt, friction.sandTrapMult);
+      }
       const cupDist = Math.hypot(ball.x - course.cup.x, ball.y - course.cup.y);
       const currentSpeed = Math.hypot(ball.vx, ball.vy);
       if (cupDist < CUP_RADIUS && currentSpeed < CUP_CAPTURE_SPEED) {
@@ -240,11 +274,13 @@ export function stepBall(
   ball: MinigolfBall,
   course: MinigolfCourse,
   dtScale: number,
+  theme: MinigolfCourseTheme = 'classic',
 ): { holed: boolean; inWater?: boolean } {
+  const { friction } = getMinigolfTheme(theme);
   let speed = Math.hypot(ball.vx, ball.vy);
   if (speed <= 0) return { holed: false };
 
-  const newSpeed = Math.max(0, speed * Math.pow(FRICTION_MULT, dtScale) - FRICTION_LINEAR * dtScale);
+  const newSpeed = Math.max(0, speed * Math.pow(friction.mult, dtScale) - friction.linear * dtScale);
   if (newSpeed < STOP_SPEED) {
     ball.vx = 0;
     ball.vy = 0;
@@ -270,6 +306,10 @@ export function stepBall(
         if (collideBallWithRect(ball, wall)) hitAny = true;
       }
       if (!hitAny) break;
+    }
+
+    if (friction.sandTrapMult != null) {
+      applySandTrapSlowdown(ball, course, stepDt, friction.sandTrapMult);
     }
 
     const cupDist = Math.hypot(ball.x - course.cup.x, ball.y - course.cup.y);
@@ -311,11 +351,12 @@ function simulateStroke(
   course: MinigolfCourse,
   angle: number,
   power: number,
+  theme: MinigolfCourseTheme,
 ): { holed: boolean; ticks: number; finalDist: number } {
   const { vx, vy } = strokeVelocity(angle, power);
   const ball: MinigolfBall = { x: start.x, y: start.y, vx, vy };
   for (let t = 0; t < BOT_SIM_MAX_TICKS; t++) {
-    const { holed, inWater } = stepBall(ball, course, 1);
+    const { holed, inWater } = stepBall(ball, course, 1, theme);
     if (holed) return { holed: true, ticks: t, finalDist: 0 };
     if (inWater) {
       return {
@@ -342,6 +383,7 @@ function simulateStroke(
 export function chooseBotStroke(
   ball: MinigolfBall,
   course: MinigolfCourse,
+  theme: MinigolfCourseTheme = 'classic',
   rng: Rng = Math.random,
 ): { angle: number; power: number } {
   const directAngle = Math.atan2(course.cup.y - ball.y, course.cup.x - ball.x);
@@ -350,7 +392,7 @@ export function chooseBotStroke(
   for (const offset of BOT_ANGLE_OFFSETS) {
     const angle = directAngle + offset;
     for (const power of BOT_POWERS) {
-      const result = simulateStroke(ball, course, angle, power);
+      const result = simulateStroke(ball, course, angle, power, theme);
       if (
         !best ||
         (result.holed && !best.holed) ||
@@ -458,6 +500,7 @@ function updatePlayerBeforePhysics(
   playerIndex: number,
   course: MinigolfCourse,
   holeIndex: number,
+  theme: MinigolfCourseTheme,
 ): { player: MinigolfPlayer; changed: boolean; needsPhysics: boolean } {
   if (playerDone(p)) return { player: p, changed: false, needsPhysics: false };
 
@@ -497,7 +540,7 @@ function updatePlayerBeforePhysics(
       if (p.botNextStrokeTick > 0) {
         return { player: { ...p, botNextStrokeTick: p.botNextStrokeTick - 1 }, changed: true, needsPhysics: false };
       }
-      const { angle, power } = chooseBotStroke(p.ball, course);
+      const { angle, power } = chooseBotStroke(p.ball, course, theme);
       const { vx, vy } = strokeVelocity(angle, power);
       return {
         player: {
@@ -543,7 +586,7 @@ function ballChanged(before: MinigolfBall, after: MinigolfBall): boolean {
 function processTickWithCollisions(state: MinigolfState, course: MinigolfCourse, dtScale: number): MinigolfState {
   let anyChange = false;
   const prePhysics = state.players.map((p, i) => {
-    const result = updatePlayerBeforePhysics(p, i, course, state.holeIndex);
+    const result = updatePlayerBeforePhysics(p, i, course, state.holeIndex, course.theme);
     if (result.changed) anyChange = true;
     return result;
   });
@@ -559,7 +602,7 @@ function processTickWithCollisions(state: MinigolfState, course: MinigolfCourse,
   if (activeIndices.length > 0) {
     const balls = activeIndices.map((i) => ({ ...players[i].ball }));
     const beforeBalls = activeIndices.map((i) => players[i].ball);
-    const results = stepBallsWithCollisions(balls, course, dtScale);
+    const results = stepBallsWithCollisions(balls, course, dtScale, course.theme);
 
     for (let j = 0; j < activeIndices.length; j++) {
       const i = activeIndices[j];
@@ -584,13 +627,13 @@ function processTickWithoutCollisions(state: MinigolfState, course: MinigolfCour
   let anyChange = false;
 
   const players = state.players.map((p, playerIndex) => {
-    const { player, changed, needsPhysics } = updatePlayerBeforePhysics(p, playerIndex, course, state.holeIndex);
+    const { player, changed, needsPhysics } = updatePlayerBeforePhysics(p, playerIndex, course, state.holeIndex, course.theme);
     if (changed) anyChange = true;
     if (!needsPhysics) return player;
 
     anyChange = true;
     const ball: MinigolfBall = { ...player.ball };
-    const result = stepBall(ball, course, dtScale);
+    const result = stepBall(ball, course, dtScale, course.theme);
     return applyBallPhysicsResult(player, ball, course, state.holeIndex, result);
   });
 
@@ -625,7 +668,8 @@ function processTick(state: MinigolfState, dt: number): MinigolfState {
 // ---------------------------------------------------------------------------
 
 export function createMinigolfState(players: Player[], options?: GameStartOptions): MinigolfState {
-  const courses = generateCourses(HOLES_PER_GAME);
+  const themeOption = options?.minigolfTheme ?? 'classic';
+  const courses = generateCourses(HOLES_PER_GAME, Math.random, themeOption);
   const gamePlayers: MinigolfPlayer[] = players.slice(0, 8).map((p, i) => ({
     id: p.id,
     name: p.name,

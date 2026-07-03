@@ -1,4 +1,10 @@
 import type { MinigolfCourse, MinigolfRect, MinigolfVec } from './types';
+import {
+  getMinigolfTheme,
+  pickRandomCourseTheme,
+  type MinigolfCourseTheme,
+  type MinigolfThemeOption,
+} from './themes';
 
 // Course play field is a fixed portrait rectangle in abstract units.
 export const COURSE_W = 100;
@@ -149,7 +155,8 @@ function computePar(pathCells: number, obstacleCount: number): number {
 // Hole generation
 // ---------------------------------------------------------------------------
 
-export function generateHole(rng: Rng = Math.random): MinigolfCourse {
+export function generateHole(rng: Rng = Math.random, theme: MinigolfCourseTheme = 'classic'): MinigolfCourse {
+  const { generation } = getMinigolfTheme(theme);
   for (let attempt = 0; attempt < 30; attempt++) {
     // Fewer obstacles on later attempts so we always converge on a valid hole.
     const relax = Math.floor(attempt / 10);
@@ -158,7 +165,8 @@ export function generateHole(rng: Rng = Math.random): MinigolfCourse {
 
     const solidObstacles: MinigolfRect[] = [];
     const waterHazards: MinigolfRect[] = [];
-    if (rng() < 0.55) {
+    const sandTraps: MinigolfRect[] = [];
+    if (rng() < generation.gateChance) {
       solidObstacles.push(...makeGateWalls(rng));
     }
     const blockCount = Math.max(1, randInt(rng, 3, 8 - solidObstacles.length) - relax * 2);
@@ -168,15 +176,19 @@ export function generateHole(rng: Rng = Math.random): MinigolfCourse {
         rectClearOfPoint(block, tee, CLEARANCE) &&
         rectClearOfPoint(block, cup, CLEARANCE)
       ) {
-        if (rng() < 0.5) {
-          waterHazards.push(block);
+        if (rng() < generation.hazardBlockChance) {
+          if (theme === 'desert' && rng() < (generation.sandTrapSplit ?? 0.6)) {
+            sandTraps.push(block);
+          } else {
+            waterHazards.push(block);
+          }
         } else {
           solidObstacles.push(block);
         }
       }
     }
 
-    const allObstacles = [...solidObstacles, ...waterHazards];
+    const allObstacles = [...solidObstacles, ...waterHazards, ...sandTraps];
     const gateClearOfEnds = allObstacles.every(
       (o) => rectClearOfPoint(o, tee, CLEARANCE - 3) && rectClearOfPoint(o, cup, CLEARANCE - 3),
     );
@@ -186,15 +198,31 @@ export function generateHole(rng: Rng = Math.random): MinigolfCourse {
     const pathCells = pathLengthCells(walls, tee, cup);
     if (pathCells == null) continue;
 
-    return { walls, waterHazards, tee, cup, par: computePar(pathCells, allObstacles.length) };
+    const course: MinigolfCourse = {
+      walls,
+      waterHazards,
+      tee,
+      cup,
+      par: computePar(pathCells, allObstacles.length),
+      theme,
+    };
+    if (sandTraps.length > 0) course.sandTraps = sandTraps;
+    return course;
   }
 
   // Fallback: an empty hole is always playable.
   const tee: MinigolfVec = { x: COURSE_W / 2, y: TEE_Y };
   const cup: MinigolfVec = { x: COURSE_W / 2, y: CUP_Y };
-  return { walls: borderWalls(), waterHazards: [], tee, cup, par: 2 };
+  return { walls: borderWalls(), waterHazards: [], tee, cup, par: 2, theme };
 }
 
-export function generateCourses(count: number, rng: Rng = Math.random): MinigolfCourse[] {
-  return Array.from({ length: count }, () => generateHole(rng));
+export function generateCourses(
+  count: number,
+  rng: Rng = Math.random,
+  themeOption: MinigolfThemeOption = 'classic',
+): MinigolfCourse[] {
+  return Array.from({ length: count }, () => {
+    const theme = themeOption === 'random' ? pickRandomCourseTheme(rng) : themeOption;
+    return generateHole(rng, theme);
+  });
 }
