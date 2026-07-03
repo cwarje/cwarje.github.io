@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Dice5, Heart, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers, Circle, Flag } from 'lucide-react';
+import { Dice5, Heart, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers, Circle, Flag, Target } from 'lucide-react';
 import type { GameType, Player, GameStartOptions, TableEvent, TableEventInput } from '../networking/types';
 
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
@@ -40,6 +40,13 @@ import {
   getCucumberWinners,
 } from './cucumber/logic';
 import { createGolfState, processGolfAction, isGolfOver, runGolfBotTurn, getGolfWinners } from './golf/logic';
+import {
+  createMinigolfState,
+  processMinigolfAction,
+  isMinigolfOver,
+  runMinigolfBotTurn,
+  getMinigolfWinners,
+} from './minigolf/logic';
 
 import YahtzeeBoard from './yahtzee/YahtzeeBoard';
 import FarkleBoard from './farkle/FarkleBoard';
@@ -55,6 +62,7 @@ import CasinoBoard from './casino/CasinoBoard';
 import PongBoard from './pong/PongBoard';
 import CucumberBoard from './cucumber/CucumberBoard';
 import GolfBoard from './golf/GolfBoard';
+import MinigolfBoard from './minigolf/MinigolfBoard';
 
 import HeartsOptions from './hearts/HeartsOptions';
 import FarkleOptions from './farkle/FarkleOptions';
@@ -751,6 +759,53 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     hideHudTitleDuringPlay: true,
   },
 
+  minigolf: {
+    title: 'Mini Golf',
+    shortDescription: 'Putt through 3 randomly generated holes at the same time as your friends — lowest total strokes wins.',
+    playersLabel: '1-8 Players',
+    minPlayers: 1,
+    maxPlayers: 8,
+    info: {
+      goal: 'Finish 3 randomly generated holes in the fewest total strokes.',
+      rules: [
+        'Every game generates 3 brand-new holes with walls and obstacles.',
+        'Each hole has a par based on how tricky the layout is.',
+        'Everyone putts at the same time — you can see all the other balls, but they pass right through each other.',
+        'Sink your ball in the cup to finish the hole; your stroke count is your score.',
+        'The next hole starts once every player has finished the hole.',
+        'Reaching par + 4 strokes without holing out scores double par for the hole.',
+        'Lowest total strokes after 3 holes wins.',
+      ],
+      howToPlay: [
+        'Wait for your ball to stop, then press and drag back from it to aim — like a slingshot.',
+        'Drag further for more power; the arrow shows your shot direction.',
+        'Release to putt. Banks off walls are your friend.',
+      ],
+    },
+    icon: Target,
+    theme: {
+      gradient: 'from-white/75 to-white/40',
+      cardBorder: 'border-white/55',
+      hoverBorder: 'hover:border-white/70',
+      playersTag: 'bg-white/35 text-white border border-white/50',
+      iconColor: 'text-white',
+      buttonColors: 'bg-white/30 hover:bg-white/45',
+      panelBg: 'bg-neutral-800',
+      labelColor: 'text-white',
+    },
+    createState: createMinigolfState,
+    processAction: processMinigolfAction,
+    isOver: isMinigolfOver,
+    runBotTurn: runMinigolfBotTurn,
+    getWinners: getMinigolfWinners,
+    Board: MinigolfBoard,
+    fullBoard: true,
+    production: true,
+    showBetaBadge: true,
+    hudTitleLines: ['Mini', 'Golf'],
+    hideHudTitleDuringPlay: true,
+  },
+
   cucumber: {
     title: 'Cucumber',
     shortDescription: 'Avoid the last trick — or get pickled at 30 or 50 points.',
@@ -853,7 +908,6 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
 export const ALL_GAME_TYPES: GameType[] = [
   'cucumber',
   'golf',
-  'pong',
   'cribbage',
   'mobilization',
   'casino',
@@ -865,13 +919,14 @@ export const ALL_GAME_TYPES: GameType[] = [
   'cross-crib',
   'settler',
   'poker',
+  'minigolf',
+  'pong',
 ];
 
 /** Game types shown in production (homepage order) */
 export const PRODUCTION_GAME_TYPES: GameType[] = [
   'cucumber',
   'golf',
-  'pong',
   'cribbage',
   'mobilization',
   'casino',
@@ -883,4 +938,6 @@ export const PRODUCTION_GAME_TYPES: GameType[] = [
   'cross-crib',
   'settler',
   'poker',
+  'minigolf',
+  'pong',
 ];

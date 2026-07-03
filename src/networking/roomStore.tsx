@@ -31,6 +31,7 @@ import type { TwelveState } from '../games/twelve/types';
 import type { SettlerState } from '../games/settler/types';
 import type { PongState } from '../games/pong/types';
 import { assignPongBotColors } from '../games/pong/logic';
+import type { MinigolfState } from '../games/minigolf/types';
 import {
   applySettlerIdleTimeout,
   reconcileSettlerTurnDeadlineAfterAction,
@@ -327,6 +328,17 @@ function applyProfileToGameState(
     }
     case 'casino': {
       const current = state as CasinoState;
+      let changed = false;
+      const players = current.players.map((player) => {
+        if (player.id !== playerId) return player;
+        if (player.name === playerName && player.color === playerColor) return player;
+        changed = true;
+        return { ...player, name: playerName, color: playerColor };
+      });
+      return changed ? { ...current, players } : current;
+    }
+    case 'minigolf': {
+      const current = state as MinigolfState;
       let changed = false;
       const players = current.players.map((player) => {
         if (player.id !== playerId) return player;
@@ -1304,6 +1316,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const settlerIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pongTickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const PONG_TICK_MS = 33;
+  const minigolfTickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const MINIGOLF_TICK_MS = 33;
   const dealSignatureRef = useRef<string | null>(null);
   const dealHoldUntilRef = useRef<number>(0);
   const [dealHoldTick, setDealHoldTick] = useState(0);
@@ -2340,6 +2354,37 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     };
   }, [isHost, room?.phase, room?.gameType, room?.roomCode, broadcastGameState, broadcastRoomState]);
 
+  // Minigolf real-time tick — separate effect so gameState updates don't restart the interval.
+  useEffect(() => {
+    if (!isHost || !room || room.phase !== 'playing' || room.gameType !== 'minigolf') {
+      return;
+    }
+
+    minigolfTickIntervalRef.current = setInterval(() => {
+      const currentGs = gameStateRef.current as MinigolfState | null;
+      const currentRoom = roomRef.current;
+      if (!currentGs || !currentRoom || currentRoom.gameType !== 'minigolf' || currentGs.gameOver) return;
+
+      const next = processGameAction('minigolf', currentGs, { type: 'tick', dt: MINIGOLF_TICK_MS }, '');
+      if (next !== currentGs) {
+        setGameState(next);
+        broadcastGameState(next);
+        if (checkGameOver('minigolf', next)) {
+          const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+          setRoom(finishedRoom);
+          broadcastRoomState(finishedRoom);
+        }
+      }
+    }, MINIGOLF_TICK_MS);
+
+    return () => {
+      if (minigolfTickIntervalRef.current) {
+        clearInterval(minigolfTickIntervalRef.current);
+        minigolfTickIntervalRef.current = null;
+      }
+    };
+  }, [isHost, room?.phase, room?.gameType, room?.roomCode, broadcastGameState, broadcastRoomState]);
+
   // Cleanup on unmount
   useEffect(() => {
     const connections = connectionsRef.current;
@@ -2349,6 +2394,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       if (botTimerRef.current) clearTimeout(botTimerRef.current);
       if (settlerIdleTimerRef.current) clearTimeout(settlerIdleTimerRef.current);
       if (pongTickIntervalRef.current) clearInterval(pongTickIntervalRef.current);
+      if (minigolfTickIntervalRef.current) clearInterval(minigolfTickIntervalRef.current);
       disconnectTimers.forEach(timer => clearTimeout(timer));
       disconnectTimers.clear();
       reconnectingRef.current = false;

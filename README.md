@@ -20,6 +20,7 @@ Current game types (from `src/games/registry.ts` and `src/networking/types.ts`):
 - `up-and-down-the-river` (4-6 players; start order `up-down` or `down-up`)
 - `twelve` (2-4 players; UI title **Tolva** — table piles, pile count 3-6)
 - `golf` (2-6 players; six table cards, draw/discard, 9 holes)
+- `minigolf` (1-8 players; real-time top-down mini golf — 3 randomly generated holes, simultaneous play, lowest total strokes wins)
 - `settler` (3-4 players)
 - `cross-crib` (2 or 4 players only)
 
