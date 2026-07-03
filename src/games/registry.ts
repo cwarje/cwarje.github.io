@@ -166,7 +166,7 @@ export interface GameDefinition {
   hideHudTitleDuringPlay?: boolean;
   /** Homepage card ribbon. Set on one game at a time; see README "New game badge". */
   showNewBadge?: boolean;
-  /** Homepage card ribbon for beta games. Rainbow sheen; may coexist with showNewBadge on other games. */
+  /** Homepage card ribbon for beta games. Red pill with white text; may coexist with showNewBadge on other games. */
   showBetaBadge?: boolean;
   /** If set, only these total player counts (humans + bots) are valid. */
   allowedPlayerCounts?: number[];
@@ -762,20 +762,22 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
 
   minigolf: {
     title: 'Mini Golf',
-    shortDescription: 'Putt through 3 randomly generated holes at the same time as your friends — lowest total strokes wins.',
+    shortDescription: 'Putt through randomly generated holes at the same time as your friends — lowest total strokes wins.',
     playersLabel: '1-8 Players',
     minPlayers: 1,
     maxPlayers: 8,
     info: {
-      goal: 'Finish 3 randomly generated holes in the fewest total strokes.',
+      goal: 'Finish every hole in the fewest strokes — lowest total after the course wins.',
       rules: [
-        'Every game generates 3 brand-new holes with walls and obstacles.',
-        'Each hole has a par based on how tricky the layout is.',
-        'Everyone putts at the same time — by default other balls pass through each other; enable ball collisions in game options to bounce off other players.',
-        'Sink your ball in the cup to finish the hole; your stroke count is your score.',
-        'The next hole starts once every player has finished the hole.',
-        'Reaching par + 4 strokes without holing out scores double par for the hole.',
-        'Lowest total strokes after 3 holes wins.',
+        'The host picks 3, 9, or 18 holes (default 9); every hole is randomly generated with walls and hazards.',
+        'Choose a course theme — Classic, Desert, Tundra, or Random — that affects look, friction, and hazard types.',
+        'Each hole has a par from 2 to 5 based on how tricky the layout is.',
+        'Everyone putts at the same time. By default balls pass through each other; enable ball collisions in game options to bounce off other players.',
+        'Sink your ball in the cup to finish the hole; your stroke count is your score for that hole.',
+        'Landing in a water hazard sinks your ball and returns it to the tee with a penalty stroke. Desert courses may have sand traps that slow the ball without sinking it.',
+        'If you reach par + 4 strokes without holing out, the hole scores double par and you move on.',
+        'After everyone finishes a hole, a scorecard appears briefly before the next hole starts.',
+        'Lowest total strokes after the final hole wins.',
       ],
       howToPlay: [
         'Wait for your ball to stop, then press and drag back from it to aim — like a slingshot.',
@@ -785,14 +787,14 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     },
     icon: Target,
     theme: {
-      gradient: 'from-white/75 to-white/40',
-      cardBorder: 'border-white/55',
-      hoverBorder: 'hover:border-white/70',
-      playersTag: 'bg-white/35 text-white border border-white/50',
-      iconColor: 'text-white',
-      buttonColors: 'bg-white/30 hover:bg-white/45',
-      panelBg: 'bg-neutral-800',
-      labelColor: 'text-white',
+      gradient: 'from-purple-300/55 to-violet-400/45',
+      cardBorder: 'border-purple-300/50',
+      hoverBorder: 'hover:border-purple-300/65',
+      playersTag: 'bg-purple-400/30 text-purple-50 border border-purple-300/45',
+      iconColor: 'text-purple-200',
+      buttonColors: 'bg-purple-400 hover:bg-purple-300',
+      panelBg: 'bg-purple-950',
+      labelColor: 'text-purple-100',
     },
     createState: createMinigolfState,
     processAction: processMinigolfAction,
@@ -908,6 +910,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
 
 /** All registered game types */
 export const ALL_GAME_TYPES: GameType[] = [
+  'minigolf',
   'cucumber',
   'golf',
   'cribbage',
@@ -921,12 +924,12 @@ export const ALL_GAME_TYPES: GameType[] = [
   'cross-crib',
   'settler',
   'poker',
-  'minigolf',
   'pong',
 ];
 
 /** Game types shown in production (homepage order) */
 export const PRODUCTION_GAME_TYPES: GameType[] = [
+  'minigolf',
   'cucumber',
   'golf',
   'cribbage',
@@ -940,6 +943,5 @@ export const PRODUCTION_GAME_TYPES: GameType[] = [
   'cross-crib',
   'settler',
   'poker',
-  'minigolf',
   'pong',
 ];

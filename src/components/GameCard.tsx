@@ -48,16 +48,8 @@ export default function GameCard({ gameType, onSelect, onInfo, disabled, isExpan
         </span>
       )}
       {gameDef.showBetaBadge && (
-        <span className="absolute top-3 left-3 inline-grid grid-cols-1 grid-rows-1 place-items-center px-2 py-0.5 rounded-md beta-badge-bg shadow-sm">
-          <span
-            className="col-start-1 row-start-1 invisible whitespace-nowrap text-[10px] font-bold uppercase tracking-wider text-black"
-            aria-hidden
-          >
-            Beta
-          </span>
-          <span className="col-start-1 row-start-1 beta-badge-text-sheen text-[10px] font-bold uppercase tracking-wider">
-            Beta
-          </span>
+        <span className="absolute top-3 left-3 px-2 py-0.5 rounded-md bg-red-500 shadow-sm text-[10px] font-bold uppercase tracking-wider text-white">
+          Beta
         </span>
       )}
       <span

@@ -18,7 +18,7 @@ import type {
 import { getMinigolfTheme } from './themes';
 
 export const MINIGOLF_TICK_MS = 33;
-export const HOLES_PER_GAME = 3;
+export const DEFAULT_MINIGOLF_HOLE_COUNT = 9;
 export const MAX_STROKE_SPEED = 4.2;
 export const MIN_STROKE_SPEED = 0.55;
 export const STOP_SPEED = 0.045;
@@ -669,7 +669,8 @@ function processTick(state: MinigolfState, dt: number): MinigolfState {
 
 export function createMinigolfState(players: Player[], options?: GameStartOptions): MinigolfState {
   const themeOption = options?.minigolfTheme ?? 'classic';
-  const courses = generateCourses(HOLES_PER_GAME, Math.random, themeOption);
+  const holeCount = options?.minigolfHoleCount ?? DEFAULT_MINIGOLF_HOLE_COUNT;
+  const courses = generateCourses(holeCount, Math.random, themeOption);
   const gamePlayers: MinigolfPlayer[] = players.slice(0, 8).map((p, i) => ({
     id: p.id,
     name: p.name,

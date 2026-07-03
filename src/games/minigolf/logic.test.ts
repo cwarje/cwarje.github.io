@@ -90,9 +90,9 @@ describe('minigolf course generation', () => {
     }
   });
 
-  it('creates a game with 3 holes and players at the tee', () => {
+  it('creates a game with 9 holes by default and players at the tee', () => {
     const state = createMinigolfState(makePlayers(3));
-    expect(state.courses).toHaveLength(3);
+    expect(state.courses).toHaveLength(9);
     expect(state.holeIndex).toBe(0);
     expect(state.phase).toBe('playing');
     expect(state.ballCollisions).toBe(false);
@@ -108,6 +108,12 @@ describe('minigolf course generation', () => {
   it('respects the ball collisions start option', () => {
     expect(createMinigolfState(makePlayers(2)).ballCollisions).toBe(false);
     expect(createMinigolfState(makePlayers(2), { minigolfBallCollisions: true }).ballCollisions).toBe(true);
+  });
+
+  it('respects the minigolfHoleCount start option', () => {
+    expect(createMinigolfState(makePlayers(2)).courses).toHaveLength(9);
+    expect(createMinigolfState(makePlayers(2), { minigolfHoleCount: 3 }).courses).toHaveLength(3);
+    expect(createMinigolfState(makePlayers(2), { minigolfHoleCount: 18 }).courses).toHaveLength(18);
   });
 
   it('defaults to classic theme and respects minigolfTheme option', () => {
