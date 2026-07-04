@@ -64,56 +64,32 @@ export default function MinigolfOptions({ onChange, labelClass }: GameOptionsPan
         </div>
       </div>
       <div className="space-y-2">
-        <p className={`text-sm font-semibold uppercase tracking-wider ${labelClass}`}>Ball collisions</p>
+        <div className="flex gap-2">
+          <p className={`flex-1 text-sm font-semibold uppercase tracking-wider ${labelClass}`}>Collisions</p>
+          <p className={`flex-1 text-sm font-semibold uppercase tracking-wider ${labelClass}`}>Obstacles</p>
+        </div>
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => setEnabled(false)}
-            className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-colors ${
-              !enabled
-                ? 'bg-white/30 text-white'
-                : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10'
-            }`}
-          >
-            Off
-          </button>
-          <button
-            type="button"
-            onClick={() => setEnabled(true)}
+            onClick={() => setEnabled((value) => !value)}
             className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-colors ${
               enabled
                 ? 'bg-white/30 text-white'
                 : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10'
             }`}
           >
-            On
-          </button>
-        </div>
-      </div>
-      <div className="space-y-2">
-        <p className={`text-sm font-semibold uppercase tracking-wider ${labelClass}`}>Obstacles</p>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setObstacles(false)}
-            className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-colors ${
-              !obstacles
-                ? 'bg-white/30 text-white'
-                : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10'
-            }`}
-          >
-            Off
+            {enabled ? 'On' : 'Off'}
           </button>
           <button
             type="button"
-            onClick={() => setObstacles(true)}
+            onClick={() => setObstacles((value) => !value)}
             className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-colors ${
               obstacles
                 ? 'bg-white/30 text-white'
                 : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10'
             }`}
           >
-            On
+            {obstacles ? 'On' : 'Off'}
           </button>
         </div>
       </div>

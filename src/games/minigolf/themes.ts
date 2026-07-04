@@ -1,11 +1,8 @@
 export type MinigolfCourseTheme = 'classic' | 'desert' | 'tundra';
-export type MinigolfThemeOption = MinigolfCourseTheme | 'random';
+export type MinigolfThemeOption = 'classic' | 'random';
 
 export const MINIGOLF_COURSE_THEMES: readonly MinigolfCourseTheme[] = ['classic', 'desert', 'tundra'];
-export const MINIGOLF_THEME_OPTIONS: readonly MinigolfThemeOption[] = [
-  ...MINIGOLF_COURSE_THEMES,
-  'random',
-];
+export const MINIGOLF_THEME_OPTIONS: readonly MinigolfThemeOption[] = ['classic', 'random'];
 
 export interface MinigolfFriction {
   mult: number;

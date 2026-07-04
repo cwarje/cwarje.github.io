@@ -152,11 +152,13 @@ describe('minigolf course generation', () => {
   it('defaults to classic theme and respects minigolfTheme option', () => {
     expect(createMinigolfState(makePlayers(2)).courses.every((c) => c.theme === 'classic')).toBe(true);
     expect(
-      createMinigolfState(makePlayers(2), { minigolfTheme: 'desert' }).courses.every((c) => c.theme === 'desert'),
+      createMinigolfState(makePlayers(2), { minigolfTheme: 'classic' }).courses.every((c) => c.theme === 'classic'),
     ).toBe(true);
-    expect(
-      createMinigolfState(makePlayers(2), { minigolfTheme: 'tundra' }).courses.every((c) => c.theme === 'tundra'),
-    ).toBe(true);
+    const randomState = createMinigolfState(makePlayers(2), { minigolfTheme: 'random' });
+    expect(randomState.courses.length).toBeGreaterThan(0);
+    for (const course of randomState.courses) {
+      expect(['classic', 'desert', 'tundra']).toContain(course.theme);
+    }
   });
 
   it('random theme assigns a theme per hole', () => {

@@ -44,7 +44,7 @@ describe('minigolf settings', () => {
       }),
     ).toEqual({
       minigolfHoleCount: 3,
-      minigolfTheme: 'desert',
+      minigolfTheme: 'classic',
       minigolfBallCollisions: false,
       minigolfObstacles: false,
     });
@@ -62,7 +62,7 @@ describe('minigolf settings', () => {
     );
     expect(readStoredMinigolfSettings()).toEqual({
       minigolfHoleCount: 18,
-      minigolfTheme: 'tundra',
+      minigolfTheme: 'classic',
       minigolfBallCollisions: true,
       minigolfObstacles: false,
     });

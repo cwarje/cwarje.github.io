@@ -23,7 +23,7 @@ export type CasinoMatchLength = 'to11' | 'to21' | 'eachDealerOnce';
 export type CribbageTargetScore = 61 | 121;
 export type CucumberEliminationThreshold = 30 | 50;
 export type MinigolfCourseTheme = 'classic' | 'desert' | 'tundra';
-export type MinigolfThemeOption = MinigolfCourseTheme | 'random';
+export type MinigolfThemeOption = 'classic' | 'random';
 export type MinigolfHoleCount = 3 | 9 | 18;
 export type DealerSpeed = 'slow' | 'medium' | 'fast';
 export interface GameStartOptions {

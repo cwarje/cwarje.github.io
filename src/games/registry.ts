@@ -770,7 +770,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
       goal: 'Finish every hole in the fewest strokes — lowest total after the course wins.',
       rules: [
         'The host picks 3, 9, or 18 holes (default 9); every hole is randomly generated with walls and hazards.',
-        'Choose a course theme — Classic, Desert, Tundra, or Random — that affects look, friction, and hazard types.',
+        'Choose a course theme — Classic or Random — that affects look, friction, and hazard types.',
         'Each hole has a par from 2 to 5 based on how tricky the layout is.',
         'Everyone putts at the same time. By default balls pass through each other; enable ball collisions in game options to bounce off other players.',
         'Sink your ball in the cup to finish the hole; your stroke count is your score for that hole.',
