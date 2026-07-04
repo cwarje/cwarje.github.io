@@ -1,112 +1,30 @@
+import { obstacleEdgeWidth } from './courseGen';
 import type { MinigolfRect } from './types';
 import type { MinigolfPalette } from './themes';
 
-type EdgeSide = 'top' | 'bottom' | 'left' | 'right';
-
-/** Match wall/sand trap stroke weight from MinigolfBoard.drawCourse. */
-function obstacleEdgeWidth(scale: number): number {
-  return Math.max(1, 0.4 * scale);
+function parseHex(hex: string): [number, number, number] {
+  const r = Number.parseInt(hex.slice(1, 3), 16);
+  const g = Number.parseInt(hex.slice(3, 5), 16);
+  const b = Number.parseInt(hex.slice(5, 7), 16);
+  return [r, g, b];
 }
 
-function isPointInRect(px: number, py: number, rect: MinigolfRect): boolean {
-  return px >= rect.x && px <= rect.x + rect.w && py >= rect.y && py <= rect.y + rect.h;
+function mixHex(a: string, b: string, bRatio: number): string {
+  const [ar, ag, ab] = parseHex(a);
+  const [br, bg, bb] = parseHex(b);
+  const aRatio = 1 - bRatio;
+  const mix = (ac: number, bc: number) => Math.round(ac * aRatio + bc * bRatio);
+  const toHex = (n: number) => n.toString(16).padStart(2, '0');
+  return `#${toHex(mix(ar, br))}${toHex(mix(ag, bg))}${toHex(mix(ab, bb))}`;
 }
 
-function probePoint(hazard: MinigolfRect, side: EdgeSide): { x: number; y: number } {
-  const cx = hazard.x + hazard.w / 2;
-  const cy = hazard.y + hazard.h / 2;
-  const offset = 0.5;
-  switch (side) {
-    case 'top':
-      return { x: cx, y: hazard.y - offset };
-    case 'bottom':
-      return { x: cx, y: hazard.y + hazard.h + offset };
-    case 'left':
-      return { x: hazard.x - offset, y: cy };
-    case 'right':
-      return { x: hazard.x + hazard.w + offset, y: cy };
-  }
-}
-
-function isExteriorEdge(
-  hazard: MinigolfRect,
-  side: EdgeSide,
-  hazards: MinigolfRect[],
-  walls: MinigolfRect[],
-): boolean {
-  const { x, y } = probePoint(hazard, side);
-  for (const other of hazards) {
-    if (other === hazard) continue;
-    if (isPointInRect(x, y, other)) return false;
-  }
-  for (const wall of walls) {
-    if (isPointInRect(x, y, wall)) return false;
-  }
-  return true;
-}
-
-function getExteriorEdges(
-  hazard: MinigolfRect,
-  hazards: MinigolfRect[],
-  walls: MinigolfRect[],
-): Record<EdgeSide, boolean> {
-  return {
-    top: isExteriorEdge(hazard, 'top', hazards, walls),
-    bottom: isExteriorEdge(hazard, 'bottom', hazards, walls),
-    left: isExteriorEdge(hazard, 'left', hazards, walls),
-    right: isExteriorEdge(hazard, 'right', hazards, walls),
-  };
-}
-
-function drawInteriorShore(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  ww: number,
-  wh: number,
-  scale: number,
-  exterior: Record<EdgeSide, boolean>,
-) {
-  const depth = obstacleEdgeWidth(scale);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-
-  if (exterior.top) {
-    const leftSkip = exterior.left ? depth : 0;
-    const rightSkip = exterior.right ? depth : 0;
-    const barW = ww - leftSkip - rightSkip;
-    if (barW > 0) ctx.fillRect(x + leftSkip, y, barW, depth);
-  }
-  if (exterior.bottom) {
-    const leftSkip = exterior.left ? depth : 0;
-    const rightSkip = exterior.right ? depth : 0;
-    const barW = ww - leftSkip - rightSkip;
-    if (barW > 0) ctx.fillRect(x + leftSkip, y + wh - depth, barW, depth);
-  }
-  if (exterior.left) {
-    const topSkip = exterior.top ? depth : 0;
-    const bottomSkip = exterior.bottom ? depth : 0;
-    const barH = wh - topSkip - bottomSkip;
-    if (barH > 0) ctx.fillRect(x, y + topSkip, depth, barH);
-  }
-  if (exterior.right) {
-    const topSkip = exterior.top ? depth : 0;
-    const bottomSkip = exterior.bottom ? depth : 0;
-    const barH = wh - topSkip - bottomSkip;
-    if (barH > 0) ctx.fillRect(x + ww - depth, y + topSkip, depth, barH);
-  }
-
-  if (exterior.top && exterior.left) {
-    ctx.fillRect(x, y, depth, depth);
-  }
-  if (exterior.top && exterior.right) {
-    ctx.fillRect(x + ww - depth, y, depth, depth);
-  }
-  if (exterior.bottom && exterior.left) {
-    ctx.fillRect(x, y + wh - depth, depth, depth);
-  }
-  if (exterior.bottom && exterior.right) {
-    ctx.fillRect(x + ww - depth, y + wh - depth, depth, depth);
-  }
+/** 50/50 blend of hazard edge with checkerboard fairway tones. */
+function hazardBorderColor(palette: MinigolfPalette): string {
+  const [br, bg, bb] = parseHex(palette.fairwayBase);
+  const [ar, ag, ab] = parseHex(palette.fairwayAlt);
+  const toHex = (n: number) => n.toString(16).padStart(2, '0');
+  const groundHex = `#${toHex(Math.round((br + ar) / 2))}${toHex(Math.round((bg + ag) / 2))}${toHex(Math.round((bb + ab) / 2))}`;
+  return mixHex(palette.hazardEdge, groundHex, 0.5);
 }
 
 function drawAnimatedWater(
@@ -151,8 +69,6 @@ function drawAnimatedWater(
 function drawSingleHazard(
   ctx: CanvasRenderingContext2D,
   hazard: MinigolfRect,
-  allHazards: MinigolfRect[],
-  walls: MinigolfRect[],
   scale: number,
   palette: MinigolfPalette,
   timeMs: number,
@@ -161,19 +77,10 @@ function drawSingleHazard(
   const y = hazard.y * scale;
   const ww = hazard.w * scale;
   const wh = hazard.h * scale;
-  const exterior = getExteriorEdges(hazard, allHazards, walls);
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x, y, ww, wh);
-  ctx.clip();
 
   drawAnimatedWater(ctx, x, y, ww, wh, scale, palette, timeMs);
-  drawInteriorShore(ctx, x, y, ww, wh, scale, exterior);
 
-  ctx.restore();
-
-  ctx.strokeStyle = palette.hazardEdge;
+  ctx.strokeStyle = hazardBorderColor(palette);
   ctx.lineWidth = obstacleEdgeWidth(scale);
   ctx.strokeRect(x, y, ww, wh);
 }
@@ -214,7 +121,7 @@ export function drawIceHazards(
       ctx.globalAlpha = 1;
     }
 
-    ctx.strokeStyle = palette.hazardEdge;
+    ctx.strokeStyle = hazardBorderColor(palette);
     ctx.lineWidth = obstacleEdgeWidth(scale);
     ctx.strokeRect(x, y, ww, wh);
   }
@@ -223,13 +130,13 @@ export function drawIceHazards(
 export function drawWaterHazards(
   ctx: CanvasRenderingContext2D,
   hazards: MinigolfRect[],
-  walls: MinigolfRect[],
+  _walls: MinigolfRect[],
   scale: number,
   palette: MinigolfPalette,
   timeMs: number,
 ): void {
   if (hazards.length === 0) return;
   for (const hazard of hazards) {
-    drawSingleHazard(ctx, hazard, hazards, walls, scale, palette, timeMs);
+    drawSingleHazard(ctx, hazard, scale, palette, timeMs);
   }
 }

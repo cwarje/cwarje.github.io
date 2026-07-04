@@ -12,6 +12,10 @@ export const COURSE_H = 140;
 export const WALL_THICKNESS = 3;
 export const BALL_RADIUS = 1.6;
 export const CUP_RADIUS = 2.8;
+/** Canvas stroke width for walls, hazards, sand traps, and similar course borders. */
+export function obstacleEdgeWidth(scale: number): number {
+  return Math.max(1, 0.4 * scale);
+}
 /** Radius around the tee where ball-to-ball collisions are ignored. */
 export const TEE_STARTING_AREA_RADIUS = 10;
 /** Ball must enter this range to detonate a proximity obstacle. */

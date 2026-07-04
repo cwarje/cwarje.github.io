@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { MinigolfBall, MinigolfCourse, MinigolfPlayer, MinigolfState } from './types';
 import { getMinigolfTheme, getObstacleEmoji, isFrozenIceHazard, type MinigolfCourseTheme, type MinigolfPalette } from './themes';
-import { BALL_RADIUS, COURSE_H, COURSE_W, CUP_RADIUS } from './courseGen';
+import { BALL_RADIUS, COURSE_H, COURSE_W, CUP_RADIUS, obstacleEdgeWidth } from './courseGen';
 import { MINIGOLF_TICK_MS, SINK_TICKS, isBallAtRest } from './logic';
 import { drawIceHazards, drawWaterHazards } from './waterRender';
 import {
@@ -36,11 +36,6 @@ interface BoardFit {
 /** Drag distance (course units) that produces a full-power stroke. */
 const FULL_POWER_DRAG_UNITS = 55;
 const MIN_POWER = 0.05;
-
-/** Match wall/sand trap stroke weight from waterRender.obstacleEdgeWidth. */
-function obstacleEdgeWidth(scale: number): number {
-  return Math.max(1, 0.4 * scale);
-}
 
 function drawWoodPlanks(
   ctx: CanvasRenderingContext2D,
@@ -194,6 +189,18 @@ function drawWallRect(
   ctx.strokeRect(x, y, w, h);
 }
 
+function drawCourseWalls(
+  ctx: CanvasRenderingContext2D,
+  course: MinigolfCourse,
+  scale: number,
+  theme: MinigolfCourseTheme,
+) {
+  const { palette } = getMinigolfTheme(theme);
+  for (const wall of course.walls) {
+    drawWallRect(ctx, wall.x * scale, wall.y * scale, wall.w * scale, wall.h * scale, palette, scale, theme);
+  }
+}
+
 function sandSpeckFraction(seed: number): number {
   let n = (seed * 2654435761) >>> 0;
   n ^= n << 13;
@@ -326,7 +333,7 @@ function drawCourse(
   ctx.fillStyle = palette.cupFill;
   ctx.fill();
   ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-  ctx.lineWidth = Math.max(1, 0.5 * scale);
+  ctx.lineWidth = obstacleEdgeWidth(scale);
   ctx.stroke();
 
   const poleH = 14 * scale;
@@ -336,11 +343,6 @@ function drawCourse(
   ctx.moveTo(cupX, cupY);
   ctx.lineTo(cupX, cupY - poleH);
   ctx.stroke();
-
-  // Walls.
-  for (const wall of course.walls) {
-    drawWallRect(ctx, wall.x * scale, wall.y * scale, wall.w * scale, wall.h * scale, palette, scale, theme);
-  }
 
   if (isFrozenIceHazard(theme)) {
     drawIceHazards(ctx, course.waterHazards ?? [], course.walls, scale, palette);
@@ -927,6 +929,13 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
     courseCanvas.width = fit.boardWidth * dpr;
     courseCanvas.height = fit.boardHeight * dpr;
     const courseCtx = courseCanvas.getContext('2d');
+
+    // Walls cached separately so they can blit above animated water without redrawing each frame.
+    const wallCanvas = document.createElement('canvas');
+    wallCanvas.width = fit.boardWidth * dpr;
+    wallCanvas.height = fit.boardHeight * dpr;
+    const wallCtx = wallCanvas.getContext('2d');
+
     let cachedHoleIndex = -1;
     let cachedCourse: MinigolfCourse | null = null;
 
@@ -939,10 +948,16 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
 
       if (
         courseCtx &&
+        wallCtx &&
         (cachedHoleIndex !== current.holeIndex || cachedCourse !== currentCourse)
       ) {
         courseCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
         drawCourse(courseCtx, currentCourse, fit.scale, currentCourse.theme);
+
+        wallCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        wallCtx.clearRect(0, 0, fit.boardWidth, fit.boardHeight);
+        drawCourseWalls(wallCtx, currentCourse, fit.scale, currentCourse.theme);
+
         cachedHoleIndex = current.holeIndex;
         cachedCourse = currentCourse;
       }
@@ -961,6 +976,8 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
           now,
         );
       }
+
+      ctx.drawImage(wallCanvas, 0, 0, fit.boardWidth, fit.boardHeight);
 
       drawFlag(
         ctx,
@@ -992,16 +1009,21 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
       for (const p of ordered) {
         if (p.holed) continue;
         const prevPlayer = prev.players.find((pp) => pp.id === p.id);
-        const sinking = p.sinkTicks > 0;
-        const pos = sinking
-          ? { x: p.ball.x, y: p.ball.y }
-          : interpolateBall(prevPlayer?.ball, p.ball, alpha);
+        const pos = interpolateBall(prevPlayer?.ball, p.ball, alpha);
         const x = pos.x * fit.scale;
         const y = pos.y * fit.scale;
         const isMe = p.id === myIdRef.current;
         const hex = PLAYER_COLOR_HEX[normalizePlayerColor(p.color)];
 
-        const sinkProgress = sinking ? 1 - p.sinkTicks / SINK_TICKS : 0;
+        const prevSinkTicks = prevPlayer?.sinkTicks ?? 0;
+        const sinkTicks = p.sinkTicks;
+        const prevSinkProgress = prevSinkTicks > 0 ? 1 - prevSinkTicks / SINK_TICKS : 0;
+        const curSinkProgress = sinkTicks > 0 ? 1 - sinkTicks / SINK_TICKS : 0;
+        const sinkProgress =
+          prevSinkTicks > 0 || sinkTicks > 0
+            ? prevSinkProgress + (curSinkProgress - prevSinkProgress) * alpha
+            : 0;
+        const sinking = sinkProgress > 0;
         const ballPx = Math.max(3, BALL_RADIUS * fit.scale * (sinking ? 1 - sinkProgress * 0.85 : 1));
         const ballAlpha = sinking ? 1 - sinkProgress : 1;
         const sinkYOffset = sinking ? sinkProgress * ballPx : 0;
