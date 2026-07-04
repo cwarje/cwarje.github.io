@@ -182,6 +182,8 @@ function drawWallRect(
     drawIceBlocks(ctx, x, y, w, h, palette, scale);
   } else if (theme === 'chocolate') {
     // flat fill — palette.wallFill only
+  } else if (theme === 'cemetery') {
+    drawSandstoneBricks(ctx, x, y, w, h, palette, scale);
   } else {
     drawWoodPlanks(ctx, x, y, w, h, palette, scale);
   }

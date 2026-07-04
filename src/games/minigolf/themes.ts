@@ -1,7 +1,7 @@
-export type MinigolfCourseTheme = 'classic' | 'desert' | 'tundra' | 'chocolate';
+export type MinigolfCourseTheme = 'classic' | 'desert' | 'tundra' | 'chocolate' | 'cemetery';
 export type MinigolfThemeOption = 'classic' | 'random';
 
-export const MINIGOLF_COURSE_THEMES: readonly MinigolfCourseTheme[] = ['classic', 'desert', 'tundra', 'chocolate'];
+export const MINIGOLF_COURSE_THEMES: readonly MinigolfCourseTheme[] = ['classic', 'desert', 'tundra', 'chocolate', 'cemetery'];
 export const MINIGOLF_THEME_OPTIONS: readonly MinigolfThemeOption[] = ['classic', 'random'];
 
 export interface MinigolfFriction {
@@ -149,6 +149,31 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
       boardBg: '#2a1410',
       summaryPanelBg: 'rgba(42, 20, 16, 0.95)',
       summaryPanelBorder: 'rgba(255, 200, 180, 0.2)',
+    },
+  },
+  cemetery: {
+    label: 'Cemetery',
+    hazardKind: 'water',
+    obstacleEmoji: '🪦',
+    friction: { mult: 0.978, linear: 0.003 },
+    generation: { gateChance: 0.55, hazardBlockChance: 0.5 },
+    palette: {
+      fairwayBase: '#4a5548',
+      fairwayAlt: '#3d4638',
+      wallFill: '#5c5c5c',
+      wallEdge: '#3a3a3a',
+      hazardFill: '#1a2838',
+      hazardEdge: '#0f1820',
+      hazardHighlight: '#2a4058',
+      sandTrapFill: '#f8ecc0',
+      sandTrapEdge: '#d8bc78',
+      cupFill: '#141820',
+      teeStroke: 'rgba(200,200,200,0.3)',
+    },
+    chrome: {
+      boardBg: '#1a1c20',
+      summaryPanelBg: 'rgba(26, 28, 32, 0.95)',
+      summaryPanelBorder: 'rgba(200, 200, 200, 0.15)',
     },
   },
 };

@@ -157,7 +157,7 @@ describe('minigolf course generation', () => {
     const randomState = createMinigolfState(makePlayers(2), { minigolfTheme: 'random' });
     expect(randomState.courses.length).toBeGreaterThan(0);
     for (const course of randomState.courses) {
-      expect(['classic', 'desert', 'tundra', 'chocolate']).toContain(course.theme);
+      expect(['classic', 'desert', 'tundra', 'chocolate', 'cemetery']).toContain(course.theme);
     }
   });
 
@@ -172,7 +172,7 @@ describe('minigolf course generation', () => {
     const courses = generateCourses(3, seededRng(42), 'random');
     expect(courses).toHaveLength(3);
     for (const course of courses) {
-      expect(['classic', 'desert', 'tundra', 'chocolate']).toContain(course.theme);
+      expect(['classic', 'desert', 'tundra', 'chocolate', 'cemetery']).toContain(course.theme);
     }
     const themes = new Set(courses.map((c) => c.theme));
     expect(themes.size).toBeGreaterThan(1);
@@ -669,7 +669,7 @@ describe('minigolf dev regenerate hole', () => {
 
     const next = processMinigolfAction(state, { type: 'dev-regenerate-hole' }, 'p1') as MinigolfState;
 
-    expect(next.courses[1].theme).toBe('desert');
+    expect(next.courses[1].theme).toBe('tundra');
   });
 
   it('replaces the current hole and resets players while preserving prior hole scores', () => {
