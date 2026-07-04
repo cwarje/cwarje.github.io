@@ -229,6 +229,61 @@ function sectionTotal(p: MinigolfPlayer, start: number, end: number): number {
   return sum;
 }
 
+const SCORECARD_HEADER_NEUTRAL = '#f5edd4';
+
+function parseHexColor(hex: string): [number, number, number] | null {
+  const normalized = hex.replace('#', '');
+  if (normalized.length !== 6) return null;
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+  if ([r, g, b].some((channel) => Number.isNaN(channel))) return null;
+  return [r, g, b];
+}
+
+function scorecardHeaderTextColor(bg: string): '#111827' | '#ffffff' {
+  const rgb = parseHexColor(bg);
+  if (!rgb) return '#111827';
+  const [r, g, b] = rgb.map((channel) => {
+    const srgb = channel / 255;
+    return srgb <= 0.03928 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance > 0.55 ? '#111827' : '#ffffff';
+}
+
+function scorecardParBadgeBackground(textColor: '#111827' | '#ffffff'): string {
+  return textColor === '#111827' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.2)';
+}
+
+function formatScorecardTimestamp(date: Date): { label: string; iso: string } {
+  const dateStr = date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const timeStr = date.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  return {
+    label: `${dateStr}, ${timeStr}`,
+    iso: date.toISOString(),
+  };
+}
+
+function useScorecardClock(): { label: string; iso: string } {
+  const [now, setNow] = useState(() => formatScorecardTimestamp(new Date()));
+
+  useEffect(() => {
+    const tick = () => setNow(formatScorecardTimestamp(new Date()));
+    const interval = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  return now;
+}
+
 function scoreToneClass(score: number | undefined, par: number): string {
   if (score === undefined) return '';
   const diff = score - par;
@@ -291,6 +346,7 @@ interface ScorecardSectionProps {
   highlightHole?: number;
   compact: boolean;
   leaderIds: Set<string>;
+  themeRevealedUpTo: number;
 }
 
 function ScorecardSection({
@@ -304,6 +360,7 @@ function ScorecardSection({
   highlightHole,
   compact,
   leaderIds,
+  themeRevealedUpTo,
 }: ScorecardSectionProps) {
   const holeCount = holeEnd - holeStart;
   const holeColPct = `${Math.floor(66 / holeCount)}%`;
@@ -329,19 +386,39 @@ function ScorecardSection({
             {Array.from({ length: holeCount }, (_, i) => {
               const holeIndex = holeStart + i;
               const played = holeIndex < holesPlayed;
+              const themeRevealed = holeIndex <= themeRevealedUpTo;
+              const headerBg = themeRevealed
+                ? getMinigolfTheme(courses[holeIndex].theme).palette.fairwayBase
+                : SCORECARD_HEADER_NEUTRAL;
+              const headerText = themeRevealed
+                ? scorecardHeaderTextColor(headerBg)
+                : undefined;
               return (
                 <th
                   key={holeIndex}
                   className={highlightHole === holeIndex ? 'minigolf-scorecardCol--highlight' : undefined}
+                  style={{
+                    background: headerBg,
+                    ...(headerText ? { color: headerText } : {}),
+                  }}
                 >
                   <span className="minigolf-scorecardHoleNum">{holeIndex + 1}</span>
                   {played && (
-                    <span className="minigolf-scorecardPar">par {courses[holeIndex].par}</span>
+                    <span
+                      className="minigolf-scorecardPar"
+                      style={
+                        headerText
+                          ? { background: scorecardParBadgeBackground(headerText) }
+                          : { background: 'rgba(0, 0, 0, 0.06)' }
+                      }
+                    >
+                      par {courses[holeIndex].par}
+                    </span>
                   )}
                 </th>
               );
             })}
-            <th>{subtotalLabel}</th>
+            <th className="minigolf-scorecardSubtotalHead">{subtotalLabel}</th>
           </tr>
         </thead>
         <tbody>
@@ -402,88 +479,87 @@ function Scorecard({ state, myId }: { state: MinigolfState; myId: string }) {
   const useFrontBack = totalHoles === 18;
   const compact = holesPlayed > 6 || state.players.length >= 5;
   const highlightHole = state.phase === 'summary' ? state.holeIndex : undefined;
+  const themeRevealedUpTo = state.gameOver ? state.courses.length - 1 : state.holeIndex;
+  const timestamp = useScorecardClock();
 
   const players = [...state.players].sort((a, b) => completedTotal(a) - completedTotal(b));
   const leaderIds = getScorecardLeaderIds(players);
 
-  if (useFrontBack) {
-    const showBack = holesPlayed > 9;
-    return (
-      <div className="minigolf-scorecardSections">
+  const scorecardContent = useFrontBack ? (
+    <div className="minigolf-scorecardSections">
+      <div>
+        <p className="minigolf-scorecardSectionLabel">Front 9</p>
+        <ScorecardSection
+          holeStart={0}
+          holeEnd={9}
+          holesPlayed={holesPlayed}
+          courses={state.courses}
+          players={players}
+          myId={myId}
+          subtotalLabel="OUT"
+          highlightHole={highlightHole}
+          compact={compact}
+          leaderIds={leaderIds}
+          themeRevealedUpTo={themeRevealedUpTo}
+        />
+      </div>
+      {holesPlayed > 9 && (
         <div>
-          <p className="minigolf-scorecardSectionLabel">Front 9</p>
+          <p className="minigolf-scorecardSectionLabel">Back 9</p>
           <ScorecardSection
-            holeStart={0}
-            holeEnd={9}
+            holeStart={9}
+            holeEnd={18}
             holesPlayed={holesPlayed}
             courses={state.courses}
             players={players}
             myId={myId}
-            subtotalLabel="OUT"
+            subtotalLabel="IN"
             highlightHole={highlightHole}
             compact={compact}
             leaderIds={leaderIds}
+            themeRevealedUpTo={themeRevealedUpTo}
           />
         </div>
-        {showBack && (
-          <div>
-            <p className="minigolf-scorecardSectionLabel">Back 9</p>
-            <ScorecardSection
-              holeStart={9}
-              holeEnd={18}
-              holesPlayed={holesPlayed}
-              courses={state.courses}
-              players={players}
-              myId={myId}
-              subtotalLabel="IN"
-              highlightHole={highlightHole}
-              compact={compact}
-              leaderIds={leaderIds}
-            />
-          </div>
-        )}
-        <div className="minigolf-scorecardScroll">
-          <table className={`minigolf-scorecard minigolf-scorecard--grandTotal${compact ? ' minigolf-scorecard--compact' : ''}`}>
-            <colgroup>
-              <col className="minigolf-scorecardCol--player" />
-              <col />
-              <col className="minigolf-scorecardCol--total" />
-            </colgroup>
-            <tbody>
-              {players.map((p) => {
-                const total = completedTotal(p);
-                const isLeader = leaderIds.has(p.id);
-                return (
-                  <tr key={p.id}>
-                    <td
-                      className="minigolf-scorecardPlayerCell minigolf-scorecardTintedCell"
-                      style={{ background: getScorecardCellBackground(p.color, 0) }}
-                    >
-                      <ScorecardPlayerLabel player={p} myId={myId} isLeader={isLeader} />
-                    </td>
-                    <td
-                      className="minigolf-scorecardGrandLabel minigolf-scorecardTintedCell"
-                      style={{ background: getScorecardCellBackground(p.color, 1) }}
-                    >
-                      Total
-                    </td>
-                    <td
-                      style={{ background: getScorecardCellBackground(p.color, 2) }}
-                      className={`minigolf-scorecardGrandTotal minigolf-scorecardTintedCell${isLeader ? ' minigolf-scorecardGrandTotal--leader' : ''}`}
-                    >
-                      {total}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      )}
+      <div className="minigolf-scorecardScroll">
+        <table className={`minigolf-scorecard minigolf-scorecard--grandTotal${compact ? ' minigolf-scorecard--compact' : ''}`}>
+          <colgroup>
+            <col className="minigolf-scorecardCol--player" />
+            <col />
+            <col className="minigolf-scorecardCol--total" />
+          </colgroup>
+          <tbody>
+            {players.map((p) => {
+              const total = completedTotal(p);
+              const isLeader = leaderIds.has(p.id);
+              return (
+                <tr key={p.id}>
+                  <td
+                    className="minigolf-scorecardPlayerCell minigolf-scorecardTintedCell"
+                    style={{ background: getScorecardCellBackground(p.color, 0) }}
+                  >
+                    <ScorecardPlayerLabel player={p} myId={myId} isLeader={isLeader} />
+                  </td>
+                  <td
+                    className="minigolf-scorecardGrandLabel minigolf-scorecardTintedCell"
+                    style={{ background: getScorecardCellBackground(p.color, 1) }}
+                  >
+                    Total
+                  </td>
+                  <td
+                    style={{ background: getScorecardCellBackground(p.color, 2) }}
+                    className={`minigolf-scorecardGrandTotal minigolf-scorecardTintedCell${isLeader ? ' minigolf-scorecardGrandTotal--leader' : ''}`}
+                  >
+                    {total}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
-    );
-  }
-
-  return (
+    </div>
+  ) : (
     <ScorecardSection
       holeStart={0}
       holeEnd={totalHoles}
@@ -495,7 +571,17 @@ function Scorecard({ state, myId }: { state: MinigolfState; myId: string }) {
       highlightHole={highlightHole}
       compact={compact}
       leaderIds={leaderIds}
+      themeRevealedUpTo={themeRevealedUpTo}
     />
+  );
+
+  return (
+    <div className="minigolf-scorecardCard">
+      <time className="minigolf-scorecardTimestamp" dateTime={timestamp.iso}>
+        {timestamp.label}
+      </time>
+      {scorecardContent}
+    </div>
   );
 }
 
