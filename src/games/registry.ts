@@ -805,7 +805,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     OptionsPanel: MinigolfOptions,
     fullBoard: true,
     production: true,
-    showBetaBadge: true,
+    showNewBadge: true,
     hudTitleLines: ['Mini Golf'],
     hideHudTitleDuringPlay: true,
   },

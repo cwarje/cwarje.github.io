@@ -35,6 +35,7 @@ export interface GameStartOptions {
   cribbageTargetScore?: CribbageTargetScore;
   cucumberEliminationThreshold?: CucumberEliminationThreshold;
   minigolfBallCollisions?: boolean;
+  minigolfObstacles?: boolean;
   minigolfTheme?: MinigolfThemeOption;
   minigolfHoleCount?: MinigolfHoleCount;
   botCount?: number;

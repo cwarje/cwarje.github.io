@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { MinigolfBall, MinigolfCourse, MinigolfPlayer, MinigolfState } from './types';
-import { getMinigolfTheme, isFrozenIceHazard, type MinigolfCourseTheme, type MinigolfPalette } from './themes';
+import { getMinigolfTheme, getObstacleEmoji, isFrozenIceHazard, type MinigolfCourseTheme, type MinigolfPalette } from './themes';
 import { BALL_RADIUS, COURSE_H, COURSE_W, CUP_RADIUS } from './courseGen';
 import { MINIGOLF_TICK_MS, SINK_TICKS, isBallAtRest } from './logic';
 import { drawIceHazards, drawWaterHazards } from './waterRender';
@@ -250,6 +250,28 @@ function drawFlag(
   ctx.closePath();
   ctx.fillStyle = '#ef4444';
   ctx.fill();
+}
+
+function drawLandmines(
+  ctx: CanvasRenderingContext2D,
+  course: MinigolfCourse,
+  scale: number,
+  theme: MinigolfCourseTheme,
+  triggeredIndices: number[],
+) {
+  const landmines = course.landmines;
+  if (!landmines?.length) return;
+  const triggered = new Set(triggeredIndices);
+  const emoji = getObstacleEmoji(theme);
+  const size = Math.max(12, 10 * scale);
+  ctx.font = `${size}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i < landmines.length; i++) {
+    if (triggered.has(i)) continue;
+    const mine = landmines[i];
+    ctx.fillText(emoji, mine.x * scale, mine.y * scale);
+  }
 }
 
 function drawCourse(
@@ -956,6 +978,16 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
         fit.scale,
         now,
       );
+
+      if (current.obstacles) {
+        drawLandmines(
+          ctx,
+          currentCourse,
+          fit.scale,
+          currentCourse.theme,
+          current.triggeredLandmines,
+        );
+      }
 
       const alpha = Math.min(1, (now - prevTimeRef.current) / MINIGOLF_TICK_MS);
 

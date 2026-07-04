@@ -46,6 +46,7 @@ export type MinigolfHazardKind = 'water' | 'ice';
 export interface MinigolfThemeConfig {
   label: string;
   hazardKind: MinigolfHazardKind;
+  obstacleEmoji: string;
   friction: MinigolfFriction;
   generation: MinigolfGenerationWeights;
   palette: MinigolfPalette;
@@ -56,6 +57,7 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
   classic: {
     label: 'Classic',
     hazardKind: 'water',
+    obstacleEmoji: '🌲',
     friction: { mult: 0.978, linear: 0.003 },
     generation: { gateChance: 0.55, hazardBlockChance: 0.5 },
     palette: {
@@ -80,6 +82,7 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
   desert: {
     label: 'Desert',
     hazardKind: 'water',
+    obstacleEmoji: '🌵',
     friction: { mult: 0.968, linear: 0.005, sandTrapMult: 0.9 },
     generation: { gateChance: 0.4, hazardBlockChance: 0.65, sandTrapSplit: 0.6 },
     palette: {
@@ -104,6 +107,7 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
   tundra: {
     label: 'Tundra',
     hazardKind: 'ice',
+    obstacleEmoji: '🐧',
     friction: { mult: 0.985, linear: 0.001 },
     generation: { gateChance: 0.7, hazardBlockChance: 0.45 },
     palette: {
@@ -129,6 +133,10 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
 
 export function getMinigolfTheme(theme: MinigolfCourseTheme | undefined): MinigolfThemeConfig {
   return MINIGOLF_THEMES[theme ?? 'classic'];
+}
+
+export function getObstacleEmoji(theme: MinigolfCourseTheme): string {
+  return MINIGOLF_THEMES[theme].obstacleEmoji;
 }
 
 export function isFrozenIceHazard(theme: MinigolfCourseTheme): boolean {

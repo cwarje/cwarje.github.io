@@ -15,6 +15,11 @@ export interface MinigolfVec {
   y: number;
 }
 
+export interface MinigolfLandmine {
+  x: number;
+  y: number;
+}
+
 export interface MinigolfCourse {
   /** Axis-aligned wall rectangles, including the four border walls. */
   walls: MinigolfRect[];
@@ -22,6 +27,8 @@ export interface MinigolfCourse {
   waterHazards: MinigolfRect[];
   /** Desert-only slow zones — ball slows heavily but does not sink. */
   sandTraps?: MinigolfRect[];
+  /** Proximity obstacles that detonate and knock nearby balls away. */
+  landmines?: MinigolfLandmine[];
   tee: MinigolfVec;
   cup: MinigolfVec;
   par: number;
@@ -62,6 +69,10 @@ export interface MinigolfState {
   players: MinigolfPlayer[];
   /** When true, active balls bounce off each other; when false, they pass through. */
   ballCollisions: boolean;
+  /** When true, proximity obstacles are placed on each hole. */
+  obstacles: boolean;
+  /** Indices of detonated landmines on the current hole. */
+  triggeredLandmines: number[];
   /** All holes are generated up front so every client renders identical courses. */
   courses: MinigolfCourse[];
   holeIndex: number;

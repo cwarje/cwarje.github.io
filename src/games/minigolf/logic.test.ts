@@ -2,6 +2,8 @@ import type { Player } from '../../networking/types';
 import {
   COURSE_H,
   COURSE_W,
+  LANDMINE_COUNT_MAX,
+  LANDMINE_COUNT_MIN,
   WALL_THICKNESS,
   generateCourses,
   generateHole,
@@ -100,6 +102,8 @@ describe('minigolf course generation', () => {
     expect(state.holeIndex).toBe(0);
     expect(state.phase).toBe('playing');
     expect(state.ballCollisions).toBe(false);
+    expect(state.obstacles).toBe(false);
+    expect(state.triggeredLandmines).toEqual([]);
     for (const p of state.players) {
       expect(p.strokes).toBe(0);
       expect(p.holed).toBe(false);
@@ -112,6 +116,30 @@ describe('minigolf course generation', () => {
   it('respects the ball collisions start option', () => {
     expect(createMinigolfState(makePlayers(2)).ballCollisions).toBe(false);
     expect(createMinigolfState(makePlayers(2), { minigolfBallCollisions: true }).ballCollisions).toBe(true);
+  });
+
+  it('respects the obstacles start option', () => {
+    expect(createMinigolfState(makePlayers(2)).obstacles).toBe(false);
+    expect(createMinigolfState(makePlayers(2)).courses.every((c) => !c.landmines?.length)).toBe(true);
+    const withObstacles = createMinigolfState(makePlayers(2), { minigolfObstacles: true });
+    expect(withObstacles.obstacles).toBe(true);
+    expect(withObstacles.triggeredLandmines).toEqual([]);
+    for (const course of withObstacles.courses) {
+      const count = course.landmines?.length ?? 0;
+      expect(count).toBeGreaterThanOrEqual(LANDMINE_COUNT_MIN);
+      expect(count).toBeLessThanOrEqual(LANDMINE_COUNT_MAX);
+    }
+  });
+
+  it('places landmines clear of tee and cup when obstacles are enabled', () => {
+    for (let i = 0; i < 30; i++) {
+      const hole = generateHole(Math.random, 'classic', true);
+      if (!hole.landmines?.length) continue;
+      for (const lm of hole.landmines) {
+        expect(Math.hypot(lm.x - hole.tee.x, lm.y - hole.tee.y)).toBeGreaterThanOrEqual(9);
+        expect(Math.hypot(lm.x - hole.cup.x, lm.y - hole.cup.y)).toBeGreaterThanOrEqual(9);
+      }
+    }
   });
 
   it('respects the minigolfHoleCount start option', () => {
@@ -349,6 +377,49 @@ describe('minigolf physics', () => {
     const trapSpeed = Math.hypot(inTrap.vx, inTrap.vy);
     const fairwaySpeed = Math.hypot(onFairway.vx, onFairway.vy);
     expect(trapSpeed).toBeLessThan(fairwaySpeed);
+  });
+
+  it('knocks the ball away when it enters obstacle trigger range', () => {
+    const course: MinigolfCourse = { ...openCourse(), landmines: [{ x: 50, y: 70 }] };
+    const ball: MinigolfBall = { x: 50, y: 63, vx: 0, vy: 2 };
+    const triggered = new Set<number>();
+    stepBall(ball, course, 1, 'classic', triggered);
+    expect(triggered.has(0)).toBe(true);
+    expect(Math.hypot(ball.vx, ball.vy)).toBeGreaterThan(2);
+    expect(ball.vy).toBeLessThan(0);
+  });
+
+  it('does not retrigger detonated obstacles', () => {
+    const course: MinigolfCourse = { ...openCourse(), landmines: [{ x: 50, y: 70 }] };
+    const ball: MinigolfBall = { x: 50, y: 63, vx: 0, vy: 2 };
+    const triggered = new Set([0]);
+    stepBall(ball, course, 1, 'classic', triggered);
+    expect(triggered.size).toBe(1);
+  });
+
+  it('detonates obstacles and knocks back all balls in explosion range', () => {
+    const course: MinigolfCourse = { ...openCourse(), landmines: [{ x: 50, y: 70 }] };
+    const base = createMinigolfState(makePlayers(2), { minigolfBallCollisions: true, minigolfObstacles: true });
+    let state: MinigolfState = {
+      ...base,
+      ballCollisions: true,
+      obstacles: true,
+      courses: [course],
+      triggeredLandmines: [],
+      players: base.players.map((p, i) =>
+        i === 0
+          ? { ...p, ball: { x: 50, y: 63, vx: 0, vy: 2 } }
+          : { ...p, ball: { x: 57, y: 70, vx: 0, vy: 0 } },
+      ),
+    };
+    const beforeB = { ...state.players[1].ball };
+    state = tick(state);
+    expect(state.triggeredLandmines).toContain(0);
+    expect(Math.hypot(state.players[0].ball.vx, state.players[0].ball.vy)).toBeGreaterThan(0);
+    const afterB = state.players[1].ball;
+    expect(
+      afterB.vx !== beforeB.vx || afterB.vy !== beforeB.vy || afterB.x !== beforeB.x || afterB.y !== beforeB.y,
+    ).toBe(true);
   });
 });
 

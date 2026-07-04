@@ -2,6 +2,8 @@ import type { GameStartOptions, Player } from '../../networking/types';
 import {
   BALL_RADIUS,
   CUP_RADIUS,
+  LANDMINE_EXPLOSION_RADIUS,
+  LANDMINE_TRIGGER_RADIUS,
   TEE_STARTING_AREA_RADIUS,
   generateCourses,
   generateHole,
@@ -12,6 +14,7 @@ import type {
   MinigolfBall,
   MinigolfCourse,
   MinigolfCourseTheme,
+  MinigolfLandmine,
   MinigolfPlayer,
   MinigolfRect,
   MinigolfState,
@@ -28,6 +31,7 @@ export const STROKE_CAP_OVER_PAR = 4;
 export const SUMMARY_TICKS = Math.round(5000 / MINIGOLF_TICK_MS);
 
 export const SINK_TICKS = 45;
+const LANDMINE_KNOCKBACK_SPEED = 3.8;
 
 const RESTITUTION = 0.85;
 
@@ -173,6 +177,7 @@ function stepBallsWithCollisions(
   course: MinigolfCourse,
   dtScale: number,
   theme: MinigolfCourseTheme,
+  triggered?: Set<number>,
 ): Array<{ holed: boolean; inWater?: boolean }> {
   const { friction } = getMinigolfTheme(theme);
   const results = balls.map(() => ({ holed: false, inWater: undefined as boolean | undefined }));
@@ -220,6 +225,10 @@ function stepBallsWithCollisions(
         }
       }
       if (!hitAny) break;
+    }
+
+    if (triggered) {
+      checkAndDetonateLandmines(balls, course, triggered);
     }
 
     for (let i = 0; i < balls.length; i++) {
@@ -275,6 +284,60 @@ function shouldSinkInHazard(theme: MinigolfCourseTheme, onHazard: boolean): bool
   return onHazard && !isFrozenIceHazard(theme);
 }
 
+function ballInLandmineTriggerRange(ball: MinigolfBall, mine: MinigolfLandmine): boolean {
+  return Math.hypot(ball.x - mine.x, ball.y - mine.y) <= LANDMINE_TRIGGER_RADIUS + BALL_RADIUS;
+}
+
+function ballInLandmineExplosionRange(ball: MinigolfBall, mine: MinigolfLandmine): boolean {
+  return Math.hypot(ball.x - mine.x, ball.y - mine.y) <= LANDMINE_EXPLOSION_RADIUS + BALL_RADIUS;
+}
+
+function applyLandmineKnockback(ball: MinigolfBall, mine: MinigolfLandmine): void {
+  let dx = ball.x - mine.x;
+  let dy = ball.y - mine.y;
+  let dist = Math.hypot(dx, dy);
+  if (dist < 1e-9) {
+    dx = 0;
+    dy = -1;
+    dist = 1;
+  }
+  ball.vx = (dx / dist) * LANDMINE_KNOCKBACK_SPEED;
+  ball.vy = (dy / dist) * LANDMINE_KNOCKBACK_SPEED;
+  const nudge = LANDMINE_EXPLOSION_RADIUS + BALL_RADIUS + 0.1;
+  ball.x = mine.x + (dx / dist) * nudge;
+  ball.y = mine.y + (dy / dist) * nudge;
+}
+
+function detonateLandmine(
+  mine: MinigolfLandmine,
+  mineIndex: number,
+  balls: MinigolfBall[],
+  triggered: Set<number>,
+): void {
+  triggered.add(mineIndex);
+  for (const ball of balls) {
+    if (ballInLandmineExplosionRange(ball, mine)) {
+      applyLandmineKnockback(ball, mine);
+    }
+  }
+}
+
+function checkAndDetonateLandmines(
+  balls: MinigolfBall[],
+  course: MinigolfCourse,
+  triggered: Set<number>,
+): void {
+  const landmines = course.landmines;
+  if (!landmines?.length) return;
+  for (let i = 0; i < landmines.length; i++) {
+    if (triggered.has(i)) continue;
+    const mine = landmines[i];
+    if (balls.some((ball) => ballInLandmineTriggerRange(ball, mine))) {
+      detonateLandmine(mine, i, balls, triggered);
+    }
+  }
+}
+
 function applyFrictionUnlessOnIce(
   ball: MinigolfBall,
   course: MinigolfCourse,
@@ -296,6 +359,7 @@ export function stepBall(
   course: MinigolfCourse,
   dtScale: number,
   theme: MinigolfCourseTheme = 'classic',
+  triggered?: Set<number>,
 ): { holed: boolean; inWater?: boolean } {
   const { friction } = getMinigolfTheme(theme);
   let speed = Math.hypot(ball.vx, ball.vy);
@@ -329,6 +393,10 @@ export function stepBall(
         if (collideBallWithRect(ball, wall)) hitAny = true;
       }
       if (!hitAny) break;
+    }
+
+    if (triggered) {
+      checkAndDetonateLandmines([ball], course, triggered);
     }
 
     if (friction.sandTrapMult != null) {
@@ -485,13 +553,14 @@ function computeWinners(players: MinigolfPlayer[]): string[] {
 function devRegenerateCurrentHole(state: MinigolfState): MinigolfState {
   const { holeIndex } = state;
   const theme = state.courses[holeIndex].theme;
-  const newCourse = generateHole(Math.random, theme);
+  const newCourse = generateHole(Math.random, theme, state.obstacles);
   const courses = [...state.courses];
   courses[holeIndex] = newCourse;
 
   return {
     ...state,
     courses,
+    triggeredLandmines: [],
     phase: 'playing',
     summaryTicks: 0,
     players: state.players.map((p, i) => {
@@ -527,6 +596,7 @@ function advanceHole(state: MinigolfState): MinigolfState {
   return {
     ...state,
     holeIndex: nextIndex,
+    triggeredLandmines: [],
     phase: 'playing',
     summaryTicks: 0,
     players: state.players.map((p, i) => {
@@ -659,7 +729,9 @@ function processTickWithCollisions(state: MinigolfState, course: MinigolfCourse,
   if (activeIndices.length > 0) {
     const balls = activeIndices.map((i) => ({ ...players[i].ball }));
     const beforeBalls = activeIndices.map((i) => players[i].ball);
-    const results = stepBallsWithCollisions(balls, course, dtScale, course.theme);
+    const triggered = new Set(state.triggeredLandmines);
+    const triggeredBefore = triggered.size;
+    const results = stepBallsWithCollisions(balls, course, dtScale, course.theme, triggered);
 
     for (let j = 0; j < activeIndices.length; j++) {
       const i = activeIndices[j];
@@ -671,6 +743,21 @@ function processTickWithCollisions(state: MinigolfState, course: MinigolfCourse,
         anyChange = true;
       }
     }
+
+    if (triggered.size > triggeredBefore) {
+      anyChange = true;
+    }
+
+    if (!anyChange) return state;
+
+    let next: MinigolfState = {
+      ...state,
+      players,
+      triggeredLandmines: [...triggered],
+      lastTickAt: Date.now(),
+    };
+    next = beginSummaryIfDone(next);
+    return next;
   }
 
   if (!anyChange) return state;
@@ -682,6 +769,8 @@ function processTickWithCollisions(state: MinigolfState, course: MinigolfCourse,
 
 function processTickWithoutCollisions(state: MinigolfState, course: MinigolfCourse, dtScale: number): MinigolfState {
   let anyChange = false;
+  const triggered = new Set(state.triggeredLandmines);
+  const triggeredBefore = triggered.size;
 
   const players = state.players.map((p, playerIndex) => {
     const { player, changed, needsPhysics } = updatePlayerBeforePhysics(p, playerIndex, course, state.holeIndex, course.theme);
@@ -690,13 +779,22 @@ function processTickWithoutCollisions(state: MinigolfState, course: MinigolfCour
 
     anyChange = true;
     const ball: MinigolfBall = { ...player.ball };
-    const result = stepBall(ball, course, dtScale, course.theme);
+    const result = stepBall(ball, course, dtScale, course.theme, triggered);
     return applyBallPhysicsResult(player, ball, course, state.holeIndex, result);
   });
 
+  if (triggered.size > triggeredBefore) {
+    anyChange = true;
+  }
+
   if (!anyChange) return state;
 
-  let next: MinigolfState = { ...state, players, lastTickAt: Date.now() };
+  let next: MinigolfState = {
+    ...state,
+    players,
+    triggeredLandmines: [...triggered],
+    lastTickAt: Date.now(),
+  };
   next = beginSummaryIfDone(next);
   return next;
 }
@@ -727,7 +825,8 @@ function processTick(state: MinigolfState, dt: number): MinigolfState {
 export function createMinigolfState(players: Player[], options?: GameStartOptions): MinigolfState {
   const themeOption = options?.minigolfTheme ?? 'classic';
   const holeCount = options?.minigolfHoleCount ?? DEFAULT_MINIGOLF_HOLE_COUNT;
-  const courses = generateCourses(holeCount, Math.random, themeOption);
+  const obstacles = options?.minigolfObstacles ?? false;
+  const courses = generateCourses(holeCount, Math.random, themeOption, obstacles);
   const gamePlayers: MinigolfPlayer[] = players.slice(0, 8).map((p, i) => {
     const tee = teePosition(courses[0], i);
     return {
@@ -749,6 +848,8 @@ export function createMinigolfState(players: Player[], options?: GameStartOption
   return {
     players: gamePlayers,
     ballCollisions: options?.minigolfBallCollisions ?? false,
+    obstacles,
+    triggeredLandmines: [],
     courses,
     holeIndex: 0,
     phase: 'playing',

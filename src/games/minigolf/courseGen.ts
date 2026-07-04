@@ -1,4 +1,4 @@
-import type { MinigolfCourse, MinigolfRect, MinigolfVec } from './types';
+import type { MinigolfCourse, MinigolfLandmine, MinigolfRect, MinigolfVec } from './types';
 import {
   getMinigolfTheme,
   pickRandomCourseTheme,
@@ -14,6 +14,12 @@ export const BALL_RADIUS = 1.6;
 export const CUP_RADIUS = 2.8;
 /** Radius around the tee where ball-to-ball collisions are ignored. */
 export const TEE_STARTING_AREA_RADIUS = 10;
+/** Ball must enter this range to detonate a proximity obstacle. */
+export const LANDMINE_TRIGGER_RADIUS = 3.5;
+/** On detonation, all balls within this radius are knocked back. */
+export const LANDMINE_EXPLOSION_RADIUS = 8;
+export const LANDMINE_COUNT_MIN = 2;
+export const LANDMINE_COUNT_MAX = 3;
 
 export type Rng = () => number;
 
@@ -21,6 +27,8 @@ const TEE_Y = COURSE_H - 18;
 const CUP_Y = 18;
 /** Keep obstacles this far away from tee/cup so every hole has room to putt. */
 const CLEARANCE = 9;
+const LANDMINE_MIN_SPACING = 8;
+const LANDMINE_PLACEMENT_ATTEMPTS = 40;
 
 function randRange(rng: Rng, min: number, max: number): number {
   return min + rng() * (max - min);
@@ -72,6 +80,54 @@ function makeBlock(rng: Rng): MinigolfRect {
     w: Math.round(w * 10) / 10,
     h: Math.round(h * 10) / 10,
   };
+}
+
+function pointClearOfWalls(p: MinigolfVec, walls: MinigolfRect[]): boolean {
+  const pad = BALL_RADIUS;
+  for (const w of walls) {
+    if (
+      p.x >= w.x - pad && p.x <= w.x + w.w + pad &&
+      p.y >= w.y - pad && p.y <= w.y + w.h + pad
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function pointClearOfLandmines(p: MinigolfVec, landmines: MinigolfLandmine[]): boolean {
+  return landmines.every((lm) => Math.hypot(p.x - lm.x, p.y - lm.y) >= LANDMINE_MIN_SPACING);
+}
+
+export function placeLandmines(
+  rng: Rng,
+  tee: MinigolfVec,
+  cup: MinigolfVec,
+  walls: MinigolfRect[],
+): MinigolfLandmine[] {
+  const count = randInt(rng, LANDMINE_COUNT_MIN, LANDMINE_COUNT_MAX);
+  const landmines: MinigolfLandmine[] = [];
+  const margin = WALL_THICKNESS + BALL_RADIUS + 1;
+  const minX = margin;
+  const maxX = COURSE_W - margin;
+  const minY = margin;
+  const maxY = COURSE_H - margin;
+
+  for (let i = 0; i < count; i++) {
+    for (let attempt = 0; attempt < LANDMINE_PLACEMENT_ATTEMPTS; attempt++) {
+      const p: MinigolfVec = {
+        x: Math.round(randRange(rng, minX, maxX) * 10) / 10,
+        y: Math.round(randRange(rng, minY, maxY) * 10) / 10,
+      };
+      if (Math.hypot(p.x - tee.x, p.y - tee.y) < CLEARANCE) continue;
+      if (Math.hypot(p.x - cup.x, p.y - cup.y) < CLEARANCE) continue;
+      if (!pointClearOfWalls(p, walls)) continue;
+      if (!pointClearOfLandmines(p, landmines)) continue;
+      landmines.push(p);
+      break;
+    }
+  }
+  return landmines;
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +211,11 @@ function computePar(pathCells: number, obstacleCount: number): number {
 // Hole generation
 // ---------------------------------------------------------------------------
 
-export function generateHole(rng: Rng = Math.random, theme: MinigolfCourseTheme = 'classic'): MinigolfCourse {
+export function generateHole(
+  rng: Rng = Math.random,
+  theme: MinigolfCourseTheme = 'classic',
+  obstaclesEnabled = false,
+): MinigolfCourse {
   const { generation } = getMinigolfTheme(theme);
   for (let attempt = 0; attempt < 30; attempt++) {
     // Fewer obstacles on later attempts so we always converge on a valid hole.
@@ -207,6 +267,10 @@ export function generateHole(rng: Rng = Math.random, theme: MinigolfCourseTheme 
       theme,
     };
     if (sandTraps.length > 0) course.sandTraps = sandTraps;
+    if (obstaclesEnabled) {
+      const landmines = placeLandmines(rng, tee, cup, walls);
+      if (landmines.length > 0) course.landmines = landmines;
+    }
     return course;
   }
 
@@ -220,9 +284,10 @@ export function generateCourses(
   count: number,
   rng: Rng = Math.random,
   themeOption: MinigolfThemeOption = 'classic',
+  obstaclesEnabled = false,
 ): MinigolfCourse[] {
   return Array.from({ length: count }, () => {
     const theme = themeOption === 'random' ? pickRandomCourseTheme(rng) : themeOption;
-    return generateHole(rng, theme);
+    return generateHole(rng, theme, obstaclesEnabled);
   });
 }

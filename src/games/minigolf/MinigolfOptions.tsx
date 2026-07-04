@@ -1,19 +1,27 @@
 import { useState, useEffect } from 'react';
-import type { MinigolfHoleCount, MinigolfThemeOption } from '../../networking/types';
+import type { MinigolfHoleCount } from '../../networking/types';
 import type { GameOptionsPanelProps } from '../registry';
+import { readStoredMinigolfSettings, writeStoredMinigolfSettings } from './settings';
 import { MINIGOLF_THEME_OPTIONS, getMinigolfThemeOptionLabel } from './themes';
 
 const HOLE_COUNT_OPTIONS: MinigolfHoleCount[] = [3, 9, 18];
-const DEFAULT_HOLE_COUNT: MinigolfHoleCount = 9;
 
 export default function MinigolfOptions({ onChange, labelClass }: GameOptionsPanelProps) {
-  const [theme, setTheme] = useState<MinigolfThemeOption>('classic');
-  const [enabled, setEnabled] = useState(false);
-  const [holeCount, setHoleCount] = useState<MinigolfHoleCount>(DEFAULT_HOLE_COUNT);
+  const [theme, setTheme] = useState(() => readStoredMinigolfSettings().minigolfTheme);
+  const [enabled, setEnabled] = useState(() => readStoredMinigolfSettings().minigolfBallCollisions);
+  const [obstacles, setObstacles] = useState(() => readStoredMinigolfSettings().minigolfObstacles);
+  const [holeCount, setHoleCount] = useState(() => readStoredMinigolfSettings().minigolfHoleCount);
 
   useEffect(() => {
-    onChange({ minigolfTheme: theme, minigolfBallCollisions: enabled, minigolfHoleCount: holeCount });
-  }, [theme, enabled, holeCount, onChange]);
+    const settings = {
+      minigolfTheme: theme,
+      minigolfBallCollisions: enabled,
+      minigolfObstacles: obstacles,
+      minigolfHoleCount: holeCount,
+    };
+    writeStoredMinigolfSettings(settings);
+    onChange(settings);
+  }, [theme, enabled, obstacles, holeCount, onChange]);
 
   return (
     <div className="space-y-4">
@@ -74,6 +82,33 @@ export default function MinigolfOptions({ onChange, labelClass }: GameOptionsPan
             onClick={() => setEnabled(true)}
             className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-colors ${
               enabled
+                ? 'bg-white/30 text-white'
+                : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10'
+            }`}
+          >
+            On
+          </button>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <p className={`text-sm font-semibold uppercase tracking-wider ${labelClass}`}>Obstacles</p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setObstacles(false)}
+            className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-colors ${
+              !obstacles
+                ? 'bg-white/30 text-white'
+                : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10'
+            }`}
+          >
+            Off
+          </button>
+          <button
+            type="button"
+            onClick={() => setObstacles(true)}
+            className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-colors ${
+              obstacles
                 ? 'bg-white/30 text-white'
                 : 'bg-white/10 text-gray-300 hover:bg-white/15 border border-white/10'
             }`}
