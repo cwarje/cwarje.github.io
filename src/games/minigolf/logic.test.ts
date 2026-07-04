@@ -56,6 +56,10 @@ function courseWithWater(water: MinigolfCourse['waterHazards'], par = 2): Minigo
   return { ...openCourse(par), waterHazards: water };
 }
 
+function courseWithIce(ice: MinigolfCourse['waterHazards'], par = 2): MinigolfCourse {
+  return { ...openCourse(par, 'tundra'), waterHazards: ice };
+}
+
 function makeState(playerCount = 2, par = 2): MinigolfState {
   const course = openCourse(par);
   const state = createMinigolfState(makePlayers(playerCount));
@@ -454,6 +458,32 @@ describe('minigolf water hazards', () => {
     state = processMinigolfAction(state, { type: 'stroke', angle: -Math.PI / 2, power: 0.5 }, 'p1') as MinigolfState;
     const p1 = state.players.find((p) => p.id === 'p1')!;
     expect(p1.lastStrokePos).toEqual({ x: 30, y: 40 });
+  });
+});
+
+describe('minigolf tundra ice hazards', () => {
+  it('does not sink the ball or stop it when center enters ice', () => {
+    const ice = [{ x: 40, y: 60, w: 20, h: 15 }];
+    const course = courseWithIce(ice);
+    const ball: MinigolfBall = { x: 50, y: 65, vx: 0, vy: 3 };
+    const result = stepBall(ball, course, 1, 'tundra');
+    expect(result.inWater).toBeUndefined();
+    expect(result.holed).toBe(false);
+    expect(ball.vy).toBeGreaterThan(0);
+  });
+
+  it('retains more speed on ice than on fairway over multiple ticks', () => {
+    const ice = [{ x: 40, y: 60, w: 20, h: 15 }];
+    const course = courseWithIce(ice);
+    const onIce: MinigolfBall = { x: 50, y: 65, vx: 0, vy: -2 };
+    const onFairway: MinigolfBall = { x: 50, y: 70, vx: 0, vy: -2 };
+    for (let i = 0; i < 10; i++) {
+      stepBall(onIce, course, 1, 'tundra');
+      stepBall(onFairway, openCourse(2, 'tundra'), 1, 'tundra');
+    }
+    const iceSpeed = Math.hypot(onIce.vx, onIce.vy);
+    const fairwaySpeed = Math.hypot(onFairway.vx, onFairway.vy);
+    expect(iceSpeed).toBeGreaterThan(fairwaySpeed);
   });
 });
 

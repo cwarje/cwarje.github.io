@@ -178,6 +178,48 @@ function drawSingleHazard(
   ctx.strokeRect(x, y, ww, wh);
 }
 
+export function drawIceHazards(
+  ctx: CanvasRenderingContext2D,
+  hazards: MinigolfRect[],
+  _walls: MinigolfRect[],
+  scale: number,
+  palette: MinigolfPalette,
+): void {
+  if (hazards.length === 0) return;
+  for (const hazard of hazards) {
+    const x = hazard.x * scale;
+    const y = hazard.y * scale;
+    const ww = hazard.w * scale;
+    const wh = hazard.h * scale;
+
+    ctx.fillStyle = palette.hazardFill;
+    ctx.fillRect(x, y, ww, wh);
+
+    const inset = Math.max(2, 2 * scale);
+    const innerX = x + inset;
+    const innerY = y + inset;
+    const innerW = Math.max(0, ww - inset * 2);
+    const innerH = Math.max(0, wh - inset * 2);
+    if (innerW > 0 && innerH > 0) {
+      const gleamW = Math.max(2, innerW * 0.45);
+      const gleamH = Math.max(1, innerH * 0.22);
+      ctx.fillStyle = palette.hazardHighlight;
+      ctx.globalAlpha = 0.35;
+      ctx.fillRect(innerX, innerY, gleamW, gleamH);
+      const gleam2Y = innerY + innerH * 0.55;
+      const gleam2W = Math.max(2, innerW * 0.35);
+      const gleam2H = Math.max(1, innerH * 0.15);
+      ctx.globalAlpha = 0.2;
+      ctx.fillRect(innerX + innerW * 0.1, gleam2Y, gleam2W, gleam2H);
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.strokeStyle = palette.hazardEdge;
+    ctx.lineWidth = obstacleEdgeWidth(scale);
+    ctx.strokeRect(x, y, ww, wh);
+  }
+}
+
 export function drawWaterHazards(
   ctx: CanvasRenderingContext2D,
   hazards: MinigolfRect[],

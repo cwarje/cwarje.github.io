@@ -18,7 +18,7 @@ export interface MinigolfVec {
 export interface MinigolfCourse {
   /** Axis-aligned wall rectangles, including the four border walls. */
   walls: MinigolfRect[];
-  /** Non-solid hazards — ball sinks and resets to last stroke position when its center enters. */
+  /** Sink hazards on classic/desert; frozen ice patches on tundra (same rects, theme-dependent behavior). */
   waterHazards: MinigolfRect[];
   /** Desert-only slow zones — ball slows heavily but does not sink. */
   sandTraps?: MinigolfRect[];

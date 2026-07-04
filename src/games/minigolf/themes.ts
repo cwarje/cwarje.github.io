@@ -41,8 +41,11 @@ export interface MinigolfChrome {
   summaryPanelBorder: string;
 }
 
+export type MinigolfHazardKind = 'water' | 'ice';
+
 export interface MinigolfThemeConfig {
   label: string;
+  hazardKind: MinigolfHazardKind;
   friction: MinigolfFriction;
   generation: MinigolfGenerationWeights;
   palette: MinigolfPalette;
@@ -52,18 +55,19 @@ export interface MinigolfThemeConfig {
 export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> = {
   classic: {
     label: 'Classic',
+    hazardKind: 'water',
     friction: { mult: 0.978, linear: 0.003 },
     generation: { gateChance: 0.55, hazardBlockChance: 0.5 },
     palette: {
       fairwayBase: '#2e8b45',
       fairwayAlt: '#37a04f',
-      wallFill: '#8a6337',
-      wallEdge: '#5f4224',
+      wallFill: '#7a4f2a',
+      wallEdge: '#4a3018',
       hazardFill: '#1e78c8',
       hazardEdge: '#1a5a8a',
       hazardHighlight: '#4da6e8',
-      sandTrapFill: '#c4a35a',
-      sandTrapEdge: '#9a7a3a',
+      sandTrapFill: '#f8ecc0',
+      sandTrapEdge: '#d8bc78',
       cupFill: '#10241a',
       teeStroke: 'rgba(255,255,255,0.35)',
     },
@@ -75,18 +79,19 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
   },
   desert: {
     label: 'Desert',
+    hazardKind: 'water',
     friction: { mult: 0.968, linear: 0.005, sandTrapMult: 0.9 },
     generation: { gateChance: 0.4, hazardBlockChance: 0.65, sandTrapSplit: 0.6 },
     palette: {
       fairwayBase: '#c4a35a',
       fairwayAlt: '#d4b86a',
-      wallFill: '#b8874a',
-      wallEdge: '#8a6337',
-      hazardFill: '#3a8a7a',
-      hazardEdge: '#2a6a5a',
-      hazardHighlight: '#5ab8a0',
-      sandTrapFill: '#a07840',
-      sandTrapEdge: '#7a5a28',
+      wallFill: '#b88858',
+      wallEdge: '#7a6040',
+      hazardFill: '#2a8ec8',
+      hazardEdge: '#1a5a8a',
+      hazardHighlight: '#6ec0f0',
+      sandTrapFill: '#f8ecc0',
+      sandTrapEdge: '#d8bc78',
       cupFill: '#3a2818',
       teeStroke: 'rgba(255,255,255,0.45)',
     },
@@ -98,18 +103,19 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
   },
   tundra: {
     label: 'Tundra',
+    hazardKind: 'ice',
     friction: { mult: 0.985, linear: 0.001 },
     generation: { gateChance: 0.7, hazardBlockChance: 0.45 },
     palette: {
       fairwayBase: '#e8f4fc',
       fairwayAlt: '#d0e8f0',
-      wallFill: '#7a8a9a',
-      wallEdge: '#5a6a7a',
-      hazardFill: '#a8d4f0',
-      hazardEdge: '#6a9ab8',
-      hazardHighlight: '#d0ecff',
-      sandTrapFill: '#c0d0e0',
-      sandTrapEdge: '#90a0b0',
+      wallFill: '#d0eeff',
+      wallEdge: '#7ab0cc',
+      hazardFill: '#a8d4f8',
+      hazardEdge: '#5090c8',
+      hazardHighlight: '#c8e8ff',
+      sandTrapFill: '#f8ecc0',
+      sandTrapEdge: '#d8bc78',
       cupFill: '#1a2838',
       teeStroke: 'rgba(80,120,160,0.4)',
     },
@@ -123,6 +129,10 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
 
 export function getMinigolfTheme(theme: MinigolfCourseTheme | undefined): MinigolfThemeConfig {
   return MINIGOLF_THEMES[theme ?? 'classic'];
+}
+
+export function isFrozenIceHazard(theme: MinigolfCourseTheme): boolean {
+  return MINIGOLF_THEMES[theme].hazardKind === 'ice';
 }
 
 export function getMinigolfThemeOptionLabel(option: MinigolfThemeOption): string {

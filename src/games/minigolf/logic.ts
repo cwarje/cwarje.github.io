@@ -16,7 +16,7 @@ import type {
   MinigolfRect,
   MinigolfState,
 } from './types';
-import { getMinigolfTheme } from './themes';
+import { getMinigolfTheme, isFrozenIceHazard } from './themes';
 
 export const MINIGOLF_TICK_MS = 33;
 export const DEFAULT_MINIGOLF_HOLE_COUNT = 9;
@@ -180,7 +180,7 @@ function stepBallsWithCollisions(
 
   let maxTravel = 0;
   for (let i = 0; i < balls.length; i++) {
-    applyBallFriction(balls[i], dtScale, friction.mult, friction.linear);
+    applyFrictionUnlessOnIce(balls[i], course, theme, dtScale, friction.mult, friction.linear);
     maxTravel = Math.max(maxTravel, Math.hypot(balls[i].vx, balls[i].vy) * dtScale);
   }
 
@@ -239,7 +239,7 @@ function stepBallsWithCollisions(
         done[i] = true;
         continue;
       }
-      if (ballInAnyWater(ball, course.waterHazards ?? [])) {
+      if (shouldSinkInHazard(theme, ballOnHazardSurface(ball, course))) {
         ball.vx = 0;
         ball.vy = 0;
         results[i].inWater = true;
@@ -267,6 +267,26 @@ function ballInAnyWater(ball: MinigolfBall, waterHazards: MinigolfRect[]): boole
   return false;
 }
 
+function ballOnHazardSurface(ball: MinigolfBall, course: MinigolfCourse): boolean {
+  return ballInAnyWater(ball, course.waterHazards ?? []);
+}
+
+function shouldSinkInHazard(theme: MinigolfCourseTheme, onHazard: boolean): boolean {
+  return onHazard && !isFrozenIceHazard(theme);
+}
+
+function applyFrictionUnlessOnIce(
+  ball: MinigolfBall,
+  course: MinigolfCourse,
+  theme: MinigolfCourseTheme,
+  dtScale: number,
+  frictionMult: number,
+  frictionLinear: number,
+): void {
+  if (isFrozenIceHazard(theme) && ballOnHazardSurface(ball, course)) return;
+  applyBallFriction(ball, dtScale, frictionMult, frictionLinear);
+}
+
 /**
  * Advances a ball one tick. Mutates and returns the passed-in ball (callers
  * pass a fresh copy). Returns whether the ball dropped into the cup.
@@ -281,16 +301,18 @@ export function stepBall(
   let speed = Math.hypot(ball.vx, ball.vy);
   if (speed <= 0) return { holed: false };
 
-  const newSpeed = Math.max(0, speed * Math.pow(friction.mult, dtScale) - friction.linear * dtScale);
-  if (newSpeed < STOP_SPEED) {
-    ball.vx = 0;
-    ball.vy = 0;
-    return { holed: false };
+  if (!(isFrozenIceHazard(theme) && ballOnHazardSurface(ball, course))) {
+    const newSpeed = Math.max(0, speed * Math.pow(friction.mult, dtScale) - friction.linear * dtScale);
+    if (newSpeed < STOP_SPEED) {
+      ball.vx = 0;
+      ball.vy = 0;
+      return { holed: false };
+    }
+    const scale = newSpeed / speed;
+    ball.vx *= scale;
+    ball.vy *= scale;
+    speed = newSpeed;
   }
-  const scale = newSpeed / speed;
-  ball.vx *= scale;
-  ball.vy *= scale;
-  speed = newSpeed;
 
   const travel = speed * dtScale;
   const steps = Math.max(1, Math.ceil(travel / (BALL_RADIUS * 0.75)));
@@ -323,7 +345,7 @@ export function stepBall(
       return { holed: true };
     }
 
-    if (ballInAnyWater(ball, course.waterHazards ?? [])) {
+    if (shouldSinkInHazard(theme, ballOnHazardSurface(ball, course))) {
       ball.vx = 0;
       ball.vy = 0;
       return { holed: false, inWater: true };

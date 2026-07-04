@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { MinigolfBall, MinigolfCourse, MinigolfPlayer, MinigolfState } from './types';
-import { getMinigolfTheme, type MinigolfCourseTheme } from './themes';
+import { getMinigolfTheme, isFrozenIceHazard, type MinigolfCourseTheme, type MinigolfPalette } from './themes';
 import { BALL_RADIUS, COURSE_H, COURSE_W, CUP_RADIUS } from './courseGen';
 import { MINIGOLF_TICK_MS, SINK_TICKS, isBallAtRest } from './logic';
-import { drawWaterHazards } from './waterRender';
+import { drawIceHazards, drawWaterHazards } from './waterRender';
 import {
   PLAYER_COLOR_HEX,
   getPlayerHudTextColor,
@@ -37,6 +37,221 @@ interface BoardFit {
 const FULL_POWER_DRAG_UNITS = 55;
 const MIN_POWER = 0.05;
 
+/** Match wall/sand trap stroke weight from waterRender.obstacleEdgeWidth. */
+function obstacleEdgeWidth(scale: number): number {
+  return Math.max(1, 0.4 * scale);
+}
+
+function drawWoodPlanks(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  palette: MinigolfPalette,
+  scale: number,
+) {
+  const plankGap = Math.max(3, 4 * scale);
+  const stripeH = Math.max(1, 0.5 * scale);
+  ctx.fillStyle = palette.wallEdge;
+  ctx.globalAlpha = 0.25;
+  for (let py = y + plankGap; py < y + h - stripeH; py += plankGap) {
+    ctx.fillRect(x, py, w, stripeH);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawSandstoneBricks(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  palette: MinigolfPalette,
+  scale: number,
+) {
+  const brickH = Math.max(3, 3 * scale);
+  const brickW = Math.max(5, 6 * scale);
+  const mortar = Math.max(1, 0.35 * scale);
+  const seedBase = Math.round(x * 19 + y * 37 + w * 11 + h * 23);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+
+  for (let row = 0, by = y; by < y + h; row++, by += brickH + mortar) {
+    const rowH = Math.min(brickH, y + h - by);
+    if (rowH <= 0) break;
+    const offset = (row % 2) * (brickW / 2);
+    for (let col = 0, bx = x + offset; bx < x + w; col++, bx += brickW + mortar) {
+      const bw = Math.min(brickW, x + w - bx);
+      if (bw <= 0) break;
+      const tone = sandSpeckFraction(seedBase + row * 17 + col * 31);
+      ctx.fillStyle = tone < 0.45 ? palette.wallFill : palette.wallEdge;
+      ctx.globalAlpha = tone < 0.45 ? 1 : 0.18;
+      ctx.fillRect(bx, by, bw, rowH);
+    }
+  }
+
+  ctx.globalAlpha = 0.45;
+  ctx.fillStyle = palette.wallEdge;
+  for (let row = 0, by = y; by < y + h; row++, by += brickH + mortar) {
+    const rowH = Math.min(brickH, y + h - by);
+    if (rowH <= 0) break;
+    const offset = (row % 2) * (brickW / 2);
+    ctx.fillRect(x, by + rowH, w, mortar);
+    for (let bx = x + offset + brickW; bx < x + w; bx += brickW + mortar) {
+      ctx.fillRect(bx - mortar, by, mortar, rowH);
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawIceBlocks(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  palette: MinigolfPalette,
+  scale: number,
+) {
+  const blockSize = Math.max(4, 4 * scale);
+  const seam = Math.max(1, 0.35 * scale);
+  const seedBase = Math.round(x * 23 + y * 41 + w * 13 + h * 29);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+
+  for (let row = 0, by = y; by < y + h; row++, by += blockSize + seam) {
+    const bh = Math.min(blockSize, y + h - by);
+    if (bh <= 0) break;
+    for (let col = 0, bx = x; bx < x + w; col++, bx += blockSize + seam) {
+      const bw = Math.min(blockSize, x + w - bx);
+      if (bw <= 0) break;
+      const tone = sandSpeckFraction(seedBase + row * 19 + col * 37);
+      ctx.fillStyle = tone < 0.55 ? palette.wallFill : 'rgba(255,255,255,0.45)';
+      ctx.globalAlpha = 1;
+      ctx.fillRect(bx, by, bw, bh);
+    }
+  }
+
+  ctx.fillStyle = palette.wallEdge;
+  ctx.globalAlpha = 0.35;
+  for (let row = 0, by = y; by < y + h; row++, by += blockSize + seam) {
+    const bh = Math.min(blockSize, y + h - by);
+    if (bh <= 0) break;
+    ctx.fillRect(x, by + bh, w, seam);
+    for (let bx = x + blockSize; bx < x + w; bx += blockSize + seam) {
+      ctx.fillRect(bx - seam, by, seam, bh);
+    }
+  }
+
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.globalAlpha = 0.7;
+  for (let row = 0, by = y; by < y + h; row++, by += blockSize + seam) {
+    const bh = Math.min(blockSize, y + h - by);
+    if (bh <= 0) break;
+    for (let bx = x; bx < x + w; bx += blockSize + seam) {
+      const bw = Math.min(blockSize, x + w - bx);
+      if (bw <= 1) continue;
+      const gleamW = Math.max(1, bw * 0.4);
+      const gleamH = Math.max(1, bh * 0.3);
+      ctx.fillRect(bx + 1, by + 1, gleamW, gleamH);
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawWallRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  palette: MinigolfPalette,
+  scale: number,
+  theme: MinigolfCourseTheme,
+) {
+  ctx.fillStyle = palette.wallFill;
+  ctx.fillRect(x, y, w, h);
+
+  if (theme === 'desert') {
+    drawSandstoneBricks(ctx, x, y, w, h, palette, scale);
+  } else if (theme === 'tundra') {
+    drawIceBlocks(ctx, x, y, w, h, palette, scale);
+  } else {
+    drawWoodPlanks(ctx, x, y, w, h, palette, scale);
+  }
+
+  ctx.strokeStyle = palette.wallEdge;
+  ctx.lineWidth = obstacleEdgeWidth(scale);
+  ctx.strokeRect(x, y, w, h);
+}
+
+function sandSpeckFraction(seed: number): number {
+  let n = (seed * 2654435761) >>> 0;
+  n ^= n << 13;
+  n ^= n >>> 17;
+  n ^= n << 5;
+  return (n >>> 0) / 0xffffffff;
+}
+
+function drawSandTrapRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  palette: MinigolfPalette,
+  scale: number,
+) {
+  ctx.fillStyle = palette.sandTrapFill;
+  ctx.fillRect(x, y, w, h);
+
+  const speckSize = Math.max(1, 0.6 * scale);
+  const seedBase = Math.round(x * 17 + y * 31 + w * 7 + h * 13);
+  const speckCount = Math.max(4, Math.floor((w * h) / (12 * scale * scale)));
+  for (let i = 0; i < speckCount; i++) {
+    const fx = sandSpeckFraction(seedBase + i * 3);
+    const fy = sandSpeckFraction(seedBase + i * 3 + 1);
+    const tone = sandSpeckFraction(seedBase + i * 3 + 2);
+    ctx.fillStyle = tone < 0.5 ? palette.sandTrapEdge : 'rgba(255,255,255,0.35)';
+    ctx.fillRect(x + fx * (w - speckSize), y + fy * (h - speckSize), speckSize, speckSize);
+  }
+
+  ctx.strokeStyle = palette.sandTrapEdge;
+  ctx.lineWidth = obstacleEdgeWidth(scale);
+  ctx.strokeRect(x, y, w, h);
+}
+
+function drawFlag(
+  ctx: CanvasRenderingContext2D,
+  cupX: number,
+  cupY: number,
+  scale: number,
+  timeMs: number,
+): void {
+  const poleH = 14 * scale;
+  const poleTopY = cupY - poleH;
+  const phase = timeMs * 0.002;
+  const tipX = cupX + 7 * scale + Math.sin(phase) * 0.75 * scale;
+  const tipY = poleTopY + 2.5 * scale + Math.sin(phase * 0.9 + 0.6) * 0.55 * scale;
+
+  ctx.beginPath();
+  ctx.moveTo(cupX, poleTopY);
+  ctx.lineTo(tipX, tipY);
+  ctx.lineTo(cupX, poleTopY + 5 * scale);
+  ctx.closePath();
+  ctx.fillStyle = '#ef4444';
+  ctx.fill();
+}
+
 function drawCourse(
   ctx: CanvasRenderingContext2D,
   course: MinigolfCourse,
@@ -62,15 +277,15 @@ function drawCourse(
 
   // Sand traps (desert slow zones).
   for (const trap of course.sandTraps ?? []) {
-    const x = trap.x * scale;
-    const y = trap.y * scale;
-    const tw = trap.w * scale;
-    const th = trap.h * scale;
-    ctx.fillStyle = palette.sandTrapFill;
-    ctx.fillRect(x, y, tw, th);
-    ctx.strokeStyle = palette.sandTrapEdge;
-    ctx.lineWidth = Math.max(1, 0.4 * scale);
-    ctx.strokeRect(x, y, tw, th);
+    drawSandTrapRect(
+      ctx,
+      trap.x * scale,
+      trap.y * scale,
+      trap.w * scale,
+      trap.h * scale,
+      palette,
+      scale,
+    );
   }
 
   // Tee marker.
@@ -80,7 +295,7 @@ function drawCourse(
   ctx.lineWidth = Math.max(1, 0.7 * scale);
   ctx.stroke();
 
-  // Cup with rim + flag.
+  // Cup with rim + pole (flag drawn dynamically each frame).
   const cupX = course.cup.x * scale;
   const cupY = course.cup.y * scale;
   const cupR = CUP_RADIUS * scale;
@@ -99,25 +314,14 @@ function drawCourse(
   ctx.moveTo(cupX, cupY);
   ctx.lineTo(cupX, cupY - poleH);
   ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(cupX, cupY - poleH);
-  ctx.lineTo(cupX + 7 * scale, cupY - poleH + 2.5 * scale);
-  ctx.lineTo(cupX, cupY - poleH + 5 * scale);
-  ctx.closePath();
-  ctx.fillStyle = '#ef4444';
-  ctx.fill();
 
   // Walls.
   for (const wall of course.walls) {
-    const x = wall.x * scale;
-    const y = wall.y * scale;
-    const ww = wall.w * scale;
-    const wh = wall.h * scale;
-    ctx.fillStyle = palette.wallFill;
-    ctx.fillRect(x, y, ww, wh);
-    ctx.strokeStyle = palette.wallEdge;
-    ctx.lineWidth = Math.max(1, 0.4 * scale);
-    ctx.strokeRect(x, y, ww, wh);
+    drawWallRect(ctx, wall.x * scale, wall.y * scale, wall.w * scale, wall.h * scale, palette, scale, theme);
+  }
+
+  if (isFrozenIceHazard(theme)) {
+    drawIceHazards(ctx, course.waterHazards ?? [], course.walls, scale, palette);
   }
 }
 
@@ -587,6 +791,7 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
   const meDone = !!me && (me.holed || me.gaveUp);
   const canStroke =
     !!me && state.phase === 'playing' && !meDone && isBallAtRest(me.ball) && me.sinkTicks === 0 && !state.gameOver;
+  const showDevRegenerate = import.meta.env.DEV && !state.gameOver;
 
   useEffect(() => {
     const el = containerRef.current;
@@ -710,6 +915,7 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
     courseCanvas.height = fit.boardHeight * dpr;
     const courseCtx = courseCanvas.getContext('2d');
     let cachedHoleIndex = -1;
+    let cachedCourse: MinigolfCourse | null = null;
 
     let raf = 0;
     const render = () => {
@@ -718,22 +924,36 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
       const prev = prevStateRef.current;
       const currentCourse = current.courses[current.holeIndex];
 
-      if (courseCtx && cachedHoleIndex !== current.holeIndex) {
+      if (
+        courseCtx &&
+        (cachedHoleIndex !== current.holeIndex || cachedCourse !== currentCourse)
+      ) {
         courseCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
         drawCourse(courseCtx, currentCourse, fit.scale, currentCourse.theme);
         cachedHoleIndex = current.holeIndex;
+        cachedCourse = currentCourse;
       }
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.drawImage(courseCanvas, 0, 0, fit.boardWidth, fit.boardHeight);
 
       const themePalette = getMinigolfTheme(currentCourse.theme).palette;
-      drawWaterHazards(
+      if (!isFrozenIceHazard(currentCourse.theme)) {
+        drawWaterHazards(
+          ctx,
+          currentCourse.waterHazards ?? [],
+          currentCourse.walls,
+          fit.scale,
+          themePalette,
+          now,
+        );
+      }
+
+      drawFlag(
         ctx,
-        currentCourse.waterHazards ?? [],
-        currentCourse.walls,
+        currentCourse.cup.x * fit.scale,
+        currentCourse.cup.y * fit.scale,
         fit.scale,
-        themePalette,
         now,
       );
 
@@ -857,6 +1077,16 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerCancel}
         />
+
+        {showDevRegenerate && (
+          <button
+            type="button"
+            onClick={() => onAction({ type: 'dev-regenerate-hole' })}
+            className="absolute right-3 top-3 z-30 rounded-md border border-amber-300/60 bg-amber-500/20 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/30 cursor-pointer"
+          >
+            Dev: new hole
+          </button>
+        )}
 
         {/* Hole info */}
         <div className="minigolf-rightHud">
