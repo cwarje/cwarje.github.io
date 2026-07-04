@@ -135,3 +135,43 @@ describe('LobbyMenu host leave button', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/');
   });
 });
+
+describe('LobbyMenu dealer speed', () => {
+  beforeEach(() => {
+    mockToast.mockClear();
+    mockNavigate.mockClear();
+  });
+
+  it('shows dealer speed for host in a card-dealing game', () => {
+    renderOpenLobbyMenu({
+      room: createRoomState({
+        gameType: 'hearts',
+        phase: 'playing',
+      }),
+    });
+
+    expect(screen.getByText('Dealer speed')).toBeInTheDocument();
+  });
+
+  it('hides dealer speed for host in a non-card game', () => {
+    renderOpenLobbyMenu({
+      room: createRoomState({
+        gameType: 'yahtzee',
+        phase: 'playing',
+      }),
+    });
+
+    expect(screen.queryByText('Dealer speed')).not.toBeInTheDocument();
+  });
+
+  it('hides dealer speed in lobby before a game starts', () => {
+    renderOpenLobbyMenu({
+      room: createRoomState({
+        gameType: null,
+        phase: 'lobby',
+      }),
+    });
+
+    expect(screen.queryByText('Dealer speed')).not.toBeInTheDocument();
+  });
+});

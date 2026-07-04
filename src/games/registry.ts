@@ -160,6 +160,8 @@ export interface GameDefinition {
 
   fullBoard?: boolean;
   hasHandZoom?: boolean;
+  /** When true, the game uses the shared card-dealing animation and dealer speed setting. */
+  hasCardDealing?: boolean;
   production?: boolean;
   hudTitleLines?: string[];
   /** When true, the floating HUD title is hidden until `isOver(state)` is true. */
@@ -315,6 +317,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     TitleExtra: HeartsTitleExtra,
     fullBoard: true,
     hasHandZoom: true,
+    hasCardDealing: true,
     production: true,
   },
 
@@ -362,6 +365,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     TitleExtra: PokerTitleExtra,
     fullBoard: true,
     hasHandZoom: true,
+    hasCardDealing: true,
     production: true,
   },
 
@@ -412,6 +416,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     ToolbarExtra: UpRiverToolbarExtra,
     fullBoard: true,
     hasHandZoom: true,
+    hasCardDealing: true,
     production: true,
     hudTitleLines: ['Up and Down', 'the River'],
   },
@@ -461,6 +466,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     Board: MobilizationBoard,
     fullBoard: true,
     hasHandZoom: true,
+    hasCardDealing: true,
     production: true,
     hudTitleLines: ['Mobilization'],
     TitleExtra: MobilizationTitleExtra,
@@ -513,6 +519,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     TitleExtra: TwelveTitleExtra,
     fullBoard: true,
     hasHandZoom: true,
+    hasCardDealing: true,
     production: true,
   },
 
@@ -606,6 +613,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     Board: CrossCribBoard,
     fullBoard: true,
     hasHandZoom: true,
+    hasCardDealing: true,
     production: true,
     hudTitleLines: ['Cross Crib'],
     TitleExtra: CrossCribTitleExtra,
@@ -655,6 +663,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     TitleExtra: CribbageTitleExtra,
     fullBoard: true,
     hasHandZoom: true,
+    hasCardDealing: true,
     production: true,
     hudTitleLines: ['Cribbage'],
   },
@@ -709,6 +718,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     ToolbarExtra: CasinoToolbarExtra,
     fullBoard: true,
     hasHandZoom: true,
+    hasCardDealing: true,
     production: true,
     hudTitleLines: ['Casino'],
   },
@@ -853,6 +863,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     TitleExtra: CucumberTitleExtra,
     fullBoard: true,
     hasHandZoom: true,
+    hasCardDealing: true,
     production: true,
     showNewBadge: true,
     hudTitleLines: ['Cucumber'],
@@ -902,11 +913,16 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     TitleExtra: GolfTitleExtra,
     fullBoard: true,
     hasHandZoom: false,
+    hasCardDealing: true,
     production: true,
     showNewBadge: true,
     hudTitleLines: ['Golf'],
   },
 };
+
+export function gameHasCardDealing(gameType: GameType | null): boolean {
+  return gameType != null && GAME_REGISTRY[gameType].hasCardDealing === true;
+}
 
 /** All registered game types */
 export const ALL_GAME_TYPES: GameType[] = [

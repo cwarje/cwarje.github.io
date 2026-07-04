@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import type { PlayerColor } from '../networking/types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 import { DEALER_SPEED_OPTIONS } from '../networking/dealerSpeed';
+import { gameHasCardDealing } from '../games/registry';
 
 type LobbyMenuProps = { variant?: 'default' | 'icon' };
 
@@ -211,7 +212,7 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                     <p className="text-[11px] text-surface-500">Share this code with friends to invite them</p>
                   </div>
 
-                  {isHost && (
+                  {isHost && gameHasCardDealing(room.gameType) && (
                     <div className="px-5 py-4 space-y-2">
                       <p className="text-[11px] font-medium text-surface-500 uppercase tracking-wider">Dealer speed</p>
                       <div className="flex gap-2">
