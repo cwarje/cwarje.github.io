@@ -806,7 +806,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     production: true,
     showBetaBadge: true,
-    hudTitleLines: ['Mini', 'Golf'],
+    hudTitleLines: ['Mini Golf'],
     hideHudTitleDuringPlay: true,
   },
 
