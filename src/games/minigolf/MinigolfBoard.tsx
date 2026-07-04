@@ -534,15 +534,12 @@ function ScorecardPlayerLabel({
   myId: string;
   isLeader: boolean;
 }) {
+  const displayName = player.id === myId ? 'You' : player.name;
   return (
-    <div className="minigolf-scorecardPlayerInner">
-      <span className="minigolf-scorecardCrown" aria-hidden={!isLeader}>
-        {isLeader ? '👑' : ''}
-      </span>
-      <span className="minigolf-scorecardPlayerName">
-        {player.id === myId ? 'You' : player.name}
-      </span>
-    </div>
+    <span className="minigolf-scorecardPlayerName">
+      {isLeader ? '👑 ' : ''}
+      {displayName}
+    </span>
   );
 }
 
@@ -554,6 +551,7 @@ interface ScorecardSectionProps {
   players: MinigolfPlayer[];
   myId: string;
   subtotalLabel: string;
+  grandTotalLabel?: string;
   highlightHole?: number;
   compact: boolean;
   leaderIds: Set<string>;
@@ -568,13 +566,32 @@ function ScorecardSection({
   players,
   myId,
   subtotalLabel,
+  grandTotalLabel,
   highlightHole,
   compact,
   leaderIds,
   themeRevealedUpTo,
 }: ScorecardSectionProps) {
   const holeCount = holeEnd - holeStart;
-  const holeColPct = `${Math.floor(66 / holeCount)}%`;
+  const holeColWidth = `calc((100% - 34%) / ${holeCount})`;
+  const holeHeaders = Array.from({ length: holeCount }, (_, i) => {
+    const holeIndex = holeStart + i;
+    const played = holeIndex < holesPlayed;
+    const themeRevealed = holeIndex <= themeRevealedUpTo;
+    const headerBg = themeRevealed
+      ? getMinigolfTheme(courses[holeIndex].theme).palette.fairwayBase
+      : SCORECARD_HEADER_NEUTRAL;
+    const headerText = themeRevealed ? scorecardHeaderTextColor(headerBg) : undefined;
+    return {
+      holeIndex,
+      played,
+      par: courses[holeIndex].par,
+      headerBg,
+      headerText,
+      highlightClass:
+        highlightHole === holeIndex ? 'minigolf-scorecardCol--highlight' : undefined,
+    };
+  });
 
   return (
     <div className="minigolf-scorecardScroll">
@@ -582,54 +599,62 @@ function ScorecardSection({
         <colgroup>
           <col className="minigolf-scorecardCol--player" />
           {Array.from({ length: holeCount }, (_, i) => (
-            <col key={i} style={{ width: holeColPct }} />
+            <col key={i} style={{ width: holeColWidth }} />
           ))}
-          <col className="minigolf-scorecardCol--total" />
+          <col
+            className={
+              grandTotalLabel ? 'minigolf-scorecardCol--totalHalf' : 'minigolf-scorecardCol--total'
+            }
+          />
+          {grandTotalLabel && <col className="minigolf-scorecardCol--totalHalf" />}
         </colgroup>
         <thead>
           <tr>
-            <th className="minigolf-scorecardPlayerHead">
-              <div className="minigolf-scorecardPlayerInner">
-                <span className="minigolf-scorecardCrown" aria-hidden />
-                <span className="minigolf-scorecardPlayerHeadLabel">Player</span>
-              </div>
-            </th>
-            {Array.from({ length: holeCount }, (_, i) => {
-              const holeIndex = holeStart + i;
-              const played = holeIndex < holesPlayed;
-              const themeRevealed = holeIndex <= themeRevealedUpTo;
-              const headerBg = themeRevealed
-                ? getMinigolfTheme(courses[holeIndex].theme).palette.fairwayBase
-                : SCORECARD_HEADER_NEUTRAL;
-              const headerText = themeRevealed
-                ? scorecardHeaderTextColor(headerBg)
-                : undefined;
-              return (
-                <th
-                  key={holeIndex}
-                  className={highlightHole === holeIndex ? 'minigolf-scorecardCol--highlight' : undefined}
-                  style={{
-                    background: headerBg,
-                    ...(headerText ? { color: headerText } : {}),
-                  }}
-                >
-                  <span className="minigolf-scorecardHoleNum">{holeIndex + 1}</span>
-                  {played && (
-                    <span
-                      className="minigolf-scorecardPar"
-                      style={
-                        headerText
-                          ? { background: scorecardParBadgeBackground(headerText) }
-                          : { background: 'rgba(0, 0, 0, 0.06)' }
-                      }
-                    >
-                      par {courses[holeIndex].par}
-                    </span>
-                  )}
-                </th>
-              );
-            })}
+            <th className="minigolf-scorecardPlayerHead minigolf-scorecardCornerHead" aria-hidden="true" />
+            {holeHeaders.map(({ holeIndex, headerBg, headerText, highlightClass }) => (
+              <th
+                key={holeIndex}
+                className={highlightClass}
+                style={{
+                  background: headerBg,
+                  ...(headerText ? { color: headerText } : {}),
+                }}
+              >
+                <span className="minigolf-scorecardHoleNum">{holeIndex + 1}</span>
+              </th>
+            ))}
             <th className="minigolf-scorecardSubtotalHead">{subtotalLabel}</th>
+            {grandTotalLabel && (
+              <th className="minigolf-scorecardSubtotalHead">{grandTotalLabel}</th>
+            )}
+          </tr>
+          <tr className="minigolf-scorecardParRow">
+            <th className="minigolf-scorecardPlayerHead minigolf-scorecardCornerHead" aria-hidden="true" />
+            {holeHeaders.map(({ holeIndex, played, par, headerBg, headerText, highlightClass }) => (
+              <th
+                key={holeIndex}
+                className={highlightClass}
+                style={{
+                  background: headerBg,
+                  ...(headerText ? { color: headerText } : {}),
+                }}
+              >
+                {played && (
+                  <span
+                    className="minigolf-scorecardPar"
+                    style={
+                      headerText
+                        ? { background: scorecardParBadgeBackground(headerText) }
+                        : { background: 'rgba(0, 0, 0, 0.06)' }
+                    }
+                  >
+                    {par}
+                  </span>
+                )}
+              </th>
+            ))}
+            <th className="minigolf-scorecardSubtotalHead" />
+            {grandTotalLabel && <th className="minigolf-scorecardSubtotalHead" />}
           </tr>
         </thead>
         <tbody>
@@ -640,6 +665,8 @@ function ScorecardSection({
               playedInSection > 0 ? sectionTotal(p, holeStart, playedEnd) : null;
             const isLeader = leaderIds.has(p.id);
             const subtotalCellIndex = 1 + holeCount;
+            const grandTotalCellIndex = grandTotalLabel ? subtotalCellIndex + 1 : null;
+            const grandTotal = grandTotalLabel ? completedTotal(p) : null;
             return (
               <tr key={p.id}>
                 <td
@@ -675,6 +702,14 @@ function ScorecardSection({
                 >
                   {subtotal ?? '–'}
                 </td>
+                {grandTotalCellIndex != null && (
+                  <td
+                    style={{ background: getScorecardCellBackground(p.color, grandTotalCellIndex) }}
+                    className={`minigolf-scorecardSubtotal minigolf-scorecardTintedCell${isLeader ? ' minigolf-scorecardSubtotal--leader' : ''}`}
+                  >
+                    {grandTotal}
+                  </td>
+                )}
               </tr>
             );
           })}
@@ -714,60 +749,22 @@ function Scorecard({ state, myId }: { state: MinigolfState; myId: string }) {
           themeRevealedUpTo={themeRevealedUpTo}
         />
       </div>
-      {holesPlayed > 9 && (
-        <div>
-          <p className="minigolf-scorecardSectionLabel">Back 9</p>
-          <ScorecardSection
-            holeStart={9}
-            holeEnd={18}
-            holesPlayed={holesPlayed}
-            courses={state.courses}
-            players={players}
-            myId={myId}
-            subtotalLabel="IN"
-            highlightHole={highlightHole}
-            compact={compact}
-            leaderIds={leaderIds}
-            themeRevealedUpTo={themeRevealedUpTo}
-          />
-        </div>
-      )}
-      <div className="minigolf-scorecardScroll">
-        <table className={`minigolf-scorecard minigolf-scorecard--grandTotal${compact ? ' minigolf-scorecard--compact' : ''}`}>
-          <colgroup>
-            <col className="minigolf-scorecardCol--player" />
-            <col />
-            <col className="minigolf-scorecardCol--total" />
-          </colgroup>
-          <tbody>
-            {players.map((p) => {
-              const total = completedTotal(p);
-              const isLeader = leaderIds.has(p.id);
-              return (
-                <tr key={p.id}>
-                  <td
-                    className="minigolf-scorecardPlayerCell minigolf-scorecardTintedCell"
-                    style={{ background: getScorecardCellBackground(p.color, 0) }}
-                  >
-                    <ScorecardPlayerLabel player={p} myId={myId} isLeader={isLeader} />
-                  </td>
-                  <td
-                    className="minigolf-scorecardGrandLabel minigolf-scorecardTintedCell"
-                    style={{ background: getScorecardCellBackground(p.color, 1) }}
-                  >
-                    Total
-                  </td>
-                  <td
-                    style={{ background: getScorecardCellBackground(p.color, 2) }}
-                    className={`minigolf-scorecardGrandTotal minigolf-scorecardTintedCell${isLeader ? ' minigolf-scorecardGrandTotal--leader' : ''}`}
-                  >
-                    {total}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div>
+        <p className="minigolf-scorecardSectionLabel">Back 9</p>
+        <ScorecardSection
+          holeStart={9}
+          holeEnd={18}
+          holesPlayed={holesPlayed}
+          courses={state.courses}
+          players={players}
+          myId={myId}
+          subtotalLabel="IN"
+          grandTotalLabel="TOT"
+          highlightHole={highlightHole}
+          compact={compact}
+          leaderIds={leaderIds}
+          themeRevealedUpTo={themeRevealedUpTo}
+        />
       </div>
     </div>
   ) : (
