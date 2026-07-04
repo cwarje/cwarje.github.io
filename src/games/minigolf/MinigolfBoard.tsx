@@ -180,6 +180,8 @@ function drawWallRect(
     drawSandstoneBricks(ctx, x, y, w, h, palette, scale);
   } else if (theme === 'tundra') {
     drawIceBlocks(ctx, x, y, w, h, palette, scale);
+  } else if (theme === 'chocolate') {
+    // flat fill — palette.wallFill only
   } else {
     drawWoodPlanks(ctx, x, y, w, h, palette, scale);
   }
