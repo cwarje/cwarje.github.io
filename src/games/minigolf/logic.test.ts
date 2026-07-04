@@ -486,6 +486,70 @@ describe('minigolf hole advancement and winners', () => {
   });
 });
 
+describe('minigolf dev regenerate hole', () => {
+  it('replaces the current hole and resets players while preserving prior hole scores', () => {
+    let state = makeState(2);
+    const priorCourse = state.courses[1];
+    state = {
+      ...state,
+      holeIndex: 1,
+      players: state.players.map((p) => ({
+        ...p,
+        strokes: 4,
+        holed: false,
+        ball: { x: 60, y: 80, vx: 1.2, vy: 0 },
+        scores: [3],
+      })),
+    };
+
+    const next = processMinigolfAction(state, { type: 'dev-regenerate-hole' }, 'p1') as MinigolfState;
+
+    expect(next.holeIndex).toBe(1);
+    expect(next.phase).toBe('playing');
+    expect(next.summaryTicks).toBe(0);
+    expect(next.courses[1]).not.toBe(priorCourse);
+    for (const p of next.players) {
+      expect(p.strokes).toBe(0);
+      expect(p.holed).toBe(false);
+      expect(p.gaveUp).toBe(false);
+      expect(p.scores).toEqual([3]);
+      expect(p.ball.vx).toBe(0);
+      expect(p.ball.vy).toBe(0);
+    }
+  });
+
+  it('clears the current hole score when triggered during summary', () => {
+    let state = makeState(2);
+    state = {
+      ...state,
+      holeIndex: 1,
+      phase: 'summary',
+      summaryTicks: SUMMARY_TICKS,
+      players: state.players.map((p) => ({
+        ...p,
+        holed: true,
+        strokes: 2,
+        scores: [3, 2],
+      })),
+    };
+
+    const next = processMinigolfAction(state, { type: 'dev-regenerate-hole' }, 'p1') as MinigolfState;
+
+    expect(next.phase).toBe('playing');
+    for (const p of next.players) {
+      expect(p.scores).toEqual([3]);
+      expect(p.strokes).toBe(0);
+      expect(p.holed).toBe(false);
+    }
+  });
+
+  it('is a no-op when the game is over', () => {
+    let state = makeState(2);
+    state = { ...state, gameOver: true, phase: 'game-over' as const };
+    expect(processMinigolfAction(state, { type: 'dev-regenerate-hole' }, 'p1')).toBe(state);
+  });
+});
+
 describe('minigolf bots', () => {
   it('runBotTurn is a no-op (bots act inside the tick)', () => {
     const state = makeState(1);

@@ -74,4 +74,5 @@ export interface MinigolfState {
 export type MinigolfAction =
   | { type: 'stroke'; angle: number; power: number }
   | { type: 'next-hole' }
-  | { type: 'tick'; dt: number };
+  | { type: 'tick'; dt: number }
+  | { type: 'dev-regenerate-hole' };

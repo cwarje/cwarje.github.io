@@ -4,6 +4,7 @@ import type { MinigolfBall, MinigolfCourse, MinigolfPlayer, MinigolfState } from
 import { getMinigolfTheme, type MinigolfCourseTheme } from './themes';
 import { BALL_RADIUS, COURSE_H, COURSE_W, CUP_RADIUS } from './courseGen';
 import { MINIGOLF_TICK_MS, SINK_TICKS, isBallAtRest } from './logic';
+import { drawWaterHazards } from './waterRender';
 import {
   PLAYER_COLOR_HEX,
   getPlayerHudTextColor,
@@ -105,22 +106,6 @@ function drawCourse(
   ctx.closePath();
   ctx.fillStyle = '#ef4444';
   ctx.fill();
-
-  // Sink hazards (water, quicksand, cracked ice).
-  for (const water of course.waterHazards ?? []) {
-    const x = water.x * scale;
-    const y = water.y * scale;
-    const ww = water.w * scale;
-    const wh = water.h * scale;
-    ctx.fillStyle = palette.hazardFill;
-    ctx.fillRect(x, y, ww, wh);
-    const inset = Math.max(1, 0.6 * scale);
-    ctx.fillStyle = palette.hazardHighlight;
-    ctx.fillRect(x + inset, y + inset, Math.max(0, ww - inset * 2), Math.max(0, wh - inset * 2));
-    ctx.strokeStyle = palette.hazardEdge;
-    ctx.lineWidth = Math.max(1, 0.4 * scale);
-    ctx.strokeRect(x, y, ww, wh);
-  }
 
   // Walls.
   for (const wall of course.walls) {
@@ -741,6 +726,16 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.drawImage(courseCanvas, 0, 0, fit.boardWidth, fit.boardHeight);
+
+      const themePalette = getMinigolfTheme(currentCourse.theme).palette;
+      drawWaterHazards(
+        ctx,
+        currentCourse.waterHazards ?? [],
+        currentCourse.walls,
+        fit.scale,
+        themePalette,
+        now,
+      );
 
       const alpha = Math.min(1, (now - prevTimeRef.current) / MINIGOLF_TICK_MS);
 

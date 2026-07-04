@@ -4,6 +4,7 @@ import {
   CUP_RADIUS,
   TEE_STARTING_AREA_RADIUS,
   generateCourses,
+  generateHole,
   type Rng,
 } from './courseGen';
 import type {
@@ -459,6 +460,32 @@ function computeWinners(players: MinigolfPlayer[]): string[] {
   return totals.filter((t) => t.total === min).map((t) => t.id);
 }
 
+function devRegenerateCurrentHole(state: MinigolfState): MinigolfState {
+  const { holeIndex } = state;
+  const theme = state.courses[holeIndex].theme;
+  const newCourse = generateHole(Math.random, theme);
+  const courses = [...state.courses];
+  courses[holeIndex] = newCourse;
+
+  return {
+    ...state,
+    courses,
+    phase: 'playing',
+    summaryTicks: 0,
+    players: state.players.map((p, i) => ({
+      ...p,
+      ball: { ...teePosition(newCourse, i), vx: 0, vy: 0 },
+      strokes: 0,
+      holed: false,
+      gaveUp: false,
+      scores: p.scores.slice(0, holeIndex),
+      botNextStrokeTick: -1,
+      sinkTicks: 0,
+    })),
+    lastTickAt: Date.now(),
+  };
+}
+
 function advanceHole(state: MinigolfState): MinigolfState {
   const nextIndex = state.holeIndex + 1;
   if (nextIndex >= state.courses.length) {
@@ -703,6 +730,11 @@ export function processMinigolfAction(state: unknown, action: unknown, playerId:
   const a = action as MinigolfAction;
 
   if (!a || typeof a !== 'object' || !('type' in a)) return state;
+
+  if (import.meta.env.DEV && a.type === 'dev-regenerate-hole') {
+    if (s.gameOver) return state;
+    return devRegenerateCurrentHole(s);
+  }
 
   switch (a.type) {
     case 'stroke': {
