@@ -19,7 +19,7 @@ import type {
   MinigolfRect,
   MinigolfState,
 } from './types';
-import { getMinigolfTheme, isFrozenIceHazard } from './themes';
+import { getMinigolfTheme, isFrozenIceHazard, pickRandomCourseTheme } from './themes';
 
 export const MINIGOLF_TICK_MS = 33;
 export const DEFAULT_MINIGOLF_HOLE_COUNT = 9;
@@ -552,7 +552,7 @@ function computeWinners(players: MinigolfPlayer[]): string[] {
 
 function devRegenerateCurrentHole(state: MinigolfState): MinigolfState {
   const { holeIndex } = state;
-  const theme = state.courses[holeIndex].theme;
+  const theme = pickRandomCourseTheme(Math.random);
   const newCourse = generateHole(Math.random, theme, state.obstacles);
   const courses = [...state.courses];
   courses[holeIndex] = newCourse;

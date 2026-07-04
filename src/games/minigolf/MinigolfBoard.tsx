@@ -1116,7 +1116,7 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
             onClick={() => onAction({ type: 'dev-regenerate-hole' })}
             className="absolute right-3 top-3 z-30 rounded-md border border-amber-300/60 bg-amber-500/20 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/30 cursor-pointer"
           >
-            Dev: new hole
+            Dev: random hole
           </button>
         )}
 

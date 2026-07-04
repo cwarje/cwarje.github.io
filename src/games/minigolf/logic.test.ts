@@ -1,3 +1,4 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Player } from '../../networking/types';
 import {
   COURSE_H,
@@ -644,6 +645,31 @@ describe('minigolf hole advancement and winners', () => {
 });
 
 describe('minigolf dev regenerate hole', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('picks a random theme for the regenerated hole', () => {
+    let state = makeState(2);
+    state = {
+      ...state,
+      courses: state.courses.map((course, i) =>
+        i === 1 ? { ...course, theme: 'classic' as const } : course,
+      ),
+      holeIndex: 1,
+    };
+
+    let call = 0;
+    vi.spyOn(Math, 'random').mockImplementation(() => {
+      call++;
+      return call === 1 ? 0.4 : 0.5;
+    });
+
+    const next = processMinigolfAction(state, { type: 'dev-regenerate-hole' }, 'p1') as MinigolfState;
+
+    expect(next.courses[1].theme).toBe('desert');
+  });
+
   it('replaces the current hole and resets players while preserving prior hole scores', () => {
     let state = makeState(2);
     const priorCourse = state.courses[1];
