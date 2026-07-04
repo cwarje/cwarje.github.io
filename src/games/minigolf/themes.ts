@@ -104,7 +104,7 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
   tundra: {
     label: 'Tundra',
     hazardKind: 'ice',
-    obstacleEmoji: '🐧',
+    obstacleEmoji: '⛄️',
     friction: { mult: 0.985, linear: 0.001 },
     generation: { gateChance: 0.7, hazardBlockChance: 0.45 },
     palette: {
