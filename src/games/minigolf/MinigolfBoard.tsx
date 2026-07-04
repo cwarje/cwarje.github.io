@@ -418,12 +418,6 @@ function drawAim(
   ctx.restore();
 }
 
-function scoreLabel(score: number, par: number): string {
-  const diff = score - par;
-  if (diff === 0) return 'Par';
-  return diff > 0 ? `+${diff}` : `${diff}`;
-}
-
 function completedTotal(p: MinigolfPlayer): number {
   return p.scores.reduce((s, v) => s + (v ?? 0), 0);
 }
@@ -1117,49 +1111,36 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
           </button>
         )}
 
-        {/* Hole info */}
-        <div className="minigolf-rightHud">
-          <span className="minigolf-hudPill minigolf-hudPill--bold">
-            Hole {state.holeIndex + 1}/{state.courses.length}
-          </span>
-          <span className="minigolf-hudPill">Par {course.par}</span>
-          {me && (
-            <span className="minigolf-hudPill">
-              {me.holed
-                ? `Holed in ${me.strokes} (${scoreLabel(me.strokes, course.par)})`
-                : me.gaveUp
-                  ? 'Max strokes'
-                  : `Strokes: ${me.strokes}`}
-            </span>
-          )}
-        </div>
-
-        {/* Scorecard toggle + player status chips */}
+        {/* Scorecard toggle + hole info + player status chips */}
         <div className="minigolf-leftHud">
-          <button
-            type="button"
-            className={`minigolf-hudPill minigolf-scorecardBtn${manualScorecardOpen ? ' minigolf-scorecardBtn--active' : ''}`}
-            onClick={() => setScorecardOpen((open) => !open)}
-            aria-expanded={manualScorecardOpen}
-            aria-label="Toggle scorecard"
-          >
-            Scorecard
-          </button>
-          <div className="minigolf-chips">
-            {state.players.map((p) => (
-              <div key={p.id} className="minigolf-hudPill minigolf-hudPill--dark minigolf-chip">
-                <span
-                  className="minigolf-chipDot"
-                  style={{ background: PLAYER_COLOR_HEX[normalizePlayerColor(p.color)] }}
-                />
-                <span className="minigolf-chipName" style={{ color: getPlayerHudTextColor(p.color) }}>
-                  {`${p.id === myId ? 'You' : p.name} (${completedTotal(p)})`}
-                </span>
-                <span className="text-white/70">
-                  {p.holed ? '⛳' : p.gaveUp ? '✕' : p.strokes}
-                </span>
+          <div className="minigolf-hudGrid">
+            <div className="minigolf-scorecardCol">
+              <button
+                type="button"
+                className={`minigolf-hudPill minigolf-scorecardBtn${manualScorecardOpen ? ' minigolf-scorecardBtn--active' : ''}`}
+                onClick={() => setScorecardOpen((open) => !open)}
+                aria-expanded={manualScorecardOpen}
+                aria-label="Toggle scorecard"
+              >
+                Scorecard
+              </button>
+              <div className="minigolf-chips">
+                {state.players.map((p) => (
+                  <div key={p.id} className="minigolf-hudPill minigolf-hudPill--dark minigolf-chip">
+                    <span className="minigolf-chipName" style={{ color: getPlayerHudTextColor(p.color) }}>
+                      {p.id === myId ? 'You' : p.name}
+                    </span>
+                    <span className="text-white/70">
+                      {p.gaveUp ? '✕' : `${p.strokes}${p.holed ? ' ⛳' : ''}`}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+            <span className="minigolf-hudPill">
+              Hole {state.holeIndex + 1}/{state.courses.length}
+            </span>
+            <span className="minigolf-hudPill">Par {course.par}</span>
           </div>
         </div>
 

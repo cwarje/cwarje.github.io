@@ -3089,23 +3089,38 @@
   text-shadow: 0 0 40px rgba(255, 255, 255, 0.35);
 }
 
-.minigolf-rightHud {
-  position: absolute;
-  right: 0.75rem;
-  top: calc(0.75rem + 2.25rem + 0.35rem);
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+.minigolf-hudGrid {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  grid-template-rows: auto;
   gap: 0.35rem;
+  align-items: start;
   pointer-events: none;
 }
 
-@media (min-width: 640px) {
-  .minigolf-rightHud {
-    right: 1rem;
-    top: calc(1rem + 2.25rem + 0.35rem);
-  }
+.minigolf-scorecardCol {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: stretch;
+  width: fit-content;
+  min-width: 0;
+}
+
+.minigolf-scorecardCol .minigolf-chips {
+  min-width: 0;
+}
+
+.minigolf-hudGrid > .minigolf-hudPill:nth-child(2) {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.minigolf-hudGrid > .minigolf-hudPill:nth-child(3) {
+  grid-column: 3;
+  grid-row: 1;
 }
 
 .minigolf-hudPill {
@@ -3123,7 +3138,7 @@
 }
 
 .minigolf-hudPill--dark {
-  background: rgba(0, 0, 0, 0.92);
+  background: rgba(0, 0, 0, 0.55);
   color: #fff;
 }
 
@@ -3132,15 +3147,7 @@
   left: 0.5rem;
   top: 0.65rem;
   z-index: 20;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.35rem;
   pointer-events: none;
-}
-
-.minigolf-leftHud .minigolf-chips {
-  margin-top: 0.35rem;
 }
 
 .minigolf-scorecardBtn {
@@ -3161,33 +3168,36 @@
 .minigolf-chips {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 0.35rem;
   pointer-events: none;
 }
 
 .minigolf-chip.minigolf-hudPill {
-  font-size: 0.75rem;
-  padding: 0.3rem 0.65rem;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.75rem;
 }
 
 .minigolf-chip {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-}
-
-.minigolf-chipDot {
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 9999px;
-  flex-shrink: 0;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .minigolf-chipName {
-  max-width: 6.5rem;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.minigolf-chip > span:last-child {
+  flex-shrink: 0;
 }
 
 .minigolf-waiting {
