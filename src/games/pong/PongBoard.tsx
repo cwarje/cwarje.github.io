@@ -32,6 +32,27 @@ interface PongBoardProps {
   onAction: (action: unknown) => void;
 }
 
+type PongDirection = -1 | 0 | 1;
+
+const LEFT_KEYS = new Set(['ArrowLeft', 'a', 'A']);
+const RIGHT_KEYS = new Set(['ArrowRight', 'd', 'D']);
+const MOVEMENT_KEYS = new Set([...LEFT_KEYS, ...RIGHT_KEYS]);
+const PONG_INPUT_HEARTBEAT_MS = 100;
+
+function directionFromKeys(keys: Set<string>): PongDirection {
+  const hasLeft = [...keys].some((key) => LEFT_KEYS.has(key));
+  const hasRight = [...keys].some((key) => RIGHT_KEYS.has(key));
+  if (hasLeft && !hasRight) return -1;
+  if (hasRight && !hasLeft) return 1;
+  return 0;
+}
+
+function combineDirection(keyDir: PongDirection, pointerDir: PongDirection): PongDirection {
+  if (pointerDir !== 0 && keyDir !== 0 && pointerDir !== keyDir) return 0;
+  if (pointerDir !== 0) return pointerDir;
+  return keyDir;
+}
+
 function mixHexWithWhite(hex: string, whitePercent: number): string {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
@@ -251,7 +272,9 @@ export default function PongBoard({ state, myId, onAction }: PongBoardProps) {
   const stateRef = useRef<PongState>(state);
   const prevStateRef = useRef<PongState>(state);
   const prevTimeRef = useRef<number>(0);
-  const inputRef = useRef<-1 | 0 | 1>(0);
+  const inputRef = useRef<PongDirection>(0);
+  const pressedKeysRef = useRef(new Set<string>());
+  const pointerDirectionRef = useRef<PongDirection>(0);
   const myIdRef = useRef(myId);
 
   const me = state.players.find((p) => p.id === myId);
@@ -279,45 +302,95 @@ export default function PongBoard({ state, myId, onAction }: PongBoardProps) {
     return () => ro.disconnect();
   }, []);
 
-  const sendInput = useCallback(
-    (direction: -1 | 0 | 1) => {
-      if (inputRef.current === direction) return;
-      inputRef.current = direction;
-      onAction({ type: 'set-input', direction });
+  const getCurrentDirection = useCallback((): PongDirection => {
+    return combineDirection(
+      directionFromKeys(pressedKeysRef.current),
+      pointerDirectionRef.current,
+    );
+  }, []);
+
+  const sendInputIfChanged = useCallback(() => {
+    const direction = getCurrentDirection();
+    if (inputRef.current === direction) return;
+    inputRef.current = direction;
+    onAction({ type: 'set-input', direction });
+  }, [getCurrentDirection, onAction]);
+
+  const forceSyncInput = useCallback(() => {
+    const direction = getCurrentDirection();
+    inputRef.current = direction;
+    onAction({ type: 'set-input', direction });
+  }, [getCurrentDirection, onAction]);
+
+  const clearAllInput = useCallback(() => {
+    pressedKeysRef.current.clear();
+    pointerDirectionRef.current = 0;
+    inputRef.current = 0;
+    onAction({ type: 'set-input', direction: 0 });
+  }, [onAction]);
+
+  const setPointerDirection = useCallback(
+    (direction: PongDirection) => {
+      pointerDirectionRef.current = direction;
+      sendInputIfChanged();
     },
-    [onAction],
+    [sendInputIfChanged],
   );
 
   useEffect(() => {
     if (!canPlay) {
-      sendInput(0);
+      clearAllInput();
       return;
     }
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-        e.preventDefault();
-        sendInput(-1);
-      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-        e.preventDefault();
-        sendInput(1);
-      }
+      if (!MOVEMENT_KEYS.has(e.key)) return;
+      if (e.repeat) return;
+      e.preventDefault();
+      pressedKeysRef.current.add(e.key);
+      sendInputIfChanged();
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
-      if (['ArrowLeft', 'ArrowRight', 'a', 'A', 'd', 'D'].includes(e.key)) {
-        sendInput(0);
+      if (!MOVEMENT_KEYS.has(e.key)) return;
+      pressedKeysRef.current.delete(e.key);
+      sendInputIfChanged();
+    };
+
+    const onBlur = () => {
+      pressedKeysRef.current.clear();
+      pointerDirectionRef.current = 0;
+      forceSyncInput();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        onBlur();
       }
     };
 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
-      sendInput(0);
+      window.removeEventListener('blur', onBlur);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      clearAllInput();
     };
-  }, [canPlay, sendInput]);
+  }, [canPlay, clearAllInput, forceSyncInput, sendInputIfChanged]);
+
+  useEffect(() => {
+    if (!canPlay) return;
+
+    const heartbeat = setInterval(() => {
+      forceSyncInput();
+    }, PONG_INPUT_HEARTBEAT_MS);
+
+    return () => clearInterval(heartbeat);
+  }, [canPlay, forceSyncInput]);
 
   useEffect(() => {
     prevStateRef.current = stateRef.current;
@@ -550,26 +623,26 @@ export default function PongBoard({ state, myId, onAction }: PongBoardProps) {
           <button
             type="button"
             aria-label="Move paddle left"
-            className="flex h-full flex-1 items-center justify-center rounded-2xl bg-white/10 text-white active:bg-white/25"
-            onTouchStart={() => sendInput(-1)}
-            onTouchEnd={() => sendInput(0)}
-            onTouchCancel={() => sendInput(0)}
-            onMouseDown={() => sendInput(-1)}
-            onMouseUp={() => sendInput(0)}
-            onMouseLeave={() => sendInput(0)}
+            className="flex h-full flex-1 items-center justify-center rounded-2xl bg-white/10 text-white active:bg-white/25 touch-none"
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId);
+              setPointerDirection(-1);
+            }}
+            onPointerUp={() => setPointerDirection(0)}
+            onPointerCancel={() => setPointerDirection(0)}
           >
             <ChevronLeft className="h-12 w-12" />
           </button>
           <button
             type="button"
             aria-label="Move paddle right"
-            className="flex h-full flex-1 items-center justify-center rounded-2xl bg-white/10 text-white active:bg-white/25"
-            onTouchStart={() => sendInput(1)}
-            onTouchEnd={() => sendInput(0)}
-            onTouchCancel={() => sendInput(0)}
-            onMouseDown={() => sendInput(1)}
-            onMouseUp={() => sendInput(0)}
-            onMouseLeave={() => sendInput(0)}
+            className="flex h-full flex-1 items-center justify-center rounded-2xl bg-white/10 text-white active:bg-white/25 touch-none"
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId);
+              setPointerDirection(1);
+            }}
+            onPointerUp={() => setPointerDirection(0)}
+            onPointerCancel={() => setPointerDirection(0)}
           >
             <ChevronRight className="h-12 w-12" />
           </button>
