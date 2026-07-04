@@ -624,7 +624,7 @@ const BOT_MAX_DELAY_TICKS = Math.round(2400 / MINIGOLF_TICK_MS);
 
 function updatePlayerBeforePhysics(
   p: MinigolfPlayer,
-  playerIndex: number,
+  _playerIndex: number,
   course: MinigolfCourse,
   holeIndex: number,
   theme: MinigolfCourseTheme,

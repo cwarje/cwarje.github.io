@@ -142,7 +142,7 @@ function drawIceBlocks(
 
   ctx.fillStyle = palette.wallEdge;
   ctx.globalAlpha = 0.35;
-  for (let row = 0, by = y; by < y + h; row++, by += blockSize + seam) {
+  for (let by = y; by < y + h; by += blockSize + seam) {
     const bh = Math.min(blockSize, y + h - by);
     if (bh <= 0) break;
     ctx.fillRect(x, by + bh, w, seam);
@@ -153,7 +153,7 @@ function drawIceBlocks(
 
   ctx.fillStyle = 'rgba(255,255,255,0.65)';
   ctx.globalAlpha = 0.7;
-  for (let row = 0, by = y; by < y + h; row++, by += blockSize + seam) {
+  for (let by = y; by < y + h; by += blockSize + seam) {
     const bh = Math.min(blockSize, y + h - by);
     if (bh <= 0) break;
     for (let bx = x; bx < x + w; bx += blockSize + seam) {
