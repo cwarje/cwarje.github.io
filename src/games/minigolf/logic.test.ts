@@ -371,10 +371,11 @@ describe('minigolf water hazards', () => {
     expect(inWater).toBe(false);
   });
 
-  it('sinks then resets to tee with a +1 stroke penalty', () => {
+  it('sinks then resets to last stroke position with a +1 stroke penalty', () => {
     const water = [{ x: 40, y: 60, w: 20, h: 15 }];
     const course = courseWithWater(water);
     let state = makeState(1);
+    const lastStrokePos = { x: course.tee.x, y: course.tee.y };
     state = {
       ...state,
       courses: [course, ...state.courses.slice(1)],
@@ -383,6 +384,7 @@ describe('minigolf water hazards', () => {
           ? {
               ...p,
               ball: { x: 50, y: 65, vx: 0, vy: 0 },
+              lastStrokePos,
               strokes: 1,
               sinkTicks: SINK_TICKS,
             }
@@ -397,7 +399,61 @@ describe('minigolf water hazards', () => {
     expect(p1.sinkTicks).toBe(0);
     expect(isBallAtRest(p1.ball)).toBe(true);
     expect(p1.strokes).toBe(2);
-    expect(Math.hypot(p1.ball.x - course.tee.x, p1.ball.y - course.tee.y)).toBeLessThan(10);
+    expect(p1.ball.x).toBe(lastStrokePos.x);
+    expect(p1.ball.y).toBe(lastStrokePos.y);
+  });
+
+  it('respawns away from the tee when the last stroke was not from the tee', () => {
+    const water = [{ x: 40, y: 60, w: 20, h: 15 }];
+    const course = courseWithWater(water);
+    const lastStrokePos = { x: 30, y: 40 };
+    let state = makeState(1);
+    state = {
+      ...state,
+      courses: [course, ...state.courses.slice(1)],
+      players: state.players.map((p) =>
+        p.id === 'p1'
+          ? {
+              ...p,
+              ball: { x: 50, y: 65, vx: 0, vy: 0 },
+              lastStrokePos,
+              strokes: 2,
+              sinkTicks: SINK_TICKS,
+            }
+          : p,
+      ),
+    };
+
+    for (let i = 0; i < SINK_TICKS; i++) {
+      state = tick(state);
+    }
+    const p1 = state.players.find((p) => p.id === 'p1')!;
+    expect(p1.ball.x).toBe(lastStrokePos.x);
+    expect(p1.ball.y).toBe(lastStrokePos.y);
+    expect(Math.hypot(p1.ball.x - course.tee.x, p1.ball.y - course.tee.y)).toBeGreaterThan(10);
+  });
+
+  it('records last stroke position when the player hits the ball', () => {
+    const water = [{ x: 40, y: 60, w: 20, h: 15 }];
+    const course = courseWithWater(water);
+    let state = makeState(1);
+    state = {
+      ...state,
+      courses: [course, ...state.courses.slice(1)],
+      players: state.players.map((p) =>
+        p.id === 'p1'
+          ? {
+              ...p,
+              ball: { x: 30, y: 40, vx: 0, vy: 0 },
+              lastStrokePos: { x: course.tee.x, y: course.tee.y },
+            }
+          : p,
+      ),
+    };
+
+    state = processMinigolfAction(state, { type: 'stroke', angle: -Math.PI / 2, power: 0.5 }, 'p1') as MinigolfState;
+    const p1 = state.players.find((p) => p.id === 'p1')!;
+    expect(p1.lastStrokePos).toEqual({ x: 30, y: 40 });
   });
 });
 

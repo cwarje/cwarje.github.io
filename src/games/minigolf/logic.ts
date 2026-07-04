@@ -472,16 +472,20 @@ function devRegenerateCurrentHole(state: MinigolfState): MinigolfState {
     courses,
     phase: 'playing',
     summaryTicks: 0,
-    players: state.players.map((p, i) => ({
-      ...p,
-      ball: { ...teePosition(newCourse, i), vx: 0, vy: 0 },
-      strokes: 0,
-      holed: false,
-      gaveUp: false,
-      scores: p.scores.slice(0, holeIndex),
-      botNextStrokeTick: -1,
-      sinkTicks: 0,
-    })),
+    players: state.players.map((p, i) => {
+      const tee = teePosition(newCourse, i);
+      return {
+        ...p,
+        ball: { ...tee, vx: 0, vy: 0 },
+        lastStrokePos: { ...tee },
+        strokes: 0,
+        holed: false,
+        gaveUp: false,
+        scores: p.scores.slice(0, holeIndex),
+        botNextStrokeTick: -1,
+        sinkTicks: 0,
+      };
+    }),
     lastTickAt: Date.now(),
   };
 }
@@ -503,15 +507,19 @@ function advanceHole(state: MinigolfState): MinigolfState {
     holeIndex: nextIndex,
     phase: 'playing',
     summaryTicks: 0,
-    players: state.players.map((p, i) => ({
-      ...p,
-      ball: { ...teePosition(course, i), vx: 0, vy: 0 },
-      strokes: 0,
-      holed: false,
-      gaveUp: false,
-      botNextStrokeTick: -1,
-      sinkTicks: 0,
-    })),
+    players: state.players.map((p, i) => {
+      const tee = teePosition(course, i);
+      return {
+        ...p,
+        ball: { ...tee, vx: 0, vy: 0 },
+        lastStrokePos: { ...tee },
+        strokes: 0,
+        holed: false,
+        gaveUp: false,
+        botNextStrokeTick: -1,
+        sinkTicks: 0,
+      };
+    }),
   };
 }
 
@@ -536,11 +544,10 @@ function updatePlayerBeforePhysics(
     if (remaining > 0) {
       return { player: { ...p, sinkTicks: remaining }, changed: true, needsPhysics: false };
     }
-    const tee = teePosition(course, playerIndex);
     return {
       player: {
         ...p,
-        ball: { x: tee.x, y: tee.y, vx: 0, vy: 0 },
+        ball: { x: p.lastStrokePos.x, y: p.lastStrokePos.y, vx: 0, vy: 0 },
         strokes: p.strokes + 1,
         sinkTicks: 0,
         botNextStrokeTick: -1,
@@ -572,6 +579,7 @@ function updatePlayerBeforePhysics(
       return {
         player: {
           ...p,
+          lastStrokePos: { x: p.ball.x, y: p.ball.y },
           ball: { ...p.ball, vx, vy },
           strokes: p.strokes + 1,
           botNextStrokeTick: -1,
@@ -698,19 +706,23 @@ export function createMinigolfState(players: Player[], options?: GameStartOption
   const themeOption = options?.minigolfTheme ?? 'classic';
   const holeCount = options?.minigolfHoleCount ?? DEFAULT_MINIGOLF_HOLE_COUNT;
   const courses = generateCourses(holeCount, Math.random, themeOption);
-  const gamePlayers: MinigolfPlayer[] = players.slice(0, 8).map((p, i) => ({
-    id: p.id,
-    name: p.name,
-    color: p.color,
-    isBot: p.isBot,
-    ball: { ...teePosition(courses[0], i), vx: 0, vy: 0 },
-    strokes: 0,
-    holed: false,
-    gaveUp: false,
-    scores: [],
-    botNextStrokeTick: -1,
-    sinkTicks: 0,
-  }));
+  const gamePlayers: MinigolfPlayer[] = players.slice(0, 8).map((p, i) => {
+    const tee = teePosition(courses[0], i);
+    return {
+      id: p.id,
+      name: p.name,
+      color: p.color,
+      isBot: p.isBot,
+      ball: { ...tee, vx: 0, vy: 0 },
+      lastStrokePos: { ...tee },
+      strokes: 0,
+      holed: false,
+      gaveUp: false,
+      scores: [],
+      botNextStrokeTick: -1,
+      sinkTicks: 0,
+    };
+  });
 
   return {
     players: gamePlayers,
@@ -749,7 +761,12 @@ export function processMinigolfAction(state: unknown, action: unknown, playerId:
       const { vx, vy } = strokeVelocity(a.angle, Math.min(1, a.power));
       const players = s.players.map((p, i) =>
         i === idx
-          ? { ...p, ball: { ...p.ball, vx, vy }, strokes: p.strokes + 1 }
+          ? {
+              ...p,
+              lastStrokePos: { x: p.ball.x, y: p.ball.y },
+              ball: { ...p.ball, vx, vy },
+              strokes: p.strokes + 1,
+            }
           : p,
       );
       return { ...s, players };

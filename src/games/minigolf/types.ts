@@ -18,7 +18,7 @@ export interface MinigolfVec {
 export interface MinigolfCourse {
   /** Axis-aligned wall rectangles, including the four border walls. */
   walls: MinigolfRect[];
-  /** Non-solid hazards — ball sinks and resets to tee when its center enters. */
+  /** Non-solid hazards — ball sinks and resets to last stroke position when its center enters. */
   waterHazards: MinigolfRect[];
   /** Desert-only slow zones — ball slows heavily but does not sink. */
   sandTraps?: MinigolfRect[];
@@ -52,6 +52,8 @@ export interface MinigolfPlayer {
   botNextStrokeTick: number;
   /** Ticks remaining in the water-sink animation; 0 = normal play. */
   sinkTicks: number;
+  /** Ball position at the start of the most recent stroke; water penalty drop point. */
+  lastStrokePos: MinigolfVec;
 }
 
 export type MinigolfPhase = 'playing' | 'summary' | 'game-over';
