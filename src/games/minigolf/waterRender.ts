@@ -2,6 +2,8 @@ import { obstacleEdgeWidth } from './courseGen';
 import type { MinigolfRect } from './types';
 import type { MinigolfPalette } from './themes';
 
+const WATER_PHASE_SPEED = 0.00125;
+
 function parseHex(hex: string): [number, number, number] {
   const r = Number.parseInt(hex.slice(1, 3), 16);
   const g = Number.parseInt(hex.slice(3, 5), 16);
@@ -49,7 +51,7 @@ function drawAnimatedWater(
 
   const bandH = Math.max(2, 3 * scale);
   const amplitude = 2 * scale;
-  const phase = timeMs * 0.002;
+  const phase = timeMs * WATER_PHASE_SPEED;
 
   for (let i = 0; i < 3; i++) {
     const drift = Math.sin(phase + i * 1.4) * amplitude;
