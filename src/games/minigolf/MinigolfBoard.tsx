@@ -1062,19 +1062,21 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="minigolf-gameOver h-full flex flex-col items-center text-center px-4 overflow-y-auto"
+        className="minigolf-gameOver h-full overflow-y-auto px-4"
         style={{ background: themeConfig.chrome.boardBg }}
       >
-        <span className="text-7xl block mx-auto mt-6" aria-hidden>⛳</span>
-        <h2 className="text-3xl font-extrabold text-white mt-4">Game Over!</h2>
-        <p className="text-xl text-white/80 mt-2 mb-6">
-          {winners.length === 1
-            ? `${winners[0].id === myId ? 'You win' : `${winners[0].name} wins`}!`
-            : `Tie: ${winners.map((w) => (w.id === myId ? 'You' : w.name)).join(', ')}`}
-        </p>
-        <div className="w-full flex justify-center pb-6">
-          <div className="minigolf-summaryPanel minigolf-summaryPanel--light">
-            <Scorecard state={state} myId={myId} />
+        <div className="min-h-full flex flex-col items-center justify-center space-y-6 text-center py-8">
+          <span className="text-7xl block mx-auto" aria-hidden>⛳</span>
+          <h2 className="text-3xl font-extrabold text-white">Game Over!</h2>
+          <p className="text-xl text-white/80">
+            {winners.length === 1
+              ? `${winners[0].id === myId ? 'You win' : `${winners[0].name} wins`}!`
+              : `Tie: ${winners.map((w) => (w.id === myId ? 'You' : w.name)).join(', ')}`}
+          </p>
+          <div className="w-full flex justify-center">
+            <div className="minigolf-summaryPanel minigolf-summaryPanel--light">
+              <Scorecard state={state} myId={myId} />
+            </div>
           </div>
         </div>
       </motion.div>

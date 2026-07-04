@@ -3705,10 +3705,6 @@
   }
 }
 
-.minigolf-gameOver {
-  justify-content: flex-start;
-}
-
 .poker-center {
   position: absolute;
   inset: 0;
