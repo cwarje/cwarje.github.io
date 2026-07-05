@@ -74,6 +74,10 @@ export interface MinigolfPlayer {
   botNextStrokeTick: number;
   /** Ticks remaining in the water-sink animation; 0 = normal play. */
   sinkTicks: number;
+  /** True while sinkTicks counts down after cup capture (not a water penalty). */
+  holeSinkPending: boolean;
+  /** Ball position when cup capture started; used for the roll-in animation. */
+  holeCapturePos?: MinigolfVec;
   /** Ball position at the start of the most recent stroke; water penalty drop point. */
   lastStrokePos: MinigolfVec;
   /** Synced lobby XP snapshot for HUD level display. */

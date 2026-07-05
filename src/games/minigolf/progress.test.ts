@@ -22,6 +22,7 @@ function makePlayer(id: string, scores: number[]): MinigolfPlayer {
     scores,
     botNextStrokeTick: -1,
     sinkTicks: 0,
+    holeSinkPending: false,
     lastStrokePos: { x: 0, y: 0 },
   };
 }

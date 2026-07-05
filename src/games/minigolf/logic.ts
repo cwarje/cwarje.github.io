@@ -252,8 +252,6 @@ function stepBallsWithCollisions(
       const cupDist = Math.hypot(ball.x - course.cup.x, ball.y - course.cup.y);
       const currentSpeed = Math.hypot(ball.vx, ball.vy);
       if (cupDist < CUP_RADIUS && currentSpeed < CUP_CAPTURE_SPEED) {
-        ball.x = course.cup.x;
-        ball.y = course.cup.y;
         ball.vx = 0;
         ball.vy = 0;
         results[i].holed = true;
@@ -563,8 +561,6 @@ export function stepBall(
     const cupDist = Math.hypot(ball.x - course.cup.x, ball.y - course.cup.y);
     const currentSpeed = Math.hypot(ball.vx, ball.vy);
     if (cupDist < CUP_RADIUS && currentSpeed < CUP_CAPTURE_SPEED) {
-      ball.x = course.cup.x;
-      ball.y = course.cup.y;
       ball.vx = 0;
       ball.vy = 0;
       return { holed: true };
@@ -733,6 +729,7 @@ function devRegenerateCurrentHole(state: MinigolfState, devTheme: MinigolfDevThe
         scores: p.scores.slice(0, holeIndex),
         botNextStrokeTick: -1,
         sinkTicks: 0,
+        holeSinkPending: false,
       };
     }),
     lastTickAt: Date.now(),
@@ -769,6 +766,7 @@ function advanceHole(state: MinigolfState): MinigolfState {
         gaveUp: false,
         botNextStrokeTick: -1,
         sinkTicks: 0,
+        holeSinkPending: false,
       };
     }),
   };
@@ -795,12 +793,32 @@ function updatePlayerBeforePhysics(
     if (remaining > 0) {
       return { player: { ...p, sinkTicks: remaining }, changed: true, needsPhysics: false };
     }
+    if (p.holeSinkPending) {
+      return {
+        player: withRecordedScore(
+          {
+            ...p,
+            ball: { x: course.cup.x, y: course.cup.y, vx: 0, vy: 0 },
+            holed: true,
+            sinkTicks: 0,
+            holeSinkPending: false,
+            holeCapturePos: undefined,
+            botNextStrokeTick: -1,
+          },
+          holeIndex,
+          p.strokes,
+        ),
+        changed: true,
+        needsPhysics: false,
+      };
+    }
     return {
       player: {
         ...p,
         ball: { x: p.lastStrokePos.x, y: p.lastStrokePos.y, vx: 0, vy: 0 },
         strokes: p.strokes + 1,
         sinkTicks: 0,
+        holeSinkPending: false,
         botNextStrokeTick: -1,
       },
       changed: true,
@@ -854,10 +872,17 @@ function applyBallPhysicsResult(
   result: { holed: boolean; inWater?: boolean },
 ): MinigolfPlayer {
   if (result.inWater) {
-    return { ...p, ball, sinkTicks: SINK_TICKS, botNextStrokeTick: -1 };
+    return { ...p, ball, sinkTicks: SINK_TICKS, holeSinkPending: false, botNextStrokeTick: -1 };
   }
   if (result.holed) {
-    return withRecordedScore({ ...p, ball, holed: true }, holeIndex, p.strokes);
+    return {
+      ...p,
+      ball,
+      sinkTicks: SINK_TICKS,
+      holeSinkPending: true,
+      holeCapturePos: { x: ball.x, y: ball.y },
+      botNextStrokeTick: -1,
+    };
   }
   if (isBallAtRest(ball) && p.strokes >= course.par + STROKE_CAP_OVER_PAR) {
     return withRecordedScore({ ...p, ball, gaveUp: true }, holeIndex, giveUpScore(course.par));
@@ -1028,6 +1053,7 @@ export function createMinigolfState(players: Player[], options?: GameStartOption
       scores: [],
       botNextStrokeTick: -1,
       sinkTicks: 0,
+      holeSinkPending: false,
       minigolfXp: p.minigolfXp ?? 0,
     };
   });

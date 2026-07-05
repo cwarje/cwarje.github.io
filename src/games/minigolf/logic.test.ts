@@ -3,6 +3,7 @@ import type { Player } from '../../networking/types';
 import {
   COURSE_H,
   COURSE_W,
+  CUP_RADIUS,
   LANDMINE_COUNT_MAX,
   LANDMINE_COUNT_MIN,
   WALL_THICKNESS,
@@ -89,7 +90,8 @@ function tickUntilRest(state: MinigolfState, playerId: string, maxTicks = 500): 
   let s = state;
   for (let i = 0; i < maxTicks; i++) {
     const p = s.players.find((pl) => pl.id === playerId)!;
-    if (isBallAtRest(p.ball) || p.holed) return s;
+    if (p.holed || p.gaveUp) return s;
+    if (isBallAtRest(p.ball) && p.sinkTicks === 0) return s;
     s = tick(s);
   }
   return s;
@@ -351,8 +353,9 @@ describe('minigolf physics', () => {
       holed = stepBall(ball, course, 1).holed;
     }
     expect(holed).toBe(true);
-    expect(ball.x).toBe(course.cup.x);
-    expect(ball.y).toBe(course.cup.y);
+    expect(ball.vx).toBe(0);
+    expect(ball.vy).toBe(0);
+    expect(Math.hypot(ball.x - course.cup.x, ball.y - course.cup.y)).toBeLessThan(CUP_RADIUS);
   });
 
   it('does not capture a ball moving too fast over the cup', () => {
@@ -378,6 +381,52 @@ describe('minigolf physics', () => {
     const p1 = state.players.find((p) => p.id === 'p1')!;
     expect(p1.holed).toBe(true);
     expect(p1.scores[0]).toBe(3);
+  });
+
+  it('starts hole sink animation when the ball is captured', () => {
+    let state = makeState(1);
+    const course = state.courses[0];
+    state = {
+      ...state,
+      players: state.players.map((p) => ({
+        ...p,
+        ball: { x: course.cup.x, y: course.cup.y + 2, vx: 0, vy: -0.5 },
+        strokes: 2,
+      })),
+    };
+    state = tick(state);
+    const p1 = state.players.find((p) => p.id === 'p1')!;
+    expect(p1.holed).toBe(false);
+    expect(p1.holeSinkPending).toBe(true);
+    expect(p1.sinkTicks).toBe(SINK_TICKS);
+    expect(p1.holeCapturePos).toEqual({ x: p1.ball.x, y: p1.ball.y });
+    expect(Math.hypot(p1.ball.x - course.cup.x, p1.ball.y - course.cup.y)).toBeLessThan(CUP_RADIUS);
+  });
+
+  it('completes hole sink without stroke penalty', () => {
+    let state = makeState(1);
+    const course = state.courses[0];
+    state = {
+      ...state,
+      players: state.players.map((p) => ({
+        ...p,
+        ball: { x: course.cup.x, y: course.cup.y, vx: 0, vy: 0 },
+        strokes: 3,
+        sinkTicks: SINK_TICKS,
+        holeSinkPending: true,
+      })),
+    };
+    for (let i = 0; i < SINK_TICKS; i++) {
+      state = tick(state);
+    }
+    const p1 = state.players.find((p) => p.id === 'p1')!;
+    expect(p1.holed).toBe(true);
+    expect(p1.holeSinkPending).toBe(false);
+    expect(p1.sinkTicks).toBe(0);
+    expect(p1.strokes).toBe(3);
+    expect(p1.scores[0]).toBe(3);
+    expect(p1.ball.x).toBe(course.cup.x);
+    expect(p1.ball.y).toBe(course.cup.y);
   });
 
   function twoBallCollisionState(ballCollisions: boolean): MinigolfState {

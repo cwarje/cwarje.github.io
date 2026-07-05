@@ -614,11 +614,32 @@ function fitCourse(width: number, height: number): BoardFit {
 
 function interpolateBall(prev: MinigolfBall | undefined, cur: MinigolfBall, alpha: number): { x: number; y: number } {
   if (!prev) return { x: cur.x, y: cur.y };
-  // Snap on teleports (hole change, cup capture).
+  // Snap on teleports (hole change, course reset).
   if (Math.hypot(cur.x - prev.x, cur.y - prev.y) > 20) return { x: cur.x, y: cur.y };
   return {
     x: prev.x + (cur.x - prev.x) * alpha,
     y: prev.y + (cur.y - prev.y) * alpha,
+  };
+}
+
+/** Share of the hole-sink animation spent rolling the ball toward the cup center. */
+const HOLE_PULL_FRACTION = 0.4;
+
+function smoothstep(t: number): number {
+  return t * t * (3 - 2 * t);
+}
+
+function holeSinkDrawPos(
+  p: MinigolfPlayer,
+  cup: { x: number; y: number },
+  sinkProgress: number,
+): { x: number; y: number } {
+  const capture = p.holeCapturePos ?? p.ball;
+  const pullT = Math.min(1, sinkProgress / HOLE_PULL_FRACTION);
+  const pullEase = smoothstep(pullT);
+  return {
+    x: capture.x + (cup.x - capture.x) * pullEase,
+    y: capture.y + (cup.y - capture.y) * pullEase,
   };
 }
 
@@ -1387,11 +1408,6 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
       for (const p of ordered) {
         if (p.holed) continue;
         const prevPlayer = prev.players.find((pp) => pp.id === p.id);
-        const pos = interpolateBall(prevPlayer?.ball, p.ball, alpha);
-        const x = pos.x * fit.scale;
-        const y = pos.y * fit.scale;
-        const isMe = p.id === myIdRef.current;
-        const hex = PLAYER_COLOR_HEX[normalizePlayerColor(p.color)];
 
         const prevSinkTicks = prevPlayer?.sinkTicks ?? 0;
         const sinkTicks = p.sinkTicks;
@@ -1401,10 +1417,24 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
           prevSinkTicks > 0 || sinkTicks > 0
             ? prevSinkProgress + (curSinkProgress - prevSinkProgress) * alpha
             : 0;
+        const isHoleSink = p.holeSinkPending || (prevPlayer?.holeSinkPending ?? false);
         const sinking = sinkProgress > 0;
-        const ballPx = Math.max(3, BALL_RADIUS * fit.scale * (sinking ? 1 - sinkProgress * 0.85 : 1));
-        const ballAlpha = sinking ? 1 - sinkProgress : 1;
-        const sinkYOffset = sinking ? sinkProgress * ballPx : 0;
+        const shrinkProgress =
+          isHoleSink && sinking
+            ? Math.max(0, (sinkProgress - HOLE_PULL_FRACTION) / (1 - HOLE_PULL_FRACTION))
+            : sinkProgress;
+        const pos =
+          isHoleSink && sinking
+            ? holeSinkDrawPos(p, currentCourse.cup, sinkProgress)
+            : interpolateBall(prevPlayer?.ball, p.ball, alpha);
+        const x = pos.x * fit.scale;
+        const y = pos.y * fit.scale;
+        const isMe = p.id === myIdRef.current;
+        const hex = PLAYER_COLOR_HEX[normalizePlayerColor(p.color)];
+
+        const ballPx = Math.max(3, BALL_RADIUS * fit.scale * (sinking ? 1 - shrinkProgress * 0.85 : 1));
+        const ballAlpha = sinking ? 1 - shrinkProgress : 1;
+        const sinkYOffset = sinking && shrinkProgress > 0 ? shrinkProgress * ballPx : 0;
 
         ctx.save();
         ctx.globalAlpha = ballAlpha;
