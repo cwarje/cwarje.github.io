@@ -1,7 +1,12 @@
 import type { PlayerColor } from '../../networking/types';
-import type { MinigolfCourseTheme, MinigolfDevThemeOption, MinigolfThemeOption } from './themes';
+import type {
+  MinigolfCourseTheme,
+  MinigolfDevThemeOption,
+  MinigolfThemeOption,
+  ObstacleMotionKind,
+} from './themes';
 
-export type { MinigolfCourseTheme, MinigolfDevThemeOption, MinigolfThemeOption };
+export type { MinigolfCourseTheme, MinigolfDevThemeOption, MinigolfThemeOption, ObstacleMotionKind };
 
 export interface MinigolfRect {
   x: number;
@@ -19,6 +24,15 @@ export interface MinigolfLandmine {
   x: number;
   y: number;
   emoji: string;
+  motion?: ObstacleMotionKind;
+}
+
+/** Live patrol position for the current hole; index matches course.landmines. */
+export interface MinigolfLandmineMotion {
+  x: number;
+  y: number;
+  /** horizontal: true = moving right; vertical: true = moving down */
+  facingPositive: boolean;
 }
 
 export interface MinigolfCourse {
@@ -74,6 +88,8 @@ export interface MinigolfState {
   obstacles: boolean;
   /** Indices of detonated landmines on the current hole. */
   triggeredLandmines: number[];
+  /** Patrol positions for emoji obstacles on the current hole. */
+  landmineMotion?: MinigolfLandmineMotion[];
   /** All holes are generated up front so every client renders identical courses. */
   courses: MinigolfCourse[];
   holeIndex: number;

@@ -452,6 +452,25 @@ export function getMinigolfTheme(theme: MinigolfCourseTheme | undefined): Minigo
   return MINIGOLF_THEMES[theme ?? 'classic'];
 }
 
+export type ObstacleMotionKind = 'horizontal' | 'vertical';
+
+/** Boats, land animals, and sideways ocean swimmers. */
+const HORIZONTAL_OBSTACLE_EMOJIS = new Set<string>([
+  '⛵️', '🚤',
+  '🐪', '🐫', '🦍', '🐅', '🐆', '🐘', '🦛', '🦏', '🦒',
+  '🐖', '🐄', '🐐', '🦚', '🦘',
+  '🐳', '🐟', '🐠', '🐡',
+]);
+
+/** Floaters, fliers, and jellyfish — patrol vertically without flipping. */
+const VERTICAL_OBSTACLE_EMOJIS = new Set<string>(['👻', '🛸', '🪼']);
+
+export function getObstacleMotionKind(emoji: string): ObstacleMotionKind | null {
+  if (HORIZONTAL_OBSTACLE_EMOJIS.has(emoji)) return 'horizontal';
+  if (VERTICAL_OBSTACLE_EMOJIS.has(emoji)) return 'vertical';
+  return null;
+}
+
 export function pickObstacleEmoji(theme: MinigolfCourseTheme, rng: () => number): string {
   const emojis = MINIGOLF_THEMES[theme].obstacleEmojis;
   return emojis[Math.floor(rng() * emojis.length)];

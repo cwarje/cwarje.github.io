@@ -1,6 +1,7 @@
 import type { MinigolfCourse, MinigolfLandmine, MinigolfRect, MinigolfVec } from './types';
 import {
   getMinigolfTheme,
+  getObstacleMotionKind,
   pickObstacleEmoji,
   pickRandomCourseTheme,
   type MinigolfCourseTheme,
@@ -192,7 +193,9 @@ export function placeLandmines(
       if (Math.hypot(p.x - cup.x, p.y - cup.y) < CLEARANCE) continue;
       if (!pointClearOfWalls(p, walls)) continue;
       if (!pointClearOfLandmines(p, landmines)) continue;
-      landmines.push({ ...p, emoji: pickObstacleEmoji(theme, rng) });
+      const emoji = pickObstacleEmoji(theme, rng);
+      const motion = getObstacleMotionKind(emoji) ?? undefined;
+      landmines.push({ ...p, emoji, motion });
       break;
     }
   }

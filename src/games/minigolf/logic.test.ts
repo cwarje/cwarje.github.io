@@ -12,7 +12,7 @@ import {
   pathLengthCells,
   type Rng,
 } from './courseGen';
-import { MINIGOLF_COURSE_THEMES, MINIGOLF_THEMES } from './themes';
+import { MINIGOLF_COURSE_THEMES, MINIGOLF_THEMES, getObstacleMotionKind } from './themes';
 import {
   CUP_CAPTURE_SPEED,
   STROKE_CAP_OVER_PAR,
@@ -21,11 +21,13 @@ import {
   chooseBotStroke,
   createMinigolfState,
   getMinigolfWinners,
+  initLandmineMotion,
   isBallAtRest,
   isMinigolfOver,
   processMinigolfAction,
   runMinigolfBotTurn,
   stepBall,
+  stepLandmineMotion,
   strokeVelocity,
 } from './logic';
 import type { MinigolfBall, MinigolfCourse, MinigolfPlayer, MinigolfState } from './types';
@@ -511,6 +513,7 @@ describe('minigolf physics', () => {
       obstacles: true,
       courses: [course],
       triggeredLandmines: [],
+      landmineMotion: initLandmineMotion(course.landmines),
       players: base.players.map((p, i) =>
         i === 0
           ? { ...p, ball: { x: 50, y: 63, vx: 0, vy: 2 } }
@@ -525,6 +528,175 @@ describe('minigolf physics', () => {
     expect(
       afterB.vx !== beforeB.vx || afterB.vy !== beforeB.vy || afterB.x !== beforeB.x || afterB.y !== beforeB.y,
     ).toBe(true);
+  });
+});
+
+describe('minigolf landmine motion', () => {
+  it('classifies emoji motion kinds', () => {
+    expect(getObstacleMotionKind('🐄')).toBe('horizontal');
+    expect(getObstacleMotionKind('⛵️')).toBe('horizontal');
+    expect(getObstacleMotionKind('🐟')).toBe('horizontal');
+    expect(getObstacleMotionKind('👻')).toBe('vertical');
+    expect(getObstacleMotionKind('🪼')).toBe('vertical');
+    expect(getObstacleMotionKind('🌲')).toBeNull();
+    expect(getObstacleMotionKind('🌋')).toBeNull();
+  });
+
+  it('initializes landmine motion from course landmines', () => {
+    const landmines = [
+      { x: 40, y: 70, emoji: '🐄', motion: 'horizontal' as const },
+      { x: 50, y: 60, emoji: '🌲' },
+    ];
+    const motion = initLandmineMotion(landmines, () => 0)!;
+    expect(motion).toHaveLength(2);
+    expect(motion[0]).toEqual({ x: 40, y: 70, facingPositive: true });
+    expect(motion[1]).toEqual({ x: 50, y: 60, facingPositive: true });
+  });
+
+  it('patrols horizontal landmines and reverses at walls', () => {
+    const course: MinigolfCourse = {
+      ...openCourse(),
+      walls: [
+        ...openCourse().walls,
+        { x: 58, y: 60, w: 6, h: 20 },
+      ],
+      landmines: [{ x: 50, y: 70, emoji: '🐄', motion: 'horizontal' }],
+    };
+    let motion = initLandmineMotion(course.landmines, () => 0)!;
+    const triggered = new Set<number>();
+
+    for (let i = 0; i < 80; i++) {
+      const result = stepLandmineMotion(course, motion, triggered, 1);
+      motion = result.motion!;
+    }
+
+    expect(motion[0].facingPositive).toBe(false);
+    expect(motion[0].x).toBeLessThan(58);
+  });
+
+  it('patrols vertical landmines and reverses at walls', () => {
+    const course: MinigolfCourse = {
+      ...openCourse(),
+      walls: [
+        ...openCourse().walls,
+        { x: 42, y: 58, w: 16, h: 12 },
+      ],
+      landmines: [{ x: 50, y: 50, emoji: '👻', motion: 'vertical' }],
+    };
+    let motion = initLandmineMotion(course.landmines, () => 0)!;
+    const triggered = new Set<number>();
+
+    for (let i = 0; i < 80; i++) {
+      const result = stepLandmineMotion(course, motion, triggered, 1);
+      motion = result.motion!;
+    }
+
+    expect(motion[0].facingPositive).toBe(false);
+    expect(motion[0].y).toBeLessThan(58);
+  });
+
+  it('reverses at ocean border water but passes through interior ponds', () => {
+    const interiorPond = { x: 45, y: 60, w: 10, h: 15 };
+    const oceanCourse: MinigolfCourse = {
+      walls: [],
+      waterHazards: [...courseBorderWalls(), interiorPond],
+      tee: { x: 50, y: COURSE_H - 18 },
+      cup: { x: 50, y: 18 },
+      par: 2,
+      theme: 'ocean',
+      landmines: [{ x: 50, y: 65, emoji: '⛵️', motion: 'horizontal' }],
+    };
+
+    let throughPond = initLandmineMotion(
+      [{ x: 50, y: 65, emoji: '⛵️', motion: 'horizontal' }],
+      () => 0,
+    )!;
+    for (let i = 0; i < 40; i++) {
+      throughPond = stepLandmineMotion(oceanCourse, throughPond, new Set(), 1).motion!;
+    }
+    expect(throughPond[0].x).toBeGreaterThan(50);
+
+    const borderCourse: MinigolfCourse = {
+      ...oceanCourse,
+      landmines: [{ x: 90, y: 70, emoji: '⛵️', motion: 'horizontal' }],
+    };
+    let atBorder = initLandmineMotion(borderCourse.landmines, () => 0)!;
+    for (let i = 0; i < 80; i++) {
+      atBorder = stepLandmineMotion(borderCourse, atBorder, new Set(), 1).motion!;
+    }
+    expect(atBorder[0].facingPositive).toBe(false);
+    expect(atBorder[0].x).toBeLessThan(COURSE_W - WALL_THICKNESS);
+  });
+
+  it('leaves static landmines fixed while stepping motion', () => {
+    const course: MinigolfCourse = {
+      ...openCourse(),
+      landmines: [{ x: 50, y: 70, emoji: '🌲' }],
+    };
+    const motion = initLandmineMotion(course.landmines)!;
+    const result = stepLandmineMotion(course, motion, new Set(), 1);
+    expect(result.changed).toBe(false);
+    expect(result.motion![0]).toEqual({ x: 50, y: 70, facingPositive: true });
+  });
+
+  it('detonates using the live patrol position, not the spawn position', () => {
+    const course: MinigolfCourse = {
+      ...openCourse(),
+      landmines: [{ x: 40, y: 70, emoji: '🐄', motion: 'horizontal' }],
+    };
+    const landmineMotion = [{ x: 50, y: 70, facingPositive: true }];
+    const ballAtLivePos: MinigolfBall = { x: 50, y: 66, vx: 0, vy: 0.5 };
+    const ballAtSpawn: MinigolfBall = { x: 40, y: 66, vx: 0, vy: 0.5 };
+    const triggeredLive = new Set<number>();
+    const triggeredSpawn = new Set<number>();
+
+    stepBall(ballAtLivePos, course, 1, 'classic', triggeredLive, landmineMotion);
+    stepBall(ballAtSpawn, course, 1, 'classic', triggeredSpawn, landmineMotion);
+
+    expect(triggeredLive.has(0)).toBe(true);
+    expect(triggeredSpawn.has(0)).toBe(false);
+  });
+
+  it('steps landmine motion on tick even when balls are at rest', () => {
+    const course: MinigolfCourse = {
+      ...openCourse(),
+      landmines: [{ x: 50, y: 70, emoji: '🐄', motion: 'horizontal' }],
+    };
+    let state = makeState(1);
+    state = {
+      ...state,
+      obstacles: true,
+      courses: [course],
+      landmineMotion: initLandmineMotion(course.landmines, () => 0),
+    };
+    const beforeX = state.landmineMotion![0].x;
+    state = tick(state);
+    expect(state.landmineMotion![0].x).not.toBe(beforeX);
+  });
+
+  it('blasts a stationary ball when a moving obstacle patrols into it', () => {
+    const course: MinigolfCourse = {
+      ...openCourse(),
+      landmines: [{ x: 40, y: 70, emoji: '🐄', motion: 'horizontal' }],
+    };
+    let state = makeState(1);
+    state = {
+      ...state,
+      obstacles: true,
+      courses: [course],
+      landmineMotion: initLandmineMotion(course.landmines, () => 0),
+      players: state.players.map((p) => ({
+        ...p,
+        ball: { x: 46, y: 70, vx: 0, vy: 0 },
+      })),
+    };
+
+    for (let i = 0; i < 60 && !state.triggeredLandmines.includes(0); i++) {
+      state = tick(state);
+    }
+
+    expect(state.triggeredLandmines).toContain(0);
+    expect(Math.hypot(state.players[0].ball.vx, state.players[0].ball.vy)).toBeGreaterThan(0);
   });
 });
 

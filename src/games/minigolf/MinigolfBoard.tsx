@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import type { MinigolfBall, MinigolfCourse, MinigolfPlayer, MinigolfState } from './types';
+import type { MinigolfBall, MinigolfCourse, MinigolfLandmine, MinigolfLandmineMotion, MinigolfPlayer, MinigolfState } from './types';
 import { getMinigolfTheme, isFrozenIceHazard, isLavaHazard, MINIGOLF_DEV_THEME_OPTIONS, getMinigolfDevThemeOptionLabel, type MinigolfCourseTheme, type MinigolfDevThemeOption, type MinigolfPalette } from './themes';
 import { BALL_RADIUS, COURSE_H, COURSE_W, CUP_RADIUS, WALL_THICKNESS, obstacleEdgeWidth } from './courseGen';
 import { MINIGOLF_TICK_MS, SINK_TICKS, isBallAtRest } from './logic';
@@ -465,11 +465,31 @@ function drawFlag(
   ctx.fill();
 }
 
+function interpolateLandminePosition(
+  mine: MinigolfLandmine,
+  prevMotion: MinigolfLandmineMotion | undefined,
+  curMotion: MinigolfLandmineMotion | undefined,
+  alpha: number,
+): { x: number; y: number; facingPositive: boolean } {
+  const cur = curMotion ?? { x: mine.x, y: mine.y, facingPositive: true };
+  if (!prevMotion || alpha >= 1) {
+    return { x: cur.x, y: cur.y, facingPositive: cur.facingPositive };
+  }
+  return {
+    x: prevMotion.x + (cur.x - prevMotion.x) * alpha,
+    y: prevMotion.y + (cur.y - prevMotion.y) * alpha,
+    facingPositive: cur.facingPositive,
+  };
+}
+
 function drawLandmines(
   ctx: CanvasRenderingContext2D,
   course: MinigolfCourse,
   scale: number,
   triggeredIndices: number[],
+  landmineMotion: MinigolfLandmineMotion[] | undefined,
+  prevLandmineMotion: MinigolfLandmineMotion[] | undefined,
+  alpha: number,
 ) {
   const landmines = course.landmines;
   if (!landmines?.length) return;
@@ -481,7 +501,24 @@ function drawLandmines(
   for (let i = 0; i < landmines.length; i++) {
     if (triggered.has(i)) continue;
     const mine = landmines[i];
-    ctx.fillText(mine.emoji, mine.x * scale, mine.y * scale);
+    const { x, y, facingPositive } = interpolateLandminePosition(
+      mine,
+      prevLandmineMotion?.[i],
+      landmineMotion?.[i],
+      alpha,
+    );
+    const px = x * scale;
+    const py = y * scale;
+
+    if (mine.motion === 'horizontal') {
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.scale(facingPositive ? -1 : 1, 1);
+      ctx.fillText(mine.emoji, 0, 0);
+      ctx.restore();
+    } else {
+      ctx.fillText(mine.emoji, px, py);
+    }
   }
 }
 
@@ -1201,16 +1238,19 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
         now,
       );
 
+      const alpha = Math.min(1, (now - prevTimeRef.current) / MINIGOLF_TICK_MS);
+
       if (current.obstacles) {
         drawLandmines(
           ctx,
           currentCourse,
           fit.scale,
           current.triggeredLandmines,
+          current.landmineMotion,
+          prev.landmineMotion,
+          alpha,
         );
       }
-
-      const alpha = Math.min(1, (now - prevTimeRef.current) / MINIGOLF_TICK_MS);
 
       // Draw other players first so my ball renders on top.
       const ordered = [...current.players].sort((a, b) => {
