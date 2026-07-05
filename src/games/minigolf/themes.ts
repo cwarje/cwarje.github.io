@@ -128,7 +128,7 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
     label: 'Desert',
     hazardKind: 'water',
     obstacleEmojis: ['🌵', '🐪', '🐫'],
-    friction: { mult: 0.968, linear: 0.005, sandTrapMult: 0.82 },
+    friction: { mult: 0.968, linear: 0.005, sandTrapMult: 0.8 },
     generation: { gateChance: 0.4, hazardBlockChance: 0.65, sandTrapSplit: 0.6 },
     palette: {
       fairwayBase: '#c4a35a',
@@ -228,7 +228,7 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
     label: 'Jungle',
     hazardKind: 'water',
     obstacleEmojis: ['🦧', '🦍', '🌴', '🗿'],
-    friction: { mult: 0.978, linear: 0.003, sandTrapMult: 0.9 },
+    friction: { mult: 0.978, linear: 0.003, sandTrapMult: 0.48 },
     generation: { gateChance: 0.55, hazardBlockChance: 0.5, mudTrapSplit: 0.55 },
     palette: {
       fairwayBase: '#2a6b32',
@@ -278,7 +278,7 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
     label: 'Sahara',
     hazardKind: 'water',
     obstacleEmojis: ['🐅', '🐆', '🐘', '🦛', '🦏', '🦒'],
-    friction: { mult: 0.968, linear: 0.005, sandTrapMult: 0.82 },
+    friction: { mult: 0.968, linear: 0.005, sandTrapMult: 0.8 },
     generation: {
       gateChance: 0,
       hazardBlockChance: 0.75,

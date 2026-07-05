@@ -462,6 +462,46 @@ describe('minigolf physics', () => {
     expect(trapSpeed).toBeLessThan(fairwaySpeed * 0.85);
   });
 
+  it('mud traps slow the ball more than fairway on jungle', () => {
+    const course: MinigolfCourse = {
+      ...openCourse(),
+      sandTraps: [{ x: 40, y: 55, w: 20, h: 30 }],
+    };
+    const inTrap: MinigolfBall = { x: 50, y: 70, vx: 0, vy: -3 };
+    const onFairway: MinigolfBall = { x: 50, y: 70, vx: 0, vy: -3 };
+    for (let i = 0; i < 15; i++) {
+      stepBall(inTrap, course, 1, 'jungle');
+      stepBall(onFairway, openCourse(), 1, 'jungle');
+    }
+    const trapSpeed = Math.hypot(inTrap.vx, inTrap.vy);
+    const fairwaySpeed = Math.hypot(onFairway.vx, onFairway.vy);
+    expect(trapSpeed).toBeLessThan(fairwaySpeed * 0.5);
+  });
+
+  it('mud traps slow the ball without sinking it', () => {
+    const course: MinigolfCourse = {
+      ...openCourse(),
+      sandTraps: [{ x: 40, y: 55, w: 20, h: 30 }],
+    };
+    const inTrap: MinigolfBall = { x: 50, y: 70, vx: 0, vy: -2 };
+    let inWater = false;
+    for (let i = 0; i < 30; i++) {
+      const result = stepBall(inTrap, course, 1, 'jungle');
+      if (result.inWater) inWater = true;
+      if (isBallAtRest(inTrap)) break;
+    }
+    expect(inWater).toBe(false);
+
+    const onFairway: MinigolfBall = { x: 50, y: 70, vx: 0, vy: -2 };
+    for (let i = 0; i < 30; i++) {
+      stepBall(onFairway, openCourse(), 1, 'jungle');
+      if (isBallAtRest(onFairway)) break;
+    }
+    const trapSpeed = Math.hypot(inTrap.vx, inTrap.vy);
+    const fairwaySpeed = Math.hypot(onFairway.vx, onFairway.vy);
+    expect(trapSpeed).toBeLessThan(fairwaySpeed);
+  });
+
   it('sand traps slow the ball without sinking it', () => {
     const course: MinigolfCourse = {
       ...openCourse(),
