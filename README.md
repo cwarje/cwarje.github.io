@@ -164,8 +164,15 @@ Host-only lobby settings (hole count, theme, collisions, obstacles) are stored s
 
 **Rules**
 
-- **20 XP** for a 1st-place finish (lowest total strokes, ties share 1st).
-- **10 XP** for a 2nd-place finish when 1st place is not tied (ties for 2nd share 10 XP each).
+- Placement XP scales with round length (host picks 3, 9, or 18 holes):
+
+| Holes | 1st place | 2nd place |
+|-------|-----------|-----------|
+| 3     | 10 XP     | 5 XP      |
+| 9     | 20 XP     | 10 XP     |
+| 18    | 40 XP     | 20 XP     |
+
+- Ties for 1st share 1st-place XP; 2nd place is only awarded when 1st is not tied (ties for 2nd share 2nd-place XP).
 - **Level** = `floor(totalXp / 100) + 1` (everyone starts at level 1).
 - Progress toward the next level = `totalXp % 100` out of 100.
 

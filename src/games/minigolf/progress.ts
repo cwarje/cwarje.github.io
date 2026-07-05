@@ -1,8 +1,15 @@
+import type { MinigolfHoleCount } from '../../networking/types';
 import type { MinigolfPlayer } from './types';
 
 export const MINIGOLF_XP_STORAGE_KEY = 'minigolfXp';
-export const MINIGOLF_XP_FIRST = 20;
-export const MINIGOLF_XP_SECOND = 10;
+export const MINIGOLF_XP_BY_HOLE_COUNT: Record<
+  MinigolfHoleCount,
+  { first: number; second: number }
+> = {
+  3: { first: 10, second: 5 },
+  9: { first: 20, second: 10 },
+  18: { first: 40, second: 20 },
+};
 export const MINIGOLF_XP_PER_LEVEL = 100;
 
 export interface MinigolfLevelProgress {
@@ -49,7 +56,14 @@ export function getMinigolfLevelProgress(xp: number): MinigolfLevelProgress {
   };
 }
 
-export function computeMinigolfXpAwards(players: MinigolfPlayer[]): Map<string, number> {
+function getMinigolfPlacementXp(holeCount: number): { first: number; second: number } {
+  return MINIGOLF_XP_BY_HOLE_COUNT[holeCount as MinigolfHoleCount] ?? MINIGOLF_XP_BY_HOLE_COUNT[9];
+}
+
+export function computeMinigolfXpAwards(
+  players: MinigolfPlayer[],
+  holeCount: number,
+): Map<string, number> {
   const awards = new Map<string, number>();
   if (players.length === 0) return awards;
 
@@ -66,7 +80,8 @@ export function computeMinigolfXpAwards(players: MinigolfPlayer[]): Map<string, 
     }
   }
 
-  const tierXp = [MINIGOLF_XP_FIRST, MINIGOLF_XP_SECOND];
+  const { first, second } = getMinigolfPlacementXp(holeCount);
+  const tierXp = [first, second];
   if (tiers[0]) {
     for (const id of tiers[0].ids) {
       awards.set(id, tierXp[0]);

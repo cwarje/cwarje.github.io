@@ -54,41 +54,92 @@ describe('minigolf progress', () => {
     });
   });
 
-  it('awards 20/10 xp for first and second place tiers', () => {
-    const awards = computeMinigolfXpAwards([
-      makePlayer('a', [3, 4]),
-      makePlayer('b', [4, 4]),
-      makePlayer('c', [5, 5]),
-    ]);
+  it('awards 20/10 xp for first and second place tiers on a 9-hole round', () => {
+    const awards = computeMinigolfXpAwards(
+      [
+        makePlayer('a', [3, 4]),
+        makePlayer('b', [4, 4]),
+        makePlayer('c', [5, 5]),
+      ],
+      9,
+    );
     expect(awards.get('a')).toBe(20);
     expect(awards.get('b')).toBe(10);
     expect(awards.get('c')).toBeUndefined();
   });
 
+  it('awards 10/5 xp for first and second place tiers on a 3-hole round', () => {
+    const awards = computeMinigolfXpAwards(
+      [
+        makePlayer('a', [3, 4, 2]),
+        makePlayer('b', [4, 4, 3]),
+        makePlayer('c', [5, 5, 4]),
+      ],
+      3,
+    );
+    expect(awards.get('a')).toBe(10);
+    expect(awards.get('b')).toBe(5);
+    expect(awards.get('c')).toBeUndefined();
+  });
+
+  it('awards 40/20 xp for first and second place tiers on an 18-hole round', () => {
+    const awards = computeMinigolfXpAwards(
+      [
+        makePlayer('a', [3, 4]),
+        makePlayer('b', [4, 4]),
+        makePlayer('c', [5, 5]),
+      ],
+      18,
+    );
+    expect(awards.get('a')).toBe(40);
+    expect(awards.get('b')).toBe(20);
+    expect(awards.get('c')).toBeUndefined();
+  });
+
   it('awards both first-place players when tied', () => {
-    const awards = computeMinigolfXpAwards([
-      makePlayer('a', [3, 3]),
-      makePlayer('b', [3, 3]),
-      makePlayer('c', [5, 5]),
-    ]);
+    const awards = computeMinigolfXpAwards(
+      [
+        makePlayer('a', [3, 3]),
+        makePlayer('b', [3, 3]),
+        makePlayer('c', [5, 5]),
+      ],
+      9,
+    );
     expect(awards.get('a')).toBe(20);
     expect(awards.get('b')).toBe(20);
     expect(awards.get('c')).toBeUndefined();
   });
 
   it('awards both second-place players when tied for second', () => {
-    const awards = computeMinigolfXpAwards([
-      makePlayer('a', [3, 3]),
-      makePlayer('b', [4, 4]),
-      makePlayer('c', [4, 4]),
-    ]);
+    const awards = computeMinigolfXpAwards(
+      [
+        makePlayer('a', [3, 3]),
+        makePlayer('b', [4, 4]),
+        makePlayer('c', [4, 4]),
+      ],
+      9,
+    );
     expect(awards.get('a')).toBe(20);
     expect(awards.get('b')).toBe(10);
     expect(awards.get('c')).toBe(10);
   });
 
+  it('shares scaled xp when tied for first on an 18-hole round', () => {
+    const awards = computeMinigolfXpAwards(
+      [
+        makePlayer('a', [3, 3]),
+        makePlayer('b', [3, 3]),
+        makePlayer('c', [5, 5]),
+      ],
+      18,
+    );
+    expect(awards.get('a')).toBe(40);
+    expect(awards.get('b')).toBe(40);
+    expect(awards.get('c')).toBeUndefined();
+  });
+
   it('awards solo player first place', () => {
-    const awards = computeMinigolfXpAwards([makePlayer('solo', [2, 3])]);
+    const awards = computeMinigolfXpAwards([makePlayer('solo', [2, 3])], 9);
     expect(awards.get('solo')).toBe(20);
   });
 });

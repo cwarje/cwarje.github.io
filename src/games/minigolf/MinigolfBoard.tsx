@@ -1202,7 +1202,10 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
     if (awardedRef.current) return;
     awardedRef.current = true;
 
-    const awards = computeMinigolfXpAwards(stateRef.current.players);
+    const awards = computeMinigolfXpAwards(
+      stateRef.current.players,
+      stateRef.current.courses.length,
+    );
     const earned = awards.get(myId) ?? 0;
     let next: number | undefined;
 
@@ -1232,7 +1235,9 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
     };
   }, [state.gameOver, myId, updateMinigolfXp]);
 
-  const gameOverXpAwards = state.gameOver ? computeMinigolfXpAwards(state.players) : undefined;
+  const gameOverXpAwards = state.gameOver
+    ? computeMinigolfXpAwards(state.players, state.courses.length)
+    : undefined;
 
   // -------------------------------------------------------------------------
   // Aim input (slingshot drag anywhere on the course)
