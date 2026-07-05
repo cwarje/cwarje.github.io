@@ -4,12 +4,20 @@ import type { MinigolfBall, MinigolfCourse, MinigolfLandmine, MinigolfLandmineMo
 import { getMinigolfTheme, isFrozenIceHazard, isLavaHazard, MINIGOLF_DEV_THEME_OPTIONS, getMinigolfDevThemeOptionLabel, type MinigolfCourseTheme, type MinigolfDevThemeOption, type MinigolfPalette } from './themes';
 import { BALL_RADIUS, COURSE_H, COURSE_W, CUP_RADIUS, WALL_THICKNESS, obstacleEdgeWidth } from './courseGen';
 import { MINIGOLF_TICK_MS, SINK_TICKS, isBallAtRest } from './logic';
+import {
+  computeMinigolfXpAwards,
+  getMinigolfLevel,
+  getMinigolfLevelProgress,
+  readMinigolfXp,
+  writeMinigolfXp,
+} from './progress';
 import { drawIceHazards, drawLavaHazards, drawWaterHazards } from './waterRender';
 import {
   PLAYER_COLOR_HEX,
   getPlayerHudTextColor,
   normalizePlayerColor,
 } from '../../networking/playerColors';
+import { useRoomContext } from '../../networking/roomStore';
 
 interface MinigolfBoardProps {
   state: MinigolfState;
@@ -766,17 +774,68 @@ function ScorecardPlayerLabel({
   player,
   myId,
   isLeader,
+  xpAward,
 }: {
   player: MinigolfPlayer;
   myId: string;
   isLeader: boolean;
+  xpAward?: number;
 }) {
   const displayName = player.id === myId ? 'You' : player.name;
   return (
     <span className="minigolf-scorecardPlayerName">
       {isLeader ? '👑 ' : ''}
       {displayName}
+      {xpAward != null && xpAward > 0 && (
+        <span className="minigolf-xpPill">+ {xpAward} xp</span>
+      )}
     </span>
+  );
+}
+
+function MinigolfProgressPanel({ xp }: { xp: number }) {
+  const { level, xpIntoLevel, xpForNextLevel } = getMinigolfLevelProgress(xp);
+  const fillPercent = (xpIntoLevel / xpForNextLevel) * 100;
+
+  return (
+    <div className="minigolf-progressCard">
+      <h4 className="minigolf-progressTitle">Progress</h4>
+      <p className="minigolf-progressLevel">Level {level}</p>
+      <div
+        className="minigolf-progressMeter"
+        role="meter"
+        aria-valuenow={xpIntoLevel}
+        aria-valuemin={0}
+        aria-valuemax={xpForNextLevel}
+        aria-label={`Level ${level} progress`}
+      >
+        <div className="minigolf-progressMeterFill" style={{ width: `${fillPercent}%` }} />
+      </div>
+      <p className="minigolf-progressMeta">
+        {xpIntoLevel} / {xpForNextLevel} XP to Level {level + 1}
+      </p>
+    </div>
+  );
+}
+
+function ScorecardStack({
+  state,
+  myId,
+  progressXp,
+  showProgress = true,
+  xpAwards,
+}: {
+  state: MinigolfState;
+  myId: string;
+  progressXp: number;
+  showProgress?: boolean;
+  xpAwards?: Map<string, number>;
+}) {
+  return (
+    <div className="minigolf-summaryStack">
+      {showProgress && <MinigolfProgressPanel xp={progressXp} />}
+      <Scorecard state={state} myId={myId} xpAwards={xpAwards} />
+    </div>
   );
 }
 
@@ -793,6 +852,7 @@ interface ScorecardSectionProps {
   compact: boolean;
   leaderIds: Set<string>;
   themeRevealedUpTo: number;
+  xpAwards?: Map<string, number>;
 }
 
 function ScorecardSection({
@@ -808,6 +868,7 @@ function ScorecardSection({
   compact,
   leaderIds,
   themeRevealedUpTo,
+  xpAwards,
 }: ScorecardSectionProps) {
   const holeCount = holeEnd - holeStart;
   const holeColWidth = `calc((100% - 34%) / ${holeCount})`;
@@ -910,7 +971,12 @@ function ScorecardSection({
                   className="minigolf-scorecardPlayerCell minigolf-scorecardTintedCell"
                   style={{ background: getScorecardCellBackground(p.color, 0) }}
                 >
-                  <ScorecardPlayerLabel player={p} myId={myId} isLeader={isLeader} />
+                  <ScorecardPlayerLabel
+                    player={p}
+                    myId={myId}
+                    isLeader={isLeader}
+                    xpAward={xpAwards?.get(p.id)}
+                  />
                 </td>
                 {Array.from({ length: holeCount }, (_, i) => {
                   const holeIndex = holeStart + i;
@@ -956,7 +1022,15 @@ function ScorecardSection({
   );
 }
 
-function Scorecard({ state, myId }: { state: MinigolfState; myId: string }) {
+function Scorecard({
+  state,
+  myId,
+  xpAwards,
+}: {
+  state: MinigolfState;
+  myId: string;
+  xpAwards?: Map<string, number>;
+}) {
   const holesPlayed = state.gameOver ? state.courses.length : state.holeIndex + 1;
   const totalHoles = state.courses.length;
   const useFrontBack = totalHoles === 18;
@@ -984,6 +1058,7 @@ function Scorecard({ state, myId }: { state: MinigolfState; myId: string }) {
           compact={compact}
           leaderIds={leaderIds}
           themeRevealedUpTo={themeRevealedUpTo}
+          xpAwards={xpAwards}
         />
       </div>
       <div>
@@ -1001,6 +1076,7 @@ function Scorecard({ state, myId }: { state: MinigolfState; myId: string }) {
           compact={compact}
           leaderIds={leaderIds}
           themeRevealedUpTo={themeRevealedUpTo}
+          xpAwards={xpAwards}
         />
       </div>
     </div>
@@ -1017,6 +1093,7 @@ function Scorecard({ state, myId }: { state: MinigolfState; myId: string }) {
       compact={compact}
       leaderIds={leaderIds}
       themeRevealedUpTo={themeRevealedUpTo}
+      xpAwards={xpAwards}
     />
   );
 
@@ -1031,11 +1108,14 @@ function Scorecard({ state, myId }: { state: MinigolfState; myId: string }) {
 }
 
 export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardProps) {
+  const { updateMinigolfXp } = useRoomContext();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [scorecardOpen, setScorecardOpen] = useState(false);
   const [devTheme, setDevTheme] = useState<MinigolfDevThemeOption>('random');
+  const [localXp, setLocalXp] = useState(() => readMinigolfXp());
+  const awardedRef = useRef(false);
   const stateRef = useRef<MinigolfState>(state);
   const prevStateRef = useRef<MinigolfState>(state);
   const prevTimeRef = useRef<number>(0);
@@ -1082,6 +1162,26 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
       setScorecardOpen(false);
     }
   }, [state.phase]);
+
+  useEffect(() => {
+    if (!state.gameOver) {
+      awardedRef.current = false;
+      return;
+    }
+    if (awardedRef.current) return;
+    awardedRef.current = true;
+
+    const awards = computeMinigolfXpAwards(state.players);
+    const earned = awards.get(myId) ?? 0;
+    if (earned <= 0) return;
+
+    const next = readMinigolfXp() + earned;
+    writeMinigolfXp(next);
+    setLocalXp(next);
+    updateMinigolfXp(next);
+  }, [state.gameOver, state.players, myId, updateMinigolfXp]);
+
+  const gameOverXpAwards = state.gameOver ? computeMinigolfXpAwards(state.players) : undefined;
 
   // -------------------------------------------------------------------------
   // Aim input (slingshot drag anywhere on the course)
@@ -1349,8 +1449,13 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
               : `Tie: ${winners.map((w) => (w.id === myId ? 'You' : w.name)).join(', ')}`}
           </p>
           <div className="w-full flex justify-center">
-            <div className="minigolf-summaryPanel minigolf-summaryPanel--light">
-              <Scorecard state={state} myId={myId} />
+            <div className="minigolf-gameOverPanels">
+              <div className="minigolf-summaryPanel minigolf-summaryPanel--light">
+                <Scorecard state={state} myId={myId} xpAwards={gameOverXpAwards} />
+              </div>
+              <div className="minigolf-summaryPanel minigolf-summaryPanel--light">
+                <MinigolfProgressPanel xp={localXp} />
+              </div>
             </div>
           </div>
         </div>
@@ -1418,6 +1523,7 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
               <div className="minigolf-chips">
                 {state.players.map((p) => (
                   <div key={p.id} className="minigolf-hudPill minigolf-hudPill--dark minigolf-chip">
+                    <span className="minigolf-levelBadge">Lv{getMinigolfLevel(p.minigolfXp ?? 0)}</span>
                     <span className="minigolf-chipName" style={{ color: getPlayerHudTextColor(p.color) }}>
                       {p.id === myId ? 'You' : p.name}
                     </span>
@@ -1472,7 +1578,7 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
               ) : (
                 <>
                   <h3 className="minigolf-summaryPanelTitle">Scorecard</h3>
-                  <Scorecard state={state} myId={myId} />
+                  <ScorecardStack state={state} myId={myId} progressXp={localXp} />
                 </>
               )}
             </motion.div>

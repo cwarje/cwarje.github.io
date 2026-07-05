@@ -1028,6 +1028,7 @@ export function createMinigolfState(players: Player[], options?: GameStartOption
       scores: [],
       botNextStrokeTick: -1,
       sinkTicks: 0,
+      minigolfXp: p.minigolfXp ?? 0,
     };
   });
 
