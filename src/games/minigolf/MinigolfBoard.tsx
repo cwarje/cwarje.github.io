@@ -43,7 +43,7 @@ interface BoardFit {
 
 /** Drag distance (course units) that produces a full-power stroke. */
 const FULL_POWER_DRAG_UNITS = 55;
-const MIN_POWER = 0.05;
+const MIN_POWER = 0.02;
 
 function drawWoodPlanks(
   ctx: CanvasRenderingContext2D,
@@ -635,13 +635,13 @@ function drawAim(
   if (power < MIN_POWER) return;
 
   const angle = Math.atan2(-dragY, -dragX);
-  const len = (10 + power * 32) * scale;
+  const len = (4 + power * 38) * scale;
   const endX = ballX + Math.cos(angle) * len;
   const endY = ballY + Math.sin(angle) * len;
 
-  const red = Math.round(255);
-  const greenBlue = Math.round(255 * (1 - power * 0.85));
-  const color = `rgb(${red}, ${greenBlue}, ${greenBlue})`;
+  const g = Math.round(165 + (38 - 165) * power);
+  const b = Math.round(0 + (38 - 0) * power);
+  const color = `rgb(255, ${g}, ${b})`;
 
   const headLen = 3.4 * scale;
   const headSpread = 0.45;

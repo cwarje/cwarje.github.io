@@ -33,7 +33,7 @@ import {
 export const MINIGOLF_TICK_MS = 33;
 export const DEFAULT_MINIGOLF_HOLE_COUNT = 9;
 export const MAX_STROKE_SPEED = 4.2;
-export const MIN_STROKE_SPEED = 0.55;
+export const MIN_STROKE_SPEED = 0.42;
 export const STOP_SPEED = 0.045;
 export const CUP_CAPTURE_SPEED = 2.15;
 export const STROKE_CAP_OVER_PAR = 4;
