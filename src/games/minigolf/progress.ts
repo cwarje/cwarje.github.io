@@ -11,6 +11,7 @@ export const MINIGOLF_XP_BY_HOLE_COUNT: Record<
   18: { first: 40, second: 20 },
 };
 export const MINIGOLF_XP_PER_LEVEL = 100;
+export const MINIGOLF_XP_OBSTACLES_BONUS = 5;
 
 export interface MinigolfLevelProgress {
   level: number;
@@ -56,13 +57,23 @@ export function getMinigolfLevelProgress(xp: number): MinigolfLevelProgress {
   };
 }
 
-function getMinigolfPlacementXp(holeCount: number): { first: number; second: number } {
-  return MINIGOLF_XP_BY_HOLE_COUNT[holeCount as MinigolfHoleCount] ?? MINIGOLF_XP_BY_HOLE_COUNT[9];
+function getMinigolfPlacementXp(
+  holeCount: number,
+  obstaclesEnabled: boolean,
+): { first: number; second: number } {
+  const base =
+    MINIGOLF_XP_BY_HOLE_COUNT[holeCount as MinigolfHoleCount] ?? MINIGOLF_XP_BY_HOLE_COUNT[9];
+  if (!obstaclesEnabled) return base;
+  return {
+    first: base.first + MINIGOLF_XP_OBSTACLES_BONUS,
+    second: base.second + MINIGOLF_XP_OBSTACLES_BONUS,
+  };
 }
 
 export function computeMinigolfXpAwards(
   players: MinigolfPlayer[],
   holeCount: number,
+  obstaclesEnabled = false,
 ): Map<string, number> {
   const awards = new Map<string, number>();
   if (players.length === 0) return awards;
@@ -80,7 +91,7 @@ export function computeMinigolfXpAwards(
     }
   }
 
-  const { first, second } = getMinigolfPlacementXp(holeCount);
+  const { first, second } = getMinigolfPlacementXp(holeCount, obstaclesEnabled);
   const tierXp = [first, second];
   if (tiers[0]) {
     for (const id of tiers[0].ids) {

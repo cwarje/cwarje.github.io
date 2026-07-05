@@ -1205,6 +1205,7 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
     const awards = computeMinigolfXpAwards(
       stateRef.current.players,
       stateRef.current.courses.length,
+      stateRef.current.obstacles,
     );
     const earned = awards.get(myId) ?? 0;
     let next: number | undefined;
@@ -1236,7 +1237,7 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
   }, [state.gameOver, myId, updateMinigolfXp]);
 
   const gameOverXpAwards = state.gameOver
-    ? computeMinigolfXpAwards(state.players, state.courses.length)
+    ? computeMinigolfXpAwards(state.players, state.courses.length, state.obstacles)
     : undefined;
 
   // -------------------------------------------------------------------------

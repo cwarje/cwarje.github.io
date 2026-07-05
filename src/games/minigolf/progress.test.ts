@@ -142,4 +142,16 @@ describe('minigolf progress', () => {
     const awards = computeMinigolfXpAwards([makePlayer('solo', [2, 3])], 9);
     expect(awards.get('solo')).toBe(20);
   });
+
+  it('adds 5 xp to each placement tier when obstacles are enabled', () => {
+    const players = [
+      makePlayer('a', [3, 4]),
+      makePlayer('b', [4, 4]),
+      makePlayer('c', [5, 5]),
+    ];
+    const awards = computeMinigolfXpAwards(players, 9, true);
+    expect(awards.get('a')).toBe(25);
+    expect(awards.get('b')).toBe(15);
+    expect(awards.get('c')).toBeUndefined();
+  });
 });

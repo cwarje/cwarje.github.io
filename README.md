@@ -172,6 +172,7 @@ Host-only lobby settings (hole count, theme, collisions, obstacles) are stored s
 | 9     | 20 XP     | 10 XP     |
 | 18    | 40 XP     | 20 XP     |
 
+- **+5 XP** to each placement tier when obstacles are enabled (e.g. 9-hole with obstacles: 25 / 15).
 - Ties for 1st share 1st-place XP; 2nd place is only awarded when 1st is not tied (ties for 2nd share 2nd-place XP).
 - **Level** = `floor(totalXp / 100) + 1` (everyone starts at level 1).
 - Progress toward the next level = `totalXp % 100` out of 100.
