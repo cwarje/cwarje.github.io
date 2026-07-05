@@ -1058,7 +1058,12 @@ function Scorecard({
   const useFrontBack = totalHoles === 18;
   const compact = holesPlayed > 6 || state.players.length >= 5;
   const highlightHole = state.phase === 'summary' ? state.holeIndex : undefined;
-  const themeRevealedUpTo = state.gameOver ? state.courses.length - 1 : state.holeIndex;
+  const themeRevealedUpTo =
+    state.gameOver
+      ? state.courses.length - 1
+      : state.phase === 'summary'
+        ? state.holeIndex
+        : state.holeIndex - 1;
   const timestamp = useScorecardClock();
 
   const players = [...state.players].sort((a, b) => completedTotal(a) - completedTotal(b));
