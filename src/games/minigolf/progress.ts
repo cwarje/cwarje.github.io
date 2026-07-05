@@ -57,6 +57,11 @@ export function getMinigolfLevelProgress(xp: number): MinigolfLevelProgress {
   };
 }
 
+export function isMinigolfDoubleXpWeekend(date: Date = new Date()): boolean {
+  const day = date.getUTCDay();
+  return day === 0 || day === 6;
+}
+
 function getMinigolfPlacementXp(
   holeCount: number,
   obstaclesEnabled: boolean,
@@ -74,6 +79,7 @@ export function computeMinigolfXpAwards(
   players: MinigolfPlayer[],
   holeCount: number,
   obstaclesEnabled = false,
+  options?: { at?: Date },
 ): Map<string, number> {
   const awards = new Map<string, number>();
   if (players.length === 0) return awards;
@@ -91,7 +97,11 @@ export function computeMinigolfXpAwards(
     }
   }
 
-  const { first, second } = getMinigolfPlacementXp(holeCount, obstaclesEnabled);
+  let { first, second } = getMinigolfPlacementXp(holeCount, obstaclesEnabled);
+  if (isMinigolfDoubleXpWeekend(options?.at)) {
+    first *= 2;
+    second *= 2;
+  }
   const tierXp = [first, second];
   if (tiers[0]) {
     for (const id of tiers[0].ids) {

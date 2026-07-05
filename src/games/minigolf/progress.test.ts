@@ -5,9 +5,14 @@ import {
   computeMinigolfXpAwards,
   getMinigolfLevel,
   getMinigolfLevelProgress,
+  isMinigolfDoubleXpWeekend,
   readMinigolfXp,
   writeMinigolfXp,
 } from './progress';
+
+const WEEKDAY = new Date('2026-07-06T12:00:00Z');
+const SATURDAY = new Date('2026-07-04T12:00:00Z');
+const SUNDAY = new Date('2026-07-05T12:00:00Z');
 
 function makePlayer(id: string, scores: number[]): MinigolfPlayer {
   return {
@@ -62,6 +67,8 @@ describe('minigolf progress', () => {
         makePlayer('c', [5, 5]),
       ],
       9,
+      false,
+      { at: WEEKDAY },
     );
     expect(awards.get('a')).toBe(20);
     expect(awards.get('b')).toBe(10);
@@ -76,6 +83,8 @@ describe('minigolf progress', () => {
         makePlayer('c', [5, 5, 4]),
       ],
       3,
+      false,
+      { at: WEEKDAY },
     );
     expect(awards.get('a')).toBe(10);
     expect(awards.get('b')).toBe(5);
@@ -90,6 +99,8 @@ describe('minigolf progress', () => {
         makePlayer('c', [5, 5]),
       ],
       18,
+      false,
+      { at: WEEKDAY },
     );
     expect(awards.get('a')).toBe(40);
     expect(awards.get('b')).toBe(20);
@@ -104,6 +115,8 @@ describe('minigolf progress', () => {
         makePlayer('c', [5, 5]),
       ],
       9,
+      false,
+      { at: WEEKDAY },
     );
     expect(awards.get('a')).toBe(20);
     expect(awards.get('b')).toBe(20);
@@ -118,6 +131,8 @@ describe('minigolf progress', () => {
         makePlayer('c', [4, 4]),
       ],
       9,
+      false,
+      { at: WEEKDAY },
     );
     expect(awards.get('a')).toBe(20);
     expect(awards.get('b')).toBe(10);
@@ -132,6 +147,8 @@ describe('minigolf progress', () => {
         makePlayer('c', [5, 5]),
       ],
       18,
+      false,
+      { at: WEEKDAY },
     );
     expect(awards.get('a')).toBe(40);
     expect(awards.get('b')).toBe(40);
@@ -139,7 +156,7 @@ describe('minigolf progress', () => {
   });
 
   it('awards solo player first place', () => {
-    const awards = computeMinigolfXpAwards([makePlayer('solo', [2, 3])], 9);
+    const awards = computeMinigolfXpAwards([makePlayer('solo', [2, 3])], 9, false, { at: WEEKDAY });
     expect(awards.get('solo')).toBe(20);
   });
 
@@ -149,9 +166,39 @@ describe('minigolf progress', () => {
       makePlayer('b', [4, 4]),
       makePlayer('c', [5, 5]),
     ];
-    const awards = computeMinigolfXpAwards(players, 9, true);
+    const awards = computeMinigolfXpAwards(players, 9, true, { at: WEEKDAY });
     expect(awards.get('a')).toBe(25);
     expect(awards.get('b')).toBe(15);
+    expect(awards.get('c')).toBeUndefined();
+  });
+
+  it('detects UTC weekends for double xp', () => {
+    expect(isMinigolfDoubleXpWeekend(SATURDAY)).toBe(true);
+    expect(isMinigolfDoubleXpWeekend(SUNDAY)).toBe(true);
+    expect(isMinigolfDoubleXpWeekend(WEEKDAY)).toBe(false);
+  });
+
+  it('doubles first and second place xp on UTC weekends', () => {
+    const players = [
+      makePlayer('a', [3, 4]),
+      makePlayer('b', [4, 4]),
+      makePlayer('c', [5, 5]),
+    ];
+    const awards = computeMinigolfXpAwards(players, 9, false, { at: SATURDAY });
+    expect(awards.get('a')).toBe(40);
+    expect(awards.get('b')).toBe(20);
+    expect(awards.get('c')).toBeUndefined();
+  });
+
+  it('doubles placement xp after obstacles bonus on UTC weekends', () => {
+    const players = [
+      makePlayer('a', [3, 4]),
+      makePlayer('b', [4, 4]),
+      makePlayer('c', [5, 5]),
+    ];
+    const awards = computeMinigolfXpAwards(players, 9, true, { at: SUNDAY });
+    expect(awards.get('a')).toBe(50);
+    expect(awards.get('b')).toBe(30);
     expect(awards.get('c')).toBeUndefined();
   });
 });

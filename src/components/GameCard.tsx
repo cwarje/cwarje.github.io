@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { Info } from 'lucide-react';
 import type { GameType } from '../networking/types';
 import { GAME_REGISTRY } from '../games/registry';
+import { isMinigolfDoubleXpWeekend } from '../games/minigolf/progress';
 
 interface GameCardProps {
   gameType: GameType;
@@ -15,6 +16,8 @@ export default function GameCard({ gameType, onSelect, onInfo, disabled, isExpan
   const gameDef = GAME_REGISTRY[gameType];
   const { theme } = gameDef;
   const Icon = gameDef.icon;
+  const showDoubleXpWeekend =
+    gameDef.showDoubleXpWeekendBadge && isMinigolfDoubleXpWeekend();
 
   return (
     <motion.div
@@ -33,19 +36,28 @@ export default function GameCard({ gameType, onSelect, onInfo, disabled, isExpan
       aria-expanded={isExpanded}
       className={`relative w-full flex flex-col p-6 min-h-[140px] rounded-2xl bg-gradient-to-br ${theme.gradient} backdrop-blur-md border ${theme.cardBorder} ${isExpanded ? 'rounded-b-none border-b-0' : ''} ${disabled ? 'opacity-40 cursor-not-allowed' : `${theme.hoverBorder} cursor-pointer`} transition-colors duration-300 group`}
     >
-      {gameDef.showNewBadge && (
-        <span className="absolute top-3 left-3 inline-grid grid-cols-1 grid-rows-1 place-items-center px-2 py-0.5 rounded-md bg-amber-400/95 shadow-sm">
-          {/* Invisible layer locks badge height to the same box as solid `text-amber-950` copy */}
-          <span
-            className="col-start-1 row-start-1 invisible whitespace-nowrap text-[10px] font-bold uppercase tracking-wider text-amber-950"
-            aria-hidden
-          >
-            New
-          </span>
-          <span className="col-start-1 row-start-1 new-badge-text-sheen text-[10px] font-bold uppercase tracking-wider">
-            New
-          </span>
-        </span>
+      {(gameDef.showNewBadge || showDoubleXpWeekend) && (
+        <div className="absolute top-3 left-3 flex items-center gap-1.5">
+          {gameDef.showNewBadge && (
+            <span className="inline-grid grid-cols-1 grid-rows-1 place-items-center px-2 py-0.5 rounded-md bg-amber-400/95 shadow-sm">
+              {/* Invisible layer locks badge height to the same box as solid `text-amber-950` copy */}
+              <span
+                className="col-start-1 row-start-1 invisible whitespace-nowrap text-[10px] font-bold uppercase tracking-wider text-amber-950"
+                aria-hidden
+              >
+                New
+              </span>
+              <span className="col-start-1 row-start-1 new-badge-text-sheen text-[10px] font-bold uppercase tracking-wider">
+                New
+              </span>
+            </span>
+          )}
+          {showDoubleXpWeekend && (
+            <span className="px-2 py-0.5 rounded-md bg-[var(--color-primary-600)] shadow-sm text-[10px] font-bold uppercase tracking-wider text-white whitespace-nowrap">
+              Double XP Weekend
+            </span>
+          )}
+        </div>
       )}
       {gameDef.showBetaBadge && (
         <span className="absolute top-3 left-3 px-2 py-0.5 rounded-md bg-red-500 shadow-sm text-[10px] font-bold uppercase tracking-wider text-white">

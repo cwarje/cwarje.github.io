@@ -170,6 +170,8 @@ export interface GameDefinition {
   showNewBadge?: boolean;
   /** Homepage card ribbon for beta games. Red pill with white text; may coexist with showNewBadge on other games. */
   showBetaBadge?: boolean;
+  /** Homepage ribbon on UTC Sat/Sun; also doubles minigolf placement XP those days. */
+  showDoubleXpWeekendBadge?: boolean;
   /** If set, only these total player counts (humans + bots) are valid. */
   allowedPlayerCounts?: number[];
 }
@@ -816,6 +818,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     production: true,
     showNewBadge: true,
+    showDoubleXpWeekendBadge: true,
     hudTitleLines: ['Mini Golf'],
     hideHudTitleDuringPlay: true,
   },

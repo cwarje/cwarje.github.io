@@ -5,9 +5,11 @@ import { getMinigolfTheme, isFrozenIceHazard, isLavaHazard, MINIGOLF_DEV_THEME_O
 import { BALL_RADIUS, COURSE_H, COURSE_W, CUP_RADIUS, WALL_THICKNESS, obstacleEdgeWidth } from './courseGen';
 import { MINIGOLF_TICK_MS, SINK_TICKS, isBallAtRest } from './logic';
 import {
+  MINIGOLF_XP_OBSTACLES_BONUS,
   computeMinigolfXpAwards,
   getMinigolfLevel,
   getMinigolfLevelProgress,
+  isMinigolfDoubleXpWeekend,
   readMinigolfXp,
   writeMinigolfXp,
 } from './progress';
@@ -762,6 +764,15 @@ function useScorecardClock(): { label: string; iso: string } {
   return now;
 }
 
+function ScorecardTimestamp() {
+  const timestamp = useScorecardClock();
+  return (
+    <time className="minigolf-scorecardTimestamp" dateTime={timestamp.iso}>
+      {timestamp.label}
+    </time>
+  );
+}
+
 function scoreToneClass(score: number | undefined, par: number): string {
   if (score === undefined) return '';
   const diff = score - par;
@@ -815,9 +826,19 @@ function ScorecardPlayerLabel({
   );
 }
 
-function MinigolfProgressPanel({ xp }: { xp: number }) {
+function MinigolfProgressPanel({
+  xp,
+  obstaclesEnabled = false,
+  showDoubleXpWeekendBadge = false,
+}: {
+  xp: number;
+  obstaclesEnabled?: boolean;
+  showDoubleXpWeekendBadge?: boolean;
+}) {
   const { level, xpIntoLevel, xpForNextLevel } = getMinigolfLevelProgress(xp);
   const fillPercent = (xpIntoLevel / xpForNextLevel) * 100;
+  const showDoubleXpWeekend = showDoubleXpWeekendBadge && isMinigolfDoubleXpWeekend();
+  const showProgressBadges = obstaclesEnabled || showDoubleXpWeekend;
 
   return (
     <div className="minigolf-progressCard">
@@ -833,9 +854,23 @@ function MinigolfProgressPanel({ xp }: { xp: number }) {
       >
         <div className="minigolf-progressMeterFill" style={{ width: `${fillPercent}%` }} />
       </div>
-      <p className="minigolf-progressMeta">
-        {xpIntoLevel} / {xpForNextLevel} XP to Level {level + 1}
-      </p>
+      <div className="minigolf-progressFooter">
+        <p className="minigolf-progressMeta">
+          {xpIntoLevel} / {xpForNextLevel} XP to Level {level + 1}
+        </p>
+        {showProgressBadges && (
+          <div className="minigolf-progressBadges">
+            {obstaclesEnabled && (
+              <span className="minigolf-progressXpBadge">
+                +{MINIGOLF_XP_OBSTACLES_BONUS} XP for obstacles
+              </span>
+            )}
+            {showDoubleXpWeekend && (
+              <span className="minigolf-doubleXpWeekendBadge">Double XP Weekend</span>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -855,7 +890,9 @@ function ScorecardStack({
 }) {
   return (
     <div className="minigolf-summaryStack">
-      {showProgress && <MinigolfProgressPanel xp={progressXp} />}
+      {showProgress && (
+        <MinigolfProgressPanel xp={progressXp} />
+      )}
       <Scorecard state={state} myId={myId} xpAwards={xpAwards} />
     </div>
   );
@@ -1048,10 +1085,12 @@ function Scorecard({
   state,
   myId,
   xpAwards,
+  showTimestamp = false,
 }: {
   state: MinigolfState;
   myId: string;
   xpAwards?: Map<string, number>;
+  showTimestamp?: boolean;
 }) {
   const holesPlayed = state.gameOver ? state.courses.length : state.holeIndex + 1;
   const totalHoles = state.courses.length;
@@ -1064,7 +1103,6 @@ function Scorecard({
       : state.phase === 'summary'
         ? state.holeIndex
         : state.holeIndex - 1;
-  const timestamp = useScorecardClock();
 
   const players = [...state.players].sort((a, b) => completedTotal(a) - completedTotal(b));
   const leaderIds = getScorecardLeaderIds(players);
@@ -1126,9 +1164,7 @@ function Scorecard({
 
   return (
     <div className="minigolf-scorecardCard">
-      <time className="minigolf-scorecardTimestamp" dateTime={timestamp.iso}>
-        {timestamp.label}
-      </time>
+      {showTimestamp && <ScorecardTimestamp />}
       {scorecardContent}
     </div>
   );
@@ -1517,10 +1553,19 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
           <div className="w-full flex justify-center">
             <div className="minigolf-gameOverPanels">
               <div className="minigolf-summaryPanel minigolf-summaryPanel--light">
-                <Scorecard state={state} myId={myId} xpAwards={showGameOverXpAwards ? gameOverXpAwards : undefined} />
+                <Scorecard
+                  state={state}
+                  myId={myId}
+                  showTimestamp
+                  xpAwards={showGameOverXpAwards ? gameOverXpAwards : undefined}
+                />
               </div>
               <div className="minigolf-summaryPanel minigolf-summaryPanel--light">
-                <MinigolfProgressPanel xp={gameOverDisplayXp ?? localXp} />
+                <MinigolfProgressPanel
+                  xp={gameOverDisplayXp ?? localXp}
+                  obstaclesEnabled={state.obstacles}
+                  showDoubleXpWeekendBadge
+                />
               </div>
             </div>
           </div>
@@ -1644,7 +1689,7 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
               ) : (
                 <>
                   <h3 className="minigolf-summaryPanelTitle">Scorecard</h3>
-                  <ScorecardStack state={state} myId={myId} progressXp={localXp} />
+                  <ScorecardStack state={state} myId={myId} progressXp={localXp} showProgress={false} />
                 </>
               )}
             </motion.div>
