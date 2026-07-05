@@ -52,6 +52,28 @@ function borderWalls(): MinigolfRect[] {
   ];
 }
 
+export function courseBorderWalls(): MinigolfRect[] {
+  return borderWalls();
+}
+
+function splitCourseBorders(
+  generation: ReturnType<typeof getMinigolfTheme>['generation'],
+  solidObstacles: MinigolfRect[],
+  interiorWater: MinigolfRect[],
+): { walls: MinigolfRect[]; waterHazards: MinigolfRect[] } {
+  const borders = borderWalls();
+  if (generation.borderAsWaterHazard) {
+    return {
+      walls: [...solidObstacles],
+      waterHazards: [...borders, ...interiorWater],
+    };
+  }
+  return {
+    walls: [...borders, ...solidObstacles],
+    waterHazards: interiorWater,
+  };
+}
+
 function rectClearOfPoint(rect: MinigolfRect, p: MinigolfVec, clearance: number): boolean {
   const nx = Math.max(rect.x, Math.min(p.x, rect.x + rect.w));
   const ny = Math.max(rect.y, Math.min(p.y, rect.y + rect.h));
@@ -301,16 +323,21 @@ export function generateHole(
     );
     if (!gateClearOfEnds) continue;
 
-    const walls = [...borderWalls(), ...solidObstacles];
+    const { walls, waterHazards: finalWaterHazards } = splitCourseBorders(
+      generation,
+      solidObstacles,
+      waterHazards,
+    );
     const pathCells = pathLengthCells(walls, tee, cup);
     if (pathCells == null) continue;
 
+    const allObstaclesWithBorder = [...solidObstacles, ...finalWaterHazards, ...sandTraps];
     const course: MinigolfCourse = {
       walls,
-      waterHazards,
+      waterHazards: finalWaterHazards,
       tee,
       cup,
-      par: computePar(pathCells, allObstacles.length),
+      par: computePar(pathCells, allObstaclesWithBorder.length),
       theme,
     };
     if (sandTraps.length > 0) course.sandTraps = sandTraps;
@@ -324,7 +351,8 @@ export function generateHole(
   // Fallback: an empty hole is always playable.
   const tee: MinigolfVec = { x: COURSE_W / 2, y: TEE_Y };
   const cup: MinigolfVec = { x: COURSE_W / 2, y: CUP_Y };
-  return { walls: borderWalls(), waterHazards: [], tee, cup, par: 2, theme };
+  const { walls, waterHazards } = splitCourseBorders(generation, [], []);
+  return { walls, waterHazards, tee, cup, par: 2, theme };
 }
 
 export function generateCourses(

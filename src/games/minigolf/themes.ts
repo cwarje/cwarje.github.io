@@ -60,6 +60,8 @@ export interface MinigolfGenerationWeights {
   disallowSolidWalls?: boolean;
   /** Never place water/lava hazard rectangles. */
   disallowWaterHazards?: boolean;
+  /** Border rects are water hazards instead of solid walls. */
+  borderAsWaterHazard?: boolean;
   /** Override default landmine count range for this theme. */
   landmineCount?: { min: number; max: number };
 }
@@ -368,15 +370,16 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
       gateChance: 0,
       hazardBlockChance: 0.75,
       disallowSolidWalls: true,
+      borderAsWaterHazard: true,
     },
     palette: {
-      fairwayBase: '#1a5080',
-      fairwayAlt: '#206898',
+      fairwayBase: '#75fbf8',
+      fairwayAlt: '#62ece9',
       wallFill: '#0a3058',
       wallEdge: '#061828',
-      hazardFill: '#2088c8',
-      hazardEdge: '#1060a0',
-      hazardHighlight: '#50b8f0',
+      hazardFill: '#75fbf8',
+      hazardEdge: '#4ec4c1',
+      hazardHighlight: '#48d4d1',
       sandTrapFill: '#f8ecc0',
       sandTrapEdge: '#d8bc78',
       cupFill: '#081828',
@@ -397,6 +400,7 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
       gateChance: 0,
       hazardBlockChance: 0.75,
       disallowSolidWalls: true,
+      borderAsWaterHazard: true,
     },
     palette: {
       fairwayBase: '#1a6878',

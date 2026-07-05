@@ -386,8 +386,6 @@ function drawWallRect(
     drawFoliageWalls(ctx, x, y, w, h, palette, scale);
   } else if (theme === 'space') {
     drawStarfieldWalls(ctx, x, y, w, h, scale);
-  } else if (theme === 'ocean' || theme === 'underwater') {
-    // flat fill — deep-water course border
   } else {
     drawWoodPlanks(ctx, x, y, w, h, palette, scale);
   }

@@ -6,6 +6,7 @@ import {
   LANDMINE_COUNT_MAX,
   LANDMINE_COUNT_MIN,
   WALL_THICKNESS,
+  courseBorderWalls,
   generateCourses,
   generateHole,
   pathLengthCells,
@@ -58,6 +59,14 @@ function openCourse(par = 2, theme: MinigolfCourse['theme'] = 'classic'): Minigo
 
 function courseWithWater(water: MinigolfCourse['waterHazards'], par = 2): MinigolfCourse {
   return { ...openCourse(par), waterHazards: water };
+}
+
+function hasCourseBorderWater(hole: MinigolfCourse): boolean {
+  return courseBorderWalls().every((border) =>
+    hole.waterHazards.some(
+      (w) => w.x === border.x && w.y === border.y && w.w === border.w && w.h === border.h,
+    ),
+  );
 }
 
 function courseWithIce(ice: MinigolfCourse['waterHazards'], par = 2): MinigolfCourse {
@@ -247,24 +256,28 @@ describe('minigolf course generation', () => {
     }
   });
 
-  it('ocean holes have ponds and no interior walls', () => {
-    let withPonds = 0;
+  it('ocean holes have border water, interior ponds, and no walls', () => {
+    let withInteriorPonds = 0;
     for (let i = 0; i < 30; i++) {
       const hole = generateHole(Math.random, 'ocean');
-      expect(hole.walls.length).toBe(4);
-      if (hole.waterHazards.length > 0) withPonds++;
+      expect(hole.walls.length).toBe(0);
+      expect(hasCourseBorderWater(hole)).toBe(true);
+      expect(hole.waterHazards.length).toBeGreaterThanOrEqual(4);
+      if (hole.waterHazards.length > 4) withInteriorPonds++;
     }
-    expect(withPonds).toBeGreaterThan(0);
+    expect(withInteriorPonds).toBeGreaterThan(0);
   });
 
-  it('underwater holes have ponds and no interior walls', () => {
-    let withPonds = 0;
+  it('underwater holes have border water, interior ponds, and no walls', () => {
+    let withInteriorPonds = 0;
     for (let i = 0; i < 30; i++) {
       const hole = generateHole(Math.random, 'underwater');
-      expect(hole.walls.length).toBe(4);
-      if (hole.waterHazards.length > 0) withPonds++;
+      expect(hole.walls.length).toBe(0);
+      expect(hasCourseBorderWater(hole)).toBe(true);
+      expect(hole.waterHazards.length).toBeGreaterThanOrEqual(4);
+      if (hole.waterHazards.length > 4) withInteriorPonds++;
     }
-    expect(withPonds).toBeGreaterThan(0);
+    expect(withInteriorPonds).toBeGreaterThan(0);
   });
 
   it('sometimes generates water hazards on reachable holes', () => {
@@ -536,6 +549,18 @@ describe('minigolf water hazards', () => {
       inWater = stepBall(ball, course, 1).inWater === true;
     }
     expect(inWater).toBe(false);
+  });
+
+  it('ocean border water sinks the ball instead of bouncing', () => {
+    const hole = generateHole(Math.random, 'ocean');
+    expect(hole.walls.length).toBe(0);
+    expect(hasCourseBorderWater(hole)).toBe(true);
+    const ball: MinigolfBall = { x: 1.5, y: 70, vx: -2, vy: 0 };
+    const result = stepBall(ball, hole, 1, 'ocean');
+    expect(result.inWater).toBe(true);
+    expect(result.holed).toBe(false);
+    expect(ball.vx).toBe(0);
+    expect(ball.vy).toBe(0);
   });
 
   it('sinks then resets to last stroke position with a +1 stroke penalty', () => {
