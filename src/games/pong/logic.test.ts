@@ -654,7 +654,7 @@ describe('pong logic', () => {
 
   it('resets ball speed after a point is scored', () => {
     const players = [makePlayer('p1', 'One'), makePlayer('p2', 'Two')];
-    let state = createPongState(players) as PongState;
+    let state = createDeterministicPongState(players) as PongState;
     const defender = state.players[0];
 
     state = {
