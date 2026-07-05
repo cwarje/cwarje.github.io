@@ -74,9 +74,14 @@ export default function GamePage() {
   const gameDef = room.gameType ? GAME_REGISTRY[room.gameType] : null;
   const isFinished = room.phase === 'finished';
 
+  const gameIsOver = gameDef?.isOver(gameState) ?? false;
+  const pokerSessionOver = (gameState as Record<string, unknown>)?.sessionOver === true;
+
   // Show "Back to Lobby" for host when game is finished or poker session is over
   const showBackToLobby = isHost && (
-    isFinished || (gameState as Record<string, unknown>)?.sessionOver === true
+    isFinished
+    || pokerSessionOver
+    || (gameIsOver && room.gameType !== 'poker')
   );
 
   const showHudTitle = !gameDef?.hideHudTitleDuringPlay || (gameDef?.isOver(gameState) ?? false);

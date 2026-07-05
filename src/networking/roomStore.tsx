@@ -2399,7 +2399,15 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     pongTickIntervalRef.current = setInterval(() => {
       const currentGs = gameStateRef.current as PongState | null;
       const currentRoom = roomRef.current;
-      if (!currentGs || !currentRoom || currentRoom.gameType !== 'pong' || currentGs.gameOver) return;
+      if (!currentGs || !currentRoom || currentRoom.gameType !== 'pong') return;
+      if (currentGs.gameOver) {
+        if (currentRoom.phase !== 'finished' && checkGameOver('pong', currentGs)) {
+          const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+          setRoom(finishedRoom);
+          broadcastRoomState(finishedRoom);
+        }
+        return;
+      }
 
       const next = processGameAction('pong', currentGs, { type: 'tick', dt: PONG_TICK_MS }, '');
       if (next !== currentGs) {
@@ -2430,7 +2438,15 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     minigolfTickIntervalRef.current = setInterval(() => {
       const currentGs = gameStateRef.current as MinigolfState | null;
       const currentRoom = roomRef.current;
-      if (!currentGs || !currentRoom || currentRoom.gameType !== 'minigolf' || currentGs.gameOver) return;
+      if (!currentGs || !currentRoom || currentRoom.gameType !== 'minigolf') return;
+      if (currentGs.gameOver) {
+        if (currentRoom.phase !== 'finished' && checkGameOver('minigolf', currentGs)) {
+          const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+          setRoom(finishedRoom);
+          broadcastRoomState(finishedRoom);
+        }
+        return;
+      }
 
       const next = processGameAction('minigolf', currentGs, { type: 'tick', dt: MINIGOLF_TICK_MS }, '');
       if (next !== currentGs) {

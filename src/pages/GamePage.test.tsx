@@ -1,6 +1,7 @@
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { RoomContextValue, RoomState } from '../networking/types';
+import { createMinigolfState } from '../games/minigolf/logic';
 import GamePage from './GamePage';
 
 const mockUseRoomContext = vi.fn();
@@ -35,6 +36,15 @@ function createRoomState(overrides: Partial<RoomState> = {}): RoomState {
     ...overrides,
   };
 }
+
+const hostPlayer = {
+  id: 'host-1',
+  name: 'Host',
+  color: 'blue' as const,
+  isBot: false,
+  isHost: true,
+  connected: true,
+};
 
 function createRoomContext(overrides: Partial<RoomContextValue> = {}): RoomContextValue {
   return {
@@ -102,6 +112,27 @@ describe('GamePage', () => {
     mockUseRoomContext.mockReturnValue(
       createRoomContext({
         room: createRoomState({ phase: 'finished' }),
+        returnToLobby,
+      }),
+    );
+
+    renderGamePage();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Lobby' }));
+
+    expect(returnToLobby).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets host return to lobby when minigolf game is over but room phase is still playing', () => {
+    const returnToLobby = vi.fn();
+    mockUseRoomContext.mockReturnValue(
+      createRoomContext({
+        room: createRoomState({ gameType: 'minigolf', phase: 'playing' }),
+        gameState: {
+          ...createMinigolfState([hostPlayer]),
+          gameOver: true,
+          winners: ['host-1'],
+          phase: 'game-over',
+        },
         returnToLobby,
       }),
     );
