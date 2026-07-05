@@ -20,7 +20,7 @@ Current game types (from `src/games/registry.ts` and `src/networking/types.ts`):
 - `up-and-down-the-river` (4-6 players; start order `up-down` or `down-up`)
 - `twelve` (2-4 players; UI title **Tolva** — table piles, pile count 3-6)
 - `golf` (2-6 players; six table cards, draw/discard, 9 holes)
-- `minigolf` (1-8 players; real-time top-down mini golf — 3 randomly generated holes, simultaneous play, lowest total strokes wins)
+- `minigolf` (1-8 players; real-time top-down mini golf — host picks 3, 9, or 18 randomly generated holes, simultaneous play, lowest total strokes wins; persistent XP/levels — see [Minigolf progression](#minigolf-progression-xp-and-levels))
 - `settler` (3-4 players)
 - `cross-crib` (2 or 4 players only)
 
@@ -70,7 +70,7 @@ sequenceDiagram
   participant room as RoomProviderHost
   participant engine as GameEngine
 
-  client->>host: join(roomCode, playerName, deviceId)
+  client->>host: join(roomCode, playerName, deviceId, minigolfXp?)
   host->>client: room-state
   host->>client: game-state (if already playing)
   host->>room: startGame(gameType)
@@ -119,7 +119,7 @@ See [`src/games/shared/README.md`](src/games/shared/README.md) for integration d
 ### Lobby and game lifecycle
 
 1. User lands on `Home`.
-2. If no name in localStorage, a prompt is shown (`playerName`, `playerColor`).
+2. If no name in localStorage, a prompt is shown (`playerName`, `playerColor`). Minigolf XP is stored separately as `minigolfXp` (see [Minigolf progression](#minigolf-progression-xp-and-levels)).
 3. Host creates lobby (`createLobby`) with generated room code.
 4. Clients join using room code (`joinRoom`).
 5. Host selects game and starts (`startGame`).
@@ -140,6 +140,7 @@ Main files:
 Important message types:
 
 - Client -> host: `join`, `update-profile`, `action`, `leave`, `ready`
+  - `join` and `update-profile` carry `playerName`, `playerColor`, `deviceId`, and optionally `minigolfXp` (synced lobby level for minigolf HUD display)
 - Host -> client: `room-state`, `game-state`, `error`, `kicked`, `host-disconnected`
 
 Reconnect behavior:
@@ -147,6 +148,39 @@ Reconnect behavior:
 - Clients attempt reconnect with backoff (1s, 2s, 4s).
 - Host applies a 15s grace period before marking players disconnected.
 - Rejoining clients can receive in-progress `game-state` immediately.
+
+### Minigolf progression (XP and levels)
+
+Minigolf has a client-persisted progression system. There is no backend or migration step — missing data defaults to zero XP (level 1).
+
+**Storage**
+
+| Key | Where | Purpose |
+|-----|-------|---------|
+| `minigolfXp` | `localStorage` | Total XP earned across all minigolf games on this browser |
+| `Player.minigolfXp` | Room state (synced) | Snapshot sent on `join` / `update-profile` so every client can show each player's level in the HUD |
+
+Host-only lobby settings (hole count, theme, collisions, obstacles) are stored separately in `minigolfHostSettings`.
+
+**Rules**
+
+- **20 XP** for a 1st-place finish (lowest total strokes, ties share 1st).
+- **10 XP** for a 2nd-place finish when 1st place is not tied (ties for 2nd share 10 XP each).
+- **Level** = `floor(totalXp / 100) + 1` (everyone starts at level 1).
+- Progress toward the next level = `totalXp % 100` out of 100.
+
+**When XP is awarded**
+
+- Each client awards **only their own** player when a round ends (`gameOver`), then writes `localStorage` and broadcasts the new total via `updateMinigolfXp()` in `roomStore.tsx`.
+- Awards are computed by `computeMinigolfXpAwards()` in `src/games/minigolf/progress.ts` (same logic drives game-over scorecard XP pills).
+
+**UI**
+
+- **HUD chips** (top-left during play): `Lv{n}` badge to the left of each player name.
+- **Game over**: final scorecard in its own white panel; a separate **Progress** panel below shows level and an XP meter. Blue `+ N xp` pills appear on scorecard names for players who earned XP.
+- **Manual scorecard toggle** (during play): Progress panel above the scorecard in the overlay (no XP pills until game over).
+
+Main files: `src/games/minigolf/progress.ts`, `src/games/minigolf/MinigolfBoard.tsx`, `src/networking/roomStore.tsx` (`updateMinigolfXp`).
 
 ## Project structure
 
@@ -158,6 +192,7 @@ src/
     gameEngine.ts    # Orchestrates logic via registry lookups
     shared/          # Cross-board utilities (deal animation, seat name fit, etc.)
     <game-name>/     # Per-game types, logic, board, and optional options/HUD
+                     # Minigolf also: progress.ts (XP/levels), settings.ts (host prefs)
   networking/        # Peer/network state and messaging
   pages/             # Route-level pages (Home/GamePage)
   utils/             # Device ID and room code helpers
@@ -206,7 +241,7 @@ Scripts are defined in `package.json`:
 
 - If joining fails, verify room code format is 4 chars and host is online.
 - If connections time out, refresh both host/client tabs and recreate lobby.
-- If identity behavior seems odd, inspect localStorage keys: `deviceId`, `playerName`, `playerColor`.
+- If identity behavior seems odd, inspect localStorage keys: `deviceId`, `playerName`, `playerColor`, `minigolfXp`, `minigolfHostSettings`.
 
 ## Build and deployment
 
@@ -314,7 +349,7 @@ npm run lint && npm run typecheck && npm run test && npm run build
 | Radial seats + deal animation wiring | `UpAndDownTheRiverBoard.tsx`, `CucumberBoard.tsx` |
 | Seat pill / trick slot layout (3–7 players) | `.river-*` classes in `index.css`; extend `TRICK_SLOT_PLACEMENTS` per player count |
 | Turn-based with phases | `mobilization/`, `twelve/` |
-| Real-time / non-card | `pong/` |
+| Real-time / non-card | `pong/`, **`minigolf/`** (host tick loop, XP in `progress.ts`) |
 
 ### Trick-taking pattern (Hearts / Up River / Cucumber)
 
@@ -387,6 +422,7 @@ Use this map to find where changes should go quickly:
 - UI styling/layout tweaks -> `src/components/*`, `src/pages/*`, `src/index.css`
 - Lobby/network behavior -> `src/networking/roomStore.tsx`, `src/networking/peer.ts`
 - Game rule bugs/features -> `src/games/<game>/logic.ts` and `src/games/<game>/types.ts`
+- Minigolf XP, levels, and scorecard UI -> `src/games/minigolf/progress.ts`, `MinigolfBoard.tsx`
 - Cross-game orchestration -> `src/games/gameEngine.ts`
 - Game metadata, themes, and discoverability -> `src/games/registry.ts`
 - Radial deal animation -> `src/games/shared/useDealAnimation.ts`, `DealAnimationLayer.tsx`, `dealTiming.ts`, and per-board wiring; host hold in `roomStore.tsx` (`getRoundDealInfo`)
