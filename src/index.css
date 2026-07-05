@@ -3346,7 +3346,7 @@
 .minigolf-progressMeterFill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  background: linear-gradient(90deg, var(--color-primary-600), var(--color-primary-500));
   transition: width 0.35s ease;
 }
 
@@ -3554,14 +3554,14 @@
   z-index: 1;
   padding: 0.12rem 0.38rem;
   border-radius: 9999px;
-  background: rgba(37, 99, 235, 0.65);
+  background: color-mix(in srgb, var(--color-primary-600) 65%, transparent);
   color: #ffffff;
   font-size: 0.55em;
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: 0.01em;
   white-space: nowrap;
-  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.45);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--color-primary-600) 45%, transparent);
   pointer-events: none;
 }
 

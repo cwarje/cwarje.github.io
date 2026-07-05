@@ -44,6 +44,7 @@ interface BoardFit {
 /** Drag distance (course units) that produces a full-power stroke. */
 const FULL_POWER_DRAG_UNITS = 55;
 const MIN_POWER = 0.02;
+const MINIGOLF_GAME_OVER_XP_FILL_DELAY_MS = 2000;
 
 function drawWoodPlanks(
   ctx: CanvasRenderingContext2D,
@@ -1115,6 +1116,8 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
   const [scorecardOpen, setScorecardOpen] = useState(false);
   const [devTheme, setDevTheme] = useState<MinigolfDevThemeOption>('random');
   const [localXp, setLocalXp] = useState(() => readMinigolfXp());
+  const [gameOverDisplayXp, setGameOverDisplayXp] = useState<number | null>(null);
+  const [showGameOverXpAwards, setShowGameOverXpAwards] = useState(false);
   const awardedRef = useRef(false);
   const stateRef = useRef<MinigolfState>(state);
   const prevStateRef = useRef<MinigolfState>(state);
@@ -1166,20 +1169,42 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
   useEffect(() => {
     if (!state.gameOver) {
       awardedRef.current = false;
+      setGameOverDisplayXp(null);
+      setShowGameOverXpAwards(false);
       return;
     }
     if (awardedRef.current) return;
     awardedRef.current = true;
 
-    const awards = computeMinigolfXpAwards(state.players);
+    const awards = computeMinigolfXpAwards(stateRef.current.players);
     const earned = awards.get(myId) ?? 0;
-    if (earned <= 0) return;
+    let next: number | undefined;
 
-    const next = readMinigolfXp() + earned;
-    writeMinigolfXp(next);
-    setLocalXp(next);
-    updateMinigolfXp(next);
-  }, [state.gameOver, state.players, myId, updateMinigolfXp]);
+    if (earned > 0) {
+      const prior = readMinigolfXp();
+      next = prior + earned;
+      writeMinigolfXp(next);
+      updateMinigolfXp(next);
+      setGameOverDisplayXp(prior);
+    }
+
+    const timer = window.setTimeout(() => {
+      if (next != null) {
+        setLocalXp(next);
+        setGameOverDisplayXp(next);
+      }
+      setShowGameOverXpAwards(true);
+    }, MINIGOLF_GAME_OVER_XP_FILL_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+      if (next != null) {
+        setLocalXp(readMinigolfXp());
+        setGameOverDisplayXp(null);
+      }
+      setShowGameOverXpAwards(false);
+    };
+  }, [state.gameOver, myId, updateMinigolfXp]);
 
   const gameOverXpAwards = state.gameOver ? computeMinigolfXpAwards(state.players) : undefined;
 
@@ -1451,10 +1476,10 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
           <div className="w-full flex justify-center">
             <div className="minigolf-gameOverPanels">
               <div className="minigolf-summaryPanel minigolf-summaryPanel--light">
-                <Scorecard state={state} myId={myId} xpAwards={gameOverXpAwards} />
+                <Scorecard state={state} myId={myId} xpAwards={showGameOverXpAwards ? gameOverXpAwards : undefined} />
               </div>
               <div className="minigolf-summaryPanel minigolf-summaryPanel--light">
-                <MinigolfProgressPanel xp={localXp} />
+                <MinigolfProgressPanel xp={gameOverDisplayXp ?? localXp} />
               </div>
             </div>
           </div>
