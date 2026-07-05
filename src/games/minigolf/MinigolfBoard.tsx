@@ -163,6 +163,60 @@ function drawIceBlocks(
   ctx.restore();
 }
 
+function drawFoliageWalls(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  palette: MinigolfPalette,
+  scale: number,
+) {
+  const seedBase = Math.round(x * 29 + y * 43 + w * 17 + h * 31);
+  const leafSize = Math.max(3, 3.5 * scale);
+  const leafCount = Math.max(6, Math.floor((w * h) / (leafSize * leafSize * 2.5)));
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+
+  ctx.strokeStyle = palette.wallEdge;
+  ctx.lineWidth = Math.max(1, 0.5 * scale);
+  ctx.globalAlpha = 0.35;
+  const vineSpacing = Math.max(8, 10 * scale);
+  for (let vx = x + vineSpacing * 0.5; vx < x + w; vx += vineSpacing) {
+    ctx.beginPath();
+    ctx.moveTo(vx, y + h);
+    ctx.quadraticCurveTo(vx + vineSpacing * 0.15, y + h * 0.5, vx - vineSpacing * 0.1, y);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  for (let i = 0; i < leafCount; i++) {
+    const fx = sandSpeckFraction(seedBase + i * 5);
+    const fy = sandSpeckFraction(seedBase + i * 5 + 1);
+    const tone = sandSpeckFraction(seedBase + i * 5 + 2);
+    const angle = sandSpeckFraction(seedBase + i * 5 + 3) * Math.PI * 2;
+    const lx = x + fx * (w - leafSize);
+    const ly = y + fy * (h - leafSize);
+    const lw = leafSize * (0.7 + tone * 0.6);
+    const lh = leafSize * (0.4 + tone * 0.5);
+
+    ctx.save();
+    ctx.translate(lx + lw / 2, ly + lh / 2);
+    ctx.rotate(angle);
+    ctx.fillStyle = tone < 0.35 ? palette.wallEdge : tone < 0.7 ? palette.wallFill : 'rgba(80,160,70,0.55)';
+    ctx.globalAlpha = tone < 0.7 ? 1 : 0.75;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, lw / 2, lh / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
 function drawWallRect(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -184,6 +238,8 @@ function drawWallRect(
     // flat fill — palette.wallFill only
   } else if (theme === 'cemetery') {
     drawSandstoneBricks(ctx, x, y, w, h, palette, scale);
+  } else if (theme === 'jungle') {
+    drawFoliageWalls(ctx, x, y, w, h, palette, scale);
   } else {
     drawWoodPlanks(ctx, x, y, w, h, palette, scale);
   }
