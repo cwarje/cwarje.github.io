@@ -43,7 +43,7 @@ export type MinigolfHazardKind = 'water' | 'ice';
 export interface MinigolfThemeConfig {
   label: string;
   hazardKind: MinigolfHazardKind;
-  obstacleEmoji: string;
+  obstacleEmojis: readonly string[];
   friction: MinigolfFriction;
   generation: MinigolfGenerationWeights;
   palette: MinigolfPalette;
@@ -54,7 +54,7 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
   classic: {
     label: 'Classic',
     hazardKind: 'water',
-    obstacleEmoji: '🌲',
+    obstacleEmojis: ['🌲', '🌳', '🪨'],
     friction: { mult: 0.978, linear: 0.003 },
     generation: { gateChance: 0.55, hazardBlockChance: 0.5 },
     palette: {
@@ -79,7 +79,7 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
   desert: {
     label: 'Desert',
     hazardKind: 'water',
-    obstacleEmoji: '🌵',
+    obstacleEmojis: ['🌵', '🐪', '🐫'],
     friction: { mult: 0.968, linear: 0.005, sandTrapMult: 0.9 },
     generation: { gateChance: 0.4, hazardBlockChance: 0.65, sandTrapSplit: 0.6 },
     palette: {
@@ -104,7 +104,7 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
   tundra: {
     label: 'Tundra',
     hazardKind: 'ice',
-    obstacleEmoji: '⛄️',
+    obstacleEmojis: ['⛄️', '🧊', '🏂'],
     friction: { mult: 0.985, linear: 0.001 },
     generation: { gateChance: 0.7, hazardBlockChance: 0.45 },
     palette: {
@@ -129,7 +129,7 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
   chocolate: {
     label: 'Chocolate',
     hazardKind: 'water',
-    obstacleEmoji: '🍫',
+    obstacleEmojis: ['🍫', '🍩', '🍪'],
     friction: { mult: 0.978, linear: 0.003 },
     generation: { gateChance: 0.55, hazardBlockChance: 0.5 },
     palette: {
@@ -154,7 +154,7 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
   cemetery: {
     label: 'Cemetery',
     hazardKind: 'water',
-    obstacleEmoji: '🪦',
+    obstacleEmojis: ['🪦', '👻', '🪾'],
     friction: { mult: 0.978, linear: 0.003 },
     generation: { gateChance: 0.55, hazardBlockChance: 0.5 },
     palette: {
@@ -179,7 +179,7 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
   jungle: {
     label: 'Jungle',
     hazardKind: 'water',
-    obstacleEmoji: '🦧',
+    obstacleEmojis: ['🦧', '🦍', '🌴'],
     friction: { mult: 0.978, linear: 0.003 },
     generation: { gateChance: 0.55, hazardBlockChance: 0.5 },
     palette: {
@@ -204,7 +204,7 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
   space: {
     label: 'Space',
     hazardKind: 'water',
-    obstacleEmoji: '✨',
+    obstacleEmojis: ['✨', '🪐', '🛸'],
     friction: { mult: 0.978, linear: 0.003 },
     generation: { gateChance: 0.55, hazardBlockChance: 0.5 },
     palette: {
@@ -232,8 +232,9 @@ export function getMinigolfTheme(theme: MinigolfCourseTheme | undefined): Minigo
   return MINIGOLF_THEMES[theme ?? 'classic'];
 }
 
-export function getObstacleEmoji(theme: MinigolfCourseTheme): string {
-  return MINIGOLF_THEMES[theme].obstacleEmoji;
+export function pickObstacleEmoji(theme: MinigolfCourseTheme, rng: () => number): string {
+  const emojis = MINIGOLF_THEMES[theme].obstacleEmojis;
+  return emojis[Math.floor(rng() * emojis.length)];
 }
 
 export function isFrozenIceHazard(theme: MinigolfCourseTheme): boolean {

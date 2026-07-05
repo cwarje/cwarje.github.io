@@ -1,6 +1,7 @@
 import type { MinigolfCourse, MinigolfLandmine, MinigolfRect, MinigolfVec } from './types';
 import {
   getMinigolfTheme,
+  pickObstacleEmoji,
   pickRandomCourseTheme,
   type MinigolfCourseTheme,
   type MinigolfThemeOption,
@@ -108,6 +109,7 @@ export function placeLandmines(
   tee: MinigolfVec,
   cup: MinigolfVec,
   walls: MinigolfRect[],
+  theme: MinigolfCourseTheme,
 ): MinigolfLandmine[] {
   const count = randInt(rng, LANDMINE_COUNT_MIN, LANDMINE_COUNT_MAX);
   const landmines: MinigolfLandmine[] = [];
@@ -127,7 +129,7 @@ export function placeLandmines(
       if (Math.hypot(p.x - cup.x, p.y - cup.y) < CLEARANCE) continue;
       if (!pointClearOfWalls(p, walls)) continue;
       if (!pointClearOfLandmines(p, landmines)) continue;
-      landmines.push(p);
+      landmines.push({ ...p, emoji: pickObstacleEmoji(theme, rng) });
       break;
     }
   }
@@ -272,7 +274,7 @@ export function generateHole(
     };
     if (sandTraps.length > 0) course.sandTraps = sandTraps;
     if (obstaclesEnabled) {
-      const landmines = placeLandmines(rng, tee, cup, walls);
+      const landmines = placeLandmines(rng, tee, cup, walls, theme);
       if (landmines.length > 0) course.landmines = landmines;
     }
     return course;

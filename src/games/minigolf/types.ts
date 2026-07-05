@@ -18,6 +18,7 @@ export interface MinigolfVec {
 export interface MinigolfLandmine {
   x: number;
   y: number;
+  emoji: string;
 }
 
 export interface MinigolfCourse {

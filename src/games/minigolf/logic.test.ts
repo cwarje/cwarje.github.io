@@ -11,7 +11,7 @@ import {
   pathLengthCells,
   type Rng,
 } from './courseGen';
-import { MINIGOLF_COURSE_THEMES } from './themes';
+import { MINIGOLF_COURSE_THEMES, MINIGOLF_THEMES } from './themes';
 import {
   CUP_CAPTURE_SPEED,
   STROKE_CAP_OVER_PAR,
@@ -142,6 +142,27 @@ describe('minigolf course generation', () => {
         expect(Math.hypot(lm.x - hole.cup.x, lm.y - hole.cup.y)).toBeGreaterThanOrEqual(9);
       }
     }
+  });
+
+  it('assigns obstacle emojis from the theme pool when obstacles are enabled', () => {
+    const seededRng = (seed: number): Rng => {
+      let s = seed >>> 0;
+      return () => {
+        s = (s * 1664525 + 1013904223) >>> 0;
+        return s / 0x100000000;
+      };
+    };
+    for (const theme of MINIGOLF_COURSE_THEMES) {
+      const pool = new Set(MINIGOLF_THEMES[theme].obstacleEmojis);
+      const hole = generateHole(seededRng(9001 + theme.length), theme, true);
+      expect(hole.landmines?.length).toBeGreaterThan(0);
+      for (const lm of hole.landmines!) {
+        expect(pool.has(lm.emoji)).toBe(true);
+      }
+    }
+    const variedHole = generateHole(seededRng(424242), 'classic', true);
+    const emojis = new Set(variedHole.landmines?.map((lm) => lm.emoji));
+    expect(emojis.size).toBeGreaterThan(1);
   });
 
   it('respects the minigolfHoleCount start option', () => {
@@ -384,7 +405,7 @@ describe('minigolf physics', () => {
   });
 
   it('knocks the ball away when it enters obstacle trigger range', () => {
-    const course: MinigolfCourse = { ...openCourse(), landmines: [{ x: 50, y: 70 }] };
+    const course: MinigolfCourse = { ...openCourse(), landmines: [{ x: 50, y: 70, emoji: '🌲' }] };
     const ball: MinigolfBall = { x: 50, y: 63, vx: 0, vy: 2 };
     const triggered = new Set<number>();
     stepBall(ball, course, 1, 'classic', triggered);
@@ -394,7 +415,7 @@ describe('minigolf physics', () => {
   });
 
   it('does not retrigger detonated obstacles', () => {
-    const course: MinigolfCourse = { ...openCourse(), landmines: [{ x: 50, y: 70 }] };
+    const course: MinigolfCourse = { ...openCourse(), landmines: [{ x: 50, y: 70, emoji: '🌲' }] };
     const ball: MinigolfBall = { x: 50, y: 63, vx: 0, vy: 2 };
     const triggered = new Set([0]);
     stepBall(ball, course, 1, 'classic', triggered);
@@ -402,7 +423,7 @@ describe('minigolf physics', () => {
   });
 
   it('detonates obstacles and knocks back all balls in explosion range', () => {
-    const course: MinigolfCourse = { ...openCourse(), landmines: [{ x: 50, y: 70 }] };
+    const course: MinigolfCourse = { ...openCourse(), landmines: [{ x: 50, y: 70, emoji: '🌲' }] };
     const base = createMinigolfState(makePlayers(2), { minigolfBallCollisions: true, minigolfObstacles: true });
     let state: MinigolfState = {
       ...base,
