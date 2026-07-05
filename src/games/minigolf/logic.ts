@@ -19,7 +19,13 @@ import type {
   MinigolfRect,
   MinigolfState,
 } from './types';
-import { getMinigolfTheme, isFrozenIceHazard, pickRandomCourseTheme } from './themes';
+import {
+  getMinigolfTheme,
+  isFrozenIceHazard,
+  isSinkHazard,
+  resolveDevThemeOption,
+  type MinigolfDevThemeOption,
+} from './themes';
 
 export const MINIGOLF_TICK_MS = 33;
 export const DEFAULT_MINIGOLF_HOLE_COUNT = 9;
@@ -185,7 +191,7 @@ function stepBallsWithCollisions(
 
   let maxTravel = 0;
   for (let i = 0; i < balls.length; i++) {
-    applyFrictionUnlessOnIce(balls[i], course, theme, dtScale, friction.mult, friction.linear);
+    applySurfaceFriction(balls[i], course, theme, dtScale);
     maxTravel = Math.max(maxTravel, Math.hypot(balls[i].vx, balls[i].vy) * dtScale);
   }
 
@@ -281,7 +287,40 @@ function ballOnHazardSurface(ball: MinigolfBall, course: MinigolfCourse): boolea
 }
 
 function shouldSinkInHazard(theme: MinigolfCourseTheme, onHazard: boolean): boolean {
-  return onHazard && !isFrozenIceHazard(theme);
+  return onHazard && isSinkHazard(theme);
+}
+
+function applyIceSpeedBoost(
+  ball: MinigolfBall,
+  dtScale: number,
+  iceSpeedMult: number,
+  iceSpeedCap: number,
+): void {
+  const factor = Math.pow(iceSpeedMult, dtScale);
+  ball.vx *= factor;
+  ball.vy *= factor;
+  const speed = Math.hypot(ball.vx, ball.vy);
+  if (speed > iceSpeedCap) {
+    const scale = iceSpeedCap / speed;
+    ball.vx *= scale;
+    ball.vy *= scale;
+  }
+}
+
+function applySurfaceFriction(
+  ball: MinigolfBall,
+  course: MinigolfCourse,
+  theme: MinigolfCourseTheme,
+  dtScale: number,
+): void {
+  const { friction } = getMinigolfTheme(theme);
+  if (isFrozenIceHazard(theme) && ballOnHazardSurface(ball, course)) {
+    if (friction.iceSpeedMult != null) {
+      applyIceSpeedBoost(ball, dtScale, friction.iceSpeedMult, friction.iceSpeedCap ?? 5.0);
+    }
+    return;
+  }
+  applyBallFriction(ball, dtScale, friction.mult, friction.linear);
 }
 
 function ballInLandmineTriggerRange(ball: MinigolfBall, mine: MinigolfLandmine): boolean {
@@ -338,18 +377,6 @@ function checkAndDetonateLandmines(
   }
 }
 
-function applyFrictionUnlessOnIce(
-  ball: MinigolfBall,
-  course: MinigolfCourse,
-  theme: MinigolfCourseTheme,
-  dtScale: number,
-  frictionMult: number,
-  frictionLinear: number,
-): void {
-  if (isFrozenIceHazard(theme) && ballOnHazardSurface(ball, course)) return;
-  applyBallFriction(ball, dtScale, frictionMult, frictionLinear);
-}
-
 /**
  * Advances a ball one tick. Mutates and returns the passed-in ball (callers
  * pass a fresh copy). Returns whether the ball dropped into the cup.
@@ -365,18 +392,9 @@ export function stepBall(
   let speed = Math.hypot(ball.vx, ball.vy);
   if (speed <= 0) return { holed: false };
 
-  if (!(isFrozenIceHazard(theme) && ballOnHazardSurface(ball, course))) {
-    const newSpeed = Math.max(0, speed * Math.pow(friction.mult, dtScale) - friction.linear * dtScale);
-    if (newSpeed < STOP_SPEED) {
-      ball.vx = 0;
-      ball.vy = 0;
-      return { holed: false };
-    }
-    const scale = newSpeed / speed;
-    ball.vx *= scale;
-    ball.vy *= scale;
-    speed = newSpeed;
-  }
+  applySurfaceFriction(ball, course, theme, dtScale);
+  speed = Math.hypot(ball.vx, ball.vy);
+  if (speed <= 0) return { holed: false };
 
   const travel = speed * dtScale;
   const steps = Math.max(1, Math.ceil(travel / (BALL_RADIUS * 0.75)));
@@ -550,9 +568,9 @@ function computeWinners(players: MinigolfPlayer[]): string[] {
   return totals.filter((t) => t.total === min).map((t) => t.id);
 }
 
-function devRegenerateCurrentHole(state: MinigolfState): MinigolfState {
+function devRegenerateCurrentHole(state: MinigolfState, devTheme: MinigolfDevThemeOption): MinigolfState {
   const { holeIndex } = state;
-  const theme = pickRandomCourseTheme(Math.random);
+  const theme = resolveDevThemeOption(devTheme, Math.random);
   const newCourse = generateHole(Math.random, theme, state.obstacles);
   const courses = [...state.courses];
   courses[holeIndex] = newCourse;
@@ -868,7 +886,7 @@ export function processMinigolfAction(state: unknown, action: unknown, playerId:
 
   if (import.meta.env.DEV && a.type === 'dev-regenerate-hole') {
     if (s.gameOver) return state;
-    return devRegenerateCurrentHole(s);
+    return devRegenerateCurrentHole(s, a.devTheme);
   }
 
   switch (a.type) {

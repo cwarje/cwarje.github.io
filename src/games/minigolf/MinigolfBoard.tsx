@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { MinigolfBall, MinigolfCourse, MinigolfPlayer, MinigolfState } from './types';
-import { getMinigolfTheme, isFrozenIceHazard, type MinigolfCourseTheme, type MinigolfPalette } from './themes';
-import { BALL_RADIUS, COURSE_H, COURSE_W, CUP_RADIUS, obstacleEdgeWidth } from './courseGen';
+import { getMinigolfTheme, isFrozenIceHazard, isLavaHazard, MINIGOLF_DEV_THEME_OPTIONS, getMinigolfDevThemeOptionLabel, type MinigolfCourseTheme, type MinigolfDevThemeOption, type MinigolfPalette } from './themes';
+import { BALL_RADIUS, COURSE_H, COURSE_W, CUP_RADIUS, WALL_THICKNESS, obstacleEdgeWidth } from './courseGen';
 import { MINIGOLF_TICK_MS, SINK_TICKS, isBallAtRest } from './logic';
-import { drawIceHazards, drawWaterHazards } from './waterRender';
+import { drawIceHazards, drawLavaHazards, drawWaterHazards } from './waterRender';
 import {
   PLAYER_COLOR_HEX,
   getPlayerHudTextColor,
@@ -245,6 +245,114 @@ function drawStarfieldWalls(
   ctx.restore();
 }
 
+function drawFencePosts(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  palette: MinigolfPalette,
+  scale: number,
+) {
+  const postW = Math.max(2, 2.5 * scale);
+  const gapW = Math.max(3, 4 * scale);
+  const spacing = postW + gapW;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+
+  for (let px = x; px < x + w; px += spacing) {
+    const pw = Math.min(postW, x + w - px);
+    if (pw <= 0) break;
+    ctx.fillStyle = palette.wallFill;
+    ctx.fillRect(px, y, pw, h);
+    ctx.fillStyle = palette.wallEdge;
+    ctx.globalAlpha = 0.4;
+    ctx.fillRect(px, y, Math.max(1, pw * 0.3), h);
+    ctx.globalAlpha = 1;
+    const gapStart = px + pw;
+    const gw = Math.min(gapW, x + w - gapStart);
+    if (gw > 0) {
+      ctx.fillStyle = palette.fairwayBase;
+      ctx.fillRect(gapStart, y, gw, h);
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawBarnWall(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  scale: number,
+) {
+  ctx.fillStyle = '#c81820';
+  ctx.fillRect(x, y, w, h);
+
+  const lineWidth = Math.max(2, 1.2 * scale);
+  const inset = lineWidth / 2;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = lineWidth;
+  ctx.beginPath();
+  ctx.moveTo(x + inset, y + inset);
+  ctx.lineTo(x + w - inset, y + h - inset);
+  ctx.moveTo(x + w - inset, y + inset);
+  ctx.lineTo(x + inset, y + h - inset);
+  ctx.stroke();
+}
+
+function drawVolcanoRockWalls(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  palette: MinigolfPalette,
+  scale: number,
+) {
+  const seedBase = Math.round(x * 31 + y * 47 + w * 19 + h * 37);
+  const veinW = Math.max(1, 0.8 * scale);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+
+  ctx.fillStyle = palette.wallFill;
+  ctx.fillRect(x, y, w, h);
+
+  const veinCount = Math.max(3, Math.floor((w * h) / (40 * scale * scale)));
+  for (let i = 0; i < veinCount; i++) {
+    const fx = sandSpeckFraction(seedBase + i * 7);
+    const fy = sandSpeckFraction(seedBase + i * 7 + 1);
+    const angle = sandSpeckFraction(seedBase + i * 7 + 2) * Math.PI;
+    const len = Math.max(w, h) * (0.3 + sandSpeckFraction(seedBase + i * 7 + 3) * 0.5);
+    const cx = x + fx * w;
+    const cy = y + fy * h;
+    const tone = sandSpeckFraction(seedBase + i * 7 + 4);
+    ctx.strokeStyle = tone < 0.5 ? '#e85810' : '#ff8830';
+    ctx.lineWidth = veinW * (0.8 + tone * 0.6);
+    ctx.globalAlpha = 0.55 + tone * 0.35;
+    ctx.beginPath();
+    ctx.moveTo(cx - Math.cos(angle) * len / 2, cy - Math.sin(angle) * len / 2);
+    ctx.lineTo(cx + Math.cos(angle) * len / 2, cy + Math.sin(angle) * len / 2);
+    ctx.stroke();
+  }
+
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function isFarmBarnWall(w: number, h: number, scale: number): boolean {
+  const minDim = WALL_THICKNESS * scale + scale;
+  return w > minDim && h > minDim;
+}
+
 function drawWallRect(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -258,7 +366,15 @@ function drawWallRect(
   ctx.fillStyle = palette.wallFill;
   ctx.fillRect(x, y, w, h);
 
-  if (theme === 'desert') {
+  if (theme === 'farm') {
+    if (isFarmBarnWall(w, h, scale)) {
+      drawBarnWall(ctx, x, y, w, h, scale);
+    } else {
+      drawFencePosts(ctx, x, y, w, h, palette, scale);
+    }
+  } else if (theme === 'volcano') {
+    drawVolcanoRockWalls(ctx, x, y, w, h, palette, scale);
+  } else if (theme === 'desert' || theme === 'sahara' || theme === 'australia') {
     drawSandstoneBricks(ctx, x, y, w, h, palette, scale);
   } else if (theme === 'tundra') {
     drawIceBlocks(ctx, x, y, w, h, palette, scale);
@@ -270,6 +386,8 @@ function drawWallRect(
     drawFoliageWalls(ctx, x, y, w, h, palette, scale);
   } else if (theme === 'space') {
     drawStarfieldWalls(ctx, x, y, w, h, scale);
+  } else if (theme === 'ocean' || theme === 'underwater') {
+    // flat fill — deep-water course border
   } else {
     drawWoodPlanks(ctx, x, y, w, h, palette, scale);
   }
@@ -882,6 +1000,7 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [scorecardOpen, setScorecardOpen] = useState(false);
+  const [devTheme, setDevTheme] = useState<MinigolfDevThemeOption>('random');
   const stateRef = useRef<MinigolfState>(state);
   const prevStateRef = useRef<MinigolfState>(state);
   const prevTimeRef = useRef<number>(0);
@@ -1054,7 +1173,16 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
       ctx.drawImage(courseCanvas, 0, 0, fit.boardWidth, fit.boardHeight);
 
       const themePalette = getMinigolfTheme(currentCourse.theme).palette;
-      if (!isFrozenIceHazard(currentCourse.theme)) {
+      if (isLavaHazard(currentCourse.theme)) {
+        drawLavaHazards(
+          ctx,
+          currentCourse.waterHazards ?? [],
+          currentCourse.walls,
+          fit.scale,
+          themePalette,
+          now,
+        );
+      } else if (!isFrozenIceHazard(currentCourse.theme)) {
         drawWaterHazards(
           ctx,
           currentCourse.waterHazards ?? [],
@@ -1213,13 +1341,27 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
         />
 
         {showDevRegenerate && (
-          <button
-            type="button"
-            onClick={() => onAction({ type: 'dev-regenerate-hole' })}
-            className="absolute right-3 top-3 z-30 rounded-md border border-amber-300/60 bg-amber-500/20 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/30 cursor-pointer"
-          >
-            Dev: random hole
-          </button>
+          <div className="absolute right-3 top-3 z-30 flex items-center gap-2">
+            <select
+              value={devTheme}
+              onChange={(e) => setDevTheme(e.target.value as MinigolfDevThemeOption)}
+              className="rounded-md border border-amber-300/60 bg-amber-500/20 px-2 py-1 text-[11px] font-semibold text-amber-200 cursor-pointer"
+              aria-label="Dev theme"
+            >
+              {MINIGOLF_DEV_THEME_OPTIONS.map((option) => (
+                <option key={option} value={option} className="bg-neutral-900 text-amber-100">
+                  {getMinigolfDevThemeOptionLabel(option)}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => onAction({ type: 'dev-regenerate-hole', devTheme })}
+              className="rounded-md border border-amber-300/60 bg-amber-500/20 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/30 cursor-pointer"
+            >
+              Dev: regenerate hole
+            </button>
+          </div>
         )}
 
         {/* Scorecard toggle + hole info + player status chips */}

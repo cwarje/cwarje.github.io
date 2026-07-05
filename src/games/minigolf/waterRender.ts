@@ -142,3 +142,71 @@ export function drawWaterHazards(
     drawSingleHazard(ctx, hazard, scale, palette, timeMs);
   }
 }
+
+const LAVA_PHASE_SPEED = 0.0018;
+
+function drawAnimatedLava(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  ww: number,
+  wh: number,
+  scale: number,
+  palette: MinigolfPalette,
+  timeMs: number,
+) {
+  ctx.fillStyle = palette.hazardFill;
+  ctx.fillRect(x, y, ww, wh);
+
+  const inset = Math.max(2, 2 * scale);
+  const innerX = x + inset;
+  const innerY = y + inset;
+  const innerW = Math.max(0, ww - inset * 2);
+  const innerH = Math.max(0, wh - inset * 2);
+  if (innerW <= 0 || innerH <= 0) return;
+
+  const phase = timeMs * LAVA_PHASE_SPEED;
+  const bubbleSize = Math.max(2, 2.5 * scale);
+  const bubbleCount = Math.max(3, Math.floor((innerW * innerH) / (80 * scale * scale)));
+
+  for (let i = 0; i < bubbleCount; i++) {
+    const bx = innerX + ((i * 17 + 3) % 97) / 97 * (innerW - bubbleSize);
+    const baseY = innerY + innerH * (0.3 + ((i * 23) % 50) / 100);
+    const drift = Math.sin(phase + i * 1.7) * 3 * scale;
+    const by = baseY + drift;
+    ctx.fillStyle = palette.hazardHighlight;
+    ctx.globalAlpha = 0.25 + ((i * 11) % 30) / 100;
+    ctx.beginPath();
+    ctx.ellipse(bx + bubbleSize / 2, by, bubbleSize * 0.6, bubbleSize * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const glowY = innerY + innerH * 0.4 + Math.sin(phase * 0.8) * 2 * scale;
+  ctx.fillStyle = palette.hazardHighlight;
+  ctx.globalAlpha = 0.2;
+  ctx.fillRect(innerX, glowY, innerW, Math.max(2, 3 * scale));
+  ctx.globalAlpha = 1;
+}
+
+export function drawLavaHazards(
+  ctx: CanvasRenderingContext2D,
+  hazards: MinigolfRect[],
+  _walls: MinigolfRect[],
+  scale: number,
+  palette: MinigolfPalette,
+  timeMs: number,
+): void {
+  if (hazards.length === 0) return;
+  for (const hazard of hazards) {
+    const x = hazard.x * scale;
+    const y = hazard.y * scale;
+    const ww = hazard.w * scale;
+    const wh = hazard.h * scale;
+
+    drawAnimatedLava(ctx, x, y, ww, wh, scale, palette, timeMs);
+
+    ctx.strokeStyle = hazardBorderColor(palette);
+    ctx.lineWidth = obstacleEdgeWidth(scale);
+    ctx.strokeRect(x, y, ww, wh);
+  }
+}

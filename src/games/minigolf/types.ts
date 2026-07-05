@@ -1,7 +1,7 @@
 import type { PlayerColor } from '../../networking/types';
-import type { MinigolfCourseTheme, MinigolfThemeOption } from './themes';
+import type { MinigolfCourseTheme, MinigolfDevThemeOption, MinigolfThemeOption } from './themes';
 
-export type { MinigolfCourseTheme, MinigolfThemeOption };
+export type { MinigolfCourseTheme, MinigolfDevThemeOption, MinigolfThemeOption };
 
 export interface MinigolfRect {
   x: number;
@@ -24,9 +24,9 @@ export interface MinigolfLandmine {
 export interface MinigolfCourse {
   /** Axis-aligned wall rectangles, including the four border walls. */
   walls: MinigolfRect[];
-  /** Sink hazards on classic/desert; frozen ice patches on tundra (same rects, theme-dependent behavior). */
+  /** Sink/lava hazards or frozen ice patches (same rects, theme-dependent behavior). */
   waterHazards: MinigolfRect[];
-  /** Desert-only slow zones — ball slows heavily but does not sink. */
+  /** Sand/mud slow zones — ball slows heavily but does not sink. */
   sandTraps?: MinigolfRect[];
   /** Proximity obstacles that detonate and knock nearby balls away. */
   landmines?: MinigolfLandmine[];
@@ -89,4 +89,4 @@ export type MinigolfAction =
   | { type: 'stroke'; angle: number; power: number }
   | { type: 'next-hole' }
   | { type: 'tick'; dt: number }
-  | { type: 'dev-regenerate-hole' };
+  | { type: 'dev-regenerate-hole'; devTheme: MinigolfDevThemeOption };

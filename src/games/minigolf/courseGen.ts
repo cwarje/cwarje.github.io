@@ -104,6 +104,45 @@ function pointClearOfLandmines(p: MinigolfVec, landmines: MinigolfLandmine[]): b
   return landmines.every((lm) => Math.hypot(p.x - lm.x, p.y - lm.y) >= LANDMINE_MIN_SPACING);
 }
 
+function canPlaceWaterHazard(
+  generation: ReturnType<typeof getMinigolfTheme>['generation'],
+  waterHazards: MinigolfRect[],
+): boolean {
+  if (generation.disallowWaterHazards) return false;
+  const max = generation.maxWaterHazards;
+  if (max != null && waterHazards.length >= max) return false;
+  return true;
+}
+
+function tryPlaceHazardBlock(
+  block: MinigolfRect,
+  rng: Rng,
+  generation: ReturnType<typeof getMinigolfTheme>['generation'],
+  sandTraps: MinigolfRect[],
+  waterHazards: MinigolfRect[],
+  solidObstacles: MinigolfRect[],
+): void {
+  const sandSplit = generation.sandTrapSplit;
+  const mudSplit = generation.mudTrapSplit;
+  if (sandSplit != null && rng() < sandSplit) {
+    sandTraps.push(block);
+    return;
+  }
+  if (mudSplit != null && rng() < mudSplit) {
+    sandTraps.push(block);
+    return;
+  }
+  if (canPlaceWaterHazard(generation, waterHazards)) {
+    waterHazards.push(block);
+    return;
+  }
+  if (generation.disallowSolidWalls) {
+    sandTraps.push(block);
+    return;
+  }
+  solidObstacles.push(block);
+}
+
 export function placeLandmines(
   rng: Rng,
   tee: MinigolfVec,
@@ -111,7 +150,9 @@ export function placeLandmines(
   walls: MinigolfRect[],
   theme: MinigolfCourseTheme,
 ): MinigolfLandmine[] {
-  const count = randInt(rng, LANDMINE_COUNT_MIN, LANDMINE_COUNT_MAX);
+  const { generation } = getMinigolfTheme(theme);
+  const countRange = generation.landmineCount ?? { min: LANDMINE_COUNT_MIN, max: LANDMINE_COUNT_MAX };
+  const count = randInt(rng, countRange.min, countRange.max);
   const landmines: MinigolfLandmine[] = [];
   const margin = WALL_THICKNESS + BALL_RADIUS + 1;
   const minX = margin;
@@ -232,10 +273,12 @@ export function generateHole(
     const solidObstacles: MinigolfRect[] = [];
     const waterHazards: MinigolfRect[] = [];
     const sandTraps: MinigolfRect[] = [];
-    if (rng() < generation.gateChance) {
+    if (!generation.disallowSolidWalls && rng() < generation.gateChance) {
       solidObstacles.push(...makeGateWalls(rng));
     }
-    const blockCount = Math.max(1, randInt(rng, 3, 8 - solidObstacles.length) - relax * 2);
+    const blockCount = generation.disallowSolidWalls
+      ? Math.max(2, randInt(rng, 4, 8) - relax)
+      : Math.max(1, randInt(rng, 3, 8 - solidObstacles.length) - relax * 2);
     for (let i = 0; i < blockCount; i++) {
       const block = makeBlock(rng);
       if (
@@ -243,13 +286,11 @@ export function generateHole(
         rectClearOfPoint(block, cup, CLEARANCE)
       ) {
         if (rng() < generation.hazardBlockChance) {
-          if (theme === 'desert' && rng() < (generation.sandTrapSplit ?? 0.6)) {
-            sandTraps.push(block);
-          } else {
-            waterHazards.push(block);
-          }
-        } else {
+          tryPlaceHazardBlock(block, rng, generation, sandTraps, waterHazards, solidObstacles);
+        } else if (!generation.disallowSolidWalls) {
           solidObstacles.push(block);
+        } else {
+          tryPlaceHazardBlock(block, rng, generation, sandTraps, waterHazards, solidObstacles);
         }
       }
     }

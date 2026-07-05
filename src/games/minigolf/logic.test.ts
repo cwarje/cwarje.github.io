@@ -216,6 +216,57 @@ describe('minigolf course generation', () => {
     expect(withSandTraps).toBeGreaterThan(0);
   });
 
+  it('generates jungle mud traps on some holes', () => {
+    const seededRng = (seed: number): Rng => {
+      let s = seed >>> 0;
+      return () => {
+        s = (s * 1664525 + 1013904223) >>> 0;
+        return s / 0x100000000;
+      };
+    };
+    let withMudTraps = 0;
+    for (let i = 0; i < 50; i++) {
+      const hole = generateHole(seededRng(i * 7919 + 1), 'jungle');
+      if ((hole.sandTraps?.length ?? 0) > 0) withMudTraps++;
+    }
+    expect(withMudTraps).toBeGreaterThan(0);
+  });
+
+  it('sahara holes have at most one pond and no interior walls', () => {
+    for (let i = 0; i < 30; i++) {
+      const hole = generateHole(Math.random, 'sahara');
+      expect(hole.waterHazards.length).toBeLessThanOrEqual(1);
+      expect(hole.walls.length).toBe(4);
+    }
+  });
+
+  it('australia holes have no ponds', () => {
+    for (let i = 0; i < 30; i++) {
+      const hole = generateHole(Math.random, 'australia');
+      expect(hole.waterHazards.length).toBe(0);
+    }
+  });
+
+  it('ocean holes have ponds and no interior walls', () => {
+    let withPonds = 0;
+    for (let i = 0; i < 30; i++) {
+      const hole = generateHole(Math.random, 'ocean');
+      expect(hole.walls.length).toBe(4);
+      if (hole.waterHazards.length > 0) withPonds++;
+    }
+    expect(withPonds).toBeGreaterThan(0);
+  });
+
+  it('underwater holes have ponds and no interior walls', () => {
+    let withPonds = 0;
+    for (let i = 0; i < 30; i++) {
+      const hole = generateHole(Math.random, 'underwater');
+      expect(hole.walls.length).toBe(4);
+      if (hole.waterHazards.length > 0) withPonds++;
+    }
+    expect(withPonds).toBeGreaterThan(0);
+  });
+
   it('sometimes generates water hazards on reachable holes', () => {
     let withWater = 0;
     for (let i = 0; i < 50; i++) {
@@ -378,6 +429,22 @@ describe('minigolf physics', () => {
       if (!isBallAtRest(tundraBall)) stepBall(tundraBall, course, 1, 'tundra');
     }
     expect(tundraBall.y).toBeLessThan(desertBall.y);
+  });
+
+  it('sand traps slow the ball more than fairway on desert', () => {
+    const course: MinigolfCourse = {
+      ...openCourse(),
+      sandTraps: [{ x: 40, y: 55, w: 20, h: 30 }],
+    };
+    const inTrap: MinigolfBall = { x: 50, y: 70, vx: 0, vy: -3 };
+    const onFairway: MinigolfBall = { x: 50, y: 70, vx: 0, vy: -3 };
+    for (let i = 0; i < 15; i++) {
+      stepBall(inTrap, course, 1, 'desert');
+      stepBall(onFairway, openCourse(), 1, 'desert');
+    }
+    const trapSpeed = Math.hypot(inTrap.vx, inTrap.vy);
+    const fairwaySpeed = Math.hypot(onFairway.vx, onFairway.vy);
+    expect(trapSpeed).toBeLessThan(fairwaySpeed * 0.85);
   });
 
   it('sand traps slow the ball without sinking it', () => {
@@ -568,6 +635,14 @@ describe('minigolf tundra ice hazards', () => {
     expect(ball.vy).toBeGreaterThan(0);
   });
 
+  it('speeds up the ball on ice over a tick while on the patch', () => {
+    const ice = [{ x: 40, y: 55, w: 20, h: 30 }];
+    const course = courseWithIce(ice);
+    const onIce: MinigolfBall = { x: 50, y: 70, vx: 0, vy: -2 };
+    stepBall(onIce, course, 1, 'tundra');
+    expect(Math.hypot(onIce.vx, onIce.vy)).toBeGreaterThan(2);
+  });
+
   it('retains more speed on ice than on fairway over multiple ticks', () => {
     const ice = [{ x: 40, y: 60, w: 20, h: 15 }];
     const course = courseWithIce(ice);
@@ -580,6 +655,16 @@ describe('minigolf tundra ice hazards', () => {
     const iceSpeed = Math.hypot(onIce.vx, onIce.vy);
     const fairwaySpeed = Math.hypot(onFairway.vx, onFairway.vy);
     expect(iceSpeed).toBeGreaterThan(fairwaySpeed);
+  });
+});
+
+describe('minigolf volcano lava hazards', () => {
+  it('sinks the ball in lava pools', () => {
+    const lava = [{ x: 40, y: 60, w: 20, h: 15 }];
+    const course: MinigolfCourse = { ...openCourse(2, 'volcano'), waterHazards: lava };
+    const ball: MinigolfBall = { x: 50, y: 65, vx: 0, vy: 1 };
+    const result = stepBall(ball, course, 1, 'volcano');
+    expect(result.inWater).toBe(true);
   });
 });
 
@@ -686,12 +771,28 @@ describe('minigolf dev regenerate hole', () => {
     let call = 0;
     vi.spyOn(Math, 'random').mockImplementation(() => {
       call++;
-      return call === 1 ? 0.4 : 0.5;
+      // First call drives pickRandomCourseTheme → index 2 (tundra) of 13 themes.
+      return call === 1 ? 2.5 / MINIGOLF_COURSE_THEMES.length : 0.5;
     });
 
-    const next = processMinigolfAction(state, { type: 'dev-regenerate-hole' }, 'p1') as MinigolfState;
+    const next = processMinigolfAction(state, { type: 'dev-regenerate-hole', devTheme: 'random' }, 'p1') as MinigolfState;
 
     expect(next.courses[1].theme).toBe('tundra');
+  });
+
+  it('uses the selected fixed theme for the regenerated hole', () => {
+    let state = makeState(2);
+    state = {
+      ...state,
+      courses: state.courses.map((course, i) =>
+        i === 1 ? { ...course, theme: 'classic' as const } : course,
+      ),
+      holeIndex: 1,
+    };
+
+    const next = processMinigolfAction(state, { type: 'dev-regenerate-hole', devTheme: 'desert' }, 'p1') as MinigolfState;
+
+    expect(next.courses[1].theme).toBe('desert');
   });
 
   it('replaces the current hole and resets players while preserving prior hole scores', () => {
@@ -709,7 +810,7 @@ describe('minigolf dev regenerate hole', () => {
       })),
     };
 
-    const next = processMinigolfAction(state, { type: 'dev-regenerate-hole' }, 'p1') as MinigolfState;
+    const next = processMinigolfAction(state, { type: 'dev-regenerate-hole', devTheme: 'random' }, 'p1') as MinigolfState;
 
     expect(next.holeIndex).toBe(1);
     expect(next.phase).toBe('playing');
@@ -740,7 +841,7 @@ describe('minigolf dev regenerate hole', () => {
       })),
     };
 
-    const next = processMinigolfAction(state, { type: 'dev-regenerate-hole' }, 'p1') as MinigolfState;
+    const next = processMinigolfAction(state, { type: 'dev-regenerate-hole', devTheme: 'random' }, 'p1') as MinigolfState;
 
     expect(next.phase).toBe('playing');
     for (const p of next.players) {
@@ -753,7 +854,7 @@ describe('minigolf dev regenerate hole', () => {
   it('is a no-op when the game is over', () => {
     let state = makeState(2);
     state = { ...state, gameOver: true, phase: 'game-over' as const };
-    expect(processMinigolfAction(state, { type: 'dev-regenerate-hole' }, 'p1')).toBe(state);
+    expect(processMinigolfAction(state, { type: 'dev-regenerate-hole', devTheme: 'random' }, 'p1')).toBe(state);
   });
 });
 
