@@ -44,6 +44,7 @@ function startRound(
   dealerIndex: number,
   roundSequence: number[],
   upRiverStartMode: UpRiverStartMode,
+  allowPerfectBids: boolean,
 ): UpRiverState {
   const cardCount = roundSequence[roundIndex];
   const playerCount = players.length;
@@ -69,6 +70,7 @@ function startRound(
     players: dealtPlayers,
     phase: 'bidding',
     upRiverStartMode,
+    allowPerfectBids,
     roundSequence,
     roundIndex,
     currentRoundCardCount: cardCount,
@@ -85,9 +87,13 @@ function startRound(
   };
 }
 
-export function createUpRiverState(players: Player[], options?: { upRiverStartMode?: UpRiverStartMode }): UpRiverState {
+export function createUpRiverState(
+  players: Player[],
+  options?: { upRiverStartMode?: UpRiverStartMode; allowPerfectBids?: boolean },
+): UpRiverState {
   const gamePlayers = players.slice(0, 6);
   const upRiverStartMode = options?.upRiverStartMode ?? 'up-down';
+  const allowPerfectBids = options?.allowPerfectBids ?? true;
   const roundSequence = getRoundSequence(upRiverStartMode);
   const initialPlayers: UpRiverPlayer[] = gamePlayers.map((player) => ({
     id: player.id,
@@ -100,7 +106,28 @@ export function createUpRiverState(players: Player[], options?: { upRiverStartMo
     roundScore: 0,
     totalScore: 0,
   }));
-  return startRound(initialPlayers, 0, 0, roundSequence, upRiverStartMode);
+  return startRound(initialPlayers, 0, 0, roundSequence, upRiverStartMode, allowPerfectBids);
+}
+
+export function getForbiddenPerfectBid(state: UpRiverState): number | null {
+  if (state.allowPerfectBids) return null;
+  const isLastBidder = state.players.every(
+    (p, i) => i === state.currentPlayerIndex || p.bid !== null,
+  );
+  if (!isLastBidder) return null;
+  const othersSum = state.players.reduce(
+    (sum, p, i) => (i === state.currentPlayerIndex ? sum : sum + (p.bid ?? 0)),
+    0,
+  );
+  const forbidden = state.currentRoundCardCount - othersSum;
+  if (forbidden >= 0 && forbidden <= state.currentRoundCardCount) return forbidden;
+  return null;
+}
+
+export function isBidAllowed(state: UpRiverState, bid: number): boolean {
+  if (!Number.isInteger(bid) || bid < 0 || bid > state.currentRoundCardCount) return false;
+  const forbidden = getForbiddenPerfectBid(state);
+  return forbidden === null || bid !== forbidden;
 }
 
 function applyRoundScoring(players: UpRiverPlayer[]): UpRiverPlayer[] {
@@ -154,7 +181,7 @@ export function processUpRiverAction(state: unknown, action: unknown, playerId: 
       if (s.phase !== 'bidding') return state;
       const playerIndex = s.players.findIndex(p => p.id === playerId);
       if (playerIndex === -1 || playerIndex !== s.currentPlayerIndex) return state;
-      if (!Number.isInteger(a.bid) || a.bid < 0 || a.bid > s.currentRoundCardCount) return state;
+      if (!isBidAllowed(s, a.bid)) return state;
       if (s.players[playerIndex].bid !== null) return state;
 
       const updatedPlayers = [...s.players];
@@ -250,6 +277,7 @@ export function processUpRiverAction(state: unknown, action: unknown, playerId: 
         nextDealer,
         s.roundSequence,
         s.upRiverStartMode,
+        s.allowPerfectBids,
       );
     }
   }
@@ -425,7 +453,18 @@ function chooseBid(state: UpRiverState, playerIndex: number): number {
   const player = state.players[playerIndex];
   if (!player) return 0;
   const rawEstimate = estimateBidFromHand(player.hand, state.trumpSuit, state.currentRoundCardCount);
-  return Math.max(0, Math.min(state.currentRoundCardCount, rawEstimate));
+  const estimate = Math.max(0, Math.min(state.currentRoundCardCount, rawEstimate));
+  if (isBidAllowed(state, estimate)) return estimate;
+
+  const max = state.currentRoundCardCount;
+  for (let offset = 1; offset <= max; offset++) {
+    const higher = estimate + offset;
+    if (higher <= max && isBidAllowed(state, higher)) return higher;
+    const lower = estimate - offset;
+    if (lower >= 0 && isBidAllowed(state, lower)) return lower;
+  }
+
+  return 0;
 }
 
 function choosePlayCard(state: UpRiverState, playerIndex: number): Card | null {

@@ -26,6 +26,7 @@ export interface UpRiverState {
   players: UpRiverPlayer[];
   phase: UpRiverPhase;
   upRiverStartMode: UpRiverStartMode;
+  allowPerfectBids: boolean;
   roundSequence: number[];
   roundIndex: number;
   currentRoundCardCount: number;

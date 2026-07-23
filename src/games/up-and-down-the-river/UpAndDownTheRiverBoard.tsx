@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Card, Suit, UpRiverPlayer, UpRiverState } from './types';
 import { isValidUpRiverPlay } from './rules';
+import { getForbiddenPerfectBid } from './logic';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
@@ -413,6 +414,8 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
     onAction({ type: 'place-bid', bid });
   };
 
+  const forbiddenBid = state.phase === 'bidding' ? getForbiddenPerfectBid(state) : null;
+
   if (state.gameOver) {
     const rankedPlayers = [...state.players].sort((a, b) => b.totalScore - a.totalScore);
     return (
@@ -577,7 +580,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
                     <button
                       key={bid}
                       type="button"
-                      disabled={!isMyTurn || deal.isDealing}
+                      disabled={!isMyTurn || deal.isDealing || bid === forbiddenBid}
                       onClick={() => placeBid(bid)}
                       className={`river-bidInlineButton ${myPlayer.bid === bid ? 'river-bidInlineButton--selected' : ''}`}
                     >

@@ -43,6 +43,7 @@ export interface GameStartOptions {
   targetScore?: HeartsTargetScore;
   farkleTargetScore?: FarkleTargetScore;
   upRiverStartMode?: UpRiverStartMode;
+  allowPerfectBids?: boolean;
   pileCount?: TwelvePileCount;
   casinoMatchLength?: CasinoMatchLength;
   cribbageTargetScore?: CribbageTargetScore;
