@@ -411,6 +411,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     },
     createState: (players, options) => createUpRiverState(players, {
       upRiverStartMode: options?.upRiverStartMode,
+      upRiverBiddingStyle: options?.upRiverBiddingStyle,
       allowPerfectBids: options?.allowPerfectBids,
     }),
     processAction: processUpRiverAction,

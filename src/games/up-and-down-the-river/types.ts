@@ -1,4 +1,4 @@
-import type { PlayerColor, UpRiverStartMode } from '../../networking/types';
+import type { PlayerColor, UpRiverBiddingStyle, UpRiverStartMode } from '../../networking/types';
 
 export type Suit = 'hearts' | 'diamonds' | 'clubs' | 'spades';
 export type Rank = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
@@ -20,13 +20,16 @@ export interface UpRiverPlayer {
   totalScore: number;
 }
 
-export type UpRiverPhase = 'bidding' | 'playing' | 'round-end';
+export type UpRiverPhase = 'bidding' | 'bid-countdown' | 'bid-reveal' | 'playing' | 'round-end';
 
 export interface UpRiverState {
   players: UpRiverPlayer[];
   phase: UpRiverPhase;
   upRiverStartMode: UpRiverStartMode;
+  upRiverBiddingStyle: UpRiverBiddingStyle;
   allowPerfectBids: boolean;
+  submittedBids: Record<string, number>;
+  bidCountdown: number;
   roundSequence: number[];
   roundIndex: number;
   currentRoundCardCount: number;
@@ -44,6 +47,9 @@ export interface UpRiverState {
 
 export type UpRiverAction =
   | { type: 'place-bid'; bid: number }
+  | { type: 'tick-bid-countdown' }
+  | { type: 'finish-bid-countdown' }
+  | { type: 'finish-bid-reveal' }
   | { type: 'play-card'; card: Card }
   | { type: 'resolve-trick' }
   | { type: 'start-next-round' };

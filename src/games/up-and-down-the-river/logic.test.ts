@@ -45,13 +45,20 @@ function biddingState(options: {
   dealerIndex: number;
   currentRoundCardCount: number;
   allowPerfectBids: boolean;
+  upRiverBiddingStyle?: UpRiverState['upRiverBiddingStyle'];
+  submittedBids?: Record<string, number>;
+  phase?: UpRiverState['phase'];
+  bidCountdown?: number;
 }): UpRiverState {
   const biddingStartIndex = (options.dealerIndex + 1) % options.players.length;
   return {
     players: options.players,
-    phase: 'bidding',
+    phase: options.phase ?? 'bidding',
     upRiverStartMode: 'up-down',
+    upRiverBiddingStyle: options.upRiverBiddingStyle ?? 'sequential',
     allowPerfectBids: options.allowPerfectBids,
+    submittedBids: options.submittedBids ?? {},
+    bidCountdown: options.bidCountdown ?? 0,
     roundSequence: ROUND_SEQUENCE_UP_DOWN,
     roundIndex: 4,
     currentRoundCardCount: options.currentRoundCardCount,
@@ -72,6 +79,17 @@ describe('perfect bid restriction', () => {
   it('defaults allowPerfectBids to true', () => {
     const state = createUpRiverState(makePlayers(4)) as UpRiverState;
     expect(state.allowPerfectBids).toBe(true);
+  });
+
+  it('defaults upRiverBiddingStyle to sequential', () => {
+    const state = createUpRiverState(makePlayers(4)) as UpRiverState;
+    expect(state.upRiverBiddingStyle).toBe('sequential');
+    expect(state.submittedBids).toEqual({});
+  });
+
+  it('stores upRiverBiddingStyle from options', () => {
+    const state = createUpRiverState(makePlayers(4), { upRiverBiddingStyle: 'knocking' }) as UpRiverState;
+    expect(state.upRiverBiddingStyle).toBe('knocking');
   });
 
   it('stores allowPerfectBids from options', () => {
@@ -215,5 +233,123 @@ describe('perfect bid restriction', () => {
     const result = runUpRiverBotTurn(state) as UpRiverState;
     expect(result.players[3].bid).not.toBe(2);
     expect(result.players[3].bid).not.toBeNull();
+  });
+});
+
+describe('knocking bidding style', () => {
+  it('stores hidden bids in submittedBids until reveal finishes', () => {
+    const state = biddingState({
+      players: [
+        player('p0', null),
+        player('p1', null),
+        player('p2', null),
+        player('p3', null),
+      ],
+      currentPlayerIndex: 0,
+      dealerIndex: 3,
+      currentRoundCardCount: 5,
+      allowPerfectBids: false,
+      upRiverBiddingStyle: 'knocking',
+    });
+
+    const afterFirst = processUpRiverAction(state, { type: 'place-bid', bid: 2 }, 'p1') as UpRiverState;
+    expect(afterFirst.submittedBids).toEqual({ p1: 2 });
+    expect(afterFirst.players[1].bid).toBeNull();
+    expect(afterFirst.phase).toBe('bidding');
+  });
+
+  it('transitions to bid-countdown when all knocking bids are in', () => {
+    const state = biddingState({
+      players: [
+        player('p0', null),
+        player('p1', null),
+        player('p2', null),
+        player('p3', null),
+      ],
+      currentPlayerIndex: 0,
+      dealerIndex: 3,
+      currentRoundCardCount: 5,
+      allowPerfectBids: true,
+      upRiverBiddingStyle: 'knocking',
+      submittedBids: { p0: 1, p1: 2, p2: 0 },
+    });
+
+    const result = processUpRiverAction(state, { type: 'place-bid', bid: 1 }, 'p3') as UpRiverState;
+    expect(result.phase).toBe('bid-countdown');
+    expect(result.bidCountdown).toBe(3);
+    expect(result.players.every(p => p.bid === null)).toBe(true);
+  });
+
+  it('moves from bid-countdown to bid-reveal and then playing with bids on pills', () => {
+    const countdownState = biddingState({
+      players: [
+        player('p0', null),
+        player('p1', null),
+        player('p2', null),
+        player('p3', null),
+      ],
+      currentPlayerIndex: 0,
+      dealerIndex: 3,
+      currentRoundCardCount: 5,
+      allowPerfectBids: true,
+      upRiverBiddingStyle: 'knocking',
+      submittedBids: { p0: 1, p1: 2, p2: 0, p3: 1 },
+      phase: 'bid-countdown',
+      bidCountdown: 1,
+    });
+
+    const revealState = processUpRiverAction(countdownState, { type: 'tick-bid-countdown' }, '') as UpRiverState;
+    expect(revealState.phase).toBe('bid-reveal');
+    expect(revealState.players.every(p => p.bid === null)).toBe(true);
+
+    const playingState = processUpRiverAction(revealState, { type: 'finish-bid-reveal' }, '') as UpRiverState;
+    expect(playingState.phase).toBe('playing');
+    expect(playingState.players.map(p => p.bid)).toEqual([1, 2, 0, 1]);
+    expect(playingState.submittedBids).toEqual({});
+    expect(playingState.currentPlayerIndex).toBe(playingState.leaderIndex);
+  });
+
+  it('does not apply perfect bid restriction in knocking mode', () => {
+    const state = biddingState({
+      players: [
+        player('p0', null),
+        player('p1', null),
+        player('p2', null),
+        player('p3', null),
+      ],
+      currentPlayerIndex: 3,
+      dealerIndex: 3,
+      currentRoundCardCount: 5,
+      allowPerfectBids: false,
+      upRiverBiddingStyle: 'knocking',
+      submittedBids: { p0: 2, p1: 1, p2: 0 },
+    });
+
+    expect(getForbiddenPerfectBid(state)).toBeNull();
+    const result = processUpRiverAction(state, { type: 'place-bid', bid: 2 }, 'p3') as UpRiverState;
+    expect(result.phase).toBe('bid-countdown');
+    expect(result.submittedBids.p3).toBe(2);
+  });
+
+  it('bot bids for all pending bots in knocking mode', () => {
+    const state = biddingState({
+      players: [
+        player('p0', null, [], false),
+        player('bot1', null, [], true),
+        player('bot2', null, [], true),
+        player('bot3', null, [], true),
+      ],
+      currentPlayerIndex: 0,
+      dealerIndex: 3,
+      currentRoundCardCount: 5,
+      allowPerfectBids: true,
+      upRiverBiddingStyle: 'knocking',
+    });
+
+    const result = runUpRiverBotTurn(state) as UpRiverState;
+    expect(result.submittedBids.bot1).toBeDefined();
+    expect(result.submittedBids.bot2).toBeDefined();
+    expect(result.submittedBids.bot3).toBeDefined();
+    expect(result.players.every(p => p.bid === null)).toBe(true);
   });
 });

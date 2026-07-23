@@ -105,6 +105,15 @@ const TRICK_SLOT_PLACEMENTS: Record<number, TrickSlotPlacement[]> = {
   ],
 };
 
+const BID_REVEAL_SEAT_BLEND = 0.68;
+
+function getBidRevealPosition(seatLeft: number, seatTop: number): { left: number; top: number } {
+  return {
+    left: 50 + (seatLeft - 50) * BID_REVEAL_SEAT_BLEND,
+    top: 50 + (seatTop - 50) * BID_REVEAL_SEAT_BLEND,
+  };
+}
+
 function getTrickSlotPlacement(playerCount: number, relativeIndex: number): TrickSlotPlacement {
   const layout = TRICK_SLOT_PLACEMENTS[playerCount]?.[relativeIndex];
   if (layout) return layout;
@@ -122,6 +131,12 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const myPlayer = myIndex >= 0 ? state.players[myIndex] : null;
   const isMyTurn = myIndex >= 0 && state.currentPlayerIndex === myIndex;
+  const isKnocking = state.upRiverBiddingStyle === 'knocking';
+  const mySubmittedBid = state.submittedBids[myId];
+  const hasSubmittedKnockingBid = mySubmittedBid !== undefined;
+  const canPlaceKnockingBid = isKnocking && state.phase === 'bidding' && !hasSubmittedKnockingBid;
+  const canPlaceSequentialBid = !isKnocking && state.phase === 'bidding' && isMyTurn;
+  const canPlaceBid = canPlaceKnockingBid || canPlaceSequentialBid;
   const boardRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const handContainerRef = useRef<HTMLDivElement>(null);
@@ -272,7 +287,39 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
       );
     }
 
+    if (state.phase === 'bid-countdown') {
+      return 'Revealing bids...';
+    }
+
+    if (state.phase === 'bid-reveal') {
+      return null;
+    }
+
     if (state.phase === 'bidding') {
+      if (isKnocking) {
+        if (!hasSubmittedKnockingBid) return 'Select your bid';
+        const waitingOn = state.players.filter(
+          player => !player.isBot && state.submittedBids[player.id] === undefined,
+        );
+        if (waitingOn.length > 0) {
+          return (
+            <>
+              {'Waiting on '}
+              {waitingOn.map((p, i) => (
+                <span key={p.id}>
+                  {i > 0 && ', '}
+                  <span style={{ color: getPlayerHudTextColor(p.color) }}>
+                    {p.id === myId ? 'You' : p.name}
+                  </span>
+                </span>
+              ))}
+              {' to bid'}
+            </>
+          );
+        }
+        return 'Revealing bids...';
+      }
+
       if (isMyTurn) return 'Your turn to bid';
       const waitingPlayer = state.players[state.currentPlayerIndex];
       if (!waitingPlayer) return null;
@@ -296,7 +343,18 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
     }
     if (state.phase === 'playing' && isMyTurn) return 'Your turn';
     return null;
-  }, [state.phase, state.players, state.currentPlayerIndex, state.trickWinner, isMyTurn, myId]);
+  }, [
+    state.phase,
+    state.players,
+    state.currentPlayerIndex,
+    state.trickWinner,
+    state.upRiverBiddingStyle,
+    state.submittedBids,
+    isMyTurn,
+    isKnocking,
+    hasSubmittedKnockingBid,
+    myId,
+  ]);
 
   useEffect(() => {
     const element = tableRef.current;
@@ -365,18 +423,28 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
 
   const renderSeatPill = (seatLayout: RiverSeatLayout, shouldMeasure = false) => {
     const player = seatLayout.player;
-    const isCurrentTurn = state.players[state.currentPlayerIndex]?.id === player.id && !state.trickWinner;
+    const isCurrentTurn =
+      !isKnocking &&
+      state.phase === 'playing' &&
+      state.players[state.currentPlayerIndex]?.id === player.id &&
+      !state.trickWinner;
+    const needsKnockingBid =
+      isKnocking && state.phase === 'bidding' && state.submittedBids[player.id] === undefined;
     const isMe = player.id === myId;
     const bidMatched = player.bid !== null && player.bid === player.tricksWon;
     const seatPillStateClass = state.phase === 'round-end'
       ? bidMatched
         ? 'river-seatPill--roundSuccess'
         : 'river-seatPill--roundFail'
-      : isCurrentTurn
+      : needsKnockingBid
         ? isMe
           ? 'river-seatPill--activeSelf'
-          : 'river-seatPill--activeOther'
-        : '';
+          : ''
+        : isCurrentTurn
+          ? isMe
+            ? 'river-seatPill--activeSelf'
+            : 'river-seatPill--activeOther'
+          : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
     const bidText = player.bid === null ? '-' : String(player.bid);
@@ -410,11 +478,13 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
   };
 
   const placeBid = (bid: number) => {
-    if (state.phase !== 'bidding' || !isMyTurn) return;
+    if (state.phase !== 'bidding' || !canPlaceBid) return;
     onAction({ type: 'place-bid', bid });
   };
 
-  const forbiddenBid = state.phase === 'bidding' ? getForbiddenPerfectBid(state) : null;
+  const forbiddenBid =
+    state.phase === 'bidding' && !isKnocking ? getForbiddenPerfectBid(state) : null;
+  const selectedBid = isKnocking ? mySubmittedBid : myPlayer?.bid ?? null;
 
   if (state.gameOver) {
     const rankedPlayers = [...state.players].sort((a, b) => b.totalScore - a.totalScore);
@@ -511,6 +581,51 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
             })}
           </div>
         </div>
+
+        {state.phase === 'bid-countdown' && state.bidCountdown > 0 && (
+          <div className="river-bidCountdown" aria-live="polite">
+            <div className="river-bidCountdownAnchor">
+              <motion.span
+                key={state.bidCountdown}
+                initial={{ scale: 0.6, opacity: 0.5 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.2 }}
+                className="river-bidCountdownNumber"
+              >
+                {state.bidCountdown}
+              </motion.span>
+            </div>
+          </div>
+        )}
+
+        {state.phase === 'bid-reveal' && (
+          <div className="river-bidRevealLayer" aria-live="polite">
+            {seatLayouts.map((layout) => {
+              const bid = state.submittedBids[layout.player.id];
+              if (bid === undefined) return null;
+              const revealPosition = getBidRevealPosition(layout.seatLeft, layout.seatTop);
+              return (
+                <div
+                  key={`bid-reveal-${layout.player.id}`}
+                  className="river-bidRevealAnchor"
+                  style={{
+                    left: `${revealPosition.left}%`,
+                    top: `${revealPosition.top}%`,
+                  }}
+                >
+                  <motion.span
+                    className="river-bidRevealNumber"
+                    initial={{ opacity: 0, scale: 0.6 }}
+                    animate={{ opacity: [0, 1, 1, 0], scale: [0.6, 1, 1, 1] }}
+                    transition={{ duration: 7, times: [0, 0.08, 6 / 7, 1], ease: 'linear' }}
+                  >
+                    {bid}
+                  </motion.span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="river-headsUp" aria-live="polite">
@@ -572,7 +687,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
             </div>
           </div>
           <div className="river-actionRow">
-            {state.phase === 'bidding' ? (
+            {state.phase === 'bidding' && canPlaceBid ? (
               <div className="river-bidInline">
                 <span className="river-bidInlineLabel">Bid:</span>
                 <div className="river-bidInlineButtons">
@@ -580,9 +695,9 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
                     <button
                       key={bid}
                       type="button"
-                      disabled={!isMyTurn || deal.isDealing || bid === forbiddenBid}
+                      disabled={deal.isDealing || bid === forbiddenBid}
                       onClick={() => placeBid(bid)}
-                      className={`river-bidInlineButton ${myPlayer.bid === bid ? 'river-bidInlineButton--selected' : ''}`}
+                      className={`river-bidInlineButton ${selectedBid === bid ? 'river-bidInlineButton--selected' : ''}`}
                     >
                       {bid}
                     </button>

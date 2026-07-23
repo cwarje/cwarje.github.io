@@ -1,4 +1,4 @@
-import type { Player, UpRiverStartMode } from '../../networking/types';
+import type { Player, UpRiverBiddingStyle, UpRiverStartMode } from '../../networking/types';
 import type { Card, Rank, Suit, UpRiverAction, UpRiverPlayer, UpRiverState } from './types';
 import { cardEquals, getTrickWinnerPlayerId, isValidUpRiverPlay } from './rules';
 
@@ -44,6 +44,7 @@ function startRound(
   dealerIndex: number,
   roundSequence: number[],
   upRiverStartMode: UpRiverStartMode,
+  upRiverBiddingStyle: UpRiverBiddingStyle,
   allowPerfectBids: boolean,
 ): UpRiverState {
   const cardCount = roundSequence[roundIndex];
@@ -70,7 +71,10 @@ function startRound(
     players: dealtPlayers,
     phase: 'bidding',
     upRiverStartMode,
+    upRiverBiddingStyle,
     allowPerfectBids,
+    submittedBids: {},
+    bidCountdown: 0,
     roundSequence,
     roundIndex,
     currentRoundCardCount: cardCount,
@@ -89,10 +93,15 @@ function startRound(
 
 export function createUpRiverState(
   players: Player[],
-  options?: { upRiverStartMode?: UpRiverStartMode; allowPerfectBids?: boolean },
+  options?: {
+    upRiverStartMode?: UpRiverStartMode;
+    upRiverBiddingStyle?: UpRiverBiddingStyle;
+    allowPerfectBids?: boolean;
+  },
 ): UpRiverState {
   const gamePlayers = players.slice(0, 6);
   const upRiverStartMode = options?.upRiverStartMode ?? 'up-down';
+  const upRiverBiddingStyle = options?.upRiverBiddingStyle ?? 'sequential';
   const allowPerfectBids = options?.allowPerfectBids ?? true;
   const roundSequence = getRoundSequence(upRiverStartMode);
   const initialPlayers: UpRiverPlayer[] = gamePlayers.map((player) => ({
@@ -106,11 +115,19 @@ export function createUpRiverState(
     roundScore: 0,
     totalScore: 0,
   }));
-  return startRound(initialPlayers, 0, 0, roundSequence, upRiverStartMode, allowPerfectBids);
+  return startRound(
+    initialPlayers,
+    0,
+    0,
+    roundSequence,
+    upRiverStartMode,
+    upRiverBiddingStyle,
+    allowPerfectBids,
+  );
 }
 
 export function getForbiddenPerfectBid(state: UpRiverState): number | null {
-  if (state.allowPerfectBids) return null;
+  if (state.allowPerfectBids || state.upRiverBiddingStyle === 'knocking') return null;
   const isLastBidder = state.players.every(
     (p, i) => i === state.currentPlayerIndex || p.bid !== null,
   );
@@ -126,8 +143,29 @@ export function getForbiddenPerfectBid(state: UpRiverState): number | null {
 
 export function isBidAllowed(state: UpRiverState, bid: number): boolean {
   if (!Number.isInteger(bid) || bid < 0 || bid > state.currentRoundCardCount) return false;
+  if (state.upRiverBiddingStyle === 'knocking') return true;
   const forbidden = getForbiddenPerfectBid(state);
   return forbidden === null || bid !== forbidden;
+}
+
+function allKnockingBidsSubmitted(state: UpRiverState): boolean {
+  return state.players.every(p => state.submittedBids[p.id] !== undefined);
+}
+
+function applyKnockingBidReveal(state: UpRiverState): UpRiverState {
+  const updatedPlayers = state.players.map(player => ({
+    ...player,
+    bid: state.submittedBids[player.id] ?? null,
+  }));
+
+  return {
+    ...state,
+    players: updatedPlayers,
+    submittedBids: {},
+    bidCountdown: 0,
+    phase: 'playing',
+    currentPlayerIndex: state.leaderIndex,
+  };
 }
 
 function applyRoundScoring(players: UpRiverPlayer[]): UpRiverPlayer[] {
@@ -180,8 +218,26 @@ export function processUpRiverAction(state: unknown, action: unknown, playerId: 
     case 'place-bid': {
       if (s.phase !== 'bidding') return state;
       const playerIndex = s.players.findIndex(p => p.id === playerId);
-      if (playerIndex === -1 || playerIndex !== s.currentPlayerIndex) return state;
+      if (playerIndex === -1) return state;
       if (!isBidAllowed(s, a.bid)) return state;
+
+      if (s.upRiverBiddingStyle === 'knocking') {
+        if (s.submittedBids[playerId] !== undefined) return state;
+
+        const submittedBids = { ...s.submittedBids, [playerId]: a.bid };
+        if (!allKnockingBidsSubmitted({ ...s, submittedBids })) {
+          return { ...s, submittedBids };
+        }
+
+        return {
+          ...s,
+          submittedBids,
+          phase: 'bid-countdown',
+          bidCountdown: 3,
+        };
+      }
+
+      if (playerIndex !== s.currentPlayerIndex) return state;
       if (s.players[playerIndex].bid !== null) return state;
 
       const updatedPlayers = [...s.players];
@@ -202,6 +258,24 @@ export function processUpRiverAction(state: unknown, action: unknown, playerId: 
         players: updatedPlayers,
         currentPlayerIndex: (s.currentPlayerIndex + 1) % s.players.length,
       };
+    }
+
+    case 'tick-bid-countdown': {
+      if (s.phase !== 'bid-countdown' || s.upRiverBiddingStyle !== 'knocking') return state;
+      if (s.bidCountdown <= 1) {
+        return { ...s, phase: 'bid-reveal', bidCountdown: 0 };
+      }
+      return { ...s, bidCountdown: s.bidCountdown - 1 };
+    }
+
+    case 'finish-bid-countdown': {
+      if (s.phase !== 'bid-countdown' || s.upRiverBiddingStyle !== 'knocking') return state;
+      return { ...s, phase: 'bid-reveal', bidCountdown: 0 };
+    }
+
+    case 'finish-bid-reveal': {
+      if (s.phase !== 'bid-reveal' || s.upRiverBiddingStyle !== 'knocking') return state;
+      return applyKnockingBidReveal(s);
     }
 
     case 'play-card': {
@@ -277,6 +351,7 @@ export function processUpRiverAction(state: unknown, action: unknown, playerId: 
         nextDealer,
         s.roundSequence,
         s.upRiverStartMode,
+        s.upRiverBiddingStyle,
         s.allowPerfectBids,
       );
     }
@@ -527,6 +602,23 @@ function choosePlayCard(state: UpRiverState, playerIndex: number): Card | null {
 export function runUpRiverBotTurn(state: unknown): unknown {
   const s = state as UpRiverState;
   if (s.gameOver) return state;
+
+  if (s.phase === 'bidding' && s.upRiverBiddingStyle === 'knocking') {
+    let current = s;
+    let changed = false;
+
+    for (let i = 0; i < current.players.length; i++) {
+      const botPlayer = current.players[i];
+      if (!botPlayer?.isBot) continue;
+      if (current.submittedBids[botPlayer.id] !== undefined) continue;
+
+      const bid = chooseBid(current, i);
+      current = processUpRiverAction(current, { type: 'place-bid', bid }, botPlayer.id) as UpRiverState;
+      changed = true;
+    }
+
+    return changed ? current : state;
+  }
 
   const currentPlayer = s.players[s.currentPlayerIndex];
   if (!currentPlayer?.isBot) return state;

@@ -18,6 +18,7 @@ export type PlayerColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indi
 export type HeartsTargetScore = 50 | 100;
 export type FarkleTargetScore = 3000 | 5000 | 10000;
 export type UpRiverStartMode = 'up-down' | 'down-up';
+export type UpRiverBiddingStyle = 'sequential' | 'knocking';
 export type TwelvePileCount = 3 | 4 | 5 | 6;
 export type CasinoMatchLength = 'to11' | 'to21' | 'eachDealerOnce';
 export type CribbageTargetScore = 61 | 121;
@@ -43,6 +44,7 @@ export interface GameStartOptions {
   targetScore?: HeartsTargetScore;
   farkleTargetScore?: FarkleTargetScore;
   upRiverStartMode?: UpRiverStartMode;
+  upRiverBiddingStyle?: UpRiverBiddingStyle;
   allowPerfectBids?: boolean;
   pileCount?: TwelvePileCount;
   casinoMatchLength?: CasinoMatchLength;
