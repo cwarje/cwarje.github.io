@@ -822,7 +822,6 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     OptionsPanel: MinigolfOptions,
     fullBoard: true,
     production: true,
-    showNewBadge: true,
     showDoubleXpWeekendBadge: true,
     hudTitleLines: ['Mini Golf'],
     hideHudTitleDuringPlay: true,
@@ -873,7 +872,6 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     hasHandZoom: true,
     hasCardDealing: true,
     production: true,
-    showNewBadge: true,
     hudTitleLines: ['Cucumber'],
   },
 
@@ -923,7 +921,6 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     hasHandZoom: false,
     hasCardDealing: true,
     production: true,
-    showNewBadge: true,
     hudTitleLines: ['Golf'],
   },
 };
