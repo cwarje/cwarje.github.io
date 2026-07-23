@@ -18,7 +18,7 @@ import type {
   DealerSpeed,
 } from './types';
 import { readStoredDealerSpeed, normalizeDealerSpeed } from './dealerSpeed';
-import { DEFAULT_PLAYER_COLOR, normalizePlayerColor } from './playerColors';
+import { normalizePlayerColor } from './playerColors';
 import { readFavoriteBots, resolveBotsForCount, type FavoriteBot } from './favoriteBots';
 import { createInitialGameState, processGameAction, checkGameOver, runSingleBotTurn, getGameWinners } from '../games/gameEngine';
 import type { HeartsState } from '../games/hearts/types';
