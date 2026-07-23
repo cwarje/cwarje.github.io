@@ -48,7 +48,7 @@ export default function GamePage() {
   useEffect(() => {
     if (!room && error && !reconnecting) {
       const message = error.includes('Host disconnected') || error.includes('Disconnected from host')
-        ? 'Host disconnected. The lobby is closed.'
+        ? 'Lobby closed.'
         : error;
       toast(message, 'info');
       clearError();

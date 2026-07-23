@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useCallback, useRef, useState, useEffect } from 'react';
 import Peer from 'peerjs';
 type DataConnection = ReturnType<Peer['connect']>;
-import { createHostPeer, createClientPeer, connectToPeer, destroyPeer } from './peer';
+import { createHostPeer, createClientPeer, connectToPeer, destroyPeer, isRetryableJoinError } from './peer';
 import { generateRoomCode } from '../utils/roomCode';
 import { getDeviceId } from '../utils/deviceId';
 import type {
@@ -392,8 +392,31 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const tableEventSequenceRef = useRef(0);
   // Host: grace period timers for disconnected clients (deviceId -> timer)
   const disconnectTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const hostKeepaliveCleanupRef = useRef<(() => void) | null>(null);
 
   const deviceId = getDeviceId();
+
+  const setupHostKeepalive = useCallback(() => {
+    hostKeepaliveCleanupRef.current?.();
+    const keepHostAlive = () => {
+      const peer = peerRef.current;
+      if (!peer || peer.destroyed || roomRef.current?.hostId !== deviceId) return;
+      if (!peer.open) {
+        peer.reconnect();
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        keepHostAlive();
+      }
+    };
+    window.addEventListener('focus', keepHostAlive);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    hostKeepaliveCleanupRef.current = () => {
+      window.removeEventListener('focus', keepHostAlive);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [deviceId]);
 
   // Keep refs in sync
   useEffect(() => { roomRef.current = room; }, [room]);
@@ -864,6 +887,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         peer.reconnect();
       });
 
+      setupHostKeepalive();
+
       return roomCode;
     } catch (err) {
       setError((err as Error).message);
@@ -871,12 +896,14 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setConnecting(false);
     }
-  }, [handleConnection, deviceId]);
+  }, [handleConnection, deviceId, setupHostKeepalive]);
 
   // Shared logic for joining a room (used by joinRoom and rejoinRoom)
   const joinRoomInternal = useCallback(async (roomCode: string, playerName: string, playerColor: PlayerColor) => {
     setError(null);
     setConnecting(true);
+    const JOIN_MAX_ATTEMPTS = 2;
+    const JOIN_BACKOFF_MS = [0, 1500];
     try {
       // If already connected, silently close the old connection first
       if (peerRef.current) {
@@ -886,6 +913,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         // old connection won't attempt auto-reconnect to the old room.
         roomRef.current = null;
         roomCodeRef.current = '';
+        hostKeepaliveCleanupRef.current?.();
+        hostKeepaliveCleanupRef.current = null;
 
         if (currentRoom && currentRoom.hostId === deviceId) {
           // We're the host — notify clients that we're shutting down
@@ -907,79 +936,105 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         peerDeviceMapRef.current.clear();
         destroyPeer(peerRef.current);
         peerRef.current = null;
+        setRoom(null);
+        setGameState(null);
       }
 
-      const peer = await createClientPeer();
-      peerRef.current = peer;
-      setMyId(deviceId);
+      let lastError: Error | null = null;
 
-      const conn = await connectToPeer(peer, roomCode);
+      for (let attempt = 0; attempt < JOIN_MAX_ATTEMPTS; attempt++) {
+        if (attempt > 0) {
+          await new Promise((resolve) => setTimeout(resolve, JOIN_BACKOFF_MS[attempt]));
+          destroyPeer(peerRef.current);
+          peerRef.current = null;
+        }
 
-      // Wait for the first room-state from the host before resolving,
-      // so that room is populated before we navigate to the lobby page.
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Timeout waiting for room state')), 10000);
-        let resolved = false;
+        try {
+          const peer = await createClientPeer();
+          peerRef.current = peer;
+          setMyId(deviceId);
 
-        conn.on('data', (data) => {
-          const msg = data as HostMessage;
-          switch (msg.type) {
-            case 'room-state':
-              setRoom(msg.state);
-              if (!resolved) { resolved = true; clearTimeout(timeout); resolve(); }
-              break;
-            case 'game-state':
-              setGameState(msg.state);
-              break;
-            case 'table-event':
-              setLastTableEvent(msg.event);
-              break;
-            case 'error':
-              setError(msg.message);
-              if (!resolved) { resolved = true; clearTimeout(timeout); reject(new Error(msg.message)); }
-              break;
-            case 'host-disconnected':
-              roomRef.current = null; // Update ref immediately so close handler won't attempt reconnect
-              setError('Host disconnected');
-              setRoom(null);
-              setGameState(null);
-              connectionsRef.current.clear();
-              peerDeviceMapRef.current.clear();
-              destroyPeer(peerRef.current);
-              peerRef.current = null;
-              if (!resolved) { resolved = true; clearTimeout(timeout); reject(new Error('Host disconnected')); }
-              break;
+          const conn = await connectToPeer(peer, roomCode);
+
+          // Wait for the first room-state from the host before resolving,
+          // so that room is populated before we navigate to the lobby page.
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('Timeout waiting for room state')), 10000);
+            let resolved = false;
+
+            conn.on('data', (data) => {
+              const msg = data as HostMessage;
+              switch (msg.type) {
+                case 'room-state':
+                  setRoom(msg.state);
+                  if (!resolved) { resolved = true; clearTimeout(timeout); resolve(); }
+                  break;
+                case 'game-state':
+                  setGameState(msg.state);
+                  break;
+                case 'table-event':
+                  setLastTableEvent(msg.event);
+                  break;
+                case 'error':
+                  setError(msg.message);
+                  if (!resolved) { resolved = true; clearTimeout(timeout); reject(new Error(msg.message)); }
+                  break;
+                case 'host-disconnected':
+                  roomRef.current = null;
+                  setError('Host disconnected');
+                  setRoom(null);
+                  setGameState(null);
+                  connectionsRef.current.clear();
+                  peerDeviceMapRef.current.clear();
+                  destroyPeer(peerRef.current);
+                  peerRef.current = null;
+                  if (!resolved) { resolved = true; clearTimeout(timeout); reject(new Error('Host disconnected')); }
+                  break;
+              }
+            });
+
+            conn.on('close', () => {
+              if (!resolved) {
+                resolved = true;
+                clearTimeout(timeout);
+                reject(new Error('Disconnected from host'));
+                return;
+              }
+              if (roomRef.current && !reconnectingRef.current) {
+                attemptReconnectRef.current();
+              } else if (!reconnectingRef.current) {
+                setError('Disconnected from host');
+                setRoom(null);
+                setGameState(null);
+              }
+            });
+
+            connectionsRef.current.set(conn.peer, conn);
+            conn.send({
+              type: 'join',
+              playerName,
+              playerColor,
+              deviceId,
+              minigolfXp: readMinigolfXp(),
+            } as ClientMessage);
+          });
+
+          return;
+        } catch (err) {
+          lastError = err as Error;
+          destroyPeer(peerRef.current);
+          peerRef.current = null;
+          if (!isRetryableJoinError(err) || attempt === JOIN_MAX_ATTEMPTS - 1) {
+            throw err;
           }
-        });
+        }
+      }
 
-        conn.on('close', () => {
-          if (!resolved) {
-            resolved = true;
-            clearTimeout(timeout);
-            reject(new Error('Disconnected from host'));
-            return;
-          }
-          // After initial join, attempt auto-reconnection instead of instant disconnect
-          if (roomRef.current && !reconnectingRef.current) {
-            attemptReconnectRef.current();
-          } else if (!reconnectingRef.current) {
-            setError('Disconnected from host');
-            setRoom(null);
-            setGameState(null);
-          }
-        });
-
-        connectionsRef.current.set(conn.peer, conn);
-        conn.send({
-          type: 'join',
-          playerName,
-          playerColor,
-          deviceId,
-          minigolfXp: readMinigolfXp(),
-        } as ClientMessage);
-      });
+      throw lastError ?? new Error('Failed to join lobby');
     } catch (err) {
       setError((err as Error).message);
+      setRoom(null);
+      setGameState(null);
       destroyPeer(peerRef.current);
       peerRef.current = null;
       throw err;
@@ -1105,6 +1160,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     // and attempt to auto-reconnect.
     roomRef.current = null;
     roomCodeRef.current = '';
+    hostKeepaliveCleanupRef.current?.();
+    hostKeepaliveCleanupRef.current = null;
 
     if (isHost) {
       broadcast({ type: 'host-disconnected' });

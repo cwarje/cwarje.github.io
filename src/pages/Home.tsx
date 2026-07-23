@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import GameCard from '../components/GameCard';
 import GameStartOptionsPanel from '../components/GameStartOptionsPanel';
 import RoomCodeInput from '../components/RoomCodeInput';
+import { useToast } from '../components/Toast';
 import { useRoomContext } from '../networking/roomStore';
 import type { GameStartOptions, GameType, Player, PlayerColor } from '../networking/types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
@@ -27,6 +28,7 @@ function ColoredPlayerName({ player }: { player: Player }) {
 export default function Home() {
   const navigate = useNavigate();
   const { room, isHost, createLobby, joinRoom, startGame, connecting, error, clearError } = useRoomContext();
+  const { toast } = useToast();
   const [playerName] = useState(() => {
     return localStorage.getItem('playerName') || '';
   });
@@ -60,12 +62,20 @@ export default function Home() {
     return color;
   };
 
-  // Clear errors when room is lost (e.g. host disconnected) — auto-create will handle recovery
+  // Notify and recover when the host closes or we lose the lobby connection
   useEffect(() => {
-    if (!room && error) {
+    if (!room && error && (
+      error.includes('Host disconnected')
+      || error.includes('Disconnected from host')
+      || error.includes('Lost connection to host')
+    )) {
+      const message = error.includes('Host disconnected') || error.includes('Disconnected from host')
+        ? 'Lobby closed.'
+        : error;
+      toast(message, 'info');
       clearError();
     }
-  }, [room, error, clearError]);
+  }, [room, error, clearError, toast]);
 
   // Auto-create lobby on mount when no room exists and name is available
   useEffect(() => {
