@@ -204,4 +204,19 @@ describe('LobbyMenu favorite bots', () => {
     expect(stored.some((b) => b.name === 'R2-D2')).toBe(true);
     expect(screen.getByText('R2-D2')).toBeInTheDocument();
   });
+
+  it('hides My Bots on the game page', () => {
+    mockUseRoomContext.mockReturnValue(createRoomContext());
+
+    render(
+      <MemoryRouter initialEntries={['/game/ABCD']}>
+        <LobbyMenu variant="icon" />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lobby' }));
+
+    expect(screen.queryByText('My Bots')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add bot' })).not.toBeInTheDocument();
+  });
 });
