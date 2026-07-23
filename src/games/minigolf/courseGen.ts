@@ -2,6 +2,7 @@ import type { MinigolfCourse, MinigolfLandmine, MinigolfRect, MinigolfVec } from
 import {
   getMinigolfTheme,
   getObstacleMotionKind,
+  isSinkHazard,
   pickObstacleEmoji,
   pickRandomCourseTheme,
   type MinigolfCourseTheme,
@@ -210,11 +211,11 @@ const GRID_CELL = 5;
 const GRID_COLS = Math.floor(COURSE_W / GRID_CELL);
 const GRID_ROWS = Math.floor(COURSE_H / GRID_CELL);
 
-function cellBlocked(col: number, row: number, walls: MinigolfRect[]): boolean {
+function cellBlocked(col: number, row: number, blockingRects: MinigolfRect[]): boolean {
   const cx = (col + 0.5) * GRID_CELL;
   const cy = (row + 0.5) * GRID_CELL;
   const pad = BALL_RADIUS + 0.5;
-  for (const w of walls) {
+  for (const w of blockingRects) {
     if (
       cx >= w.x - pad && cx <= w.x + w.w + pad &&
       cy >= w.y - pad && cy <= w.y + w.h + pad
@@ -225,12 +226,28 @@ function cellBlocked(col: number, row: number, walls: MinigolfRect[]): boolean {
   return false;
 }
 
+/** Rects that block tee-to-cup pathfinding during generation. */
+export function reachabilityBlockingRects(
+  walls: MinigolfRect[],
+  waterHazards: MinigolfRect[],
+  theme: MinigolfCourseTheme,
+): MinigolfRect[] {
+  if (isSinkHazard(theme)) {
+    return [...walls, ...waterHazards];
+  }
+  return walls;
+}
+
 /** Returns BFS path length from tee to cup in grid cells, or null if unreachable. */
-export function pathLengthCells(walls: MinigolfRect[], tee: MinigolfVec, cup: MinigolfVec): number | null {
+export function pathLengthCells(
+  blockingRects: MinigolfRect[],
+  tee: MinigolfVec,
+  cup: MinigolfVec,
+): number | null {
   const blocked: boolean[] = new Array(GRID_COLS * GRID_ROWS);
   for (let r = 0; r < GRID_ROWS; r++) {
     for (let c = 0; c < GRID_COLS; c++) {
-      blocked[r * GRID_COLS + c] = cellBlocked(c, r, walls);
+      blocked[r * GRID_COLS + c] = cellBlocked(c, r, blockingRects);
     }
   }
 
@@ -266,6 +283,17 @@ export function pathLengthCells(walls: MinigolfRect[], tee: MinigolfVec, cup: Mi
     }
   }
   return null;
+}
+
+/** Playability-aware path length for a generated course (walls + sink hazards). */
+export function coursePathLengthCells(
+  course: Pick<MinigolfCourse, 'walls' | 'waterHazards' | 'theme' | 'tee' | 'cup'>,
+): number | null {
+  return pathLengthCells(
+    reachabilityBlockingRects(course.walls, course.waterHazards, course.theme),
+    course.tee,
+    course.cup,
+  );
 }
 
 function computePar(pathCells: number, obstacleCount: number): number {
@@ -331,7 +359,11 @@ export function generateHole(
       solidObstacles,
       waterHazards,
     );
-    const pathCells = pathLengthCells(walls, tee, cup);
+    const pathCells = pathLengthCells(
+      reachabilityBlockingRects(walls, finalWaterHazards, theme),
+      tee,
+      cup,
+    );
     if (pathCells == null) continue;
 
     const allObstaclesWithBorder = [...solidObstacles, ...finalWaterHazards, ...sandTraps];

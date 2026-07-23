@@ -8,9 +8,11 @@ import {
   LANDMINE_COUNT_MIN,
   WALL_THICKNESS,
   courseBorderWalls,
+  coursePathLengthCells,
   generateCourses,
   generateHole,
   pathLengthCells,
+  reachabilityBlockingRects,
   type Rng,
 } from './courseGen';
 import { MINIGOLF_COURSE_THEMES, MINIGOLF_THEMES, getObstacleMotionKind } from './themes';
@@ -108,6 +110,7 @@ describe('minigolf course generation', () => {
       expect(hole.cup.y).toBeLessThan(COURSE_H / 2);
       expect(hole.tee.y).toBeGreaterThan(COURSE_H / 2);
       expect(pathLengthCells(hole.walls, hole.tee, hole.cup)).not.toBeNull();
+      expect(coursePathLengthCells(hole)).not.toBeNull();
     }
   });
 
@@ -289,9 +292,53 @@ describe('minigolf course generation', () => {
     for (let i = 0; i < 50; i++) {
       const hole = generateHole();
       expect(pathLengthCells(hole.walls, hole.tee, hole.cup)).not.toBeNull();
+      expect(coursePathLengthCells(hole)).not.toBeNull();
       if (hole.waterHazards.length > 0) withWater++;
     }
     expect(withWater).toBeGreaterThan(0);
+  });
+
+  it('treats sink hazards as blocking for playability checks', () => {
+    const tee = { x: 50, y: COURSE_H - 18 };
+    const cup = { x: 50, y: 18 };
+    const gateY = 60;
+    const gapStart = 43;
+    const gapWidth = 14;
+    const walls = [
+      ...courseBorderWalls(),
+      { x: WALL_THICKNESS, y: gateY, w: gapStart - WALL_THICKNESS, h: WALL_THICKNESS },
+      {
+        x: gapStart + gapWidth,
+        y: gateY,
+        w: COURSE_W - WALL_THICKNESS - (gapStart + gapWidth),
+        h: WALL_THICKNESS,
+      },
+    ];
+    const waterHazards = [{ x: gapStart, y: gateY - 1, w: gapWidth, h: WALL_THICKNESS + 2 }];
+    const course: MinigolfCourse = {
+      walls,
+      waterHazards,
+      tee,
+      cup,
+      par: 3,
+      theme: 'classic',
+    };
+
+    expect(pathLengthCells(walls, tee, cup)).not.toBeNull();
+    expect(coursePathLengthCells(course)).toBeNull();
+    expect(
+      pathLengthCells(reachabilityBlockingRects(walls, waterHazards, 'classic'), tee, cup),
+    ).toBeNull();
+  });
+
+  it('generates playable holes for every sink-hazard theme', () => {
+    const sinkThemes = ['classic', 'ocean', 'underwater', 'volcano', 'sahara'] as const;
+    for (const theme of sinkThemes) {
+      for (let i = 0; i < 40; i++) {
+        const hole = generateHole(Math.random, theme);
+        expect(coursePathLengthCells(hole)).not.toBeNull();
+      }
+    }
   });
 });
 
