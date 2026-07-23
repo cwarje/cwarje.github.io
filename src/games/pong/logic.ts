@@ -40,15 +40,23 @@ function shuffleColors(colors: PlayerColor[]): PlayerColor[] {
   return shuffled;
 }
 
-/** Assign each bot a random color, preferring colors not already taken by humans. */
+/** Assign each bot a color, preserving chosen colors when not already taken. */
 export function assignPongBotColors(players: Player[]): Player[] {
-  const usedByHumans = new Set(players.filter((p) => !p.isBot).map((p) => p.color));
-  const available = shuffleColors(ALL_PLAYER_COLORS.filter((c) => !usedByHumans.has(c)));
+  const usedColors = new Set(players.filter((p) => !p.isBot).map((p) => p.color));
+  const available = shuffleColors(ALL_PLAYER_COLORS.filter((c) => !usedColors.has(c)));
 
   return players.map((p) => {
-    if (!p.isBot) return p;
+    if (!p.isBot) {
+      usedColors.add(p.color);
+      return p;
+    }
+    if (!usedColors.has(p.color)) {
+      usedColors.add(p.color);
+      return p;
+    }
     const color =
       available.pop() ?? ALL_PLAYER_COLORS[Math.floor(Math.random() * ALL_PLAYER_COLORS.length)];
+    usedColors.add(color);
     return { ...p, color };
   });
 }

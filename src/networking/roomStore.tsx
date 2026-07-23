@@ -19,6 +19,7 @@ import type {
 } from './types';
 import { readStoredDealerSpeed, normalizeDealerSpeed } from './dealerSpeed';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor } from './playerColors';
+import { readFavoriteBots, resolveBotsForCount, type FavoriteBot } from './favoriteBots';
 import { createInitialGameState, processGameAction, checkGameOver, runSingleBotTurn, getGameWinners } from '../games/gameEngine';
 import type { HeartsState } from '../games/hearts/types';
 import { getHeartsPassCount } from '../games/hearts/logic';
@@ -49,28 +50,36 @@ import { shouldBotBank } from '../games/farkle/logic';
 import { GAME_REGISTRY } from '../games/registry';
 import { readMinigolfXp, writeMinigolfXp } from '../games/minigolf/progress';
 
-export const BOT_NAMES = ['Pippi', 'Maja', 'Stina', 'Kajsa', 'Lotta', 'Ebba', 'Ida', 'Tova', 'Sigge', 'Nisse', 'Kalle', 'Hasse', 'Kekke', 'Challe', 'Bönne', 'Migge', 'Sune'];
-
-function pickRandom<T>(arr: T[]): T | undefined {
-  return arr.length > 0 ? arr[Math.floor(Math.random() * arr.length)] : undefined;
+function createBotId(): string {
+  return `bot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-function createBots(count: number, existingPlayers: Player[]): Player[] {
-  const usedNames = existingPlayers.map(p => p.name);
-  const bots: Player[] = [];
-  for (let i = 0; i < count; i++) {
-    const available = BOT_NAMES.filter(n => !usedNames.includes(n) && !bots.some(b => b.name === n));
-    const name = pickRandom(available) ?? `Bot ${existingPlayers.length + i}`;
-    bots.push({
-      id: `bot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+function resolveBotName(name: string, usedNames: Set<string>): string {
+  if (!usedNames.has(name)) return name;
+  const withSuffix = `${name} (bot)`;
+  if (!usedNames.has(withSuffix)) return withSuffix;
+  let i = 2;
+  while (usedNames.has(`${name} (${i})`)) i += 1;
+  return `${name} (${i})`;
+}
+
+function createBotsFromFavorites(
+  favorites: FavoriteBot[],
+  existingPlayers: Player[],
+): Player[] {
+  const usedNames = new Set(existingPlayers.map((p) => p.name));
+  return favorites.map((favorite) => {
+    const name = resolveBotName(favorite.name, usedNames);
+    usedNames.add(name);
+    return {
+      id: createBotId(),
       name,
-      color: DEFAULT_PLAYER_COLOR,
+      color: favorite.color,
       isBot: true,
       isHost: false,
       connected: true,
-    });
-  }
-  return bots;
+    };
+  });
 }
 
 function isPokerHostControlAction(payload: unknown): payload is { type: 'next-hand' | 'end-session' } {
@@ -1140,15 +1149,15 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   // Add bot (host only)
   const addBot = useCallback(() => {
     if (!isHost || !room) return;
-    const usedNames = room.players.map(p => p.name);
-    const availableNames = BOT_NAMES.filter(n => !usedNames.includes(n));
-    const botName = pickRandom(availableNames) ?? `Bot ${room.players.length}`;
-    const botId = `bot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const favorites = readFavoriteBots();
+    const usedNames = new Set(room.players.map((p) => p.name));
+    const favorite = favorites.find((f) => !usedNames.has(f.name)) ?? favorites[0];
+    if (!favorite) return;
 
     const bot: Player = {
-      id: botId,
-      name: botName,
-      color: DEFAULT_PLAYER_COLOR,
+      id: createBotId(),
+      name: resolveBotName(favorite.name, usedNames),
+      color: favorite.color,
       isBot: true,
       isHost: false,
       connected: true,
@@ -1173,14 +1182,27 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     if (gameDef.minPlayers === gameDef.maxPlayers) {
       // Fixed-count game: auto-fill with bots
       if (players.length > gameDef.maxPlayers) return;
-      if (players.length < gameDef.maxPlayers) {
-        players = [...players, ...createBots(gameDef.maxPlayers - players.length, players)];
+      const botsToAdd = gameDef.maxPlayers - players.length;
+      if (botsToAdd > 0) {
+        const preferredIds = options?.selectedBots?.map((b) => b.id);
+        const resolved = resolveBotsForCount(
+          botsToAdd,
+          preferredIds,
+          players.map((p) => p.name),
+        );
+        players = [...players, ...createBotsFromFavorites(resolved, players)];
       }
     } else if (options?.botCount && options.botCount > 0) {
       const maxBots = gameDef.maxPlayers - players.length;
       const botsToAdd = Math.min(options.botCount, maxBots);
       if (botsToAdd > 0) {
-        players = [...players, ...createBots(botsToAdd, players)];
+        const preferredIds = options?.selectedBots?.map((b) => b.id);
+        const resolved = resolveBotsForCount(
+          botsToAdd,
+          preferredIds,
+          players.map((p) => p.name),
+        );
+        players = [...players, ...createBotsFromFavorites(resolved, players)];
       }
     }
 

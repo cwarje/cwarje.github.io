@@ -406,6 +406,29 @@ describe('pong logic', () => {
     expect(colored[1].color).not.toBe(colored[2].color);
   });
 
+  it('preserves a bot chosen color when it does not conflict', () => {
+    const players = [
+      { ...makePlayer('p1', 'Human'), color: 'red' as const },
+      { ...makePlayer('bot-1', 'Bot 1', true), color: 'green' as const },
+      { ...makePlayer('bot-2', 'Bot 2', true), color: 'blue' as const },
+    ];
+
+    const colored = assignPongBotColors(players);
+    expect(colored[1].color).toBe('green');
+    expect(colored[2].color).toBe('blue');
+  });
+
+  it('reassigns bot color when it clashes with another player', () => {
+    const players = [
+      { ...makePlayer('p1', 'Human'), color: 'red' as const },
+      { ...makePlayer('bot-1', 'Bot 1', true), color: 'red' as const },
+    ];
+
+    const colored = assignPongBotColors(players);
+    expect(colored[0].color).toBe('red');
+    expect(colored[1].color).not.toBe('red');
+  });
+
   it('declares a winner when one player remains', () => {
     const state: PongState = {
       players: [

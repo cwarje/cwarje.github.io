@@ -1,5 +1,6 @@
 import { MemoryRouter } from 'react-router-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import type { Player, RoomContextValue, RoomState } from '../networking/types';
 import LobbyMenu from './LobbyMenu';
 
@@ -174,5 +175,33 @@ describe('LobbyMenu dealer speed', () => {
     });
 
     expect(screen.queryByText('Dealer speed')).not.toBeInTheDocument();
+  });
+});
+
+describe('LobbyMenu favorite bots', () => {
+  beforeEach(() => {
+    mockToast.mockClear();
+    vi.stubGlobal('crypto', {
+      randomUUID: () => 'new-bot-id',
+    });
+    window.localStorage.setItem('favoriteBots', '[]');
+  });
+
+  afterEach(() => {
+    window.localStorage.removeItem('favoriteBots');
+    vi.unstubAllGlobals();
+  });
+
+  it('adds a bot and persists it to localStorage', () => {
+    renderOpenLobbyMenu();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add bot' }));
+    fireEvent.change(screen.getByPlaceholderText('New bot name'), { target: { value: 'R2-D2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(mockToast).toHaveBeenCalledWith('Bot added.', 'success');
+    const stored = JSON.parse(window.localStorage.getItem('favoriteBots') ?? '[]') as { name: string }[];
+    expect(stored.some((b) => b.name === 'R2-D2')).toBe(true);
+    expect(screen.getByText('R2-D2')).toBeInTheDocument();
   });
 });

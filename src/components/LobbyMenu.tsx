@@ -1,16 +1,32 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Copy, X, LogOut, Loader2, Settings, StopCircle, RotateCcw } from 'lucide-react';
+import { Users, Copy, X, LogOut, Loader2, Settings, StopCircle, RotateCcw, Pencil, Trash2, Check, Plus } from 'lucide-react';
 import PlayerList from './PlayerList';
+import ColorSwatchGrid from './ColorSwatchGrid';
+import ColoredBotIcon from './ColoredBotIcon';
 import { useRoomContext } from '../networking/roomStore';
 import { useToast } from './Toast';
 import { useNavigate } from 'react-router-dom';
 import type { PlayerColor } from '../networking/types';
-import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
+import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX } from '../networking/playerColors';
+import {
+  addFavoriteBot,
+  MAX_FAVORITE_BOT_NAME_LENGTH,
+  readCustomBots,
+  removeFavoriteBot,
+  updateFavoriteBot,
+  type FavoriteBot,
+} from '../networking/favoriteBots';
 import { DEALER_SPEED_OPTIONS } from '../networking/dealerSpeed';
 import { gameHasCardDealing } from '../games/registry';
 
 type LobbyMenuProps = { variant?: 'default' | 'icon' };
+
+const botRowClass = 'rounded-md border border-surface-200 bg-surface-50 px-2 py-1 min-h-[40px]';
+const botActionClass =
+  'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md transition-colors cursor-pointer touch-manipulation';
+const botInputClass =
+  'min-w-0 flex-1 rounded-md border border-surface-300 bg-white px-2 py-1.5 text-sm text-surface-900 placeholder-surface-400 focus:border-primary-500 focus:outline-none';
 
 export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
   const { room, myId, myPlayer, isHost, removeBot, removePlayer, leaveRoom, endGame, updateProfile, setDealerSpeed, connecting } = useRoomContext();
@@ -19,6 +35,13 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
   const [open, setOpen] = useState(false);
   const [nameInput, setNameInput] = useState(() => localStorage.getItem('playerName') || '');
   const [colorInput, setColorInput] = useState<PlayerColor>(() => normalizePlayerColor(localStorage.getItem('playerColor')));
+  const [favoriteBots, setFavoriteBots] = useState<FavoriteBot[]>(() => readCustomBots());
+  const [newBotName, setNewBotName] = useState('');
+  const [newBotColor, setNewBotColor] = useState<PlayerColor>(DEFAULT_PLAYER_COLOR);
+  const [addingBot, setAddingBot] = useState(false);
+  const [editingBotId, setEditingBotId] = useState<string | null>(null);
+  const [editBotName, setEditBotName] = useState('');
+  const [editBotColor, setEditBotColor] = useState<PlayerColor>(DEFAULT_PLAYER_COLOR);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const playerCount = room?.players.length ?? 0;
@@ -43,6 +66,11 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
     const profileColor = myPlayer?.color ?? normalizePlayerColor(localStorage.getItem('playerColor'));
     setNameInput(profileName);
     setColorInput(profileColor);
+    setFavoriteBots(readCustomBots());
+    setEditingBotId(null);
+    setAddingBot(false);
+    setNewBotName('');
+    setNewBotColor(DEFAULT_PLAYER_COLOR);
   }, [open, myPlayer?.name, myPlayer?.color]);
 
   useEffect(() => {
@@ -99,6 +127,63 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
       return;
     }
     updateProfile(nameToSave, nextColor);
+  };
+
+  const handleAddBot = () => {
+    const trimmed = newBotName.trim();
+    if (!trimmed) {
+      toast('Please enter a bot name.', 'error');
+      return;
+    }
+    const bot = addFavoriteBot(trimmed, newBotColor);
+    if (!bot) {
+      toast(`Bot name must be 1–${MAX_FAVORITE_BOT_NAME_LENGTH} characters.`, 'error');
+      return;
+    }
+    setFavoriteBots(readCustomBots());
+    setNewBotName('');
+    setAddingBot(false);
+    toast('Bot added.', 'success');
+  };
+
+  const cancelAddBot = () => {
+    setAddingBot(false);
+    setNewBotName('');
+    setNewBotColor(DEFAULT_PLAYER_COLOR);
+  };
+
+  const startEditBot = (bot: FavoriteBot) => {
+    setEditingBotId(bot.id);
+    setEditBotName(bot.name);
+    setEditBotColor(bot.color);
+  };
+
+  const cancelEditBot = () => {
+    setEditingBotId(null);
+  };
+
+  const handleSaveEditBot = () => {
+    if (!editingBotId) return;
+    const trimmed = editBotName.trim();
+    if (!trimmed) {
+      toast('Please enter a bot name.', 'error');
+      return;
+    }
+    const updated = updateFavoriteBot(editingBotId, trimmed, editBotColor);
+    if (!updated) {
+      toast(`Bot name must be 1–${MAX_FAVORITE_BOT_NAME_LENGTH} characters.`, 'error');
+      return;
+    }
+    setFavoriteBots(readCustomBots());
+    setEditingBotId(null);
+    toast('Bot updated.', 'success');
+  };
+
+  const handleRemoveBot = (id: string) => {
+    removeFavoriteBot(id);
+    setFavoriteBots(readCustomBots());
+    if (editingBotId === id) setEditingBotId(null);
+    toast('Bot removed.', 'info');
   };
 
   const isIconVariant = variant === 'icon';
@@ -167,18 +252,115 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                     Save
                   </button>
                 </div>
-                <div className="grid grid-cols-8 gap-2">
-                  {PLAYER_COLOR_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => handleSelectColor(option.value)}
-                      className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${colorInput === option.value ? 'border-surface-900 scale-105' : 'border-transparent hover:border-surface-400'}`}
-                      style={{ backgroundColor: PLAYER_COLOR_HEX[option.value] }}
-                      title={option.label}
-                      aria-label={`Set color to ${option.label}`}
-                    />
+                <ColorSwatchGrid value={colorInput} onChange={handleSelectColor} />
+              </div>
+
+              {/* My Bots section */}
+              <div className="px-5 py-3 space-y-2">
+                <p className="text-[11px] font-medium text-surface-500 uppercase tracking-wider">My Bots</p>
+                <ul className="max-h-52 space-y-1 overflow-y-auto -mx-1 px-1">
+                  {addingBot ? (
+                    <li className={`${botRowClass} space-y-1.5 py-1.5`}>
+                      <div className="flex min-h-[40px] items-center gap-1.5 min-w-0">
+                        <ColoredBotIcon color={newBotColor} />
+                        <input
+                          type="text"
+                          value={newBotName}
+                          onChange={(e) => setNewBotName(e.target.value)}
+                          maxLength={MAX_FAVORITE_BOT_NAME_LENGTH}
+                          className={botInputClass}
+                          placeholder="New bot name"
+                          onKeyDown={(e) => e.key === 'Enter' && handleAddBot()}
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddBot}
+                          className="rounded-md bg-primary-600 px-2.5 py-1.5 text-sm font-medium text-white transition-colors cursor-pointer whitespace-nowrap touch-manipulation"
+                        >
+                          Add
+                        </button>
+                      </div>
+                      <ColorSwatchGrid compact value={newBotColor} onChange={setNewBotColor} />
+                      <button
+                        type="button"
+                        onClick={cancelAddBot}
+                        className="w-full rounded-md bg-surface-200 py-1.5 text-xs font-medium text-surface-700 transition-colors cursor-pointer touch-manipulation hover:bg-surface-300"
+                      >
+                        Cancel
+                      </button>
+                    </li>
+                  ) : (
+                    <li className={botRowClass}>
+                      <button
+                        type="button"
+                        onClick={() => setAddingBot(true)}
+                        className="flex min-h-[40px] w-full items-center gap-1.5 min-w-0 cursor-pointer touch-manipulation"
+                        aria-label="Add bot"
+                      >
+                        <ColoredBotIcon muted />
+                        <span className="flex-1 min-w-0 text-left text-sm text-surface-500">Add bot</span>
+                        <span className={`${botActionClass} text-surface-600`}>
+                          <Plus className="h-4 w-4" />
+                        </span>
+                      </button>
+                    </li>
+                  )}
+                  {favoriteBots.map((bot) => (
+                    <li key={bot.id} className={botRowClass}>
+                      {editingBotId === bot.id ? (
+                        <div className="space-y-1.5 py-0.5">
+                          <input
+                            type="text"
+                            value={editBotName}
+                            onChange={(e) => setEditBotName(e.target.value)}
+                            maxLength={MAX_FAVORITE_BOT_NAME_LENGTH}
+                            className={`${botInputClass} w-full`}
+                          />
+                          <ColorSwatchGrid compact value={editBotColor} onChange={setEditBotColor} />
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={handleSaveEditBot}
+                              className="flex flex-1 items-center justify-center gap-1 rounded-md bg-primary-600 py-1.5 text-sm font-medium text-white cursor-pointer touch-manipulation hover:bg-primary-500"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEditBot}
+                              className="flex-1 rounded-md bg-surface-200 py-1.5 text-sm font-medium text-surface-700 cursor-pointer touch-manipulation hover:bg-surface-300"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex min-h-[40px] items-center gap-1.5 min-w-0">
+                          <ColoredBotIcon color={bot.color} />
+                          <span className="flex-1 min-w-0 truncate text-sm leading-tight text-surface-900">{bot.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => startEditBot(bot)}
+                            className={`${botActionClass} text-surface-600 hover:bg-surface-200`}
+                            aria-label={`Edit ${bot.name}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveBot(bot.id)}
+                            className={`${botActionClass} text-red-600 hover:bg-red-100`}
+                            aria-label={`Remove ${bot.name}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
 
               {!hasRoom ? (

@@ -52,6 +52,7 @@ export interface GameStartOptions {
   minigolfTheme?: MinigolfThemeOption;
   minigolfHoleCount?: MinigolfHoleCount;
   botCount?: number;
+  selectedBots?: { id: string; name: string; color: PlayerColor }[];
 }
 
 export interface Player {
