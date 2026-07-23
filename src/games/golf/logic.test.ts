@@ -14,7 +14,7 @@ import {
   slotPointValue,
   startHole,
 } from './logic';
-import { cardPointValue, columnPairScore, scorePlayerTable as rulesScore, squareBonus } from './rules';
+import { cardPointValue, columnPairScore, estimatedSlotValue, scorePlayerTable as rulesScore, scorePlayerTableEstimated, squareBonus } from './rules';
 
 function card(rank: Rank, suit: Card['suit'] = 'hearts'): Card {
   return { rank, suit };
@@ -434,6 +434,47 @@ describe('scoring', () => {
     ];
     expect(squareBonus(table)).toBe(0);
     expect(rulesScore(makePlayer('p1', table))).toBe(7);
+  });
+});
+
+describe('scorePlayerTableEstimated', () => {
+  it('counts hidden slots as 7 regardless of actual rank', () => {
+    const table = [
+      slot(card(13, 'hearts'), false),
+      slot(card(3), true),
+      slot(card(4), true),
+      slot(card(5), true),
+      slot(card(6), true),
+      slot(card(7), true),
+    ];
+    expect(scorePlayerTableEstimated(makePlayer('p1', table))).toBe(7 + 3 + 4 + 5 + 6 + 7);
+  });
+
+  it('does not cancel column pairs when the partner card is hidden', () => {
+    const table = [
+      slot(card(7, 'hearts'), false),
+      slot(card(3), true),
+      slot(card(9), true),
+      slot(card(7, 'spades'), true),
+      slot(card(4), true),
+      slot(card(2), true),
+    ];
+    expect(estimatedSlotValue(table, 0)).toBe(7);
+    expect(estimatedSlotValue(table, 3)).toBe(7);
+    expect(scorePlayerTableEstimated(makePlayer('p1', table))).toBe(28);
+  });
+
+  it('cancels column pairs once both cards are face up', () => {
+    const table = [
+      slot(card(7, 'hearts'), true),
+      slot(card(3), true),
+      slot(card(9), true),
+      slot(card(7, 'spades'), true),
+      slot(card(4), true),
+      slot(card(2), true),
+    ];
+    expect(estimatedSlotValue(table, 0)).toBe(0);
+    expect(estimatedSlotValue(table, 3)).toBe(0);
   });
 });
 

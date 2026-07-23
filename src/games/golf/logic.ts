@@ -13,9 +13,9 @@ import {
   cardEquals,
   COLUMN_PAIRS,
   scorePlayerTable,
+  scorePlayerTableEstimated,
   slotPointValue,
   isSetupPhase,
-  cardPointValue,
 } from './rules';
 
 const SUITS: Suit[] = ['clubs', 'diamonds', 'spades', 'hearts'];
@@ -450,10 +450,10 @@ function estimateOpponentScore(opponent: GolfPlayer): number {
 }
 
 export function swapTableScoreImprovement(player: GolfPlayer, drawn: Card, slotIndex: number): number {
-  const before = scorePlayerTable(player);
+  const before = scorePlayerTableEstimated(player);
   const nextTable = [...player.table];
   nextTable[slotIndex] = { card: drawn, faceUp: true };
-  const after = scorePlayerTable({ ...player, table: nextTable });
+  const after = scorePlayerTableEstimated({ ...player, table: nextTable });
   return before - after;
 }
 
@@ -488,7 +488,7 @@ function getEndgameSlotBonus(player: GolfPlayer, state: GolfState, slotIndex: nu
   if (!slot || slot.faceUp) return 0;
 
   const faceDownCount = player.table.filter(s => !s.faceUp).length;
-  const botScore = scorePlayerTable(player);
+  const botScore = scorePlayerTableEstimated(player);
   const opponentScores = state.players
     .filter(p => p.id !== player.id)
     .map(estimateOpponentScore);
@@ -577,20 +577,27 @@ function bestOptionalFlipSlot(player: GolfPlayer, state: GolfState): number | nu
 }
 
 function bestSetupFlipSlot(player: GolfPlayer): number {
-  let bestSlot = 0;
-  let bestValue = -Infinity;
+  const faceDownIndices = player.table
+    .map((slot, slotIndex) => (slot && !slot.faceUp ? slotIndex : -1))
+    .filter(slotIndex => slotIndex >= 0);
 
-  for (let slotIndex = 0; slotIndex < TABLE_SLOT_COUNT; slotIndex++) {
-    const slot = player.table[slotIndex];
-    if (!slot || slot.faceUp) continue;
-    const value = cardPointValue(slot.card);
-    if (value > bestValue) {
-      bestValue = value;
-      bestSlot = slotIndex;
+  if (faceDownIndices.length === 0) return 0;
+
+  const hasTopFaceUp = player.table.some((slot, slotIndex) => slotIndex < 3 && slot?.faceUp);
+  if (!hasTopFaceUp) {
+    for (const slotIndex of [1, 0, 2]) {
+      if (faceDownIndices.includes(slotIndex)) return slotIndex;
     }
   }
 
-  return bestSlot;
+  const hasBottomFaceUp = player.table.some((slot, slotIndex) => slotIndex >= 3 && slot?.faceUp);
+  if (!hasBottomFaceUp) {
+    for (const slotIndex of [4, 3, 5]) {
+      if (faceDownIndices.includes(slotIndex)) return slotIndex;
+    }
+  }
+
+  return faceDownIndices[0]!;
 }
 
 function resolveOptionalFlip(state: GolfState, playerId: string): GolfState {

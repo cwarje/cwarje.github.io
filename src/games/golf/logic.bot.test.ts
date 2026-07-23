@@ -41,7 +41,7 @@ function makeHuman(id: string, table: TableSlot[], totalScore = 0, setupFlipsRem
 }
 
 describe('swapTableScoreImprovement', () => {
-  it('uses actual hidden card values, not the face-down estimate', () => {
+  it('uses face-down estimate for hidden slots, not actual card values', () => {
     const bot = makeBot('bot', [
       slot(card(13, 'hearts'), false),
       slot(card(3), true),
@@ -51,11 +51,11 @@ describe('swapTableScoreImprovement', () => {
       slot(card(2), true),
     ]);
 
-    expect(swapTableScoreImprovement(bot, card(9), 0)).toBe(-9);
+    expect(swapTableScoreImprovement(bot, card(9), 0)).toBe(-2);
     expect(swapTableScoreImprovement(bot, card(9), 3)).toBe(1);
   });
 
-  it('counts column-pair cancellation across the full table', () => {
+  it('does not cancel column pairs when the partner card is still hidden', () => {
     const bot = makeBot('bot', [
       slot(card(7, 'hearts'), false),
       slot(card(3), true),
@@ -65,11 +65,11 @@ describe('swapTableScoreImprovement', () => {
       slot(card(2), true),
     ]);
 
-    expect(swapTableScoreImprovement(bot, card(5), 0)).toBe(-12);
+    expect(swapTableScoreImprovement(bot, card(5), 0)).toBe(2);
     expect(bestSwapImprovement(bot, card(5))).toBe(4);
   });
 
-  it('measures improvement when replacing a hidden jack with a low card', () => {
+  it('measures improvement when replacing a hidden slot using the face-down estimate', () => {
     const bot = makeBot('bot', [
       slot(card(11, 'hearts'), false),
       slot(card(4), true),
@@ -79,26 +79,12 @@ describe('swapTableScoreImprovement', () => {
       slot(card(6), true),
     ]);
 
-    expect(swapTableScoreImprovement(bot, card(3, 'spades'), 0)).toBe(7);
-    expect(bestSwapImprovement(bot, card(3, 'spades'))).toBe(7);
+    expect(swapTableScoreImprovement(bot, card(3, 'spades'), 0)).toBe(4);
+    expect(bestSwapImprovement(bot, card(3, 'spades'))).toBe(6);
   });
 });
 
 describe('bestSwapSlot', () => {
-  it('preserves a hidden column pair instead of swapping the matching card away', () => {
-    const bot = makeBot('bot', [
-      slot(card(7, 'hearts'), false),
-      slot(card(3), true),
-      slot(card(9), true),
-      slot(card(7, 'spades'), true),
-      slot(card(4), true),
-      slot(card(2), true),
-    ]);
-
-    expect(bestSwapSlot(bot, card(6))).not.toBe(0);
-    expect(bestSwapSlot(bot, card(6))).not.toBe(3);
-  });
-
   it('does not swap away a hidden king for a marginal draw', () => {
     const bot = makeBot('bot', [
       slot(card(13, 'clubs'), false),
@@ -129,12 +115,12 @@ describe('runGolfBotTurn', () => {
     });
 
     const afterFirst = runGolfBotTurn(state) as typeof state;
-    expect(afterFirst.players[0].table[0].faceUp).toBe(true);
+    expect(afterFirst.players[0].table[1].faceUp).toBe(true);
     expect(afterFirst.players[0].setupFlipsRemaining).toBe(1);
     expect(afterFirst.pendingDraw).toBeNull();
 
     const afterSecond = runGolfBotTurn(afterFirst) as typeof state;
-    expect(afterSecond.players[0].table[3].faceUp).toBe(true);
+    expect(afterSecond.players[0].table[4].faceUp).toBe(true);
     expect(afterSecond.players[0].setupFlipsRemaining).toBe(0);
     expect(afterSecond.pendingDraw).toBeNull();
   });
@@ -158,7 +144,7 @@ describe('runGolfBotTurn', () => {
     expect(next.pendingDrawSource).toBe('discard');
   });
 
-  it('swaps a stock draw into a hidden high card using accurate scoring', () => {
+  it('swaps a stock draw into the best slot using estimated scoring', () => {
     const bot = makeBot('bot', [
       slot(card(11, 'hearts'), false),
       slot(card(4), true),
@@ -175,9 +161,9 @@ describe('runGolfBotTurn', () => {
     });
 
     const next = runGolfBotTurn(state) as typeof state;
-    expect(next.players[0].table[0].card).toEqual(card(3, 'spades'));
-    expect(next.players[0].table[0].faceUp).toBe(true);
-    expect(next.discard.at(-1)).toEqual(card(11, 'hearts'));
+    expect(next.players[0].table[3].card).toEqual(card(3, 'spades'));
+    expect(next.players[0].table[3].faceUp).toBe(true);
+    expect(next.discard.at(-1)).toEqual(card(9));
   });
 
   it('discards a stock draw that does not improve the table', () => {

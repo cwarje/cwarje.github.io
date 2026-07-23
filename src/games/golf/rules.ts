@@ -156,9 +156,54 @@ export function canSkipOptionalFlip(state: GolfState, playerId: string): boolean
   return isCurrentPlayer(state, playerId);
 }
 
+const FACE_DOWN_SLOT_ESTIMATE = 7;
+
+function isVisibleSameRankSquare(table: TableSlot[], slots: number[]): boolean {
+  const first = table[slots[0]!];
+  if (!first?.faceUp) return false;
+  const rank = first.card.rank;
+  return slots.every(i => {
+    const slot = table[i];
+    return slot?.faceUp && slot.card.rank === rank;
+  });
+}
+
+export function estimatedSquareBonus(table: TableSlot[]): number {
+  let bonus = 0;
+  for (const square of SQUARES) {
+    if (isVisibleSameRankSquare(table, square)) {
+      bonus += SQUARE_BONUS;
+    }
+  }
+  return bonus;
+}
+
 export function estimatedSlotValue(table: TableSlot[], slotIndex: number): number {
   const slot = table[slotIndex];
   if (!slot) return 0;
-  if (slot.faceUp) return slotPointValue(table, slotIndex);
-  return 7;
+  if (!slot.faceUp) return FACE_DOWN_SLOT_ESTIMATE;
+
+  const columnPair = COLUMN_PAIRS.find(([a, b]) => a === slotIndex || b === slotIndex);
+  if (columnPair) {
+    const [top, bottom] = columnPair;
+    const topSlot = table[top];
+    const bottomSlot = table[bottom];
+    if (
+      topSlot?.faceUp &&
+      bottomSlot?.faceUp &&
+      topSlot.card.rank === bottomSlot.card.rank
+    ) {
+      return 0;
+    }
+  }
+  return cardPointValue(slot.card);
+}
+
+export function scorePlayerTableEstimated(player: GolfPlayer): number {
+  let total = 0;
+  for (let i = 0; i < TABLE_SLOT_COUNT; i++) {
+    total += estimatedSlotValue(player.table, i);
+  }
+  total += estimatedSquareBonus(player.table);
+  return total;
 }
