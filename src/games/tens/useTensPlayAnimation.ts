@@ -122,7 +122,6 @@ export function useTensPlayAnimation(options: {
   const [revealedPickupAnnouncementId, setRevealedPickupAnnouncementId] = useState<string | null>(null);
   const [pendingClearDiscard, setPendingClearDiscard] = useState<{ id: string; count: number } | null>(null);
   const pendingClearDiscardRef = useRef(pendingClearDiscard);
-  pendingClearDiscardRef.current = pendingClearDiscard;
   const lastStartedIdRef = useRef<string | null>(null);
   const outcomeFlyCompleteRef = useRef(false);
 
@@ -190,6 +189,10 @@ export function useTensPlayAnimation(options: {
     const pileEl = pileRefs.current?.get(pileKey);
     return getElementMetrics(boardRef, pileEl ?? null);
   }, [boardRef, pileRefs, resolveHandSource]);
+
+  useLayoutEffect(() => {
+    pendingClearDiscardRef.current = pendingClearDiscard;
+  }, [pendingClearDiscard]);
 
   useLayoutEffect(() => {
     const prev = prevStateRef.current;

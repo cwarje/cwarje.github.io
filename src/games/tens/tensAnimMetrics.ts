@@ -1,9 +1,11 @@
-export {
+import {
   getElementMetrics,
   FLY_DURATION_MS,
   type ElementMetrics,
   type Point,
 } from '../golf/golfAnimMetrics';
+
+export { getElementMetrics, FLY_DURATION_MS, type ElementMetrics, type Point };
 
 export const PLAY_STAGGER_MS = 80;
 export const OUTCOME_STAGGER_MS = 40;
