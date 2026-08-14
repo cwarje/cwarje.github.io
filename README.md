@@ -9,7 +9,6 @@ This project runs fully peer-to-peer in the browser: one player hosts a lobby an
 Current game types (from `src/games/registry.ts` and `src/networking/types.ts`):
 
 - `cucumber` (3-7 players; avoid the last trick, elimination at 30 penalty points)
-- `pong` (2-12 players)
 - `cribbage` (2-4 players; target score 61 or 121)
 - `mobilization` (4-6 players)
 - `casino` (2-4 players; optional `casinoMatchLength` in start options: `to11`, `to21`, or `eachDealerOnce` — default `to21`)
@@ -357,7 +356,7 @@ npm run lint && npm run typecheck && npm run test && npm run build
 | Radial seats + deal animation wiring | `UpAndDownTheRiverBoard.tsx`, `CucumberBoard.tsx` |
 | Seat pill / trick slot layout (3–7 players) | `.river-*` classes in `index.css`; extend `TRICK_SLOT_PLACEMENTS` per player count |
 | Turn-based with phases | `mobilization/`, `twelve/` |
-| Real-time / non-card | `pong/`, **`minigolf/`** (host tick loop, XP in `progress.ts`) |
+| Real-time / non-card | **`minigolf/`** (host tick loop, XP in `progress.ts`) |
 
 ### Trick-taking pattern (Hearts / Up River / Cucumber)
 
@@ -406,7 +405,7 @@ Use a rainbow **Beta** ribbon for games that are playable on the homepage but st
 1. Set `showBetaBadge: true` on that game's `GAME_REGISTRY` entry.
 2. Remove `showBetaBadge` from any other game — **only one** game should wear the badge at a time.
 
-Unlike **New**, **Beta** can appear on a different game at the same time (e.g. Cucumber **New** + Pong **Beta**).
+Unlike **New**, **Beta** can appear on a different game at the same time (e.g. Cucumber **New** + Mini Golf **Beta**).
 
 No other changes needed: `GameCard` reads the flag. Styles are in `src/index.css`:
 

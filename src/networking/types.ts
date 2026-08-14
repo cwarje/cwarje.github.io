@@ -10,7 +10,6 @@ export type GameType =
   | 'cribbage'
   | 'mobilization'
   | 'casino'
-  | 'pong'
   | 'cucumber'
   | 'golf'
   | 'minigolf';

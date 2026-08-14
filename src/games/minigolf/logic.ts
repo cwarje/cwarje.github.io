@@ -1127,7 +1127,7 @@ export function isMinigolfOver(state: unknown): boolean {
 }
 
 export function runMinigolfBotTurn(state: unknown): unknown {
-  // Bots act inside the host physics tick, like pong.
+  // Bots act inside the host physics tick.
   return state;
 }
 
