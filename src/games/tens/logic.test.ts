@@ -74,8 +74,13 @@ function baseState(players: TensPlayer[], overrides: Partial<TensState> = {}): T
     roundSummary: '',
     gameOver: false,
     winners: [],
+    actionAnnouncement: null,
     ...overrides,
   };
+}
+
+function finishAnnouncement(state: TensState): TensState {
+  return processTensAction(state, { type: 'finish-action-announcement' }, '') as TensState;
 }
 
 describe('tens rules', () => {
@@ -157,7 +162,10 @@ describe('tens play', () => {
     }, 'p0') as TensState;
     expect(next.centerPile).toHaveLength(1);
     expect(next.players[0].hand).toHaveLength(1);
+    expect(next.phase).toBe('announcement');
+    expect(next.actionAnnouncement?.outcome).toBe('normal');
     expect(next.currentPlayerIndex).toBe(1);
+    expect(finishAnnouncement(next).phase).toBe('playing');
   });
 
   it('allows pickup when playing higher rank', () => {
@@ -170,7 +178,7 @@ describe('tens play', () => {
   });
 
   it('clears center on set of four', () => {
-    const p0 = player('p0', [card('hearts', 6), card('diamonds', 6)]);
+    const p0 = player('p0', [card('hearts', 6), card('diamonds', 6), card('clubs', 3)]);
     const state = baseState([p0, player('p1', [])], {
       centerPile: [card('clubs', 6), card('spades', 6)],
       lastPlayRank: 6,
@@ -185,6 +193,8 @@ describe('tens play', () => {
 
     expect(next.centerPile).toHaveLength(0);
     expect(next.discardCount).toBe(4);
+    expect(next.phase).toBe('announcement');
+    expect(next.actionAnnouncement?.outcome).toBe('set-clear');
     expect(next.currentPlayerIndex).toBe(0);
   });
 
@@ -201,6 +211,8 @@ describe('tens play', () => {
 
     expect(next.centerPile).toHaveLength(0);
     expect(next.players[0].hand.length).toBe(3);
+    expect(next.phase).toBe('announcement');
+    expect(next.actionAnnouncement?.outcome).toBe('pickup');
     expect(next.currentPlayerIndex).toBe(0);
   });
 
@@ -218,9 +230,10 @@ describe('tens play', () => {
       plays: [{ card: card('hearts', 5), source: 'pile-top', pileIndex: 0 }],
     }, 'p0') as TensState;
 
-    expect(next.phase).toBe('playing');
-    expect(next.players[0].tablePiles[0].bottomFaceUp).toBe(false);
-    expect(validatePlays(next, 0, [{ card: card('clubs', 4), source: 'pile-bottom', pileIndex: 0 }])).toBe(false);
+    expect(next.phase).toBe('announcement');
+    expect(next.actionAnnouncement?.outcome).toBe('normal');
+    expect(finishAnnouncement(next).players[0].tablePiles[0].bottomFaceUp).toBe(false);
+    expect(validatePlays(finishAnnouncement(next), 0, [{ card: card('clubs', 4), source: 'pile-bottom', pileIndex: 0 }])).toBe(false);
   });
 
   it('allows pile bottoms only after all tops are played', () => {
@@ -248,7 +261,7 @@ describe('tens play', () => {
   });
 
   it('wild ten clears the center pile', () => {
-    const p0 = player('p0', [card('hearts', 10)]);
+    const p0 = player('p0', [card('hearts', 10), card('clubs', 3)]);
     const state = baseState([p0, player('p1', [])], {
       centerPile: [card('clubs', 8), card('diamonds', 4)],
       lastPlayRank: 8,
@@ -260,11 +273,13 @@ describe('tens play', () => {
 
     expect(next.centerPile).toHaveLength(0);
     expect(next.discardCount).toBe(3);
+    expect(next.phase).toBe('announcement');
+    expect(next.actionAnnouncement?.outcome).toBe('wild-clear');
     expect(next.currentPlayerIndex).toBe(0);
   });
 
   it('wild ten clears instead of pickup when center rank is lower', () => {
-    const p0 = player('p0', [card('hearts', 10)]);
+    const p0 = player('p0', [card('hearts', 10), card('clubs', 3)]);
     const state = baseState([p0, player('p1', [card('spades', 3)])], {
       centerPile: [card('clubs', 8)],
       lastPlayRank: 8,
@@ -275,9 +290,25 @@ describe('tens play', () => {
     }, 'p0') as TensState;
 
     expect(next.centerPile).toHaveLength(0);
-    expect(next.players[0].hand).toHaveLength(0);
+    expect(next.players[0].hand).toHaveLength(1);
     expect(next.discardCount).toBe(2);
+    expect(next.phase).toBe('announcement');
+    expect(next.actionAnnouncement?.outcome).toBe('wild-clear');
     expect(next.currentPlayerIndex).toBe(0);
+  });
+
+  it('finish-action-announcement restores playing phase', () => {
+    const p0 = player('p0', [card('hearts', 9), card('clubs', 3)]);
+    const state = baseState([p0, player('p1', [])], { lastPlayRank: 10 });
+    const afterPlay = processTensAction(state, {
+      type: 'play-cards',
+      plays: [{ card: card('hearts', 9), source: 'hand' }],
+    }, 'p0') as TensState;
+    expect(afterPlay.phase).toBe('announcement');
+    const afterFinish = finishAnnouncement(afterPlay);
+    expect(afterFinish.phase).toBe('playing');
+    expect(afterFinish.actionAnnouncement).toBeNull();
+    expect(afterFinish.currentPlayerIndex).toBe(1);
   });
 
   it('scores round when a player goes out', () => {
@@ -343,19 +374,29 @@ describe('tens play', () => {
     });
     const next = runTensBotTurn(state) as TensState;
     expect(next).not.toBe(state);
+    expect(next.phase).toBe('announcement');
     expect(next.players[0].tablePiles[0].bottomCard).toBeNull();
   });
 
   it('bot clears with ten when center pile is stuck under ace limit', () => {
-    const botPlayer = { ...player('bot', [card('hearts', 10)]), isBot: true };
+    const piles: FrontPile[] = [
+      { bottomCard: card('clubs', 3), topCard: card('spades', 2), bottomFaceUp: false },
+      ...emptyPiles().slice(1),
+    ];
+    const botPlayer = { ...player('bot', [card('hearts', 10)], piles), isBot: true };
     const state = baseState([botPlayer, player('p1', [])], {
       lastPlayRank: 14,
       centerPile: [card('hearts', 14), card('diamonds', 3)],
       discardCount: 4,
     });
-    const next = runTensBotTurn(state) as TensState;
+    const next = processTensAction(state, {
+      type: 'play-cards',
+      plays: [{ card: card('hearts', 10), source: 'hand' }],
+    }, 'bot') as TensState;
     expect(next.centerPile).toHaveLength(0);
     expect(next.discardCount).toBe(7);
+    expect(next.phase).toBe('announcement');
+    expect(next.actionAnnouncement?.outcome).toBe('wild-clear');
     expect(next.currentPlayerIndex).toBe(0);
   });
 });

@@ -42,6 +42,7 @@ import type { CribbageState } from '../games/cribbage/types';
 import type { CasinoState } from '../games/casino/types';
 import type { CucumberState } from '../games/cucumber/types';
 import type { TensState } from '../games/tens/types';
+import { tensAnnouncementDelayMs } from '../games/tens/tensAnimMetrics';
 import { CARDS_PER_PLAYER } from '../games/tens/types';
 import type { GolfState } from '../games/golf/types';
 import { dealHoldDurationMs, registerDealHoldExtender } from '../games/shared/dealTiming';
@@ -1461,6 +1462,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const TWELVE_ROUND_END_DELAY = 6500; // ms to show round summary before next round
   const TWELVE_FINAL_RESULTS_DELAY = 6000; // ms to hold final round summary before end screen
   const TENS_BOT_DELAY = 1400;
+  const TENS_ANNOUNCEMENT_DELAY = tensAnnouncementDelayMs();
   const TENS_ROUND_END_DELAY = 6500;
   const TENS_FINAL_RESULTS_DELAY = 6000;
   const CROSS_CRIB_ROUND_END_DELAY = 10000; // ms to show round summary before next round
@@ -1808,6 +1810,26 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     if (room.gameType === 'tens') {
       const ts = gameState as TensState;
       if (ts.phase === 'game-over') return;
+
+      if (ts.phase === 'announcement') {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as TensState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'announcement') return;
+
+          const next = processGameAction(
+            'tens',
+            currentGs,
+            { type: 'finish-action-announcement' },
+            '',
+          );
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+          }
+        }, TENS_ANNOUNCEMENT_DELAY);
+        return;
+      }
 
       if (ts.phase === 'round-end') {
         const roundEndAction = ts.gameOver

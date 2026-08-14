@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { TableEvent, TableEventInput } from '../../networking/types';
-import type { Card, SelectedCardPlay, TensPlayer, TensState } from './types';
+import type { Card, SelectedCardPlay, TensActionAnnouncement, TensPlayer, TensState } from './types';
 import {
   allPileTopsPlayed,
   cardEquals,
@@ -11,7 +11,7 @@ import {
   rankDisplay,
   validatePlays,
 } from './rules';
-import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX } from '../../networking/playerColors';
+import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 import { useDealerDealAnimation, type DealExtraTarget, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 import { CardTossLayers } from '../shared/CardTossLayers';
@@ -19,6 +19,9 @@ import { useCardToss } from '../shared/useCardToss';
 import { CardFace } from '../shared/ui/CardFace';
 import { FlipCard } from '../shared/ui/FlipCard';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
+import { SUIT_COLORS, SUIT_SYMBOLS } from '../shared/ui/cardConstants';
+import { TensPlayAnimationLayer } from './TensPlayAnimationLayer';
+import { useTensPlayAnimation } from './useTensPlayAnimation';
 
 interface TensBoardProps {
   state: TensState;
@@ -83,6 +86,76 @@ function cardKey(card: Card, source: SelectedCardPlay['source'], pileIndex?: num
   return `${source}-${pileIndex ?? 'h'}-${card.suit}-${card.rank}`;
 }
 
+function headsUpCardSpan(card: Card): ReactNode {
+  return (
+    <span className={SUIT_COLORS[card.suit]}>
+      {rankDisplay(card.rank)}
+      {SUIT_SYMBOLS[card.suit]}
+    </span>
+  );
+}
+
+function playedCardsHudMessage(cards: Card[]): ReactNode {
+  if (cards.length === 1) return headsUpCardSpan(cards[0]!);
+  const rank = cards[0]?.rank;
+  const countWords = ['', 'one', 'two', 'three', 'four'];
+  const countLabel = countWords[cards.length] ?? String(cards.length);
+  return `${countLabel} ${rankDisplay(rank ?? 0)}s`;
+}
+
+function announcementHudMessage(
+  ann: TensActionAnnouncement,
+  actor: TensPlayer,
+  myId: string,
+): ReactNode {
+  const displayName = actor.id === myId ? 'You' : actor.name;
+  const nameEl = <span style={{ color: getPlayerHudTextColor(actor.color) }}>{displayName}</span>;
+  const playedCards = ann.plays.map(p => p.card);
+  const extraTurnSuffix = ann.outcome !== 'normal' ? ' · plays again' : '';
+
+  if (ann.outcome === 'pickup') {
+    const pickupCount = ann.centerAfterPlay.length;
+    const cardWord = pickupCount === 1 ? 'card' : 'cards';
+    return (
+      <>
+        {nameEl}
+        {' played '}
+        {playedCardsHudMessage(playedCards)}
+        {` and picked up ${pickupCount} ${cardWord}${extraTurnSuffix}`}
+      </>
+    );
+  }
+
+  if (ann.outcome === 'set-clear') {
+    const rank = ann.plays[0]?.card.rank;
+    return (
+      <>
+        {nameEl}
+        {` cleared the center with four ${rankDisplay(rank ?? 0)}s${extraTurnSuffix}`}
+      </>
+    );
+  }
+
+  if (ann.outcome === 'wild-clear') {
+    return (
+      <>
+        {nameEl}
+        {' played '}
+        {playedCardsHudMessage(playedCards)}
+        {` and cleared the center${extraTurnSuffix}`}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {nameEl}
+      {' played '}
+      {playedCardsHudMessage(playedCards)}
+    </>
+  );
+}
+
 function TensFlipCard({ card, faceDown, disabled = false }: { card?: Card | null; faceDown: boolean; disabled?: boolean }) {
   return <FlipCard card={card ?? undefined} faceDown={faceDown || !card} disabled={disabled} size="sm" />;
 }
@@ -124,6 +197,11 @@ export default function TensBoard({
   const boardRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const handContainerRef = useRef<HTMLDivElement>(null);
+  const centerRef = useRef<HTMLDivElement>(null);
+  const discardRef = useRef<HTMLDivElement>(null);
+  const pileRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const seatRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const animationBusyRef = useRef(false);
   const [handWidth, setHandWidth] = useState(360);
   const [tableSize, setTableSize] = useState<ElementSize>({ width: 0, height: 0 });
   const [seatPillElement, setSeatPillElement] = useState<HTMLButtonElement | null>(null);
@@ -236,8 +314,23 @@ export default function TensBoard({
     extraTargets: dealExtras,
   });
 
-  const myRevealCount = deal.revealedFor(myId, myPlayer?.hand.length ?? 0);
-  const visibleHand = myPlayer ? myPlayer.hand.slice(0, myRevealCount) : [];
+  const myHandForLayout = useMemo((): Card[] => {
+    if (!myPlayer) return [];
+    const ann = state.actionAnnouncement;
+    if (
+      ann?.outcome === 'pickup' &&
+      ann.playerId === myId &&
+      state.phase === 'announcement'
+    ) {
+      const withoutPickup = [...myPlayer.hand];
+      for (const card of ann.centerAfterPlay) {
+        const idx = withoutPickup.findIndex(c => cardEquals(c, card));
+        if (idx >= 0) withoutPickup.splice(idx, 1);
+      }
+      return withoutPickup;
+    }
+    return myPlayer.hand;
+  }, [myPlayer, state.actionAnnouncement, state.phase, myId]);
 
   useEffect(() => {
     const el = handContainerRef.current;
@@ -273,7 +366,7 @@ export default function TensBoard({
   }, [seatPillElement]);
 
   const handLayout = useMemo(() => {
-    const cardCount = visibleHand.length;
+    const cardCount = myHandForLayout.length;
     const cardWidth = Math.min(92, Math.max(64, Math.floor(handWidth / 6)));
     const cardHeight = Math.round(cardWidth * 1.45);
     const defaultStep = Math.round(cardWidth * 0.52);
@@ -282,7 +375,34 @@ export default function TensBoard({
     const step = cardCount > 1 ? Math.max(14, Math.min(defaultStep, fitStep)) : defaultStep;
     const spreadWidth = cardCount > 1 ? cardWidth + step * (cardCount - 1) : cardWidth;
     return { cardWidth, cardHeight, step, spreadWidth, selectedLift: 14 };
-  }, [visibleHand.length, handWidth]);
+  }, [myHandForLayout.length, handWidth]);
+
+  const playAnim = useTensPlayAnimation({
+    boardRef,
+    centerRef,
+    discardRef,
+    handContainerRef,
+    pileRefs,
+    seatRefs,
+    handLayout,
+    myId,
+    state,
+    animationBusyRef,
+  });
+
+  const myHandCards = playAnim.displayMyHand ?? myPlayer?.hand ?? [];
+  const myRevealCount = deal.revealedFor(myId, myHandCards.length);
+  const visibleHand = myPlayer ? myHandCards.slice(0, myRevealCount) : [];
+
+  const setPileRef = useCallback((key: string, el: HTMLButtonElement | null) => {
+    if (el) pileRefs.current.set(key, el);
+    else pileRefs.current.delete(key);
+  }, []);
+
+  const setSeatRef = useCallback((playerId: string, el: HTMLButtonElement | null) => {
+    if (el) seatRefs.current.set(playerId, el);
+    else seatRefs.current.delete(playerId);
+  }, []);
 
   const canInteract =
     !deal.isDealing &&
@@ -385,6 +505,13 @@ export default function TensBoard({
     if (state.phase === 'round-end') {
       return state.roundSummary || 'Round over';
     }
+
+    if (state.phase === 'announcement' && state.actionAnnouncement) {
+      const actor = state.players.find(p => p.id === state.actionAnnouncement?.playerId);
+      if (!actor) return null;
+      return announcementHudMessage(state.actionAnnouncement, actor, myId);
+    }
+
     const current = state.players[state.currentPlayerIndex];
     if (!current) return null;
     const turnLabel = current.id === myId ? 'Your turn' : `${current.name}'s turn`;
@@ -446,7 +573,8 @@ export default function TensBoard({
 
   const renderSeatPill = (seatLayout: SeatLayout, shouldMeasure = false) => {
     const player = seatLayout.player;
-    const isCurrentTurn = state.players[state.currentPlayerIndex]?.id === player.id && state.phase !== 'round-end';
+    const isCurrentTurn = state.players[state.currentPlayerIndex]?.id === player.id
+      && state.phase === 'playing';
     const isMe = player.id === myId;
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
@@ -463,7 +591,10 @@ export default function TensBoard({
     return (
       <button
         type="button"
-        ref={shouldMeasure ? setSeatPillElement : undefined}
+        ref={(el) => {
+          setSeatRef(player.id, el);
+          if (shouldMeasure) setSeatPillElement(el);
+        }}
         onClick={tossProps.onClick}
         disabled={!canTossCards}
         className={`radial-seatPill card-toss-seatPillButton tens-seatPill ${isCurrentTurn ? (isMe ? 'radial-seatPill--activeSelf' : 'radial-seatPill--activeOther') : ''} ${isMe ? 'radial-seatPill--me' : ''}`}
@@ -501,7 +632,15 @@ export default function TensBoard({
     );
   }
 
-  const visibleCenter = state.centerPile.slice(-8);
+  const visibleCenter = playAnim.displayCenterPile.slice(-8).filter(card => !playAnim.hideCenterCards(card));
+
+  const renderCenterCardFace = (card: Card) => (
+    <div className="radial-slotCard">
+      <div className="radial-slotCardInner">
+        <CardFace card={card} compact />
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -509,6 +648,12 @@ export default function TensBoard({
       className={`tens-board radial-board radial-board--players-${state.players.length} tens-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}
     >
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
+      <TensPlayAnimationLayer
+        animation={playAnim.animation}
+        renderCardFace={renderCenterCardFace}
+        centerZoom={isHandZoomed}
+        onOutcomeFlyComplete={playAnim.handleOutcomeFlyComplete}
+      />
       <CardTossLayers cardTossBursts={cardTossBursts} seatCardSplats={seatCardSplats} cardSplats={cardSplats} />
 
       <div ref={tableRef} className={`radial-table radial-table--players-${state.players.length}`}>
@@ -541,9 +686,21 @@ export default function TensBoard({
                     cardKey(playable.card, playable.fromTop ? 'pile-top' : 'pile-bottom', pileIndex),
                   );
 
+                  const pileTopAnimating = playAnim.animation?.phase === 'playFly'
+                    && state.actionAnnouncement?.playerId === layout.player.id
+                    && state.actionAnnouncement.plays.some(
+                      p => p.source === 'pile-top' && p.pileIndex === pileIndex,
+                    );
+                  const pileBottomAnimating = playAnim.animation?.phase === 'playFly'
+                    && state.actionAnnouncement?.playerId === layout.player.id
+                    && state.actionAnnouncement.plays.some(
+                      p => p.source === 'pile-bottom' && p.pileIndex === pileIndex,
+                    );
+
                   return (
                     <button
                       key={`${layout.player.id}-pile-${pileIndex}`}
+                      ref={el => setPileRef(`${layout.player.id}-${pileIndex}`, el)}
                       type="button"
                       onClick={() => {
                         if (!isMyPile || !playable) return;
@@ -554,7 +711,7 @@ export default function TensBoard({
                         );
                       }}
                       disabled={!isMyPile || !playable || (!canSelectPile && !pileSelected)}
-                      className={`twelve-pileButton ${pileSelected ? 'tens-pileButton--selected' : ''}`}
+                      className={`twelve-pileButton ${pileSelected ? 'tens-pileButton--selected' : ''} ${pileTopAnimating ? 'tens-pileButton--animatingTop' : ''} ${pileBottomAnimating ? 'tens-pileButton--animatingBottom' : ''}`}
                       aria-label={`Pile ${pileIndex + 1}`}
                     >
                       <div className="twelve-pileBottom">
@@ -578,7 +735,7 @@ export default function TensBoard({
         ))}
 
         <div className={`radial-center tens-center ${isHandZoomed ? 'radial-center--zoom' : ''}`}>
-          <div className="tens-centerStack">
+          <div ref={centerRef} className="tens-centerStack">
             {visibleCenter.map((centerCard, i) => (
               <div
                 key={`center-${centerCard.suit}-${centerCard.rank}-${i}`}
@@ -588,20 +745,23 @@ export default function TensBoard({
                   zIndex: i + 1,
                 }}
               >
-                <div className="radial-slotCard">
-                  <div className="radial-slotCardInner">
-                    <CardFace card={centerCard} compact />
-                  </div>
-                </div>
+                {renderCenterCardFace(centerCard)}
               </div>
             ))}
           </div>
-          {state.discardCount > 0 && (
-            <div className="tens-discardBadge" aria-label={`${state.discardCount} cards cleared`}>
-              <span className="card-back tens-discardBack" />
-              <span className="tens-discardCount">{state.discardCount}</span>
-            </div>
-          )}
+          <div
+            ref={discardRef}
+            className="tens-discardBadge"
+            aria-label={playAnim.displayDiscardCount > 0 ? `${playAnim.displayDiscardCount} cards cleared` : undefined}
+            aria-hidden={playAnim.displayDiscardCount === 0}
+          >
+            {playAnim.displayDiscardCount > 0 && (
+              <>
+                <span className="card-back tens-discardBack" />
+                <span className="tens-discardCount">{playAnim.displayDiscardCount}</span>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

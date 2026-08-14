@@ -24,7 +24,19 @@ export interface TensPlayer {
   totalScore: number;
 }
 
-export type TensPhase = 'playing' | 'round-end' | 'game-over';
+export type TensPhase = 'playing' | 'announcement' | 'round-end' | 'game-over';
+
+export type TensPlayOutcome = 'normal' | 'pickup' | 'set-clear' | 'wild-clear';
+
+export interface TensActionAnnouncement {
+  playerId: string;
+  plays: SelectedCardPlay[];
+  outcome: TensPlayOutcome;
+  /** Center pile contents after cards were played, before pickup/clear (for fly-out animation). */
+  centerAfterPlay: Card[];
+  /** Discard pile size before a set/wild clear (for deferring the badge until fly-out completes). */
+  discardCountBeforeClear?: number;
+}
 
 export type PlaySource = 'hand' | 'pile-top' | 'pile-bottom';
 
@@ -50,10 +62,12 @@ export interface TensState {
   roundSummary: string;
   gameOver: boolean;
   winners: string[];
+  actionAnnouncement: TensActionAnnouncement | null;
 }
 
 export type TensAction =
   | { type: 'play-cards'; plays: SelectedCardPlay[] }
+  | { type: 'finish-action-announcement' }
   | { type: 'start-next-round' }
   | { type: 'show-final-results' };
 

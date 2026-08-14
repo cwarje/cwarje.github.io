@@ -761,6 +761,11 @@
   .radial-center.radial-center--zoom .card-faceCorner {
     width: 1.8em;
   }
+
+  .tens-board .radial-center.radial-center--zoom .tens-discardCount {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
 }
 
 .radial-handSpread {
@@ -4626,6 +4631,43 @@
   gap: 3px;
 }
 
+@media (max-width: 639px) {
+  .tens-board .radial-seat:not(.radial-seat--self) .twelve-pileRow {
+    gap: 3px;
+  }
+
+  .tens-board .radial-seat:not(.radial-seat--self) .twelve-pileButton {
+    width: 32px;
+    height: 49px;
+  }
+
+  .tens-board .radial-seat:not(.radial-seat--self) .twelve-pileButton .card-faceRank {
+    font-size: 1.1rem;
+  }
+
+  .tens-board .radial-seat:not(.radial-seat--self) .twelve-pileButton .card-faceSuit {
+    font-size: 1.05rem;
+  }
+
+  .tens-board .radial-seat:not(.radial-seat--self) .twelve-pileButton .card-faceCorner {
+    width: 1.1em;
+  }
+
+  .tens-board .radial-seat:not(.radial-seat--self) .twelve-pileButton .card-face,
+  .tens-board .radial-seat:not(.radial-seat--self) .twelve-pileButton .card-flipFront {
+    padding: 3px 4px 3px 1px;
+    border-width: 2px;
+  }
+
+  .tens-board .radial-seat:not(.radial-seat--self) .twelve-pileButton .card-face {
+    overflow: visible;
+  }
+
+  .tens-board .radial-seat:not(.radial-seat--self) .twelve-pileTop--stacked {
+    transform: translate(1px, 1px);
+  }
+}
+
 .tens-center {
   display: flex;
   flex-direction: column;
@@ -4666,20 +4708,31 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  width: var(--radial-slot-w);
+  height: var(--radial-slot-h);
 }
 
 .tens-discardBack {
-  width: 36px;
-  height: 54px;
-  border-radius: 6px;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
   opacity: 0.85;
 }
 
 .tens-discardCount {
   position: absolute;
   color: #fff;
-  font-size: 0.7rem;
   font-weight: 800;
+}
+
+.tens-board .radial-center:not(.radial-center--zoom) .tens-discardCount {
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.tens-board .radial-center.radial-center--zoom .tens-discardCount {
+  font-size: 1.6rem;
+  line-height: 1;
 }
 
 .tens-board .twelve-statusBlock {
@@ -4720,6 +4773,70 @@
 .tens-playButton:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.tens-playAnimLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 35;
+}
+
+.tens-playAnimCard {
+  position: absolute;
+  will-change: transform;
+}
+
+.tens-playAnimCard .radial-slotCard,
+.tens-playAnimCard .radial-slotCardInner,
+.tens-playAnimCard .card-face {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.tens-playAnimCard .card-face.card-face--compact {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 6px 8px 6px 3px;
+  gap: 3px;
+  border-radius: 8px;
+}
+
+.tens-playAnimCard .card-faceRank {
+  font-size: 1.45rem;
+}
+
+.tens-playAnimCard .card-faceSuit {
+  font-size: 1.38rem;
+}
+
+.tens-playAnimLayer--centerZoom .tens-playAnimCard .card-faceRank {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.tens-playAnimLayer--centerZoom .tens-playAnimCard .card-faceSuit {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.tens-playAnimLayer--centerZoom .tens-playAnimCard .card-faceCorner {
+  width: 1.75em;
+}
+
+.tens-pileButton--animatingTop .twelve-pileTop {
+  visibility: hidden;
+}
+
+.tens-pileButton--animatingBottom .twelve-pileBottom {
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tens-playAnimLayer {
+    display: none;
+  }
 }
 
 @media (min-width: 640px) {

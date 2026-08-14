@@ -6,6 +6,8 @@ import type {
   SelectedCardPlay,
   Suit,
   TensAction,
+  TensActionAnnouncement,
+  TensPlayOutcome,
   TensPlayer,
   TensState,
 } from './types';
@@ -190,6 +192,7 @@ function startRound(
     roundSummary: '',
     gameOver: false,
     winners: [],
+    actionAnnouncement: null,
   };
 }
 
@@ -218,6 +221,7 @@ function endRound(state: TensState, outPlayerId: string): TensState {
       gameOver: true,
       winners: getLowestScoreWinners(updatedPlayers),
       extraTurnPending: false,
+      actionAnnouncement: null,
     };
   }
 
@@ -230,6 +234,7 @@ function endRound(state: TensState, outPlayerId: string): TensState {
     roundSummary: summary,
     gameOver: false,
     extraTurnPending: false,
+    actionAnnouncement: null,
   };
 }
 
@@ -253,36 +258,52 @@ function applyPlayResult(
   const playedRank = plays[0]?.card.rank;
   if (!playedRank) return state;
 
-  let centerPile = [...state.centerPile, ...plays.map(p => p.card)];
+  const centerAfterPlay = [...state.centerPile, ...plays.map(p => p.card)];
+  let centerPile = centerAfterPlay;
   let lastPlayRank = state.lastPlayRank;
   let discardCount = state.discardCount;
   let extraTurnPending = false;
+  let outcome: TensPlayOutcome = 'normal';
+
+  let discardCountBeforeClear: number | undefined;
 
   const wildClear = options.clearWithWild === true && playedRank === 10;
 
   if (wildClear) {
+    discardCountBeforeClear = discardCount;
     discardCount += centerPile.length;
     centerPile = [];
     lastPlayRank = null;
     extraTurnPending = true;
+    outcome = 'wild-clear';
   } else if (wouldPickup(playedRank, lastPlayRank)) {
-    const pickupCards = centerPile;
     centerPile = [];
     lastPlayRank = null;
     players[playerIndex] = {
       ...players[playerIndex],
-      hand: sortHand([...players[playerIndex].hand, ...pickupCards]),
+      hand: sortHand([...players[playerIndex].hand, ...centerAfterPlay]),
     };
     extraTurnPending = true;
+    outcome = 'pickup';
   } else {
     lastPlayRank = playedRank;
     if (isSetClear(centerPile)) {
+      discardCountBeforeClear = discardCount;
       discardCount += centerPile.length;
       centerPile = [];
       lastPlayRank = null;
       extraTurnPending = true;
+      outcome = 'set-clear';
     }
   }
+
+  const actionAnnouncement: TensActionAnnouncement = {
+    playerId,
+    plays,
+    outcome,
+    centerAfterPlay,
+    ...(discardCountBeforeClear !== undefined ? { discardCountBeforeClear } : {}),
+  };
 
   if (playerHasNoCards(players[playerIndex])) {
     return endRound(
@@ -294,23 +315,15 @@ function applyPlayResult(
         lastPlayRank,
         extraTurnPending: false,
         phase: 'playing',
+        actionAnnouncement: null,
       },
       playerId,
     );
   }
 
-  if (extraTurnPending) {
-    return {
-      ...state,
-      players,
-      centerPile,
-      discardCount,
-      lastPlayRank,
-      extraTurnPending: false,
-      phase: 'playing',
-      currentPlayerIndex: playerIndex,
-    };
-  }
+  const nextPlayerIndex = extraTurnPending
+    ? playerIndex
+    : advanceToNextPlayer({ ...state, currentPlayerIndex: playerIndex });
 
   return {
     ...state,
@@ -319,8 +332,9 @@ function applyPlayResult(
     discardCount,
     lastPlayRank,
     extraTurnPending: false,
-    phase: 'playing',
-    currentPlayerIndex: advanceToNextPlayer({ ...state, currentPlayerIndex: playerIndex }),
+    phase: 'announcement',
+    currentPlayerIndex: nextPlayerIndex,
+    actionAnnouncement,
   };
 }
 
@@ -356,6 +370,16 @@ export function processTensAction(state: unknown, action: unknown, playerId: str
   if (a.type === 'play-cards') {
     if (!playerId) return s;
     return handlePlayCards(s, playerId, a);
+  }
+
+  if (a.type === 'finish-action-announcement') {
+    if (playerId) return s;
+    if (s.phase !== 'announcement') return s;
+    return {
+      ...s,
+      phase: 'playing',
+      actionAnnouncement: null,
+    };
   }
 
   if (a.type === 'start-next-round') {
