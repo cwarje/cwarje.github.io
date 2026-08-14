@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import type { TableEvent, TableEventInput } from '../../networking/types';
 import type { HeartsState, Card, HeartsPlayer } from './types';
 import { isValidHeartsPlay } from './rules';
-import { getHeartsPassCount } from './logic';
+import { getHeartsPassCount, getPassDirectionLabel } from './logic';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 import { CardFace } from '../shared/ui/CardFace';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
@@ -345,7 +345,7 @@ export default function HeartsBoard({
         }
         return 'All players confirmed. Starting round...';
       }
-      return `Pass ${passCount} cards ${state.passDirection} · Selected ${selectedPass.length}/${passCount}`;
+      return `Pass ${passCount} cards ${getPassDirectionLabel(state.passDirection, state.players.length)} · Selected ${selectedPass.length}/${passCount}`;
     }
     if (state.trickWinner && trickWinnerPlayer) {
       return (

@@ -19,7 +19,7 @@ export interface HeartsPlayer {
   totalScore: number;
 }
 
-export type PassDirection = 'left' | 'right' | 'across' | 'none';
+export type PassDirection = 'left' | 'right' | 'across' | 'across-right' | 'none';
 
 export interface HeartsState {
   players: HeartsPlayer[];

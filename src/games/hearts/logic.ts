@@ -69,19 +69,28 @@ function cardPoints(card: Card): number {
   return 0;
 }
 
-const PASS_DIRECTIONS: PassDirection[] = ['left', 'right', 'across', 'none'];
+const PASS_DIRECTIONS_4: PassDirection[] = ['left', 'right', 'across', 'none'];
+const PASS_DIRECTIONS_5: PassDirection[] = ['left', 'right', 'across', 'across-right', 'none'];
 
-function getPassDirection(roundNumber: number): PassDirection {
-  return PASS_DIRECTIONS[(roundNumber - 1) % 4];
+export function getPassDirection(roundNumber: number, playerCount: number): PassDirection {
+  const directions = playerCount === 5 ? PASS_DIRECTIONS_5 : PASS_DIRECTIONS_4;
+  return directions[(roundNumber - 1) % directions.length];
 }
 
-function getPassTargetIndex(fromIndex: number, direction: PassDirection, playerCount: number): number {
+export function getPassTargetIndex(fromIndex: number, direction: PassDirection, playerCount: number): number {
   switch (direction) {
     case 'left': return (fromIndex + 1) % playerCount;
     case 'right': return (fromIndex - 1 + playerCount) % playerCount;
     case 'across': return (fromIndex + 2) % playerCount;
+    case 'across-right': return (fromIndex - 2 + playerCount) % playerCount;
     case 'none': return fromIndex;
   }
+}
+
+export function getPassDirectionLabel(direction: PassDirection, playerCount: number): string {
+  if (direction === 'across' && playerCount === 5) return 'across left';
+  if (direction === 'across-right') return 'across right';
+  return direction;
 }
 
 export function createHeartsState(players: Player[], options?: { targetScore?: 50 | 100 }): HeartsState {
@@ -101,7 +110,7 @@ export function createHeartsState(players: Player[], options?: { targetScore?: 5
     totalScore: 0,
   }));
 
-  const passDir = getPassDirection(1);
+  const passDir = getPassDirection(1, gamePlayers.length);
   const startIdx = findStartingCardHolder(heartsPlayers, cfg.startRank);
 
   return {
@@ -344,7 +353,7 @@ function endRound(s: HeartsState): HeartsState {
     roundScore: 0,
   }));
 
-  const passDir = getPassDirection(nextRound);
+  const passDir = getPassDirection(nextRound, newPlayers.length);
   const startIdx = findStartingCardHolder(dealtPlayers, cfg.startRank);
 
   return {
@@ -526,7 +535,7 @@ export function chooseHeartsPassCards(state: HeartsState, playerIndex: number): 
       if (voidsSuit && card.suit === 'spades' && canPassSpade(workingHand, card)) score += 7;
       else if (voidsSuit && card.suit !== 'clubs' && card.suit !== 'spades') score += 7;
       if (voidsSuit && card.suit === 'clubs' && state.trickNumber <= 3) score -= 4;
-      if (state.passDirection === 'across') score += rankWeight(card.rank) * 5;
+      if (state.passDirection === 'across' || state.passDirection === 'across-right') score += rankWeight(card.rank) * 5;
       if (state.passDirection === 'none') score -= 1000;
 
       if (score > bestScore) {

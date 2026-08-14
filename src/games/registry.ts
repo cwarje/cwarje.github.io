@@ -282,7 +282,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
       goal: 'Have the fewest points when any player reaches 100. Hearts are worth 1 point each, and the Queen of Spades is worth 13.',
       rules: [
         'With 4 players, a standard 52-card deck is dealt 13 cards each. With 5 players, the 2 of Clubs and 2 of Diamonds are removed and 10 cards are dealt to each player.',
-        'Each round, players pass cards to another player (left, right, across, then no pass — rotating each round). Pass 3 cards with 4 players, or 2 cards with 5 players.',
+        'Each round, players pass cards to another player. With 4 players, pass 3 cards in rotation: left, right, across, then no pass. With 5 players, pass 2 cards in rotation: left, right, across left, across right, then no pass.',
         'The player with the lowest club leads the first trick: the 2 of Clubs with 4 players, or the 3 of Clubs with 5 players.',
         'You must follow the lead suit if you can. If you can\'t, you may play any card.',
         'Hearts cannot be led until a heart has been "broken" (played on a previous trick).',
