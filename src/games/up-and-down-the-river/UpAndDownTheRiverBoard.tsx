@@ -1,12 +1,15 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import type { TableEvent, TableEventInput } from '../../networking/types';
 import type { Card, UpRiverPlayer, UpRiverState } from './types';
 import { isValidUpRiverPlay } from './rules';
 import { getForbiddenPerfectBid } from './logic';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
+import { CardTossLayers } from '../shared/CardTossLayers';
+import { useCardToss } from '../shared/useCardToss';
 import { CardFace } from '../shared/ui/CardFace';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
 import { rankDisplay } from '../shared/ui/cardConstants';
@@ -16,6 +19,8 @@ interface UpRiverBoardProps {
   myId: string;
   onAction: (action: unknown) => void;
   isHandZoomed?: boolean;
+  sendTableEvent?: (event: TableEventInput) => void;
+  lastTableEvent?: TableEvent | null;
 }
 
 interface RiverSeatLayout {
@@ -107,7 +112,14 @@ function getTrickSlotPlacement(playerCount: number, relativeIndex: number): Tric
   };
 }
 
-export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZoomed = false }: UpRiverBoardProps) {
+export default function UpAndDownTheRiverBoard({
+  state,
+  myId,
+  onAction,
+  isHandZoomed = false,
+  sendTableEvent,
+  lastTableEvent,
+}: UpRiverBoardProps) {
   const myIndex = state.players.findIndex(player => player.id === myId);
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const myPlayer = myIndex >= 0 ? state.players[myIndex] : null;
@@ -123,8 +135,25 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
   const handContainerRef = useRef<HTMLDivElement>(null);
   const [handWidth, setHandWidth] = useState(360);
   const [tableSize, setTableSize] = useState<ElementSize>({ width: 0, height: 0 });
-  const [seatPillElement, setSeatPillElement] = useState<HTMLDivElement | null>(null);
+  const [seatPillElement, setSeatPillElement] = useState<HTMLButtonElement | null>(null);
   const [seatPillSize, setSeatPillSize] = useState<ElementSize>({ width: 0, height: 0 });
+
+  const {
+    cardTossBursts,
+    seatCardSplats,
+    cardSplats,
+    isThrowingCards,
+    getSeatPillTossProps,
+  } = useCardToss({
+    boardRef,
+    tableRef,
+    handContainerRef,
+    myId,
+    handCount: myPlayer?.hand.length ?? 0,
+    gameType: 'up-and-down-the-river',
+    sendTableEvent,
+    lastTableEvent,
+  });
 
   const seatLayouts = useMemo<RiverSeatLayout[]>(() => {
     const playerCount = state.players.length;
@@ -419,11 +448,23 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
     const bidText = player.bid === null ? '-' : String(player.bid);
+    const tossProps = getSeatPillTossProps({
+      playerId: player.id,
+      playerName: player.name,
+      isMe,
+      selfAriaLabel: 'Your seat',
+      seatLeft: seatLayout.seatLeft,
+      seatTop: seatLayout.seatTop,
+    });
 
     return (
-      <div
+      <button
+        type="button"
         ref={shouldMeasure ? setSeatPillElement : undefined}
-        className={`radial-seatPill ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`}
+        onClick={tossProps.onClick}
+        disabled={tossProps.disabled}
+        className={`radial-seatPill card-toss-seatPillButton ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`}
+        aria-label={tossProps['aria-label']}
       >
         <div className="radial-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
           <RadialSeatName name={isMe ? 'You' : player.name} textColor={seatTextColor} />
@@ -438,7 +479,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
           <span className="radial-seatCell radial-seatCell--tricks">{player.tricksWon}</span>
           <span className="radial-seatCell radial-seatCell--total">{player.totalScore}</span>
         </div>
-      </div>
+      </button>
     );
   };
 
@@ -485,6 +526,11 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
   return (
     <div ref={boardRef} className={`radial-board radial-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
+      <CardTossLayers
+        cardTossBursts={cardTossBursts}
+        seatCardSplats={seatCardSplats}
+        cardSplats={cardSplats}
+      />
       <div ref={tableRef} className={`radial-table radial-table--players-${state.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
@@ -612,7 +658,7 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
         <div className="space-y-3">
           <div ref={handContainerRef} className={`radial-hand ${isHandZoomed ? 'radial-hand--zoom' : ''}`}>
             <div
-              className="radial-handSpread"
+              className={`radial-handSpread ${isThrowingCards ? 'card-toss-handSpread--hidden' : ''}`}
               style={{
                 width: `${handLayout.spreadWidth}px`,
                 height: `${handLayout.cardHeight + handLayout.selectedLift}px`,

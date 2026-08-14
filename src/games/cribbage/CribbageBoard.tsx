@@ -13,6 +13,7 @@ import {
 import { classifyCribbageSkunk, cribbageCribOwnerLabel } from './logic';
 import { legalPeggingPlays, scoreCribShow, scoreShowHand } from './rules';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
+import type { TableEvent, TableEventInput } from '../../networking/types';
 import { CardFace } from '../shared/ui/CardFace';
 import { CardBack } from '../shared/ui/CardBack';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
@@ -21,6 +22,8 @@ import { CRIB_HUD_FLIP_DURATION_MS } from '../shared/CribHudFlipCard';
 import CribbagePegBoard from './CribbagePegBoard';
 import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
+import { CardTossLayers } from '../shared/CardTossLayers';
+import { useCardToss } from '../shared/useCardToss';
 
 const RIVER_SEAT_EDGE_GAP_PX = 8;
 
@@ -89,6 +92,8 @@ interface CribbageBoardProps {
   onAction: (payload: unknown) => void;
   isHost?: boolean;
   isHandZoomed?: boolean;
+  sendTableEvent?: (event: TableEventInput) => void;
+  lastTableEvent?: TableEvent | null;
 }
 
 function scoreForSeat(s: CribbageState, seat: number): number {
@@ -98,7 +103,15 @@ function scoreForSeat(s: CribbageState, seat: number): number {
   return s.playerScores[seat] ?? 0;
 }
 
-export default function CribbageBoard({ state, myId, onAction, isHost = false, isHandZoomed = false }: CribbageBoardProps) {
+export default function CribbageBoard({
+  state,
+  myId,
+  onAction,
+  isHost = false,
+  isHandZoomed = false,
+  sendTableEvent,
+  lastTableEvent,
+}: CribbageBoardProps) {
   const s = state as CribbageState;
   const myIndex = s.players.findIndex(p => p.id === myId);
   const myPlayer = myIndex >= 0 ? s.players[myIndex] : null;
@@ -120,8 +133,25 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
   const boardRef = useRef<HTMLDivElement>(null);
   const [handWidth, setHandWidth] = useState(360);
   const [tableSize, setTableSize] = useState<ElementSize>({ width: 0, height: 0 });
-  const [seatPillElement, setSeatPillElement] = useState<HTMLDivElement | null>(null);
+  const [seatPillElement, setSeatPillElement] = useState<HTMLButtonElement | null>(null);
   const [seatPillSize, setSeatPillSize] = useState<ElementSize>({ width: 0, height: 0 });
+
+  const {
+    cardTossBursts,
+    seatCardSplats,
+    cardSplats,
+    isThrowingCards,
+    getSeatPillTossProps,
+  } = useCardToss({
+    boardRef,
+    tableRef,
+    handContainerRef,
+    myId,
+    handCount: myPlayer?.hand.length ?? 0,
+    gameType: 'cribbage',
+    sendTableEvent,
+    lastTableEvent,
+  });
   const [cribShowScoreVisible, setCribShowScoreVisible] = useState(false);
 
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
@@ -643,11 +673,23 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
           };
         })()
       : { backgroundColor: seatColor, color: seatTextColor };
+    const tossProps = getSeatPillTossProps({
+      playerId: player.id,
+      playerName: player.name,
+      isMe: player.id === myId,
+      selfAriaLabel: 'Your seat',
+      seatLeft: layout.seatLeft,
+      seatTop: layout.seatTop,
+    });
 
     return (
-      <div
+      <button
+        type="button"
         ref={shouldMeasure ? setSeatPillElement : undefined}
-        className={`cribbage-seatPill ${activeSeatPillClass} ${player.id === myId ? 'cribbage-seatPill--me' : ''}`}
+        onClick={tossProps.onClick}
+        disabled={tossProps.disabled}
+        className={`cribbage-seatPill card-toss-seatPillButton ${activeSeatPillClass} ${player.id === myId ? 'cribbage-seatPill--me' : ''}`}
+        aria-label={tossProps['aria-label']}
       >
         <div className="cribbage-seatPillTop" style={pillTopStyle}>
           <RadialSeatName
@@ -659,7 +701,7 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
         <div className="cribbage-seatPillBottom">
           <span className="cribbage-seatPillScore">{sc}</span>
         </div>
-      </div>
+      </button>
     );
   };
 
@@ -721,6 +763,11 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
   return (
     <div ref={boardRef} className="radial-board cribbage-board relative flex flex-col h-full min-h-0 text-white">
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
+      <CardTossLayers
+        cardTossBursts={cardTossBursts}
+        seatCardSplats={seatCardSplats}
+        cardSplats={cardSplats}
+      />
       {showDevScoreShortcut && (
         <button
           type="button"
@@ -918,7 +965,7 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
       {myPlayer && (
         <div ref={handContainerRef} className={`radial-hand shrink-0 ${isHandZoomed ? 'radial-hand--zoom' : ''}`}>
           <div
-            className="radial-handSpread"
+            className={`radial-handSpread ${isThrowingCards ? 'card-toss-handSpread--hidden' : ''}`}
             role={isShowHandStrip && stripCardsLen > 0 ? 'list' : undefined}
             aria-label={showHandStripAriaLabel ?? undefined}
             style={{

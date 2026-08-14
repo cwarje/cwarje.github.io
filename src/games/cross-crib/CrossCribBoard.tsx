@@ -6,8 +6,11 @@ import { cribCardsToSelect } from './types';
 import { cardEquals } from './rules';
 import { getCribHandScore } from './logic';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
+import type { TableEvent, TableEventInput } from '../../networking/types';
 import { useDealerDealAnimation, type DealSeat, type DealExtraTarget } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
+import { CardTossLayers } from '../shared/CardTossLayers';
+import { useCardToss } from '../shared/useCardToss';
 import { CardFace } from '../shared/ui/CardFace';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
 import { rankDisplay } from '../shared/ui/cardConstants';
@@ -17,6 +20,8 @@ interface CrossCribBoardProps {
   myId: string;
   onAction: (action: unknown) => void;
   isHandZoomed?: boolean;
+  sendTableEvent?: (event: TableEventInput) => void;
+  lastTableEvent?: TableEvent | null;
 }
 
 interface SeatLayout {
@@ -47,6 +52,8 @@ export default function CrossCribBoard({
   myId,
   onAction,
   isHandZoomed = false,
+  sendTableEvent,
+  lastTableEvent,
 }: CrossCribBoardProps) {
   const s = state as CrossCribState;
   const myIndex = s.players.findIndex(p => p.id === myId);
@@ -65,8 +72,25 @@ export default function CrossCribBoard({
   const handContainerRef = useRef<HTMLDivElement>(null);
   const [handWidth, setHandWidth] = useState(360);
   const [tableSize, setTableSize] = useState<ElementSize>({ width: 0, height: 0 });
-  const [seatPillElement, setSeatPillElement] = useState<HTMLDivElement | null>(null);
+  const [seatPillElement, setSeatPillElement] = useState<HTMLButtonElement | null>(null);
   const [seatPillSize, setSeatPillSize] = useState<ElementSize>({ width: 0, height: 0 });
+
+  const {
+    cardTossBursts,
+    seatCardSplats,
+    cardSplats,
+    isThrowingCards,
+    getSeatPillTossProps,
+  } = useCardToss({
+    boardRef,
+    tableRef,
+    handContainerRef,
+    myId,
+    handCount: myPlayer?.hand.length ?? 0,
+    gameType: 'cross-crib',
+    sendTableEvent,
+    lastTableEvent,
+  });
 
   const playerCount = s.players.length;
   const cribNeed = cribCardsToSelect(playerCount);
@@ -284,11 +308,23 @@ export default function CrossCribBoard({
           };
         })()
       : { backgroundColor: seatColor, color: seatTextColor };
+    const tossProps = getSeatPillTossProps({
+      playerId: player.id,
+      playerName: player.name,
+      isMe,
+      selfAriaLabel: `Your seat, ${player.totalScore} points`,
+      seatLeft: layout.seatLeft,
+      seatTop: layout.seatTop,
+    });
 
     return (
-      <div
+      <button
+        type="button"
         ref={shouldMeasure ? setSeatPillElement : undefined}
-        className={`radial-seatPill ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`}
+        onClick={tossProps.onClick}
+        disabled={tossProps.disabled}
+        className={`radial-seatPill card-toss-seatPillButton ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`}
+        aria-label={tossProps['aria-label']}
       >
         <div className="radial-seatPillTop" style={pillTopStyle}>
           <RadialSeatName
@@ -296,7 +332,7 @@ export default function CrossCribBoard({
             textColor={seatTextColor}
           />
         </div>
-      </div>
+      </button>
     );
   };
 
@@ -424,6 +460,11 @@ export default function CrossCribBoard({
   return (
     <div ref={boardRef} className={`radial-board radial-board--players-${playerCount} relative space-y-3 sm:space-y-4`}>
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
+      <CardTossLayers
+        cardTossBursts={cardTossBursts}
+        seatCardSplats={seatCardSplats}
+        cardSplats={cardSplats}
+      />
       <div ref={tableRef} className={`radial-table radial-table--players-${playerCount}`}>
         {seatLayouts.map((layout) => (
           <div
@@ -517,7 +558,7 @@ export default function CrossCribBoard({
         <div className="space-y-3">
           <div ref={handContainerRef} className={`radial-hand ${isHandZoomed ? 'radial-hand--zoom' : ''}`}>
             <div
-              className="radial-handSpread"
+              className={`radial-handSpread ${isThrowingCards ? 'card-toss-handSpread--hidden' : ''}`}
               style={{
                 width: `${handLayout.spreadWidth}px`,
                 height: `${handLayout.cardHeight + handLayout.selectedLift}px`,

@@ -3,9 +3,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, ChevronUp, ChevronDown, Play, LogOut } from 'lucide-react';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor, normalizePlayerColor } from '../../networking/playerColors';
+import type { TableEvent, TableEventInput } from '../../networking/types';
 import type { PokerState, PokerAction, Card, PokerPlayer } from './types';
 import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
+import { CardTossLayers } from '../shared/CardTossLayers';
+import { useCardToss } from '../shared/useCardToss';
 import { FlipCard } from '../shared/ui/FlipCard';
 
 function PokerCardDisplay({ card, faceDown = false, size = 'md', skipFlip = false }: { card?: Card; faceDown?: boolean; size?: 'sm' | 'md'; skipFlip?: boolean }) {
@@ -50,9 +53,20 @@ interface PokerBoardProps {
   isHost: boolean;
   onLeave?: () => void;
   isHandZoomed?: boolean;
+  sendTableEvent?: (event: TableEventInput) => void;
+  lastTableEvent?: TableEvent | null;
 }
 
-export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isHandZoomed = false }: PokerBoardProps) {
+export default function PokerBoard({
+  state,
+  myId,
+  onAction,
+  isHost,
+  onLeave,
+  isHandZoomed = false,
+  sendTableEvent,
+  lastTableEvent,
+}: PokerBoardProps) {
   const [raiseAmount, setRaiseAmount] = useState<number>(0);
   const boardRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
@@ -64,6 +78,24 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const isMyTurn = state.players[state.currentPlayerIndex]?.id === myId && !state.gameOver;
   const currentPlayer = state.players[state.currentPlayerIndex];
+
+  const {
+    cardTossBursts,
+    seatCardSplats,
+    cardSplats,
+    isThrowingCards,
+    getSeatPillTossProps,
+  } = useCardToss({
+    boardRef,
+    tableRef,
+    handContainerRef,
+    myId,
+    handCount: me?.holeCards.length ?? 0,
+    gameType: 'poker',
+    sendTableEvent,
+    lastTableEvent,
+    enabled: !me?.folded,
+  });
 
   const toCall = me ? state.currentBet - me.betThisStreet : 0;
   const canCheck = toCall === 0;
@@ -208,10 +240,22 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
     const seatTextColor = DARK_PLAYER_COLORS.has(color) ? '#ffffff' : '#111827';
     const activeClass = isCurrentTurn ? (isMe ? 'poker-seatPill--activeSelf' : 'poker-seatPill--activeOther') : '';
     const foldedClass = player.folded ? 'poker-seatPill--folded' : '';
+    const tossProps = getSeatPillTossProps({
+      playerId: player.id,
+      playerName: player.name,
+      isMe,
+      selfAriaLabel: 'Your seat',
+      seatLeft: layout.seatLeft,
+      seatTop: layout.seatTop,
+    });
 
     return (
-      <div
-        className={`poker-seatPill ${activeClass} ${isMe ? 'poker-seatPill--me' : ''} ${foldedClass}`}
+      <button
+        type="button"
+        onClick={tossProps.onClick}
+        disabled={tossProps.disabled}
+        className={`poker-seatPill card-toss-seatPillButton ${activeClass} ${isMe ? 'poker-seatPill--me' : ''} ${foldedClass}`}
+        aria-label={tossProps['aria-label']}
       >
         <div className="poker-seatPillTop" style={{ backgroundColor: seatColor }}>
           <span className="poker-seatPillName" style={{ color: seatTextColor }}>{isMe ? 'You' : player.name}{isDealer ? ' (Dealer)' : ''}</span>
@@ -225,7 +269,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
           <span className="poker-seatCell poker-seatCell--label">bet</span>
           <span className="poker-seatCell poker-seatCell--bet">{player.betThisStreet}</span>
         </div>
-      </div>
+      </button>
     );
   };
 
@@ -254,6 +298,11 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
   return (
     <div ref={boardRef} className="poker-board relative space-y-3 sm:space-y-4">
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
+      <CardTossLayers
+        cardTossBursts={cardTossBursts}
+        seatCardSplats={seatCardSplats}
+        cardSplats={cardSplats}
+      />
       <div ref={tableRef} className={`poker-table poker-table--players-${state.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
@@ -346,7 +395,7 @@ export default function PokerBoard({ state, myId, onAction, isHost, onLeave, isH
           {me && (
             <div ref={handContainerRef} className={`poker-hand ${isHandZoomed ? 'poker-hand--zoom' : ''}`}>
               <div
-                className="poker-handSpread"
+                className={`poker-handSpread ${isThrowingCards ? 'card-toss-handSpread--hidden' : ''}`}
                 style={{
                   width: `${handLayout.spreadWidth}px`,
                   height: `${handLayout.cardHeight + handLayout.hoverLift}px`,

@@ -11,8 +11,11 @@ import {
   isValidMobilizationTrickPlay,
 } from './rules';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
+import type { TableEvent, TableEventInput } from '../../networking/types';
 import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
+import { CardTossLayers } from '../shared/CardTossLayers';
+import { useCardToss } from '../shared/useCardToss';
 import { CardFace } from '../shared/ui/CardFace';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
 import { SUIT_COLORS, SUIT_SYMBOLS, rankDisplay } from '../shared/ui/cardConstants';
@@ -23,6 +26,8 @@ interface MobilizationBoardProps {
   onAction: (action: unknown) => void;
   isHandZoomed?: boolean;
   isHost?: boolean;
+  sendTableEvent?: (event: TableEventInput) => void;
+  lastTableEvent?: TableEvent | null;
 }
 
 interface SeatLayout {
@@ -102,7 +107,15 @@ function legalRowToGridRow(row: 'top' | 'mid' | 'bottom'): 0 | 1 | 2 {
   return 0;
 }
 
-export default function MobilizationBoard({ state, myId, onAction, isHandZoomed = false, isHost = false }: MobilizationBoardProps) {
+export default function MobilizationBoard({
+  state,
+  myId,
+  onAction,
+  isHandZoomed = false,
+  isHost = false,
+  sendTableEvent,
+  lastTableEvent,
+}: MobilizationBoardProps) {
   const myIndex = state.players.findIndex(player => player.id === myId);
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const myPlayer = myIndex >= 0 ? state.players[myIndex] : null;
@@ -112,8 +125,25 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
   const handContainerRef = useRef<HTMLDivElement>(null);
   const [handWidth, setHandWidth] = useState(360);
   const [tableSize, setTableSize] = useState<ElementSize>({ width: 0, height: 0 });
-  const [seatPillElement, setSeatPillElement] = useState<HTMLDivElement | null>(null);
+  const [seatPillElement, setSeatPillElement] = useState<HTMLButtonElement | null>(null);
   const [seatPillSize, setSeatPillSize] = useState<ElementSize>({ width: 0, height: 0 });
+
+  const {
+    cardTossBursts,
+    seatCardSplats,
+    cardSplats,
+    isThrowingCards,
+    getSeatPillTossProps,
+  } = useCardToss({
+    boardRef,
+    tableRef,
+    handContainerRef,
+    myId,
+    handCount: myPlayer?.hand.length ?? 0,
+    gameType: 'mobilization',
+    sendTableEvent,
+    lastTableEvent,
+  });
   const [selectedSolitaireCard, setSelectedSolitaireCard] = useState<Card | null>(null);
   const [solitaireHandHoverCard, setSolitaireHandHoverCard] = useState<Card | null>(null);
 
@@ -404,11 +434,23 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
 
     const isSolitaire = state.phase === 'solitaire' || state.phase === 'solitaire-reveal';
+    const tossProps = getSeatPillTossProps({
+      playerId: player.id,
+      playerName: player.name,
+      isMe,
+      selfAriaLabel: 'Your seat',
+      seatLeft: seatLayout.seatLeft,
+      seatTop: seatLayout.seatTop,
+    });
 
     return (
-      <div
+      <button
+        type="button"
         ref={shouldMeasure ? setSeatPillElement : undefined}
-        className={`radial-seatPill radial-seatPill--mobilization2col ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`}
+        onClick={tossProps.onClick}
+        disabled={tossProps.disabled}
+        className={`radial-seatPill card-toss-seatPillButton radial-seatPill--mobilization2col ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`}
+        aria-label={tossProps['aria-label']}
       >
         <div
           className="radial-seatPillTop radial-seatPillTop--mobilization"
@@ -429,7 +471,7 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
           <span className="radial-seatCell radial-seatCell--bid">{isSolitaire ? player.hand.length : player.tricksThisRound}</span>
           <span className="radial-seatCell radial-seatCell--total">{player.totalScore}</span>
         </div>
-      </div>
+      </button>
     );
   };
 
@@ -574,6 +616,11 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
   return (
     <div ref={boardRef} className={`radial-board radial-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
+      <CardTossLayers
+        cardTossBursts={cardTossBursts}
+        seatCardSplats={seatCardSplats}
+        cardSplats={cardSplats}
+      />
       {devJumpToolbar}
       <div ref={tableRef} className={`radial-table radial-table--players-${state.players.length}`}>
         {seatLayouts.map((layout) => (
@@ -660,7 +707,7 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
         <div className="space-y-3">
           <div ref={handContainerRef} className={`radial-hand ${isHandZoomed ? 'radial-hand--zoom' : ''}`}>
             <div
-              className="radial-handSpread"
+              className={`radial-handSpread ${isThrowingCards ? 'card-toss-handSpread--hidden' : ''}`}
               style={{
                 width: `${handLayout.spreadWidth}px`,
                 height: `${handLayout.cardHeight + handLayout.selectedLift}px`,

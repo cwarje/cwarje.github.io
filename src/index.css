@@ -1619,24 +1619,24 @@
   background: transparent;
 }
 
-.twelve-seatPillButton {
+.card-toss-seatPillButton {
   appearance: none;
   padding: 0;
   color: inherit;
   text-align: inherit;
 }
 
-.twelve-seatPillButton:not(:disabled) {
+.card-toss-seatPillButton:not(:disabled) {
   cursor: pointer;
   transition: transform 0.14s ease, box-shadow 0.14s ease;
 }
 
-.twelve-seatPillButton:not(:disabled):hover {
+.card-toss-seatPillButton:not(:disabled):hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 16px rgba(15, 23, 42, 0.24);
 }
 
-.twelve-seatPillButton:disabled {
+.card-toss-seatPillButton:disabled {
   cursor: default;
   opacity: 1;
 }
@@ -2184,7 +2184,7 @@
   position: relative;
 }
 
-.twelve-handSpread--tossing {
+.card-toss-handSpread--hidden {
   opacity: 0;
   pointer-events: none;
 }
@@ -2326,7 +2326,7 @@
   }
 }
 
-.twelve-cardTossLayer {
+.card-toss-layer {
   position: absolute;
   inset: 0;
   z-index: 30;
@@ -2334,7 +2334,7 @@
   overflow: visible;
 }
 
-.twelve-cardTossCard {
+.card-toss-card {
   position: absolute;
   width: 88px;
   height: 128px;
@@ -2342,7 +2342,7 @@
   transform-origin: center;
 }
 
-.twelve-cardSplatLayer {
+.card-toss-centerSplatLayer {
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -2352,7 +2352,7 @@
   justify-content: center;
 }
 
-.twelve-cardSplatCard {
+.card-toss-centerSplatCard {
   position: absolute;
   width: 82px;
   height: 116px;
@@ -2360,7 +2360,7 @@
   transform-origin: center;
 }
 
-.twelve-seatSplatLayer {
+.card-toss-seatSplatLayer {
   position: absolute;
   inset: 0;
   z-index: 35;
@@ -2368,7 +2368,7 @@
   overflow: visible;
 }
 
-.twelve-seatSplatCard {
+.card-toss-seatSplatCard {
   position: absolute;
   width: 64px;
   height: 90px;
@@ -2388,9 +2388,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .twelve-cardTossLayer,
-  .twelve-seatSplatLayer,
-  .twelve-cardSplatLayer {
+  .card-toss-layer,
+  .card-toss-seatSplatLayer,
+  .card-toss-centerSplatLayer {
     display: none;
   }
 }
@@ -2818,7 +2818,7 @@
   justify-content: center;
 }
 
-.twelve-seatPillCluster .twelve-seatPillButton {
+.twelve-seatPillCluster .card-toss-seatPillButton {
   position: relative;
   z-index: 1;
 }

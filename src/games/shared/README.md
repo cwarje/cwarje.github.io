@@ -23,8 +23,86 @@ Reusable components and CSS classes for radial card games:
 | `cribHud-*` | Crib/starter HUD strips (Cribbage, Cross Crib) |
 | `upriver-*` | Up and Down the River–specific UI (trump card, bidding) |
 | `hearts-*`, `poker-*`, etc. | Game-specific board chrome only |
+| `card-toss-*` | Shared cosmetic card throw (fly + splat layers, seat pill button) |
 
 Site-wide visual standards: Hearts green felt (`#3e963e`), corner card faces, patterned backs, `AutoFitSeatName` on all radial games.
+
+## Card toss (throw cards at another player)
+
+In multiplayer playing-card games, you can click an **opponent's seat pill** to throw your hand at them. This is **cosmetic only** — no cards leave your hand in game state, and `logic.ts` is never involved.
+
+### Games covered
+
+| Game | Board | Hand count source |
+|------|-------|-------------------|
+| Hearts | `HeartsBoard.tsx` | `hand.length` (disabled during passing phase) |
+| Poker | `PokerBoard.tsx` | `holeCards.length` (disabled when folded) |
+| Up and Down the River | `UpAndDownTheRiverBoard.tsx` | `hand.length` |
+| Mobilization | `MobilizationBoard.tsx` | `hand.length` |
+| Tolva (Twelve) | `TwelveBoard.tsx` | `hand.length` |
+| Cross Crib | `CrossCribBoard.tsx` | `hand.length` |
+| Cribbage | `CribbageBoard.tsx` | `hand.length` |
+| Casino | `CasinoBoard.tsx` | `hand.length` |
+| Cucumber | `CucumberBoard.tsx` | `hand.length` |
+
+### Module layout
+
+```text
+src/games/shared/
+  useCardToss.ts       # Hook: launch, network sync, seat pill helpers
+  CardTossLayers.tsx   # Framer-motion fly + seat/center splat overlays
+```
+
+Styles live in `src/index.css` (`.card-toss-layer`, `.card-toss-seatPillButton`, etc.).
+
+### How it works
+
+```mermaid
+sequenceDiagram
+  participant thrower as Thrower client
+  participant room as roomStore
+  participant target as Target client
+
+  thrower->>thrower: launchCardToss (local fly + seat splat)
+  thrower->>room: sendTableEvent kind card-toss
+  room->>target: broadcast table-event
+  target->>target: center splat if toPlayerId matches
+```
+
+1. **Trigger** — Opponent seat pills are `<button>` elements with `card-toss-seatPillButton`. Click calls `launchCardToss` with seat percentage coordinates.
+2. **Coordinates** — Same as deal animation: cards arc from `handContainerRef` center to the target seat on `tableRef`.
+3. **Networking** — `sendTableEvent` / `lastTableEvent` on `BoardProps` (already wired from `GamePage`). Event kind is `'card-toss'`, filtered by `gameType` so events never cross games.
+4. **Visibility** — Thrower sees fly + seat splat; target sees full-screen center splat; other players see nothing.
+5. **Hand hide** — While flying, the local hand spread gets `card-toss-handSpread--hidden`.
+
+### Hook API
+
+```ts
+const {
+  cardTossBursts,
+  seatCardSplats,
+  cardSplats,
+  isThrowingCards,
+  getSeatPillTossProps,
+} = useCardToss({
+  boardRef,
+  tableRef,
+  handContainerRef,
+  myId,
+  handCount: myPlayer?.hand.length ?? 0,
+  gameType: 'hearts',
+  sendTableEvent,
+  lastTableEvent,
+  enabled: true, // e.g. false during Hearts passing phase
+});
+
+// In JSX:
+<CardTossLayers cardTossBursts={...} seatCardSplats={...} cardSplats={...} />
+```
+
+### Accessibility
+
+If the user has `prefers-reduced-motion: reduce`, CSS hides all `.card-toss-*` animation layers.
 
 ## Radial deal animation
 

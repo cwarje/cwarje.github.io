@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import type { TableEvent, TableEventInput } from '../../networking/types';
 import type { HeartsState, Card, HeartsPlayer } from './types';
 import { isValidHeartsPlay } from './rules';
 import { getHeartsPassCount } from './logic';
@@ -10,6 +11,8 @@ import { RadialSeatName } from '../shared/ui/RadialSeatName';
 import { rankDisplay } from '../shared/ui/cardConstants';
 import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
+import { CardTossLayers } from '../shared/CardTossLayers';
+import { useCardToss } from '../shared/useCardToss';
 
 function placementLabel(position: number): string {
   if (position % 100 >= 11 && position % 100 <= 13) return `${position}th`;
@@ -84,9 +87,18 @@ interface HeartsBoardProps {
   myId: string;
   onAction: (action: unknown) => void;
   isHandZoomed?: boolean;
+  sendTableEvent?: (event: TableEventInput) => void;
+  lastTableEvent?: TableEvent | null;
 }
 
-export default function HeartsBoard({ state, myId, onAction, isHandZoomed = false }: HeartsBoardProps) {
+export default function HeartsBoard({
+  state,
+  myId,
+  onAction,
+  isHandZoomed = false,
+  sendTableEvent,
+  lastTableEvent,
+}: HeartsBoardProps) {
   const myIndex = state.players.findIndex(p => p.id === myId);
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const myPlayer = state.players[myIndex];
@@ -97,11 +109,29 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
   const handContainerRef = useRef<HTMLDivElement>(null);
   const [handWidth, setHandWidth] = useState(360);
   const [tableSize, setTableSize] = useState<ElementSize>({ width: 0, height: 0 });
-  const [seatPillElement, setSeatPillElement] = useState<HTMLDivElement | null>(null);
+  const [seatPillElement, setSeatPillElement] = useState<HTMLButtonElement | null>(null);
   const [seatPillSize, setSeatPillSize] = useState<ElementSize>({ width: 0, height: 0 });
   const handBeforePassRef = useRef<Card[]>([]);
   const prevPhaseRef = useRef(state.phase);
   const [receivedCardKeys, setReceivedCardKeys] = useState<Set<string>>(() => new Set());
+
+  const {
+    cardTossBursts,
+    seatCardSplats,
+    cardSplats,
+    isThrowingCards,
+    getSeatPillTossProps,
+  } = useCardToss({
+    boardRef,
+    tableRef,
+    handContainerRef,
+    myId,
+    handCount: myPlayer?.hand.length ?? 0,
+    gameType: 'hearts',
+    sendTableEvent,
+    lastTableEvent,
+    enabled: state.phase !== 'passing',
+  });
 
   const selectedPass = state.passSelections[myId] || [];
   const myPassConfirmed = state.passConfirmed[myId] || false;
@@ -378,10 +408,22 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
         : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
+    const tossProps = getSeatPillTossProps({
+      playerId: player.id,
+      playerName: player.name,
+      isMe,
+      selfAriaLabel: 'Your seat',
+      seatLeft: seatLayout.seatLeft,
+      seatTop: seatLayout.seatTop,
+    });
     return (
-      <div
+      <button
+        type="button"
         ref={shouldMeasure ? setSeatPillElement : undefined}
-        className={`radial-seatPill ${activeSeatPillClass} ${isMe ? 'radial-seatPill--me' : ''}`}
+        onClick={tossProps.onClick}
+        disabled={tossProps.disabled}
+        className={`radial-seatPill card-toss-seatPillButton ${activeSeatPillClass} ${isMe ? 'radial-seatPill--me' : ''}`}
+        aria-label={tossProps['aria-label']}
       >
         <div className="radial-seatPillTop" style={{ backgroundColor: seatColor }}>
           <RadialSeatName name={isMe ? 'You' : player.name} textColor={seatTextColor} />
@@ -390,7 +432,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
           <span className="radial-seatPillRound">{player.roundScore}</span>
           <span className="radial-seatPillTotal">{player.totalScore}</span>
         </div>
-      </div>
+      </button>
     );
   };
 
@@ -438,6 +480,11 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
   return (
     <div ref={boardRef} className={`hearts-board hearts-board--players-${state.players.length} relative space-y-4 sm:space-y-5`}>
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
+      <CardTossLayers
+        cardTossBursts={cardTossBursts}
+        seatCardSplats={seatCardSplats}
+        cardSplats={cardSplats}
+      />
       <div ref={tableRef} className={`radial-table radial-table--players-${state.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
@@ -517,7 +564,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
         <div>
           <div ref={handContainerRef} className={`radial-hand ${isHandZoomed ? 'radial-hand--zoom' : ''}`}>
             <div
-              className="radial-handSpread"
+              className={`radial-handSpread ${isThrowingCards ? 'card-toss-handSpread--hidden' : ''}`}
               style={{
                 width: `${handLayout.spreadWidth}px`,
                 height: `${handLayout.cardHeight + handLayout.selectedLift}px`,

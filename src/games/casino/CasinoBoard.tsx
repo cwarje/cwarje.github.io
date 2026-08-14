@@ -28,9 +28,12 @@ import {
   PLAYER_COLOR_HEX,
   getPlayerHudTextColor,
 } from '../../networking/playerColors';
+import type { TableEvent, TableEventInput } from '../../networking/types';
 import { useLastDealFlash } from './useLastDealFlash';
 import { useDealerDealAnimation, type DealSeat, type DealExtraTarget } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
+import { CardTossLayers } from '../shared/CardTossLayers';
+import { useCardToss } from '../shared/useCardToss';
 import { CardFace as SharedCardFace } from '../shared/ui/CardFace';
 import { SUIT_COLORS, SUIT_SYMBOLS } from '../shared/ui/cardConstants';
 
@@ -40,6 +43,8 @@ interface CasinoBoardProps {
   onAction: (action: unknown) => void;
   isHost?: boolean;
   isHandZoomed?: boolean;
+  sendTableEvent?: (event: TableEventInput) => void;
+  lastTableEvent?: TableEvent | null;
 }
 
 interface CasinoSeatLayout {
@@ -196,6 +201,8 @@ export default function CasinoBoard({
   onAction,
   isHost = false,
   isHandZoomed = false,
+  sendTableEvent,
+  lastTableEvent,
 }: CasinoBoardProps) {
   const s = state as CasinoState;
   const myIndex = s.players.findIndex(p => p.id === myId);
@@ -206,9 +213,26 @@ export default function CasinoBoard({
   const tableRef = useRef<HTMLDivElement>(null);
   const handContainerRef = useRef<HTMLDivElement>(null);
   const [tableSize, setTableSize] = useState<ElementSize>({ width: 0, height: 0 });
-  const [seatPillElement, setSeatPillElement] = useState<HTMLDivElement | null>(null);
+  const [seatPillElement, setSeatPillElement] = useState<HTMLButtonElement | null>(null);
   const [seatPillSize, setSeatPillSize] = useState<ElementSize>({ width: 0, height: 0 });
   const [handWidth, setHandWidth] = useState(360);
+
+  const {
+    cardTossBursts,
+    seatCardSplats,
+    cardSplats,
+    isThrowingCards,
+    getSeatPillTossProps,
+  } = useCardToss({
+    boardRef,
+    tableRef,
+    handContainerRef,
+    myId,
+    handCount: myPlayer?.hand.length ?? 0,
+    gameType: 'casino',
+    sendTableEvent,
+    lastTableEvent,
+  });
 
   const [selectedHandCard, setSelectedHandCard] = useState<Card | null>(null);
   const [selectedTableIndices, setSelectedTableIndices] = useState<number[]>([]);
@@ -684,10 +708,22 @@ export default function CasinoBoard({
       : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
+    const tossProps = getSeatPillTossProps({
+      playerId: player.id,
+      playerName: player.name,
+      isMe,
+      selfAriaLabel: 'Your seat',
+      seatLeft: layout.seatLeft,
+      seatTop: layout.seatTop,
+    });
     return (
-      <div
+      <button
+        type="button"
         ref={shouldMeasure ? setSeatPillElement : undefined}
-        className={`casino-seatPill ${activeClass} ${isMe ? 'casino-seatPill--me' : ''}`}
+        onClick={tossProps.onClick}
+        disabled={tossProps.disabled}
+        className={`casino-seatPill card-toss-seatPillButton ${activeClass} ${isMe ? 'casino-seatPill--me' : ''}`}
+        aria-label={tossProps['aria-label']}
       >
         <div className="casino-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
           <span className="casino-seatPillName">{isMe ? 'You' : player.name}</span>
@@ -702,7 +738,7 @@ export default function CasinoBoard({
           <span className="radial-seatCell radial-seatCell--tricks">{player.capturedCards.length}</span>
           <span className="radial-seatCell radial-seatCell--total">{s.scores[player.id] ?? 0}</span>
         </div>
-      </div>
+      </button>
     );
   };
 
@@ -806,6 +842,11 @@ export default function CasinoBoard({
   return (
     <div ref={boardRef} className={`casino-board casino-board--players-${s.players.length} relative space-y-3 sm:space-y-4`}>
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
+      <CardTossLayers
+        cardTossBursts={cardTossBursts}
+        seatCardSplats={seatCardSplats}
+        cardSplats={cardSplats}
+      />
       <div ref={tableRef} className={`casino-table casino-table--players-${s.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
@@ -885,7 +926,7 @@ export default function CasinoBoard({
         <div>
           <div ref={handContainerRef} className={`casino-hand ${isHandZoomed ? 'casino-hand--zoom' : ''}`}>
             <div
-              className="casino-handSpread"
+              className={`casino-handSpread ${isThrowingCards ? 'card-toss-handSpread--hidden' : ''}`}
               style={{
                 width: `${handLayout.spreadWidth}px`,
                 height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
