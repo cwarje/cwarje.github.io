@@ -1454,6 +1454,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const CASINO_CAPTURE_PREVIEW_DELAY = 1600; // ms for capture preview overlay before capture resolves
   const CASINO_ACTION_ANNOUNCEMENT_DELAY = 3000; // ms to show last play in heads-up before next turn
   const CASINO_TABLE_REMNANT_DELAY = 3000; // ms to show who takes remaining table cards before scoring
+  const CASINO_FINAL_RESULTS_DELAY = 6000; // ms to show final round breakdown before game-over screen
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settlerIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const minigolfTickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -2305,6 +2306,31 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
           }
         }, CASINO_TABLE_REMNANT_DELAY);
+        return;
+      }
+
+      if (bs.phase === 'round-end' && bs.gameOver) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as CasinoState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'round-end' || !currentGs.gameOver) return;
+
+          const next = processGameAction(
+            'casino',
+            currentGs,
+            { type: 'show-final-results' },
+            ''
+          );
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('casino', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, CASINO_FINAL_RESULTS_DELAY);
         return;
       }
 

@@ -286,7 +286,7 @@ function endRound(state: CasinoState): CasinoState {
     tableSlots: [],
     scores: newScores,
     lastRoundScores: roundScores,
-    phase: isGameOver ? 'game-over' : 'round-end',
+    phase: 'round-end',
     gameOver: isGameOver,
     winners,
     actionAnnouncement: null,
@@ -382,7 +382,7 @@ export function processCasinoAction(
   if (!a || typeof a !== 'object' || !('type' in a)) return state;
 
   if (a.type === 'start-next-round') {
-    if (s.phase !== 'round-end') return state;
+    if (s.phase !== 'round-end' || s.gameOver) return state;
     const newDealerIndex = (s.dealerIndex + 1) % s.players.length;
     const resetPlayers = s.players.map(p => ({
       ...p,
@@ -398,6 +398,11 @@ export function processCasinoAction(
       s.targetScore,
       s.matchLength
     );
+  }
+
+  if (a.type === 'show-final-results') {
+    if (s.phase !== 'round-end' || !s.gameOver) return state;
+    return { ...s, phase: 'game-over' };
   }
 
   if (a.type === 'finish-action-announcement') {
@@ -789,7 +794,7 @@ export function processCasinoAction(
 }
 
 export function isCasinoOver(state: unknown): boolean {
-  return (state as CasinoState).gameOver;
+  return (state as CasinoState).phase === 'game-over';
 }
 
 export function getCasinoWinners(state: unknown): string[] {

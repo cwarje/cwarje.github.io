@@ -115,6 +115,7 @@ export type CasinoAction =
   | { type: 'extend-build'; playedCard: Card; buildIndex: number; declaredValue: number }
   | { type: 'trail'; playedCard: Card; targetSlotIndex: number }
   | { type: 'start-next-round' }
+  | { type: 'show-final-results' }
   | { type: 'finish-action-announcement' }
   | { type: 'finish-table-remnant' };
 

@@ -3,6 +3,7 @@ import type { Player } from '../../networking/types';
 import {
   createCasinoState,
   getCaptureOutcomeFromPreview,
+  isCasinoOver,
   processCasinoAction,
   runCasinoBotTurn,
 } from './logic';
@@ -1616,8 +1617,18 @@ describe('casino eachDealerOnce game end', () => {
       { type: 'finish-table-remnant' },
       ''
     ) as CasinoState;
-    expect(afterRound2.phase).toBe('game-over');
+    expect(afterRound2.phase).toBe('round-end');
     expect(afterRound2.gameOver).toBe(true);
+    expect(isCasinoOver(afterRound2)).toBe(false);
+
+    const afterFinalResults = processCasinoAction(
+      afterRound2,
+      { type: 'show-final-results' },
+      ''
+    ) as CasinoState;
+    expect(afterFinalResults.phase).toBe('game-over');
+    expect(afterFinalResults.gameOver).toBe(true);
+    expect(isCasinoOver(afterFinalResults)).toBe(true);
   });
 });
 

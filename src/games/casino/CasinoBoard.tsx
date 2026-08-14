@@ -468,6 +468,10 @@ export default function CasinoBoard({
     onAction({ type: 'start-next-round' });
   }, [onAction]);
 
+  const handleShowFinalResults = useCallback(() => {
+    onAction({ type: 'show-final-results' });
+  }, [onAction]);
+
   useEffect(() => {
     if (!s.pendingCapturePreview) return;
     resetSelection();
@@ -823,13 +827,23 @@ export default function CasinoBoard({
             </div>
 
             {isHost ? (
-              <button
-                type="button"
-                onClick={handleStartNextRound}
-                className="px-6 py-2 bg-lime-600 hover:bg-lime-500 text-white rounded-lg font-medium transition-colors"
-              >
-                Next Round
-              </button>
+              s.gameOver ? (
+                <button
+                  type="button"
+                  onClick={handleShowFinalResults}
+                  className="px-6 py-2 bg-lime-600 hover:bg-lime-500 text-white rounded-lg font-medium transition-colors"
+                >
+                  View Results
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleStartNextRound}
+                  className="px-6 py-2 bg-lime-600 hover:bg-lime-500 text-white rounded-lg font-medium transition-colors"
+                >
+                  Next Round
+                </button>
+              )
             ) : (
               <p className="text-sm text-white">Waiting for the host to continue…</p>
             )}
