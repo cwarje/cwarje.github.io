@@ -18,6 +18,7 @@ import {
 } from './types';
 import {
   allCardsHeld,
+  canPlayRank,
   cardPenaltyPoints,
   cardEquals,
   countCardsHeld,
@@ -29,6 +30,7 @@ import {
   validatePlays,
   wouldPickup,
 } from './rules';
+import type { PlayableCard } from './rules';
 
 const SUITS: Suit[] = ['clubs', 'diamonds', 'spades', 'hearts'];
 const RANKS: Rank[] = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
@@ -406,6 +408,50 @@ export function getTensWinners(state: unknown): string[] {
   return (state as TensState).winners;
 }
 
+type LegalPlayGroup = { rank: Rank; plays: PlayableCard[] };
+
+function orderPlaysBySource(plays: PlayableCard[]): PlayableCard[] {
+  return [
+    ...plays.filter(p => p.source === 'pile-top'),
+    ...plays.filter(p => p.source === 'pile-bottom'),
+    ...plays.filter(p => p.source === 'hand'),
+  ];
+}
+
+function selectRankToPlay(
+  groups: LegalPlayGroup[],
+  lastPlayRank: Rank | null,
+): LegalPlayGroup | null {
+  const nonTen = groups.filter(g => g.rank !== 10);
+
+  if (lastPlayRank !== null) {
+    const legal = nonTen
+      .filter(g => canPlayRank(g.rank, lastPlayRank))
+      .sort((a, b) => playRankValue(b.rank) - playRankValue(a.rank));
+    return legal[0] ?? null;
+  }
+
+  const withoutAce = nonTen.filter(g => g.rank !== 14);
+  const candidates = (withoutAce.length > 0 ? withoutAce : nonTen)
+    .sort((a, b) => playRankValue(b.rank) - playRankValue(a.rank));
+  return candidates[0] ?? null;
+}
+
+function selectCardsForRank(group: LegalPlayGroup, centerPile: Card[]): SelectedCardPlay[] {
+  const ordered = orderPlaysBySource(group.plays);
+  const sameRankInCenter = centerPile.filter(c => c.rank === group.rank).length;
+  const neededForClear = Math.max(1, 4 - sameRankInCenter);
+  const count = sameRankInCenter + ordered.length >= 4
+    ? Math.min(ordered.length, neededForClear)
+    : ordered.length;
+
+  return ordered.slice(0, count).map(p => ({
+    card: p.card,
+    source: p.source,
+    pileIndex: p.pileIndex,
+  }));
+}
+
 function chooseBotPlays(state: TensState, playerIndex: number): SelectedCardPlay[] | null {
   const player = state.players[playerIndex];
   if (!player || state.phase !== 'playing') return null;
@@ -438,16 +484,9 @@ function chooseBotPlays(state: TensState, playerIndex: number): SelectedCardPlay
     }
   }
 
-  const legalLow = groups
-    .filter(g => g.rank !== 10 && (state.lastPlayRank === null || playRankValue(g.rank) <= playRankValue(state.lastPlayRank)))
-    .sort((a, b) => playRankValue(a.rank) - playRankValue(b.rank));
-
-  if (legalLow.length > 0) {
-    const pick = legalLow[0];
-    const entry = pick.plays.find(p => p.source === 'pile-top') ?? pick.plays[0];
-    if (entry) {
-      return [{ card: entry.card, source: entry.source, pileIndex: entry.pileIndex }];
-    }
+  const chosenGroup = selectRankToPlay(groups, state.lastPlayRank);
+  if (chosenGroup) {
+    return selectCardsForRank(chosenGroup, state.centerPile);
   }
 
   const pickupGroups = groups

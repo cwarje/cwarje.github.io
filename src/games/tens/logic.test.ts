@@ -362,6 +362,69 @@ describe('tens play', () => {
     expect(getTensWinners(finished)).toEqual(['p0']);
   });
 
+  it('bot follows rank by playing 8 after a 9', () => {
+    const botPlayer = {
+      ...player('bot', [card('hearts', 8), card('clubs', 14), card('diamonds', 2)]),
+      isBot: true,
+    };
+    const state = baseState([botPlayer, player('p1', [])], {
+      lastPlayRank: 9,
+      centerPile: [card('spades', 9)],
+    });
+    const next = runTensBotTurn(state) as TensState;
+    expect(next.actionAnnouncement?.plays).toHaveLength(1);
+    expect(next.actionAnnouncement?.plays[0]?.card.rank).toBe(8);
+  });
+
+  it('bot plays all matching cards when dumping multiples', () => {
+    const botPlayer = {
+      ...player('bot', [
+        card('hearts', 7),
+        card('clubs', 7),
+        card('diamonds', 7),
+        card('spades', 3),
+      ]),
+      isBot: true,
+    };
+    const state = baseState([botPlayer, player('p1', [])], {
+      lastPlayRank: 9,
+      centerPile: [card('spades', 9)],
+    });
+    const next = runTensBotTurn(state) as TensState;
+    expect(next.actionAnnouncement?.plays).toHaveLength(3);
+    expect(next.actionAnnouncement?.plays.every(p => p.card.rank === 7)).toBe(true);
+  });
+
+  it('bot leads with high cards instead of ace on empty center', () => {
+    const botPlayer = {
+      ...player('bot', [card('clubs', 14), card('hearts', 13), card('diamonds', 5)]),
+      isBot: true,
+    };
+    const state = baseState([botPlayer, player('p1', [])], {
+      lastPlayRank: null,
+      centerPile: [],
+    });
+    const next = runTensBotTurn(state) as TensState;
+    expect(next.actionAnnouncement?.plays).toHaveLength(1);
+    expect(next.actionAnnouncement?.plays[0]?.card.rank).toBe(13);
+  });
+
+  it('bot completes set clear with multiple matching cards', () => {
+    const botPlayer = {
+      ...player('bot', [card('hearts', 7), card('clubs', 7), card('diamonds', 5)]),
+      isBot: true,
+    };
+    const state = baseState([botPlayer, player('p1', [])], {
+      lastPlayRank: 9,
+      centerPile: [card('spades', 9), card('diamonds', 7), card('hearts', 7)],
+    });
+    const next = runTensBotTurn(state) as TensState;
+    expect(next.actionAnnouncement?.plays).toHaveLength(2);
+    expect(next.actionAnnouncement?.plays.every(p => p.card.rank === 7)).toBe(true);
+    expect(next.actionAnnouncement?.outcome).toBe('set-clear');
+    expect(next.centerPile).toHaveLength(0);
+  });
+
   it('bot plays pile bottom after all tops are cleared', () => {
     const piles: FrontPile[] = [
       { bottomCard: card('clubs', 4), topCard: null, bottomFaceUp: false },
