@@ -13,10 +13,10 @@ export default function TwelveTitleExtra({ state, isHandZoomed }: GameHudProps) 
   if (!displaySuit) return null;
   return (
     <div className="inline-flex flex-col items-center mt-1">
-      <div className={`river-hudTrumpCard ${isHandZoomed ? 'river-hudTrumpCard--zoom' : ''}`}>
-        <div className="river-card river-card--compact">
-          <div className="river-cardCorner">
-            <span className={`river-cardSuit ${suitColors[displaySuit]}`}>{suitSymbols[displaySuit]}</span>
+      <div className={`upriver-trumpCard ${isHandZoomed ? 'upriver-trumpCard--zoom' : ''}`}>
+        <div className="card-face card-face--compact">
+          <div className="card-faceCorner">
+            <span className={`card-faceSuit ${suitColors[displaySuit]}`}>{suitSymbols[displaySuit]}</span>
           </div>
         </div>
       </div>

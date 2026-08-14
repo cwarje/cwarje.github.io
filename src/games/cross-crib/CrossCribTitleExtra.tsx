@@ -4,6 +4,7 @@ import type { CrossCribState } from './types';
 import type { GameHudProps } from '../registry';
 import { cribOwnerLabel } from './logic';
 import type { Card } from './types';
+import { CardBack } from '../shared/ui/CardBack';
 import { CribHudFlipCard } from '../shared/CribHudFlipCard';
 
 function isNewlyFilledCribSlot(
@@ -45,13 +46,13 @@ export default function CrossCribTitleExtra({ state }: GameHudProps) {
       <p className="text-xs sm:text-sm text-white/80">Round {s.roundNumber}/4</p>
       <p className="text-xs sm:text-sm text-white/70">{cribLabel}</p>
       {showCribStrip && (
-        <div className="crosscrib-cribHudSpread pointer-events-none" aria-hidden>
+        <div className="cribHudSpread pointer-events-none" aria-hidden>
           {s.phase === 'crib-discard'
             ? s.cribCards.map((card, i) =>
                 card ? (
                   <div
                     key={`crib-discard-slot-${i}`}
-                    className="crosscrib-cribHudSlot"
+                    className="cribHudSlot"
                     style={{ zIndex: i + 1 }}
                   >
                     <motion.div
@@ -59,7 +60,7 @@ export default function CrossCribTitleExtra({ state }: GameHudProps) {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3, ease: 'easeOut' }}
                     >
-                      <div className="river-card river-card--compact crosscrib-cribHudCard crosscrib-cribHudCard--back" />
+                      <CardBack className="cribHudCard cribHudCard--back card-face--compact" />
                     </motion.div>
                   </div>
                 ) : null
@@ -76,7 +77,7 @@ export default function CrossCribTitleExtra({ state }: GameHudProps) {
                 return (
                   <div
                     key={`crib-hud-slot-${i}`}
-                    className="crosscrib-cribHudSlot"
+                    className="cribHudSlot"
                     style={{ zIndex: i + 1 }}
                   >
                     {card ? (
@@ -88,7 +89,7 @@ export default function CrossCribTitleExtra({ state }: GameHudProps) {
                         <CribHudFlipCard card={card} faceUp={showFace} />
                       </motion.div>
                     ) : (
-                      <div className="river-card river-card--compact crosscrib-cribHudCard crosscrib-cribHudCard--back" />
+                      <CardBack className="cribHudCard cribHudCard--back card-face--compact" />
                     )}
                   </div>
                 );

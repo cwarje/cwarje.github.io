@@ -2,6 +2,30 @@
 
 Cross-game helpers used by multiple board components.
 
+## Shared card and table UI (`src/games/shared/ui/`)
+
+Reusable components and CSS classes for radial card games:
+
+| Module | Purpose |
+|--------|---------|
+| `cardConstants.ts` | `SUIT_SYMBOLS`, `SUIT_COLORS`, `rankDisplay()` |
+| `CardFace.tsx` | Corner-layout card face (`.card-face`) |
+| `CardBack.tsx` | Patterned card back (`.card-back`) used site-wide |
+| `FlipCard.tsx` | 3D flip wrapper (`.card-flip*`) |
+| `RadialSeatName.tsx` | Auto-shrinking seat name via `AutoFitSeatName` |
+
+### CSS naming conventions
+
+| Prefix | Scope |
+|--------|-------|
+| `radial-*` | Shared radial table layout (seats, hands, center trick grid, HUD rows) |
+| `card-face*` / `card-back` / `card-flip*` | Shared card rendering |
+| `cribHud-*` | Crib/starter HUD strips (Cribbage, Cross Crib) |
+| `upriver-*` | Up and Down the River–specific UI (trump card, bidding) |
+| `hearts-*`, `poker-*`, etc. | Game-specific board chrome only |
+
+Site-wide visual standards: Hearts green felt (`#3e963e`), corner card faces, patterned backs, `AutoFitSeatName` on all radial games.
+
 ## Radial deal animation
 
 At the start of each round where cards are dealt to hands (and sometimes to the table), radial-seat card games play a **local, client-side** dealing animation. Face-down cards fly one at a time from a stack at the table center to each destination. The animation is cosmetic only: authoritative game state arrives from the host immediately; boards gate what is visible until each card's flight "lands."
@@ -27,12 +51,15 @@ These boards use the deal animation (all use a radial seat layout with the local
 
 ```text
 src/games/shared/
+  ui/                   # CardFace, CardBack, FlipCard, RadialSeatName
   useDealAnimation.ts   # Hook: flight planning, reveal timers, deal state
   DealAnimationLayer.tsx # Overlay: center stack + flying card backs
   dealTiming.ts         # Shared timing constants (board + host scheduler)
+  CribHudFlipCard.tsx   # Flip card for crib HUD strips
+  AutoFitSeatName.tsx   # Dynamic font-size seat names
 ```
 
-Styles live in `src/index.css` (`.deal-animLayer`, `.deal-animStack`, `.deal-animCard`). Flying cards reuse Tolva's `.twelve-cardBackFace` back design.
+Styles live in `src/index.css` (`.deal-animLayer`, `.deal-animStack`, `.deal-animCard`). Flying cards reuse Tolva's `.card-back` back design.
 
 ### How it works
 

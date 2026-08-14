@@ -8,20 +8,10 @@ import { getTeamRoundCardPoints } from './logic';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 import { useDealerDealAnimation, type DealSeat, type DealExtraTarget } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
-
-const SUIT_SYMBOLS: Record<Suit, string> = {
-  hearts: '\u2665',
-  diamonds: '\u2666',
-  clubs: '\u2663',
-  spades: '\u2660',
-};
-
-const SUIT_COLORS: Record<Suit, string> = {
-  hearts: 'text-red-400',
-  diamonds: 'text-red-400',
-  clubs: 'text-gray-800',
-  spades: 'text-gray-800',
-};
+import { CardFace } from '../shared/ui/CardFace';
+import { FlipCard } from '../shared/ui/FlipCard';
+import { RadialSeatName } from '../shared/ui/RadialSeatName';
+import { SUIT_COLORS, SUIT_SYMBOLS } from '../shared/ui/cardConstants';
 
 interface TwelveBoardProps {
   state: TwelveState;
@@ -114,19 +104,19 @@ function createRandomSplatPlacements(
 
 const TRICK_SLOT_PLACEMENTS: Record<number, TrickSlotPlacement[]> = {
   2: [
-    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--river-slot-h) * 0.2)' },
-    { row: 1, col: 2, dx: '0px', dy: 'calc(var(--river-slot-h) * -0.2)' },
+    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--radial-slot-h) * 0.2)' },
+    { row: 1, col: 2, dx: '0px', dy: 'calc(var(--radial-slot-h) * -0.2)' },
   ],
   3: [
-    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--river-slot-h) * 0.2)' },
-    { row: 1, col: 1, dx: 'calc(var(--river-slot-w) * 0.45)', dy: '0px' },
-    { row: 1, col: 3, dx: 'calc(var(--river-slot-w) * -0.45)', dy: '0px' },
+    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--radial-slot-h) * 0.2)' },
+    { row: 1, col: 1, dx: 'calc(var(--radial-slot-w) * 0.45)', dy: '0px' },
+    { row: 1, col: 3, dx: 'calc(var(--radial-slot-w) * -0.45)', dy: '0px' },
   ],
   4: [
     { row: 2, col: 2, dx: '0px', dy: '0px' },
-    { row: 2, col: 1, dx: '0px', dy: 'calc(var(--river-slot-h) * -0.5)' },
+    { row: 2, col: 1, dx: '0px', dy: 'calc(var(--radial-slot-h) * -0.5)' },
     { row: 1, col: 2, dx: '0px', dy: '0px' },
-    { row: 2, col: 3, dx: '0px', dy: 'calc(var(--river-slot-h) * -0.5)' },
+    { row: 2, col: 3, dx: '0px', dy: 'calc(var(--radial-slot-h) * -0.5)' },
   ],
 };
 
@@ -174,29 +164,8 @@ function getTableEventCardCount(event: TableEvent): number {
   return typeof cardCount === 'number' ? clampTossCardCount(cardCount) : 5;
 }
 
-function PokerFlipCard({ card, faceDown, disabled = false }: { card?: Card | null; faceDown: boolean; disabled?: boolean }) {
-  if (faceDown || !card) {
-    return <div className="poker-card poker-cardBack poker-cardFlip--sm" />;
-  }
-
-  return (
-    <div className="poker-cardFlip poker-cardFlip--sm">
-      <motion.div
-        className="poker-cardFlipInner"
-        initial={{ rotateY: 0 }}
-        animate={{ rotateY: 180 }}
-        transition={{ duration: 0.42, ease: 'easeInOut' }}
-      >
-        <div className="poker-cardFlipBack" aria-hidden="true" />
-        <div className={`poker-cardFlipFront ${disabled ? 'poker-cardFlipFront--disabled' : ''}`}>
-          <div className="poker-cardCorner">
-            <span className={`poker-cardRank ${SUIT_COLORS[card.suit]}`}>{rankDisplay(card.rank)}</span>
-            <span className={`poker-cardSuit ${SUIT_COLORS[card.suit]}`}>{SUIT_SYMBOLS[card.suit]}</span>
-          </div>
-        </div>
-      </motion.div>
-    </div>
-  );
+function TwelveFlipCard({ card, faceDown, disabled = false }: { card?: Card | null; faceDown: boolean; disabled?: boolean }) {
+  return <FlipCard card={card ?? undefined} faceDown={faceDown || !card} disabled={disabled} size="sm" />;
 }
 
 export default function TwelveBoard({
@@ -680,15 +649,6 @@ export default function TwelveBoard({
     && !state.gameOver;
   const isThrowingCards = cardTossBursts.length > 0;
 
-  const renderCardFace = (card: Card, disabled = false, compact = false) => (
-    <div className={`river-card ${disabled ? 'river-card--disabled' : ''} ${compact ? 'river-card--compact' : ''}`}>
-      <div className="river-cardCorner">
-        <span className={`river-cardRank ${SUIT_COLORS[card.suit]}`}>{rankDisplay(card.rank)}</span>
-        <span className={`river-cardSuit ${SUIT_COLORS[card.suit]}`}>{SUIT_SYMBOLS[card.suit]}</span>
-      </div>
-    </div>
-  );
-
   const playHandCard = (card: Card) => {
     if (!canUseActionButtons || myIndex < 0) return;
     if (!isLegalPlay(state, myIndex, card, 'hand')) return;
@@ -835,13 +795,13 @@ export default function TwelveBoard({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="river-board h-full flex flex-col items-center justify-center space-y-6 text-center"
+          className="radial-board h-full flex flex-col items-center justify-center space-y-6 text-center"
         >
           <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
           <h2 className="text-3xl font-extrabold text-white">Game Over</h2>
           <div className="space-y-3 w-full max-w-2xl">
             {teams.map((team, i) => (
-              <div key={team.players[0].id} className="river-resultRow">
+              <div key={team.players[0].id} className="radial-resultRow">
                 <div className="flex items-center gap-3">
                   <span className="text-lg font-bold">#{i + 1}</span>
                   <span className="font-semibold">{team.players[0].name} & {team.players[1].name}</span>
@@ -859,13 +819,13 @@ export default function TwelveBoard({
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="river-board h-full flex flex-col items-center justify-center space-y-6 text-center"
+        className="radial-board h-full flex flex-col items-center justify-center space-y-6 text-center"
       >
         <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
         <h2 className="text-3xl font-extrabold text-white">Game Over</h2>
         <div className="space-y-3 w-full max-w-2xl">
           {rankedPlayers.map((player, i) => (
-            <div key={player.id} className="river-resultRow">
+            <div key={player.id} className="radial-resultRow">
               <div className="flex items-center gap-3">
                 <span className="text-lg font-bold">#{i + 1}</span>
                 <span className="font-semibold">{player.name}</span>
@@ -918,7 +878,7 @@ export default function TwelveBoard({
                   className="twelve-opponentHandCardWrap"
                   style={{ width: `${layout.cardWidth}px`, height: `${layout.cardHeight}px` }}
                 >
-                  <div className="twelve-cardBackFace" />
+                  <div className="card-back" />
                 </span>
               </motion.div>
             );
@@ -934,8 +894,8 @@ export default function TwelveBoard({
     const isMe = player.id === myId;
     const seatPillStateClass = isCurrentTurn
       ? isMe
-        ? 'river-seatPill--activeSelf'
-        : 'river-seatPill--activeOther'
+        ? 'radial-seatPill--activeSelf'
+        : 'radial-seatPill--activeOther'
       : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
@@ -962,20 +922,21 @@ export default function TwelveBoard({
         ref={shouldMeasure ? setSeatPillElement : undefined}
         onClick={() => launchCardToss(seatLayout)}
         disabled={!canTossCards}
-        className={`river-seatPill twelve-seatPillButton ${seatPillStateClass} ${isMe ? 'river-seatPill--me' : ''}`}
+        className={`radial-seatPill twelve-seatPillButton ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`}
         aria-label={isMe ? `Your seat, ${player.totalScore} points` : `Throw cards at ${player.name}`}
       >
-        <div className="river-seatPillTop" style={pillTopStyle}>
-          <span className="river-seatName">
-            {isMe ? 'You' : player.name} ({player.totalScore})
-          </span>
+        <div className="radial-seatPillTop" style={pillTopStyle}>
+          <RadialSeatName
+            name={`${isMe ? 'You' : player.name} (${player.totalScore})`}
+            textColor={seatTextColor}
+          />
         </div>
       </button>
     );
   };
 
   return (
-    <div ref={boardRef} className={`twelve-board river-board river-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
+    <div ref={boardRef} className={`twelve-board radial-board radial-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
       {showDevBestCardsButton && (
         <button
@@ -1025,7 +986,7 @@ export default function TwelveBoard({
                       opacity: { times: [0, 0.78, 1] },
                     }}
                   >
-                    <div className="twelve-cardBackFace" />
+                    <div className="card-back" />
                   </motion.div>
                 );
               })}
@@ -1065,7 +1026,7 @@ export default function TwelveBoard({
                     ease: [0.16, 1, 0.3, 1],
                   }}
                 >
-                  <div className="twelve-cardBackFace" />
+                  <div className="card-back" />
                 </motion.div>
             ))}
           </div>
@@ -1099,17 +1060,17 @@ export default function TwelveBoard({
                     ease: [0.16, 1, 0.3, 1],
                   }}
                 >
-                  <div className="twelve-cardBackFace" />
+                  <div className="card-back" />
                 </motion.div>
             ))}
           </div>
         ))}
       </AnimatePresence>
-      <div ref={tableRef} className={`river-table river-table--players-${state.players.length}`}>
+      <div ref={tableRef} className={`radial-table radial-table--players-${state.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
             key={`seat-${layout.player.id}`}
-            className={`river-seat ${layout.relativeIndex === 0 ? 'river-seat--self' : ''}`}
+            className={`radial-seat ${layout.relativeIndex === 0 ? 'radial-seat--self' : ''}`}
             style={{ left: `${layout.seatLeft}%`, top: `${layout.seatTop}%` }}
           >
             <div className={`twelve-seatStack ${isHandZoomed ? 'twelve-seatStack--zoom' : ''}`}>
@@ -1141,14 +1102,14 @@ export default function TwelveBoard({
                     >
                       <div className="twelve-pileBottom">
                         {bottomShown ? (
-                          <PokerFlipCard card={pile.bottomCard!} faceDown={!pile.bottomFaceUp} disabled={!canPlayPile} />
+                          <TwelveFlipCard card={pile.bottomCard!} faceDown={!pile.bottomFaceUp} disabled={!canPlayPile} />
                         ) : (
                           <div className="twelve-pilePlaceholder" />
                         )}
                       </div>
                       {topShown && (
                         <div className={`twelve-pileTop ${bottomShown ? 'twelve-pileTop--stacked' : ''}`}>
-                          {renderCardFace(pile.topCard!, !canPlayPile, true)}
+                          <CardFace card={pile.topCard!} disabled={!canPlayPile} compact />
                         </div>
                       )}
                     </button>
@@ -1159,8 +1120,8 @@ export default function TwelveBoard({
           </div>
         ))}
 
-        <div className={`river-center ${isHandZoomed ? 'river-center--zoom' : ''}`}>
-          <div className="river-centerGrid">
+        <div className={`radial-center ${isHandZoomed ? 'radial-center--zoom' : ''}`}>
+          <div className="radial-centerGrid">
             {seatLayouts.map((layout) => {
               const trickEntry = trickByRelativeSeat[layout.relativeIndex];
               const isWinningCard = trickWinnerRelativeSeat === layout.relativeIndex && !!state.trickWinner;
@@ -1178,7 +1139,7 @@ export default function TwelveBoard({
               return (
                 <div
                   key={`slot-${layout.player.id}`}
-                  className={`river-slot ${trickEntry ? 'river-slot--filled' : 'river-slot--empty'}`}
+                  className={`radial-slot ${trickEntry ? 'radial-slot--filled' : 'radial-slot--empty'}`}
                   style={{
                     gridColumn: placement.col,
                     gridRow: placement.row,
@@ -1193,14 +1154,14 @@ export default function TwelveBoard({
                         animate={{ scale: 1, opacity: 1, x: 0, y: 0 }}
                         exit={{ x: trickExitOffset.x, y: trickExitOffset.y, opacity: 0 }}
                         transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-                        className={`river-slotCard ${isWinningCard ? 'river-slotCard--winner' : ''}`}
+                        className={`radial-slotCard ${isWinningCard ? 'radial-slotCard--winner' : ''}`}
                       >
-                        <div className="river-slotCardInner">
-                          {renderCardFace(trickEntry.card, false, true)}
+                        <div className="radial-slotCardInner">
+                          <CardFace card={trickEntry.card} compact />
                         </div>
                       </motion.div>
                     ) : (
-                      <div key={`placeholder-${layout.relativeIndex}`} className="river-slotPlaceholder" />
+                      <div key={`placeholder-${layout.relativeIndex}`} className="radial-slotPlaceholder" />
                     )}
                   </AnimatePresence>
                 </div>
@@ -1211,15 +1172,15 @@ export default function TwelveBoard({
       </div>
 
       <div className="twelve-statusBlock">
-        <div className="river-headsUp" aria-live="polite">
+        <div className="radial-headsUp" aria-live="polite">
           <p
-            className={`river-headsUpText ${state.phase === 'round-end' ? 'river-headsUpText--roundEnd' : ''} ${hasActionButtons ? 'twelve-headsUpText--withAction' : ''}`}
+            className={`radial-headsUpText ${state.phase === 'round-end' ? 'radial-headsUpText--roundEnd' : ''} ${hasActionButtons ? 'twelve-headsUpText--withAction' : ''}`}
             aria-label={state.phase === 'round-end' ? state.roundSummary : undefined}
           >
             {headsUpContent ?? '\u00a0'}
           </p>
         </div>
-        <div className="river-actionRow twelve-actionRow" aria-hidden={!hasActionButtons}>
+        <div className="radial-actionRow twelve-actionRow" aria-hidden={!hasActionButtons}>
           {hasActionButtons && (
             <div className="twelve-actionPanel">
               {showSetTrumpActions && (
@@ -1294,9 +1255,9 @@ export default function TwelveBoard({
 
       {myPlayer && (
         <div className="space-y-3">
-          <div ref={handContainerRef} className={`river-hand ${isHandZoomed ? 'river-hand--zoom' : ''}`}>
+          <div ref={handContainerRef} className={`radial-hand ${isHandZoomed ? 'radial-hand--zoom' : ''}`}>
             <div
-              className={`river-handSpread ${isThrowingCards ? 'twelve-handSpread--tossing' : ''}`}
+              className={`radial-handSpread ${isThrowingCards ? 'twelve-handSpread--tossing' : ''}`}
               style={{
                 width: `${handLayout.spreadWidth}px`,
                 height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
@@ -1320,7 +1281,7 @@ export default function TwelveBoard({
                     transition={deal.isDealing ? { duration: 0.2, ease: [0.22, 1, 0.36, 1] } : { delay: i * 0.02 }}
                     onClick={() => playHandCard(card)}
                     disabled={isDisabled}
-                    className="river-handHitbox"
+                    className="radial-handHitbox"
                     style={{
                       left: `${i * handLayout.step}px`,
                       width: `${hitboxWidth}px`,
@@ -1330,10 +1291,10 @@ export default function TwelveBoard({
                     aria-label={`Play ${rankDisplay(card.rank)} of ${card.suit}`}
                   >
                     <span
-                      className={`river-handCardWrap ${canPlay ? 'river-handCardWrap--active' : ''}`}
+                      className={`radial-handCardWrap ${canPlay ? 'radial-handCardWrap--active' : ''}`}
                       style={{ width: `${handLayout.cardWidth}px`, height: `${handLayout.cardHeight}px` }}
                     >
-                      {renderCardFace(card, state.phase === 'playing' && isDisabled)}
+                      <CardFace card={card} disabled={state.phase === 'playing' && isDisabled} />
                     </span>
                   </motion.button>
                 );

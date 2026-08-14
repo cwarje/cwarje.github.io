@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { Card, MobilizationPlayer, MobilizationState, Suit } from './types';
+import type { Card, MobilizationPlayer, MobilizationState } from './types';
 import {
   canPlayOnSolitaireBottom,
   canPlayOnSolitaireTop,
@@ -13,20 +13,9 @@ import {
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
-
-const SUIT_SYMBOLS: Record<Suit, string> = {
-  hearts: '\u2665',
-  diamonds: '\u2666',
-  clubs: '\u2663',
-  spades: '\u2660',
-};
-
-const SUIT_COLORS: Record<Suit, string> = {
-  hearts: 'text-red-400',
-  diamonds: 'text-red-400',
-  clubs: 'text-gray-800',
-  spades: 'text-gray-800',
-};
+import { CardFace } from '../shared/ui/CardFace';
+import { RadialSeatName } from '../shared/ui/RadialSeatName';
+import { SUIT_COLORS, SUIT_SYMBOLS, rankDisplay } from '../shared/ui/cardConstants';
 
 interface MobilizationBoardProps {
   state: MobilizationState;
@@ -59,14 +48,6 @@ interface ElementSize {
 const RIVER_SEAT_EDGE_GAP_PX = 8;
 const TRICK_EXIT_DISTANCE_PX = 72;
 
-function rankDisplay(rank: number): string {
-  if (rank === 11) return 'J';
-  if (rank === 12) return 'Q';
-  if (rank === 13) return 'K';
-  if (rank === 14) return 'A';
-  return String(rank);
-}
-
 function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
   if (playerCount >= 6) return { seatRadiusX: 40, seatRadiusY: 34 };
   if (playerCount === 5) return { seatRadiusX: 37, seatRadiusY: 32 };
@@ -76,22 +57,22 @@ function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY
 const TRICK_SLOT_PLACEMENTS: Record<number, TrickSlotPlacement[]> = {
   4: [
     { row: 2, col: 2, dx: '0px', dy: '0px' },
-    { row: 2, col: 1, dx: '0px', dy: 'calc(var(--river-slot-h) * -0.5)' },
+    { row: 2, col: 1, dx: '0px', dy: 'calc(var(--radial-slot-h) * -0.5)' },
     { row: 1, col: 2, dx: '0px', dy: '0px' },
-    { row: 2, col: 3, dx: '0px', dy: 'calc(var(--river-slot-h) * -0.5)' },
+    { row: 2, col: 3, dx: '0px', dy: 'calc(var(--radial-slot-h) * -0.5)' },
   ],
   5: [
-    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--river-slot-h) * 0.25)' },
+    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--radial-slot-h) * 0.25)' },
     { row: 2, col: 1, dx: '0px', dy: '0px' },
-    { row: 1, col: 1, dx: 'calc(var(--river-slot-w) * 0.5)', dy: '0px' },
-    { row: 1, col: 3, dx: 'calc(var(--river-slot-w) * -0.5)', dy: '0px' },
+    { row: 1, col: 1, dx: 'calc(var(--radial-slot-w) * 0.5)', dy: '0px' },
+    { row: 1, col: 3, dx: 'calc(var(--radial-slot-w) * -0.5)', dy: '0px' },
     { row: 2, col: 3, dx: '0px', dy: '0px' },
   ],
   6: [
-    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--river-slot-h) * 0.25)' },
+    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--radial-slot-h) * 0.25)' },
     { row: 2, col: 1, dx: '0px', dy: '0px' },
     { row: 1, col: 1, dx: '0px', dy: '0px' },
-    { row: 1, col: 2, dx: '0px', dy: 'calc(var(--river-slot-h) * -0.25)' },
+    { row: 1, col: 2, dx: '0px', dy: 'calc(var(--radial-slot-h) * -0.25)' },
     { row: 1, col: 3, dx: '0px', dy: '0px' },
     { row: 2, col: 3, dx: '0px', dy: '0px' },
   ],
@@ -401,15 +382,6 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
     return { cardWidth, cardHeight, step, spreadWidth, selectedLift: 14 };
   }, [handWidth, visibleHand.length]);
 
-  const renderCardFace = (card: Card, disabled = false, compact = false) => (
-    <div className={`river-card ${disabled ? 'river-card--disabled' : ''} ${compact ? 'river-card--compact' : ''}`}>
-      <div className="river-cardCorner">
-        <span className={`river-cardRank ${SUIT_COLORS[card.suit]}`}>{rankDisplay(card.rank)}</span>
-        <span className={`river-cardSuit ${SUIT_COLORS[card.suit]}`}>{SUIT_SYMBOLS[card.suit]}</span>
-      </div>
-    </div>
-  );
-
   const renderSeatPill = (seatLayout: SeatLayout, shouldMeasure = false) => {
     const player = seatLayout.player;
     const isCurrentTurn =
@@ -421,12 +393,12 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
     const seatPillStateClass =
       state.phase === 'round-end'
         ? player.roundScore >= 0
-          ? 'river-seatPill--roundSuccess'
-          : 'river-seatPill--roundFail'
+          ? 'radial-seatPill--roundSuccess'
+          : 'radial-seatPill--roundFail'
         : isCurrentTurn
           ? isMe
-            ? 'river-seatPill--activeSelf'
-            : 'river-seatPill--activeOther'
+            ? 'radial-seatPill--activeSelf'
+            : 'radial-seatPill--activeOther'
           : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
@@ -436,26 +408,26 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
     return (
       <div
         ref={shouldMeasure ? setSeatPillElement : undefined}
-        className={`river-seatPill river-seatPill--mobilization2col ${seatPillStateClass} ${isMe ? 'river-seatPill--me' : ''}`}
+        className={`radial-seatPill radial-seatPill--mobilization2col ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`}
       >
         <div
-          className="river-seatPillTop river-seatPillTop--mobilization"
+          className="radial-seatPillTop radial-seatPillTop--mobilization"
           style={{ backgroundColor: seatColor, color: seatTextColor }}
         >
-          <span className="river-seatName river-seatName--mobilization">{isMe ? 'You' : player.name}</span>
+          <RadialSeatName name={isMe ? 'You' : player.name} textColor={seatTextColor} className="radial-seatName radial-seatName--mobilization" />
           {hasPig ? (
             <span className="mobilization-seatPig" aria-label="Has the pig">
               {'\u{1F437}'}
             </span>
           ) : null}
         </div>
-        <div className="river-seatPillLabels">
-          <span className="river-seatCell river-seatCell--bid">{isSolitaire ? 'Hand' : 'Trx'}</span>
-          <span className="river-seatCell river-seatCell--total">Tot</span>
+        <div className="radial-seatPillLabels">
+          <span className="radial-seatCell radial-seatCell--bid">{isSolitaire ? 'Hand' : 'Trx'}</span>
+          <span className="radial-seatCell radial-seatCell--total">Tot</span>
         </div>
-        <div className="river-seatPillValues">
-          <span className="river-seatCell river-seatCell--bid">{isSolitaire ? player.hand.length : player.tricksThisRound}</span>
-          <span className="river-seatCell river-seatCell--total">{player.totalScore}</span>
+        <div className="radial-seatPillValues">
+          <span className="radial-seatCell radial-seatCell--bid">{isSolitaire ? player.hand.length : player.tricksThisRound}</span>
+          <span className="radial-seatCell radial-seatCell--total">{player.totalScore}</span>
         </div>
       </div>
     );
@@ -530,14 +502,14 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="river-board relative h-full flex flex-col items-center justify-center space-y-6 text-center"
+        className="radial-board relative h-full flex flex-col items-center justify-center space-y-6 text-center"
       >
         {devJumpToolbar}
         <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
         <h2 className="text-3xl font-extrabold text-white">Game Over</h2>
         <div className="space-y-3 w-full max-w-2xl">
           {rankedPlayers.map((player, i) => (
-            <div key={player.id} className="river-resultRow">
+            <div key={player.id} className="radial-resultRow">
               <div className="flex items-center gap-3">
                 <span className="text-lg font-bold">#{i + 1}</span>
                 <span className="font-semibold">{player.name}</span>
@@ -584,7 +556,7 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
                 className={`mobilization-solitaireCell ${card ? 'mobilization-solitaireCell--filled' : 'mobilization-solitaireCell--empty'} ${canDrop ? 'mobilization-solitaireCell--dropTarget' : ''} ${isHandHoverTarget ? 'mobilization-solitaireCell--handHover' : ''} ${isRevealHighlight ? 'mobilization-solitaireCell--revealHighlight' : ''}`}
               >
                 {card ? (
-                  <div className="mobilization-solitaireCardInner">{renderCardFace(card, false, true)}</div>
+                  <div className="mobilization-solitaireCardInner"><CardFace card={card} compact /></div>
                 ) : (
                   <span className="mobilization-solitairePlaceholder">
                     {rowIdx === 1 ? '7' : rowIdx === 0 ? '↑' : '↓'}
@@ -600,14 +572,14 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
   };
 
   return (
-    <div ref={boardRef} className={`river-board river-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
+    <div ref={boardRef} className={`radial-board radial-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
       {devJumpToolbar}
-      <div ref={tableRef} className={`river-table river-table--players-${state.players.length}`}>
+      <div ref={tableRef} className={`radial-table radial-table--players-${state.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
             key={`seat-${layout.player.id}`}
-            className={`river-seat ${layout.relativeIndex === 0 ? 'river-seat--self' : ''}`}
+            className={`radial-seat ${layout.relativeIndex === 0 ? 'radial-seat--self' : ''}`}
             style={{
               left: `${layout.seatLeft}%`,
               top: `${layout.seatTop}%`,
@@ -617,11 +589,11 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
           </div>
         ))}
 
-        <div className={`river-center ${isHandZoomed ? 'river-center--zoom' : ''}`}>
+        <div className={`radial-center ${isHandZoomed ? 'radial-center--zoom' : ''}`}>
           {state.phase === 'solitaire' || state.phase === 'solitaire-reveal' ? (
             renderSolitaireCenter()
           ) : (
-            <div className="river-centerGrid">
+            <div className="radial-centerGrid">
               {seatLayouts.map((layout) => {
                 const trickEntry = trickByRelativeSeat[layout.relativeIndex];
                 const isWinningCard = trickWinnerRelativeSeat === layout.relativeIndex && !!state.trickWinner;
@@ -639,7 +611,7 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
                 return (
                   <div
                     key={`slot-${layout.player.id}`}
-                    className={`river-slot ${trickEntry ? 'river-slot--filled' : 'river-slot--empty'}`}
+                    className={`radial-slot ${trickEntry ? 'radial-slot--filled' : 'radial-slot--empty'}`}
                     style={{
                       gridColumn: placement.col,
                       gridRow: placement.row,
@@ -658,14 +630,14 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
                             opacity: 0,
                           }}
                           transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-                          className={`river-slotCard ${isWinningCard ? 'river-slotCard--winner' : ''}`}
+                          className={`radial-slotCard ${isWinningCard ? 'radial-slotCard--winner' : ''}`}
                         >
-                          <div className="river-slotCardInner">
-                            {renderCardFace(trickEntry.card, false, true)}
+                          <div className="radial-slotCardInner">
+                            <CardFace card={trickEntry.card} compact />
                           </div>
                         </motion.div>
                       ) : (
-                        <div key={`placeholder-${layout.relativeIndex}`} className="river-slotPlaceholder" />
+                        <div key={`placeholder-${layout.relativeIndex}`} className="radial-slotPlaceholder" />
                       )}
                     </AnimatePresence>
                   </div>
@@ -676,9 +648,9 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
         </div>
       </div>
 
-      <div className="river-headsUp" aria-live="polite">
+      <div className="radial-headsUp" aria-live="polite">
         <p
-          className={`river-headsUpText ${state.phase === 'round-end' || state.phase === 'round-depleted' ? 'river-headsUpText--roundEnd' : ''}`}
+          className={`radial-headsUpText ${state.phase === 'round-end' || state.phase === 'round-depleted' ? 'radial-headsUpText--roundEnd' : ''}`}
         >
           {headsUpContent ?? '\u00a0'}
         </p>
@@ -686,9 +658,9 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
 
       {myPlayer && (
         <div className="space-y-3">
-          <div ref={handContainerRef} className={`river-hand ${isHandZoomed ? 'river-hand--zoom' : ''}`}>
+          <div ref={handContainerRef} className={`radial-hand ${isHandZoomed ? 'radial-hand--zoom' : ''}`}>
             <div
-              className="river-handSpread"
+              className="radial-handSpread"
               style={{
                 width: `${handLayout.spreadWidth}px`,
                 height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
@@ -737,7 +709,7 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
                         : undefined
                     }
                     disabled={isDisabled}
-                    className="river-handHitbox"
+                    className="radial-handHitbox"
                     style={{
                       left: `${i * handLayout.step}px`,
                       width: `${hitboxWidth}px`,
@@ -747,24 +719,26 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
                     aria-label={`${state.phase === 'solitaire' ? 'Select or play' : 'Play'} ${rankDisplay(card.rank)} of ${card.suit}`}
                   >
                     <span
-                      className={`river-handCardWrap ${canPlay ? 'river-handCardWrap--active' : ''} ${selected ? 'mobilization-handCard--selected' : ''}`}
+                      className={`radial-handCardWrap ${canPlay ? 'radial-handCardWrap--active' : ''} ${selected ? 'mobilization-handCard--selected' : ''}`}
                       style={{
                         width: `${handLayout.cardWidth}px`,
                         height: `${handLayout.cardHeight}px`,
                       }}
                     >
-                      {renderCardFace(
-                        card,
-                        (state.phase === 'playing' || state.phase === 'solitaire' || state.phase === 'round-depleted')
-                          && isDisabled,
-                      )}
+                      <CardFace
+                        card={card}
+                        disabled={
+                          (state.phase === 'playing' || state.phase === 'solitaire' || state.phase === 'round-depleted')
+                          && isDisabled
+                        }
+                      />
                     </span>
                   </motion.button>
                 );
               })}
             </div>
           </div>
-          <div className="river-actionRow river-actionRow--mobilization">
+          <div className="radial-actionRow radial-actionRow--mobilization">
             {state.phase === 'solitaire' && isMyTurn ? (
               myLegalSolitaire.length === 0 ? (
                 <div className="mobilization-solitaireActions">
@@ -773,12 +747,12 @@ export default function MobilizationBoard({ state, myId, onAction, isHandZoomed 
                   </button>
                 </div>
               ) : (
-                <div className="river-actionSpacer" aria-hidden="true">
+                <div className="radial-actionSpacer" aria-hidden="true">
                   &nbsp;
                 </div>
               )
             ) : (
-              <div className="river-actionSpacer" aria-hidden="true">
+              <div className="radial-actionSpacer" aria-hidden="true">
                 &nbsp;
               </div>
             )}

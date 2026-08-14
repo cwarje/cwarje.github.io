@@ -6,59 +6,16 @@ import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHu
 import type { PokerState, PokerAction, Card, PokerPlayer } from './types';
 import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
-
-// ────────────────────────────────────────────
-// Card display helpers
-// ────────────────────────────────────────────
-
-const SUIT_SYMBOLS: Record<string, string> = {
-  hearts: '\u2665',
-  diamonds: '\u2666',
-  clubs: '\u2663',
-  spades: '\u2660',
-};
-
-const SUIT_COLORS: Record<string, string> = {
-  hearts: 'text-red-500',
-  diamonds: 'text-red-500',
-  clubs: 'text-gray-800',
-  spades: 'text-gray-800',
-};
-
-function rankLabel(rank: number): string {
-  if (rank === 14) return 'A';
-  if (rank === 13) return 'K';
-  if (rank === 12) return 'Q';
-  if (rank === 11) return 'J';
-  return String(rank);
-}
+import { FlipCard } from '../shared/ui/FlipCard';
 
 function PokerCardDisplay({ card, faceDown = false, size = 'md', skipFlip = false }: { card?: Card; faceDown?: boolean; size?: 'sm' | 'md'; skipFlip?: boolean }) {
-  if (faceDown || !card) {
-    const backSizeClass = size === 'sm' ? '!w-10 !h-14' : '';
-    return (
-      <div className={`poker-card poker-cardBack ${backSizeClass}`} />
-    );
-  }
-
-  const sizeClass = size === 'sm' ? 'poker-cardFlip--sm' : '';
   return (
-    <div className={`poker-cardFlip ${sizeClass}`}>
-      <motion.div
-        className="poker-cardFlipInner"
-        initial={skipFlip ? false : { rotateY: 0 }}
-        animate={{ rotateY: 180 }}
-        transition={skipFlip ? undefined : { duration: 0.45, ease: 'easeInOut' }}
-      >
-        <div className="poker-cardFlipBack" aria-hidden="true" />
-        <div className="poker-cardFlipFront">
-          <div className="poker-cardCorner">
-            <span className={`poker-cardRank ${SUIT_COLORS[card.suit]}`}>{rankLabel(card.rank)}</span>
-            <span className={`poker-cardSuit ${SUIT_COLORS[card.suit]}`}>{SUIT_SYMBOLS[card.suit]}</span>
-          </div>
-        </div>
-      </motion.div>
-    </div>
+    <FlipCard
+      card={card}
+      faceDown={faceDown}
+      size={size}
+      skipFlip={skipFlip}
+    />
   );
 }
 

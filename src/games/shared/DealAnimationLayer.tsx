@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import type { DealFlight, DealPoint } from './useDealAnimation';
+import { CardBack } from './ui/CardBack';
 
 interface DealAnimationLayerProps {
   flights: DealFlight[];
@@ -35,7 +36,7 @@ export function DealAnimationLayer({ flights, dealCenter, remaining }: DealAnima
                 className="deal-animCard"
                 style={{ transform: `translate(${i * -1.5}px, ${i * -1.5}px)` }}
               >
-                <div className="twelve-cardBackFace" />
+                <CardBack />
               </div>
             ))}
           </div>
@@ -67,7 +68,7 @@ export function DealAnimationLayer({ flights, dealCenter, remaining }: DealAnima
                 scale: { delay: flight.delay, duration: flight.duration, times: [0, 0.18, 0.82, 1] },
               }}
             >
-              <div className="twelve-cardBackFace" />
+              <CardBack />
             </motion.div>
           );
         })}

@@ -1,27 +1,16 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { Card, CrossCribPlayer, CrossCribState, Suit } from './types';
+import type { Card, CrossCribPlayer, CrossCribState } from './types';
 import { cribCardsToSelect } from './types';
 import { cardEquals } from './rules';
 import { getCribHandScore } from './logic';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 import { useDealerDealAnimation, type DealSeat, type DealExtraTarget } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
-
-const SUIT_SYMBOLS: Record<Suit, string> = {
-  hearts: '\u2665',
-  diamonds: '\u2666',
-  clubs: '\u2663',
-  spades: '\u2660',
-};
-
-const SUIT_COLORS: Record<Suit, string> = {
-  hearts: 'text-red-400',
-  diamonds: 'text-red-400',
-  clubs: 'text-gray-800',
-  spades: 'text-gray-800',
-};
+import { CardFace } from '../shared/ui/CardFace';
+import { RadialSeatName } from '../shared/ui/RadialSeatName';
+import { rankDisplay } from '../shared/ui/cardConstants';
 
 interface CrossCribBoardProps {
   state: unknown;
@@ -46,14 +35,6 @@ interface ElementSize {
 const RIVER_SEAT_EDGE_GAP_PX = 8;
 const CARD_ENTRY_DISTANCE_PX = 80;
 const NO_CRIB_SELECTION: Card[] = [];
-
-function rankDisplay(rank: number): string {
-  if (rank === 11) return 'J';
-  if (rank === 12) return 'Q';
-  if (rank === 13) return 'K';
-  if (rank === 14) return 'A';
-  return String(rank);
-}
 
 function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
   if (playerCount === 2) return { seatRadiusX: 30, seatRadiusY: 35 };
@@ -247,15 +228,6 @@ export default function CrossCribBoard({
     return { cardWidth, cardHeight, step, spreadWidth, selectedLift: 14 };
   }, [handWidth, visibleHand.length]);
 
-  const renderCardFace = (card: Card, disabled = false, compact = false) => (
-    <div className={`river-card ${disabled ? 'river-card--disabled' : ''} ${compact ? 'river-card--compact' : ''}`}>
-      <div className="river-cardCorner">
-        <span className={`river-cardRank ${SUIT_COLORS[card.suit]}`}>{rankDisplay(card.rank)}</span>
-        <span className={`river-cardSuit ${SUIT_COLORS[card.suit]}`}>{SUIT_SYMBOLS[card.suit]}</span>
-      </div>
-    </div>
-  );
-
   const toggleCribCard = (card: Card) => {
     if (s.phase !== 'crib-discard' || myCribConfirmed || myIndex < 0) return;
     const isSel = selectedCrib.some(c => cardEquals(c, card));
@@ -294,8 +266,8 @@ export default function CrossCribBoard({
     const isMe = player.id === myId;
     const seatPillStateClass = isCurrentTurn
       ? isMe
-        ? 'river-seatPill--activeSelf'
-        : 'river-seatPill--activeOther'
+        ? 'radial-seatPill--activeSelf'
+        : 'radial-seatPill--activeOther'
       : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
@@ -316,12 +288,13 @@ export default function CrossCribBoard({
     return (
       <div
         ref={shouldMeasure ? setSeatPillElement : undefined}
-        className={`river-seatPill ${seatPillStateClass} ${isMe ? 'river-seatPill--me' : ''}`}
+        className={`radial-seatPill ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`}
       >
-        <div className="river-seatPillTop" style={pillTopStyle}>
-          <span className="river-seatName">
-            {isMe ? 'You' : player.name} ({player.totalScore})
-          </span>
+        <div className="radial-seatPillTop" style={pillTopStyle}>
+          <RadialSeatName
+            name={`${isMe ? 'You' : player.name} (${player.totalScore})`}
+            textColor={seatTextColor}
+          />
         </div>
       </div>
     );
@@ -404,13 +377,13 @@ export default function CrossCribBoard({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="river-board h-full flex flex-col items-center justify-center space-y-6 text-center"
+          className="radial-board h-full flex flex-col items-center justify-center space-y-6 text-center"
         >
           <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
           <h2 className="text-3xl font-extrabold text-white">Game Over</h2>
           <div className="space-y-3 w-full max-w-2xl">
             {teamRows.map((t, i) => (
-              <div key={i} className="river-resultRow">
+              <div key={i} className="radial-resultRow">
                 <div className="flex items-center gap-3">
                   <span className="text-lg font-bold">#{i + 1}</span>
                   <span className="font-semibold">{t.name}</span>
@@ -426,13 +399,13 @@ export default function CrossCribBoard({
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="river-board h-full flex flex-col items-center justify-center space-y-6 text-center"
+        className="radial-board h-full flex flex-col items-center justify-center space-y-6 text-center"
       >
         <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
         <h2 className="text-3xl font-extrabold text-white">Game Over</h2>
         <div className="space-y-3 w-full max-w-2xl">
           {ranked.map((player, i) => (
-            <div key={player.id} className="river-resultRow">
+            <div key={player.id} className="radial-resultRow">
               <div className="flex items-center gap-3">
                 <span className="text-lg font-bold">#{i + 1}</span>
                 <span className="font-semibold">{player.name}</span>
@@ -449,20 +422,20 @@ export default function CrossCribBoard({
   const scoresRight = shouldRotate ? [...s.columnScores].reverse() : s.rowScores;
 
   return (
-    <div ref={boardRef} className={`river-board river-board--players-${playerCount} relative space-y-3 sm:space-y-4`}>
+    <div ref={boardRef} className={`radial-board radial-board--players-${playerCount} relative space-y-3 sm:space-y-4`}>
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
-      <div ref={tableRef} className={`river-table river-table--players-${playerCount}`}>
+      <div ref={tableRef} className={`radial-table radial-table--players-${playerCount}`}>
         {seatLayouts.map((layout) => (
           <div
             key={`seat-${layout.player.id}`}
-            className={`river-seat ${layout.relativeIndex === 0 ? 'river-seat--self' : ''}`}
+            className={`radial-seat ${layout.relativeIndex === 0 ? 'radial-seat--self' : ''}`}
             style={{ left: `${layout.seatLeft}%`, top: `${layout.seatTop}%` }}
           >
             {renderSeatPill(layout, layout.relativeIndex === 0)}
           </div>
         ))}
 
-        <div className={`crosscrib-center ${isHandZoomed ? 'river-center--zoom' : ''}`}>
+        <div className={`crosscrib-center ${isHandZoomed ? 'radial-center--zoom' : ''}`}>
           <div className="crosscrib-gridWrapper">
             <div className="crosscrib-colScores">
               {scoresAbove.map((score, i) => (
@@ -495,7 +468,7 @@ export default function CrossCribBoard({
                         <AnimatePresence mode="wait" initial={false}>
                           {isCenter && s.starterCard && deal.isExtraRevealed('crosscrib-starter') ? (
                             <div key="starter" className="crosscrib-cellCard crosscrib-cellCard--starter">
-                              {renderCardFace(s.starterCard, false, true)}
+                              <CardFace card={s.starterCard} compact />
                             </div>
                           ) : cell ? (
                             <motion.div
@@ -510,7 +483,7 @@ export default function CrossCribBoard({
                               transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
                               className="crosscrib-cellCard"
                             >
-                              {renderCardFace(cell.card, false, true)}
+                              <CardFace card={cell.card} compact />
                             </motion.div>
                           ) : (
                             <div key="empty" className="crosscrib-slotPlaceholder" />
@@ -531,10 +504,10 @@ export default function CrossCribBoard({
         </div>
       </div>
 
-      <div className="river-headsUp" aria-live="polite">
+      <div className="radial-headsUp" aria-live="polite">
         <div
           role="status"
-          className={`river-headsUpText ${s.phase === 'round-end' || s.phase === 'crib-reveal' ? 'river-headsUpText--roundEnd' : ''} ${s.phase === 'crib-discard' && !myCribConfirmed && myIndex >= 0 ? 'crosscrib-headsUpText--withAction' : ''}`}
+          className={`radial-headsUpText ${s.phase === 'round-end' || s.phase === 'crib-reveal' ? 'radial-headsUpText--roundEnd' : ''} ${s.phase === 'crib-discard' && !myCribConfirmed && myIndex >= 0 ? 'crosscrib-headsUpText--withAction' : ''}`}
         >
           {headsUpContent ?? '\u00a0'}
         </div>
@@ -542,9 +515,9 @@ export default function CrossCribBoard({
 
       {myPlayer && (
         <div className="space-y-3">
-          <div ref={handContainerRef} className={`river-hand ${isHandZoomed ? 'river-hand--zoom' : ''}`}>
+          <div ref={handContainerRef} className={`radial-hand ${isHandZoomed ? 'radial-hand--zoom' : ''}`}>
             <div
-              className="river-handSpread"
+              className="radial-handSpread"
               style={{
                 width: `${handLayout.spreadWidth}px`,
                 height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
@@ -578,7 +551,7 @@ export default function CrossCribBoard({
                       setSelectedCard(isPlayingPick ? null : card);
                     }}
                     disabled={!canSelect}
-                    className="river-handHitbox"
+                    className="radial-handHitbox"
                     style={{
                       left: `${i * handLayout.step}px`,
                       width: `${hitboxWidth}px`,
@@ -589,13 +562,13 @@ export default function CrossCribBoard({
                     aria-pressed={isSelected}
                   >
                     <span
-                      className={`river-handCardWrap ${canSelect ? 'river-handCardWrap--active' : ''} ${isSelected ? 'crosscrib-handCard--selected' : ''}`}
+                      className={`radial-handCardWrap ${canSelect ? 'radial-handCardWrap--active' : ''} ${isSelected ? 'crosscrib-handCard--selected' : ''}`}
                       style={{
                         width: `${handLayout.cardWidth}px`,
                         height: `${handLayout.cardHeight}px`,
                       }}
                     >
-                      {renderCardFace(card, !canSelect)}
+                      <CardFace card={card} disabled={!canSelect} />
                     </span>
                   </motion.button>
                 );

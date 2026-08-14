@@ -16,11 +16,11 @@ export default function UpRiverToolbarExtra({ state }: GameHudProps) {
   const s = state as UpRiverState;
   if (!s.trumpCard) return null;
   return (
-    <div className="river-hudTrumpCard">
-      <div className="river-card river-card--compact">
-        <div className="river-cardCorner">
-          <span className={`river-cardRank ${suitColors[s.trumpCard.suit]}`}>{rankDisplay(s.trumpCard.rank)}</span>
-          <span className={`river-cardSuit ${suitColors[s.trumpCard.suit]}`}>{suitSymbols[s.trumpCard.suit]}</span>
+    <div className="upriver-trumpCard">
+      <div className="card-face card-face--compact">
+        <div className="card-faceCorner">
+          <span className={`card-faceRank ${suitColors[s.trumpCard.suit]}`}>{rankDisplay(s.trumpCard.rank)}</span>
+          <span className={`card-faceSuit ${suitColors[s.trumpCard.suit]}`}>{suitSymbols[s.trumpCard.suit]}</span>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
-import type { Card, Suit } from '../cross-crib/types';
+import type { Card } from '../cross-crib/types';
 import { cardEquals } from '../cross-crib/rules';
 import {
   cribCardsToSelect,
@@ -13,7 +13,10 @@ import {
 import { classifyCribbageSkunk, cribbageCribOwnerLabel } from './logic';
 import { legalPeggingPlays, scoreCribShow, scoreShowHand } from './rules';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
-import { AutoFitSeatName } from '../shared/AutoFitSeatName';
+import { CardFace } from '../shared/ui/CardFace';
+import { CardBack } from '../shared/ui/CardBack';
+import { RadialSeatName } from '../shared/ui/RadialSeatName';
+import { rankDisplay } from '../shared/ui/cardConstants';
 import { CRIB_HUD_FLIP_DURATION_MS } from '../shared/CribHudFlipCard';
 import CribbagePegBoard from './CribbagePegBoard';
 import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
@@ -72,28 +75,6 @@ function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY
     return { seatRadiusX: 37, seatRadiusY: 32 };
   }
   return { seatRadiusX: 35, seatRadiusY: 30 };
-}
-
-const SUIT_SYMBOLS: Record<Suit, string> = {
-  hearts: '\u2665',
-  diamonds: '\u2666',
-  clubs: '\u2663',
-  spades: '\u2660',
-};
-
-const SUIT_COLORS: Record<Suit, string> = {
-  hearts: 'text-red-400',
-  diamonds: 'text-red-400',
-  clubs: 'text-gray-800',
-  spades: 'text-gray-800',
-};
-
-function rankDisplay(rank: number): string {
-  if (rank === 11) return 'J';
-  if (rank === 12) return 'Q';
-  if (rank === 13) return 'K';
-  if (rank === 14) return 'A';
-  return String(rank);
 }
 
 function possessiveNameOrDealer(name: string | undefined): string {
@@ -279,17 +260,6 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
       peggingFanLayout.cardHeight,
       peggingFanLayout.selectedLift,
     ]
-  );
-
-  const renderHandCardFace = (card: Card, disabled = false, selected = false) => (
-    <div
-      className={`hearts-card ${disabled ? 'hearts-card--disabled' : ''} ${selected ? 'hearts-card--selected' : ''}`}
-    >
-      <div className="hearts-cardCorner">
-        <span className={`hearts-cardRank ${SUIT_COLORS[card.suit]}`}>{rankDisplay(card.rank)}</span>
-        <span className={`hearts-cardSuit ${SUIT_COLORS[card.suit]}`}>{SUIT_SYMBOLS[card.suit]}</span>
-      </div>
-    </div>
   );
 
   const toggleCribCard = (card: Card) => {
@@ -680,10 +650,10 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
         className={`cribbage-seatPill ${activeSeatPillClass} ${player.id === myId ? 'cribbage-seatPill--me' : ''}`}
       >
         <div className="cribbage-seatPillTop" style={pillTopStyle}>
-          <AutoFitSeatName
+          <RadialSeatName
             name={player.id === myId ? 'You' : player.name}
             textColor={seatTextColor}
-            nameClassName="cribbage-seatPillName"
+            className="cribbage-seatPillName"
           />
         </div>
         <div className="cribbage-seatPillBottom">
@@ -701,7 +671,7 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="river-board cribbage-board h-full flex flex-col items-center justify-center space-y-6 text-center px-4"
+        className="radial-board cribbage-board h-full flex flex-col items-center justify-center space-y-6 text-center px-4"
       >
         <span className="text-7xl" aria-hidden>
           🏆
@@ -749,7 +719,7 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
   }
 
   return (
-    <div ref={boardRef} className="river-board cribbage-board relative flex flex-col h-full min-h-0 text-white">
+    <div ref={boardRef} className="radial-board cribbage-board relative flex flex-col h-full min-h-0 text-white">
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
       {showDevScoreShortcut && (
         <button
@@ -762,11 +732,11 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
       )}
       <div className="flex-1 min-h-0 flex flex-col min-w-0 gap-2 px-2 pt-2 pb-1">
         <div className="flex-1 min-h-0 min-w-0 flex flex-col">
-          <div ref={tableRef} className={`river-table river-table--players-${n} flex-1 min-h-0`}>
+          <div ref={tableRef} className={`radial-table radial-table--players-${n} flex-1 min-h-0`}>
             {seatLayouts.map(layout => (
               <div
                 key={`seat-${layout.player.id}`}
-                className={`river-seat ${layout.relativeIndex === 0 ? 'river-seat--self' : ''}`}
+                className={`radial-seat ${layout.relativeIndex === 0 ? 'radial-seat--self' : ''}`}
                 style={{
                   left: `${layout.seatLeft}%`,
                   top: `${layout.seatTop}%`,
@@ -776,7 +746,7 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
               </div>
             ))}
 
-            <div className={`river-center ${isHandZoomed ? 'river-center--zoom' : ''}`}>
+            <div className={`radial-center ${isHandZoomed ? 'radial-center--zoom' : ''}`}>
               <div className="absolute inset-0 z-[2] flex items-center justify-center p-2 overflow-y-auto pointer-events-none">
                 <div className="cribbage-center pointer-events-auto flex max-h-full w-full max-w-xl min-h-[120px] flex-col items-center justify-start gap-2 rounded-2xl bg-transparent p-3">
                   <CribbagePegBoard targetScore={s.targetScore} sides={pegBoardSides} />
@@ -788,11 +758,11 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
                       <div className="w-full h-full min-h-0">
                         <div className="cribbage-stockFanScroll w-full h-full flex justify-center">
                           <div
-                            className={`hearts-hand cribbage-stockFanHost ${isHandZoomed ? 'hearts-hand--zoom' : ''}`}
+                            className={`radial-hand cribbage-stockFanHost ${isHandZoomed ? 'radial-hand--zoom' : ''}`}
                             style={{ minHeight: 0 }}
                           >
                             <div
-                              className="hearts-handSpread"
+                              className="radial-handSpread"
                               role="group"
                               aria-label={
                                 isPone
@@ -810,14 +780,14 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
                                 const hitboxWidth = isLast ? stockCutFanLayout.cardWidth : stockCutFanLayout.step;
                                 const cardWrap = (
                                   <span
-                                    className={`hearts-handCardWrap ${isPone ? 'hearts-handCardWrap--active' : ''}`}
+                                    className={`radial-handCardWrap ${isPone ? 'radial-handCardWrap--active' : ''}`}
                                     style={{
                                       width: `${stockCutFanLayout.cardWidth}px`,
                                       height: `${stockCutFanLayout.cardHeight}px`,
                                       transform: 'translateY(0px)',
                                     }}
                                   >
-                                    <div className="hearts-card cribbage-stockCardBack" aria-hidden />
+                                    <CardBack className="cribbage-stockCardBack" />
                                   </span>
                                 );
 
@@ -833,7 +803,7 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
                                         if (s.phase !== 'cut-starter' || s.stock.length === 0) return;
                                         onAction({ type: 'perform-cut', cutIndex: i });
                                       }}
-                                      className="hearts-handHitbox"
+                                      className="radial-handHitbox"
                                       style={{
                                         left: `${i * stockCutFanLayout.step}px`,
                                         width: `${hitboxWidth}px`,
@@ -850,7 +820,7 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
                                 return (
                                   <div
                                     key={`cut-stock-${i}`}
-                                    className="hearts-handHitbox pointer-events-none !cursor-default"
+                                    className="radial-handHitbox pointer-events-none !cursor-default"
                                     style={{
                                       left: `${i * stockCutFanLayout.step}px`,
                                       width: `${hitboxWidth}px`,
@@ -873,11 +843,11 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
                       <div className="w-full h-full min-h-0">
                         <div className="flex justify-center min-h-0 h-full w-full">
                           <div
-                            className={`hearts-hand cribbage-peggingFanHost ${isHandZoomed ? 'hearts-hand--zoom' : ''}`}
+                            className={`radial-hand cribbage-peggingFanHost ${isHandZoomed ? 'radial-hand--zoom' : ''}`}
                             style={{ minHeight: 0 }}
                           >
                             <div
-                              className="hearts-handSpread"
+                              className="radial-handSpread"
                               role="list"
                               aria-label={`Cards played this count · running total ${s.peggingRunningTotal}`}
                               style={{
@@ -893,7 +863,7 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
                                   <div
                                     key={`${i}-${pl.card.suit}-${pl.card.rank}`}
                                     role="listitem"
-                                    className="hearts-handHitbox pointer-events-none !cursor-default"
+                                    className="radial-handHitbox pointer-events-none !cursor-default"
                                     style={{
                                       left: `${i * peggingFanLayout.step}px`,
                                       width: `${hitboxWidth}px`,
@@ -903,14 +873,14 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
                                     aria-label={`${rankDisplay(pl.card.rank)} of ${pl.card.suit}, play ${i + 1} of ${s.peggingSequence.length}`}
                                   >
                                     <div
-                                      className="hearts-handCardWrap"
+                                      className="radial-handCardWrap"
                                       style={{
                                         width: `${peggingFanLayout.cardWidth}px`,
                                         height: `${peggingFanLayout.cardHeight}px`,
                                         transform: 'translateY(0px)',
                                       }}
                                     >
-                                      {renderHandCardFace(pl.card, false, false)}
+                                      <CardFace card={pl.card} />
                                     </div>
                                   </div>
                                 );
@@ -928,9 +898,9 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
         </div>
       </div>
 
-      <div className="river-headsUp shrink-0 px-2 sm:px-4 pb-1" aria-live="polite">
+      <div className="radial-headsUp shrink-0 px-2 sm:px-4 pb-1" aria-live="polite">
         <p
-          className={`river-headsUpText ${
+          className={`radial-headsUpText ${
             (s.phase === 'crib-discard' && !myCribConfirmed && myIndex >= 0) ||
             (s.phase === 'pegging' &&
               !peggingInputBlocked &&
@@ -946,9 +916,9 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
       </div>
 
       {myPlayer && (
-        <div ref={handContainerRef} className={`hearts-hand shrink-0 ${isHandZoomed ? 'hearts-hand--zoom' : ''}`}>
+        <div ref={handContainerRef} className={`radial-hand shrink-0 ${isHandZoomed ? 'radial-hand--zoom' : ''}`}>
           <div
-            className="hearts-handSpread"
+            className="radial-handSpread"
             role={isShowHandStrip && stripCardsLen > 0 ? 'list' : undefined}
             aria-label={showHandStripAriaLabel ?? undefined}
             style={{
@@ -976,7 +946,7 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
                         key={`${i}-${card.suit}-${card.rank}`}
                         role="listitem"
                         variants={cribShowHandCardVariants}
-                        className="hearts-handHitbox pointer-events-none !cursor-default"
+                        className="radial-handHitbox pointer-events-none !cursor-default"
                         style={{
                           left: `${i * handLayout.step}px`,
                           width: `${hitboxWidth}px`,
@@ -986,14 +956,14 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
                         aria-label={`${rankDisplay(card.rank)} of ${card.suit}`}
                       >
                         <span
-                          className="hearts-handCardWrap"
+                          className="radial-handCardWrap"
                           style={{
                             width: `${handLayout.cardWidth}px`,
                             height: `${handLayout.cardHeight}px`,
                             transform: 'translateY(0px)',
                           }}
                         >
-                          {renderHandCardFace(card, false, false)}
+                          <CardFace card={card} />
                         </span>
                       </motion.div>
                     );
@@ -1024,7 +994,7 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
                         else if (canPegThisCard) playPegging(card);
                       }}
                       disabled={isDisabled}
-                      className="hearts-handHitbox"
+                      className="radial-handHitbox"
                       style={{
                         left: `${i * handLayout.step}px`,
                         width: `${hitboxWidth}px`,
@@ -1034,14 +1004,14 @@ export default function CribbageBoard({ state, myId, onAction, isHost = false, i
                       aria-label={`Play ${rankDisplay(card.rank)} of ${card.suit}`}
                     >
                       <span
-                        className={`hearts-handCardWrap ${(isCribSelecting && !isSelectedForCrib) || canPegThisCard ? 'hearts-handCardWrap--active' : ''}`}
+                        className={`radial-handCardWrap ${(isCribSelecting && !isSelectedForCrib) || canPegThisCard ? 'radial-handCardWrap--active' : ''}`}
                         style={{
                           width: `${handLayout.cardWidth}px`,
                           height: `${handLayout.cardHeight}px`,
                           transform: isSelectedForCrib ? `translateY(-${handLayout.selectedLift}px)` : 'translateY(0px)',
                         }}
                       >
-                        {renderHandCardFace(card, isDisabled, isSelectedForCrib)}
+                        <CardFace card={card} disabled={isDisabled} selected={isSelectedForCrib} />
                       </span>
                     </motion.button>
                   );

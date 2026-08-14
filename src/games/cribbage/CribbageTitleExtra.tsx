@@ -5,6 +5,7 @@ import { getPlayerHudTextColor } from '../../networking/playerColors';
 import type { CribbageState } from './types';
 import { cribbageCribOwnerLabel, getShelvedShowHands } from './logic';
 import { scoreCribShow, scoreShowHand } from './rules';
+import { CardBack } from '../shared/ui/CardBack';
 import { CRIB_HUD_FLIP_DURATION_MS, CribHudFlipCard } from '../shared/CribHudFlipCard';
 
 export default function CribbageTitleExtra({ state }: GameHudProps) {
@@ -44,15 +45,15 @@ export default function CribbageTitleExtra({ state }: GameHudProps) {
 
       {showCribStrip && (
         <div className="flex items-center gap-2">
-          <div className="crosscrib-cribHudSpread pointer-events-none" aria-hidden>
+          <div className="cribHudSpread pointer-events-none" aria-hidden>
             {show3pSeed && !fullCrib ? (
-              <div className="crosscrib-cribHudSlot" style={{ zIndex: 1 }}>
+              <div className="cribHudSlot" style={{ zIndex: 1 }}>
                 <motion.div
                   initial={{ opacity: 0, y: 14 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, ease: 'easeOut' }}
                 >
-                  <div className="river-card river-card--compact crosscrib-cribHudCard crosscrib-cribHudCard--back" />
+                  <CardBack className="cribHudCard cribHudCard--back card-face--compact" />
                 </motion.div>
               </div>
             ) : (
@@ -60,7 +61,7 @@ export default function CribbageTitleExtra({ state }: GameHudProps) {
                 return (
                   <div
                     key={`crib-hud-${card.suit}-${card.rank}-${i}`}
-                    className="crosscrib-cribHudSlot"
+                    className="cribHudSlot"
                     style={{ zIndex: i + 1 }}
                   >
                     <motion.div
@@ -86,7 +87,7 @@ export default function CribbageTitleExtra({ state }: GameHudProps) {
       {s.starterCard ? (
         <div className="flex flex-col items-start gap-0.5 text-white/90">
           <span className="text-xs uppercase tracking-wide text-white/50">Crib card</span>
-          <div className="crosscrib-cribHudSlot" style={{ marginLeft: 0 }}>
+          <div className="cribHudSlot" style={{ marginLeft: 0 }}>
             <motion.div
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
@@ -115,11 +116,11 @@ export default function CribbageTitleExtra({ state }: GameHudProps) {
                 {player.name}
               </span>
               <div className="flex items-center gap-2">
-                <div className="crosscrib-cribHudSpread pointer-events-none" aria-hidden>
+                <div className="cribHudSpread pointer-events-none" aria-hidden>
                   {cards.map((card, i) => (
                     <div
                       key={`shelved-${seat}-${card.suit}-${card.rank}-${i}`}
-                      className="crosscrib-cribHudSlot"
+                      className="cribHudSlot"
                       style={{ zIndex: i + 1 }}
                     >
                       <CribHudFlipCard card={card} faceUp />

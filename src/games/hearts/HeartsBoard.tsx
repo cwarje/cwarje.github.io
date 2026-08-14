@@ -1,35 +1,15 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { HeartsState, Card, Suit, HeartsPlayer } from './types';
+import type { HeartsState, Card, HeartsPlayer } from './types';
 import { isValidHeartsPlay } from './rules';
 import { getHeartsPassCount } from './logic';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
-import { AutoFitSeatName } from '../shared/AutoFitSeatName';
+import { CardFace } from '../shared/ui/CardFace';
+import { RadialSeatName } from '../shared/ui/RadialSeatName';
+import { rankDisplay } from '../shared/ui/cardConstants';
 import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
-
-const SUIT_SYMBOLS: Record<Suit, string> = {
-  hearts: '\u2665',
-  diamonds: '\u2666',
-  clubs: '\u2663',
-  spades: '\u2660',
-};
-
-const SUIT_COLORS: Record<Suit, string> = {
-  hearts: 'text-red-400',
-  diamonds: 'text-red-400',
-  clubs: 'text-gray-800',
-  spades: 'text-gray-800',
-};
-
-function rankDisplay(rank: number): string {
-  if (rank === 11) return 'J';
-  if (rank === 12) return 'Q';
-  if (rank === 13) return 'K';
-  if (rank === 14) return 'A';
-  return String(rank);
-}
 
 function placementLabel(position: number): string {
   if (position % 100 >= 11 && position % 100 <= 13) return `${position}th`;
@@ -72,15 +52,15 @@ function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY
 const TRICK_SLOT_PLACEMENTS: Record<number, TrickSlotPlacement[]> = {
   4: [
     { row: 2, col: 2, dx: '0px', dy: '0px' },
-    { row: 2, col: 1, dx: '0px', dy: 'calc(var(--hearts-slot-h) * -0.5)' },
+    { row: 2, col: 1, dx: '0px', dy: 'calc(var(--radial-slot-h) * -0.5)' },
     { row: 1, col: 2, dx: '0px', dy: '0px' },
-    { row: 2, col: 3, dx: '0px', dy: 'calc(var(--hearts-slot-h) * -0.5)' },
+    { row: 2, col: 3, dx: '0px', dy: 'calc(var(--radial-slot-h) * -0.5)' },
   ],
   5: [
-    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--hearts-slot-h) * 0.25)' },
+    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--radial-slot-h) * 0.25)' },
     { row: 2, col: 1, dx: '0px', dy: '0px' },
-    { row: 1, col: 1, dx: 'calc(var(--hearts-slot-w) * 0.5)', dy: '0px' },
-    { row: 1, col: 3, dx: 'calc(var(--hearts-slot-w) * -0.5)', dy: '0px' },
+    { row: 1, col: 1, dx: 'calc(var(--radial-slot-w) * 0.5)', dy: '0px' },
+    { row: 1, col: 3, dx: 'calc(var(--radial-slot-w) * -0.5)', dy: '0px' },
     { row: 2, col: 3, dx: '0px', dy: '0px' },
   ],
 };
@@ -393,37 +373,26 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
     const activeSeatPillClass =
       isCurrentTurn && showActiveSeatPill
         ? isMe
-          ? 'hearts-seatPill--activeSelf'
-          : 'hearts-seatPill--activeOther'
+          ? 'radial-seatPill--activeSelf'
+          : 'radial-seatPill--activeOther'
         : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
     return (
       <div
         ref={shouldMeasure ? setSeatPillElement : undefined}
-        className={`hearts-seatPill ${activeSeatPillClass} ${isMe ? 'hearts-seatPill--me' : ''}`}
+        className={`radial-seatPill ${activeSeatPillClass} ${isMe ? 'radial-seatPill--me' : ''}`}
       >
-        <div className="hearts-seatPillTop" style={{ backgroundColor: seatColor }}>
-          <AutoFitSeatName name={isMe ? 'You' : player.name} textColor={seatTextColor} />
+        <div className="radial-seatPillTop" style={{ backgroundColor: seatColor }}>
+          <RadialSeatName name={isMe ? 'You' : player.name} textColor={seatTextColor} />
         </div>
-        <div className="hearts-seatPillBottom">
-          <span className="hearts-seatPillRound">{player.roundScore}</span>
-          <span className="hearts-seatPillTotal">{player.totalScore}</span>
+        <div className="radial-seatPillBottom">
+          <span className="radial-seatPillRound">{player.roundScore}</span>
+          <span className="radial-seatPillTotal">{player.totalScore}</span>
         </div>
       </div>
     );
   };
-
-  const renderCardFace = (card: Card, disabled = false, selected = false, compact = false, received = false) => (
-    <div
-      className={`hearts-card ${disabled ? 'hearts-card--disabled' : ''} ${selected ? 'hearts-card--selected' : ''} ${compact ? 'hearts-card--compact' : ''} ${received ? 'hearts-card--received' : ''}`}
-    >
-      <div className="hearts-cardCorner">
-        <span className={`hearts-cardRank ${SUIT_COLORS[card.suit]}`}>{rankDisplay(card.rank)}</span>
-        <span className={`hearts-cardSuit ${SUIT_COLORS[card.suit]}`}>{SUIT_SYMBOLS[card.suit]}</span>
-      </div>
-    </div>
-  );
 
   if (state.gameOver) {
     const sorted = [...state.players].sort((a, b) => a.totalScore - b.totalScore);
@@ -469,11 +438,11 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
   return (
     <div ref={boardRef} className={`hearts-board hearts-board--players-${state.players.length} relative space-y-4 sm:space-y-5`}>
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
-      <div ref={tableRef} className={`hearts-table hearts-table--players-${state.players.length}`}>
+      <div ref={tableRef} className={`radial-table radial-table--players-${state.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
             key={`seat-${layout.player.id}`}
-            className={`hearts-seat ${layout.relativeIndex === 0 ? 'hearts-seat--self' : ''}`}
+            className={`radial-seat ${layout.relativeIndex === 0 ? 'radial-seat--self' : ''}`}
             style={{
               left: `${layout.seatLeft}%`,
               top: `${layout.seatTop}%`,
@@ -483,8 +452,8 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
           </div>
         ))}
 
-        <div className={`hearts-center ${isHandZoomed ? 'hearts-center--zoom' : ''}`}>
-          <div className="hearts-centerGrid">
+        <div className={`radial-center ${isHandZoomed ? 'radial-center--zoom' : ''}`}>
+          <div className="radial-centerGrid">
             {seatLayouts.map((layout) => {
               const trickEntry = trickByRelativeSeat[layout.relativeIndex];
               const isWinningCard = trickWinnerRelativeSeat === layout.relativeIndex && !!state.trickWinner;
@@ -502,7 +471,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
               return (
                 <div
                   key={`slot-${layout.player.id}`}
-                  className={`hearts-slot ${trickEntry ? 'hearts-slot--filled' : 'hearts-slot--empty'}`}
+                  className={`radial-slot ${trickEntry ? 'radial-slot--filled' : 'radial-slot--empty'}`}
                   style={{
                     gridColumn: placement.col,
                     gridRow: placement.row,
@@ -521,14 +490,14 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
                           opacity: 0,
                         }}
                         transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
-                        className={`hearts-slotCard ${isWinningCard ? 'hearts-slotCard--winner' : ''}`}
+                        className={`radial-slotCard ${isWinningCard ? 'radial-slotCard--winner' : ''}`}
                       >
-                        <div className="hearts-slotCardInner">
-                          {renderCardFace(trickEntry.card, false, false, true)}
+                        <div className="radial-slotCardInner">
+                          <CardFace card={trickEntry.card} compact />
                         </div>
                       </motion.div>
                     ) : (
-                      <div key={`placeholder-${layout.relativeIndex}`} className="hearts-slotPlaceholder" />
+                      <div key={`placeholder-${layout.relativeIndex}`} className="radial-slotPlaceholder" />
                     )}
                   </AnimatePresence>
                 </div>
@@ -546,9 +515,9 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
 
       {myPlayer && (
         <div>
-          <div ref={handContainerRef} className={`hearts-hand ${isHandZoomed ? 'hearts-hand--zoom' : ''}`}>
+          <div ref={handContainerRef} className={`radial-hand ${isHandZoomed ? 'radial-hand--zoom' : ''}`}>
             <div
-              className="hearts-handSpread"
+              className="radial-handSpread"
               style={{
                 width: `${handLayout.spreadWidth}px`,
                 height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
@@ -575,7 +544,7 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
                       else if (canPlay) playCard(card);
                     }}
                     disabled={isDisabled}
-                    className="hearts-handHitbox"
+                    className="radial-handHitbox"
                     style={{
                       left: `${i * handLayout.step}px`,
                       width: `${hitboxWidth}px`,
@@ -585,14 +554,14 @@ export default function HeartsBoard({ state, myId, onAction, isHandZoomed = fals
                     aria-label={`Play ${rankDisplay(card.rank)} of ${card.suit}`}
                   >
                     <span
-                      className={`hearts-handCardWrap ${canPlay || isPassing ? (isSelectedForPass ? '' : 'hearts-handCardWrap--active') : ''}`}
+                      className={`radial-handCardWrap ${canPlay || isPassing ? (isSelectedForPass ? '' : 'radial-handCardWrap--active') : ''}`}
                       style={{
                         width: `${handLayout.cardWidth}px`,
                         height: `${handLayout.cardHeight}px`,
                         transform: isSelectedForPass ? `translateY(-${handLayout.selectedLift}px)` : 'translateY(0px)',
                       }}
                     >
-                      {renderCardFace(card, isDisabled, isSelectedForPass, false, isReceived)}
+                      <CardFace card={card} disabled={isDisabled} selected={isSelectedForPass} received={isReceived} />
                     </span>
                   </motion.button>
                 );

@@ -11,17 +11,17 @@ interface GolfFlipAnimationLayerProps {
 
 function FlipCard({ card, renderCardFace }: { card: Card; renderCardFace: (card: Card) => ReactNode }) {
   return (
-    <div className="poker-cardFlip poker-cardFlip--sm golf-discardAnimFlip">
+    <div className="card-flip card-flip--sm golf-discardAnimFlip">
       <motion.div
-        className="poker-cardFlipInner"
+        className="card-flipInner"
         initial={{ rotateY: 0 }}
         animate={{ rotateY: 180 }}
         transition={{ duration: FLIP_DURATION_MS / 1000, ease: 'easeInOut' }}
       >
-        <div className="poker-cardFlipBack" aria-hidden="true">
-          <div className="twelve-cardBackFace" />
+        <div className="card-flipBack" aria-hidden="true">
+          <div className="card-back" />
         </div>
-        <div className="poker-cardFlipFront">{renderCardFace(card)}</div>
+        <div className="card-flipFront">{renderCardFace(card)}</div>
       </motion.div>
     </div>
   );

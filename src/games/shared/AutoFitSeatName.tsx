@@ -21,7 +21,7 @@ interface AutoFitSeatNameProps {
   nameClassName?: string;
 }
 
-export function AutoFitSeatName({ name, textColor, nameClassName = 'hearts-seatPillName' }: AutoFitSeatNameProps) {
+export function AutoFitSeatName({ name, textColor, nameClassName = 'radial-seatName' }: AutoFitSeatNameProps) {
   const nameRef = useRef<HTMLSpanElement>(null);
   const [fontSize, setFontSize] = useState(13);
 

@@ -1,25 +1,14 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { Card, CucumberPlayer, CucumberState, Suit } from './types';
+import type { Card, CucumberPlayer, CucumberState } from './types';
 import { isValidCucumberPlay } from './rules';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
-
-const SUIT_SYMBOLS: Record<Suit, string> = {
-  hearts: '\u2665',
-  diamonds: '\u2666',
-  clubs: '\u2663',
-  spades: '\u2660',
-};
-
-const SUIT_COLORS: Record<Suit, string> = {
-  hearts: 'text-red-400',
-  diamonds: 'text-red-400',
-  clubs: 'text-gray-800',
-  spades: 'text-gray-800',
-};
+import { CardFace } from '../shared/ui/CardFace';
+import { RadialSeatName } from '../shared/ui/RadialSeatName';
+import { rankDisplay } from '../shared/ui/cardConstants';
 
 interface CucumberBoardProps {
   state: CucumberState;
@@ -51,14 +40,6 @@ interface ElementSize {
 const SEAT_EDGE_GAP_PX = 8;
 const TRICK_EXIT_DISTANCE_PX = 72;
 
-function rankDisplay(rank: number): string {
-  if (rank === 11) return 'J';
-  if (rank === 12) return 'Q';
-  if (rank === 13) return 'K';
-  if (rank === 14) return 'A';
-  return String(rank);
-}
-
 function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
   if (playerCount >= 6) return { seatRadiusX: 40, seatRadiusY: 34 };
   if (playerCount === 5) return { seatRadiusX: 37, seatRadiusY: 32 };
@@ -73,22 +54,22 @@ const TRICK_SLOT_PLACEMENTS: Record<number, TrickSlotPlacement[]> = {
   ],
   4: [
     { row: 2, col: 2, dx: '0px', dy: '0px' },
-    { row: 2, col: 1, dx: '0px', dy: 'calc(var(--river-slot-h) * -0.5)' },
+    { row: 2, col: 1, dx: '0px', dy: 'calc(var(--radial-slot-h) * -0.5)' },
     { row: 1, col: 2, dx: '0px', dy: '0px' },
-    { row: 2, col: 3, dx: '0px', dy: 'calc(var(--river-slot-h) * -0.5)' },
+    { row: 2, col: 3, dx: '0px', dy: 'calc(var(--radial-slot-h) * -0.5)' },
   ],
   5: [
-    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--river-slot-h) * 0.25)' },
+    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--radial-slot-h) * 0.25)' },
     { row: 2, col: 1, dx: '0px', dy: '0px' },
-    { row: 1, col: 1, dx: 'calc(var(--river-slot-w) * 0.5)', dy: '0px' },
-    { row: 1, col: 3, dx: 'calc(var(--river-slot-w) * -0.5)', dy: '0px' },
+    { row: 1, col: 1, dx: 'calc(var(--radial-slot-w) * 0.5)', dy: '0px' },
+    { row: 1, col: 3, dx: 'calc(var(--radial-slot-w) * -0.5)', dy: '0px' },
     { row: 2, col: 3, dx: '0px', dy: '0px' },
   ],
   6: [
-    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--river-slot-h) * 0.25)' },
+    { row: 2, col: 2, dx: '0px', dy: 'calc(var(--radial-slot-h) * 0.25)' },
     { row: 2, col: 1, dx: '0px', dy: '0px' },
     { row: 1, col: 1, dx: '0px', dy: '0px' },
-    { row: 1, col: 2, dx: '0px', dy: 'calc(var(--river-slot-h) * -0.25)' },
+    { row: 1, col: 2, dx: '0px', dy: 'calc(var(--radial-slot-h) * -0.25)' },
     { row: 1, col: 3, dx: '0px', dy: '0px' },
     { row: 2, col: 3, dx: '0px', dy: '0px' },
   ],
@@ -302,23 +283,14 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
     return { cardWidth, cardHeight, step, spreadWidth, selectedLift: 14 };
   }, [handWidth, visibleHand.length]);
 
-  const renderCardFace = (cardFace: Card, disabled = false, compact = false) => (
-    <div className={`river-card ${disabled ? 'river-card--disabled' : ''} ${compact ? 'river-card--compact' : ''}`}>
-      <div className="river-cardCorner">
-        <span className={`river-cardRank ${SUIT_COLORS[cardFace.suit]}`}>{rankDisplay(cardFace.rank)}</span>
-        <span className={`river-cardSuit ${SUIT_COLORS[cardFace.suit]}`}>{SUIT_SYMBOLS[cardFace.suit]}</span>
-      </div>
-    </div>
-  );
-
   const renderSeatPill = (seatLayout: SeatLayout, shouldMeasure = false) => {
     const player = seatLayout.player;
     const isCurrentTurn = currentPlayerId === player.id && !state.trickWinner && state.phase === 'playing';
     const isMe = player.id === myId;
     const seatPillStateClass = isCurrentTurn
       ? isMe
-        ? 'river-seatPill--activeSelf'
-        : 'river-seatPill--activeOther'
+        ? 'radial-seatPill--activeSelf'
+        : 'radial-seatPill--activeOther'
       : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
@@ -327,10 +299,10 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
     return (
       <div
         ref={shouldMeasure ? setSeatPillElement : undefined}
-        className={`river-seatPill cucumber-seatPill ${seatPillStateClass} ${isMe ? 'river-seatPill--me' : ''}`}
+        className={`radial-seatPill cucumber-seatPill ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`}
       >
-        <div className="river-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
-          <span className="river-seatName">{isMe ? 'You' : player.name}</span>
+        <div className="radial-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
+          <RadialSeatName name={isMe ? 'You' : player.name} textColor={seatTextColor} />
         </div>
         <div className={`cucumber-seatScoreRow ${dangerClass}`}>
           {player.penaltyScore}/{state.eliminationThreshold}
@@ -361,7 +333,7 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="cucumber-board river-board h-full flex flex-col items-center justify-center space-y-6 text-center"
+        className="cucumber-board radial-board h-full flex flex-col items-center justify-center space-y-6 text-center"
       >
         <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
         <h2 className="text-3xl font-extrabold text-white">Game Over</h2>
@@ -372,7 +344,7 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
           {[...state.players]
             .sort((a, b) => a.penaltyScore - b.penaltyScore)
             .map((player, i) => (
-              <div key={player.id} className="river-resultRow">
+              <div key={player.id} className="radial-resultRow">
                 <div className="flex items-center gap-3">
                   <span className="text-lg font-bold">#{i + 1}</span>
                   <span className="font-semibold">{player.name}</span>
@@ -386,7 +358,7 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
   }
 
   return (
-    <div ref={boardRef} className={`cucumber-board river-board river-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
+    <div ref={boardRef} className={`cucumber-board radial-board radial-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
       {showDevNearLoss && (
         <button
@@ -397,19 +369,19 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
           Dev: near loss
         </button>
       )}
-      <div ref={tableRef} className={`river-table river-table--players-${state.players.length}`}>
+      <div ref={tableRef} className={`radial-table radial-table--players-${state.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
             key={`seat-${layout.player.id}`}
-            className={`river-seat ${layout.relativeIndex === 0 ? 'river-seat--self' : ''}`}
+            className={`radial-seat ${layout.relativeIndex === 0 ? 'radial-seat--self' : ''}`}
             style={{ left: `${layout.seatLeft}%`, top: `${layout.seatTop}%` }}
           >
             {renderSeatPill(layout, layout.relativeIndex === 0)}
           </div>
         ))}
 
-        <div className={`river-center ${isHandZoomed ? 'river-center--zoom' : ''}`}>
-          <div className="river-centerGrid">
+        <div className={`radial-center ${isHandZoomed ? 'radial-center--zoom' : ''}`}>
+          <div className="radial-centerGrid">
             {seatLayouts.map((layout) => {
               const trickEntry = trickByRelativeSeat[layout.relativeIndex];
               const isWinningCard = trickWinnerRelativeSeat === layout.relativeIndex && !!state.trickWinner;
@@ -427,7 +399,7 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
               return (
                 <div
                   key={`slot-${layout.player.id}`}
-                  className={`river-slot ${trickEntry ? 'river-slot--filled' : 'river-slot--empty'}`}
+                  className={`radial-slot ${trickEntry ? 'radial-slot--filled' : 'radial-slot--empty'}`}
                   style={{
                     gridColumn: placement.col,
                     gridRow: placement.row,
@@ -442,14 +414,14 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
                         animate={{ scale: 1, opacity: 1, x: 0, y: 0 }}
                         exit={{ x: trickExitOffset.x, y: trickExitOffset.y, opacity: 0 }}
                         transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-                        className={`river-slotCard ${isWinningCard ? 'river-slotCard--winner' : ''}`}
+                        className={`radial-slotCard ${isWinningCard ? 'radial-slotCard--winner' : ''}`}
                       >
-                        <div className="river-slotCardInner">
-                          {renderCardFace(trickEntry.card, false, true)}
+                        <div className="radial-slotCardInner">
+                          <CardFace card={trickEntry.card} compact />
                         </div>
                       </motion.div>
                     ) : (
-                      <div key={`placeholder-${layout.relativeIndex}`} className="river-slotPlaceholder" />
+                      <div key={`placeholder-${layout.relativeIndex}`} className="radial-slotPlaceholder" />
                     )}
                   </AnimatePresence>
                 </div>
@@ -459,17 +431,17 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
         </div>
       </div>
 
-      <div className="river-headsUp" aria-live="polite">
-        <p className="river-headsUpText">
+      <div className="radial-headsUp" aria-live="polite">
+        <p className="radial-headsUpText">
           {headsUpContent ?? '\u00a0'}
         </p>
       </div>
 
       {myPlayer && (
         <div className="space-y-3">
-          <div ref={handContainerRef} className={`river-hand ${isHandZoomed ? 'river-hand--zoom' : ''}`}>
+          <div ref={handContainerRef} className={`radial-hand ${isHandZoomed ? 'radial-hand--zoom' : ''}`}>
             <div
-              className="river-handSpread"
+              className="radial-handSpread"
               style={{
                 width: `${handLayout.spreadWidth}px`,
                 height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
@@ -496,7 +468,7 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
                     transition={deal.isDealing ? { duration: 0.2, ease: [0.22, 1, 0.36, 1] } : { delay: i * 0.02 }}
                     onClick={() => playCard(cardFace)}
                     disabled={isDisabled}
-                    className="river-handHitbox"
+                    className="radial-handHitbox"
                     style={{
                       left: `${i * handLayout.step}px`,
                       width: `${hitboxWidth}px`,
@@ -506,18 +478,18 @@ export default function CucumberBoard({ state, myId, onAction, isHandZoomed = fa
                     aria-label={`Play ${rankDisplay(cardFace.rank)} of ${cardFace.suit}`}
                   >
                     <span
-                      className={`river-handCardWrap ${canPlay ? 'river-handCardWrap--active' : ''}`}
+                      className={`radial-handCardWrap ${canPlay ? 'radial-handCardWrap--active' : ''}`}
                       style={{ width: `${handLayout.cardWidth}px`, height: `${handLayout.cardHeight}px` }}
                     >
-                      {renderCardFace(cardFace, state.phase === 'playing' && isDisabled)}
+                      <CardFace card={cardFace} disabled={state.phase === 'playing' && isDisabled} />
                     </span>
                   </motion.button>
                 );
               })}
             </div>
           </div>
-          <div className="river-actionRow">
-            <div className="river-actionSpacer" aria-hidden="true">&nbsp;</div>
+          <div className="radial-actionRow">
+            <div className="radial-actionSpacer" aria-hidden="true">&nbsp;</div>
           </div>
         </div>
       )}

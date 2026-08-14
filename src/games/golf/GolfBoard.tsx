@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import type { Card, GolfPlayer, GolfState, Suit } from './types';
+import type { Card, GolfPlayer, GolfState } from './types';
 import {
   canDiscardDrawn,
   canDrawFromStock,
@@ -12,11 +12,13 @@ import {
   columnPairScore,
   COLUMN_PAIRS,
   isSetupPhase,
-  rankDisplay,
   squareBonus,
 } from './rules';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX } from '../../networking/playerColors';
-import { AutoFitSeatName } from '../shared/AutoFitSeatName';
+import { CardBack } from '../shared/ui/CardBack';
+import { CardFace } from '../shared/ui/CardFace';
+import { FlipCard } from '../shared/ui/FlipCard';
+import { RadialSeatName } from '../shared/ui/RadialSeatName';
 import { useDealerDealAnimation, type DealExtraTarget, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 import { GolfDiscardAnimationLayer } from './GolfDiscardAnimationLayer';
@@ -26,19 +28,9 @@ import { useGolfDiscardAnimation } from './useGolfDiscardAnimation';
 import { useGolfSwapAnimation } from './useGolfSwapAnimation';
 import { useGolfFlipAnimation } from './useGolfFlipAnimation';
 
-const SUIT_SYMBOLS: Record<Suit, string> = {
-  hearts: '\u2665',
-  diamonds: '\u2666',
-  clubs: '\u2663',
-  spades: '\u2660',
-};
-
-const SUIT_COLORS: Record<Suit, string> = {
-  hearts: 'text-red-400',
-  diamonds: 'text-red-400',
-  clubs: 'text-gray-800',
-  spades: 'text-gray-800',
-};
+function GolfFlipCard({ card, faceDown, disabled = false }: { card?: Card | null; faceDown: boolean; disabled?: boolean }) {
+  return <FlipCard card={card ?? undefined} faceDown={faceDown || !card} disabled={disabled} size="sm" />;
+}
 
 interface GolfBoardProps {
   state: GolfState;
@@ -67,33 +59,6 @@ function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY
   if (playerCount >= 5) return { seatRadiusX: 40, seatRadiusY: 34 };
   if (playerCount === 4) return { seatRadiusX: 35, seatRadiusY: 27 };
   return { seatRadiusX: 34, seatRadiusY: 30 };
-}
-
-function PokerFlipCard({ card, faceDown, disabled = false }: { card?: Card | null; faceDown: boolean; disabled?: boolean }) {
-  if (faceDown || !card) {
-    return <div className="twelve-cardBackFace" />;
-  }
-
-  return (
-    <div className="poker-cardFlip poker-cardFlip--sm">
-      <motion.div
-        className="poker-cardFlipInner"
-        initial={{ rotateY: 0 }}
-        animate={{ rotateY: 180 }}
-        transition={{ duration: 0.42, ease: 'easeInOut' }}
-      >
-        <div className="poker-cardFlipBack" aria-hidden="true">
-          <div className="twelve-cardBackFace" />
-        </div>
-        <div className={`poker-cardFlipFront ${disabled ? 'poker-cardFlipFront--disabled' : ''}`}>
-          <div className="poker-cardCorner">
-            <span className={`poker-cardRank ${SUIT_COLORS[card.suit]}`}>{rankDisplay(card.rank)}</span>
-            <span className={`poker-cardSuit ${SUIT_COLORS[card.suit]}`}>{SUIT_SYMBOLS[card.suit]}</span>
-          </div>
-        </div>
-      </motion.div>
-    </div>
-  );
 }
 
 export default function GolfBoard({ state, myId, onAction, isHost = false }: GolfBoardProps) {
@@ -264,12 +229,7 @@ export default function GolfBoard({ state, myId, onAction, isHost = false }: Gol
   };
 
   const renderCardFace = (card: Card, disabled = false) => (
-    <div className={`river-card river-card--compact ${disabled ? 'river-card--disabled' : ''}`}>
-      <div className="river-cardCorner">
-        <span className={`river-cardRank ${SUIT_COLORS[card.suit]}`}>{rankDisplay(card.rank)}</span>
-        <span className={`river-cardSuit ${SUIT_COLORS[card.suit]}`}>{SUIT_SYMBOLS[card.suit]}</span>
-      </div>
-    </div>
+    <CardFace card={card} disabled={disabled} compact />
   );
 
   const headsUpContent = useMemo((): ReactNode => {
@@ -338,21 +298,20 @@ export default function GolfBoard({ state, myId, onAction, isHost = false }: Gol
     const isMe = player.id === myId;
     const seatPillStateClass = isCurrentTurn
       ? isMe
-        ? 'river-seatPill--activeSelf'
-        : 'river-seatPill--activeOther'
+        ? 'radial-seatPill--activeSelf'
+        : 'radial-seatPill--activeOther'
       : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
 
     return (
       <div
-        className={`river-seatPill golf-seatPill ${seatPillStateClass} ${isMe ? 'river-seatPill--me' : ''}`}
+        className={`radial-seatPill golf-seatPill ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`}
       >
-        <div className="river-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
-          <AutoFitSeatName
+        <div className="radial-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
+          <RadialSeatName
             name={`${isMe ? 'You' : player.name} (${player.totalScore})`}
             textColor={seatTextColor}
-            nameClassName="river-seatName"
           />
         </div>
       </div>
@@ -403,16 +362,16 @@ export default function GolfBoard({ state, myId, onAction, isHost = false }: Gol
           {isAnimating ? (
             <span className="golf-slotButtonPlaceholder" aria-hidden="true" />
           ) : needsRevealFlip ? (
-            <PokerFlipCard
+            <GolfFlipCard
               key={`reveal-${state.holeNumber}-${slotId}`}
               card={slot.card}
               faceDown={false}
               disabled={!slotEnabled}
             />
           ) : slot.faceUp ? (
-            renderCardFace(slot.card, !slotEnabled)
+            <CardFace card={slot.card} disabled={!slotEnabled} compact />
           ) : (
-            <PokerFlipCard card={slot.card} faceDown disabled={!slotEnabled} />
+            <GolfFlipCard card={slot.card} faceDown disabled={!slotEnabled} />
           )}
         </button>
       </div>
@@ -433,7 +392,7 @@ export default function GolfBoard({ state, myId, onAction, isHost = false }: Gol
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="golf-board river-board h-full flex flex-col items-center justify-center space-y-6 text-center"
+        className="golf-board radial-board h-full flex flex-col items-center justify-center space-y-6 text-center"
       >
         <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
         <h2 className="text-3xl font-extrabold text-white">Game Over</h2>
@@ -446,7 +405,7 @@ export default function GolfBoard({ state, myId, onAction, isHost = false }: Gol
             .map((player, i) => (
               <div
                 key={player.id}
-                className={`river-resultRow ${state.winners.includes(player.id) ? 'ring-2 ring-yellow-400' : ''}`}
+                className={`radial-resultRow ${state.winners.includes(player.id) ? 'ring-2 ring-yellow-400' : ''}`}
               >
                 <div className="flex items-center gap-3">
                   <span className="text-lg font-bold">#{i + 1}</span>
@@ -461,7 +420,7 @@ export default function GolfBoard({ state, myId, onAction, isHost = false }: Gol
   }
 
   return (
-    <div ref={boardRef} className={`golf-board river-board river-board--players-${state.players.length} relative`}>
+    <div ref={boardRef} className={`golf-board radial-board radial-board--players-${state.players.length} relative`}>
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
       <GolfDiscardAnimationLayer
         animation={discardAnim.animation}
@@ -476,11 +435,11 @@ export default function GolfBoard({ state, myId, onAction, isHost = false }: Gol
         renderCardFace={card => renderCardFace(card)}
       />
 
-      <div ref={tableRef} className={`river-table river-table--players-${state.players.length}`}>
+      <div ref={tableRef} className={`radial-table radial-table--players-${state.players.length}`}>
         {seatLayouts.map(layout => (
           <div
             key={`seat-${layout.player.id}`}
-            className={`river-seat ${layout.relativeIndex === 0 ? 'river-seat--self' : ''}`}
+            className={`radial-seat ${layout.relativeIndex === 0 ? 'radial-seat--self' : ''}`}
             style={{ left: `${layout.seatLeft}%`, top: `${layout.seatTop}%` }}
           >
             <div
@@ -523,7 +482,7 @@ export default function GolfBoard({ state, myId, onAction, isHost = false }: Gol
             aria-label={`Draw from stock, ${state.stock.length} cards remaining`}
           >
             <div className="golf-stockStack">
-              <div className="twelve-cardBackFace" />
+              <div className="card-back" />
             </div>
             {hasStockPendingDraw && state.pendingDraw && (
               <div
@@ -531,9 +490,9 @@ export default function GolfBoard({ state, myId, onAction, isHost = false }: Gol
                 aria-label="Drawn card"
               >
                 {isActiveDrawer ? (
-                  <PokerFlipCard card={state.pendingDraw} faceDown={false} />
+                  <GolfFlipCard card={state.pendingDraw} faceDown={false} />
                 ) : (
-                  <div className="twelve-cardBackFace" />
+                  <CardBack />
                 )}
               </div>
             )}
@@ -561,10 +520,10 @@ export default function GolfBoard({ state, myId, onAction, isHost = false }: Gol
       </div>
 
       <div className="golf-statusBlock">
-        <div className="river-headsUp" aria-live="polite">
+        <div className="radial-headsUp" aria-live="polite">
           <div
             role="status"
-            className={`river-headsUpText ${state.phase === 'hole-end' ? 'river-headsUpText--roundEnd' : ''} ${showSkipOptionalFlip || (state.phase === 'hole-end' && isHost) ? 'golf-headsUpText--withAction' : ''}`}
+            className={`radial-headsUpText ${state.phase === 'hole-end' ? 'radial-headsUpText--roundEnd' : ''} ${showSkipOptionalFlip || (state.phase === 'hole-end' && isHost) ? 'golf-headsUpText--withAction' : ''}`}
           >
             {headsUpContent ?? '\u00a0'}
           </div>

@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   CASINO_TABLE_COLUMNS,
   type Card,
-  type Suit,
   type CasinoState,
   type TableItem,
   buildMultiplicityLabel,
@@ -32,20 +31,8 @@ import {
 import { useLastDealFlash } from './useLastDealFlash';
 import { useDealerDealAnimation, type DealSeat, type DealExtraTarget } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
-
-const SUIT_SYMBOLS: Record<Suit, string> = {
-  hearts: '\u2665',
-  diamonds: '\u2666',
-  clubs: '\u2663',
-  spades: '\u2660',
-};
-
-const SUIT_COLORS: Record<Suit, string> = {
-  hearts: 'text-red-400',
-  diamonds: 'text-red-400',
-  clubs: 'text-gray-800',
-  spades: 'text-gray-800',
-};
+import { CardFace as SharedCardFace } from '../shared/ui/CardFace';
+import { SUIT_COLORS, SUIT_SYMBOLS } from '../shared/ui/cardConstants';
 
 interface CasinoBoardProps {
   state: unknown;
@@ -121,16 +108,8 @@ function captureHudMessage(
   );
 }
 
-function CardFace({ card, small = false }: { card: Card; small?: boolean }) {
-  const symbol = SUIT_SYMBOLS[card.suit];
-  const colorClass = SUIT_COLORS[card.suit];
-  const label = rankDisplay(card.rank);
-  return (
-    <div className={`casino-cardFace ${small ? 'casino-cardFace--small' : ''}`}>
-      <span className={`casino-cardRank ${colorClass}`}>{label}</span>
-      <span className={`casino-cardSuit ${colorClass}`}>{symbol}</span>
-    </div>
-  );
+function CasinoCardFace({ card, small = false, disabled = false, selected = false }: { card: Card; small?: boolean; disabled?: boolean; selected?: boolean }) {
+  return <SharedCardFace card={card} compact={small} disabled={disabled} selected={selected} />;
 }
 
 function TableCard({
@@ -156,14 +135,10 @@ function TableCard({
       disabled={disabled}
       className={`casino-tableCard ${selected ? 'casino-tableCard--selected' : ''} ${disabled ? 'casino-tableCard--disabled' : ''}`}
     >
-      <div className="casino-card">
-        <CardFace card={card} />
-      </div>
+      <CasinoCardFace card={card} />
       {previewCard && (
         <div className="casino-capturePreviewCard">
-          <div className="casino-card">
-            <CardFace card={previewCard} />
-          </div>
+          <CasinoCardFace card={previewCard} />
         </div>
       )}
     </motion.button>
@@ -201,18 +176,14 @@ function BuildPile({
             className="casino-buildPileLayer"
             style={{ transform: `translate(${i * 5}px, ${-i * 4}px)` }}
           >
-            <div className="casino-card">
-              <CardFace card={card} />
-            </div>
+            <CasinoCardFace card={card} />
           </div>
         ))}
       </div>
       <span className="casino-buildPileValueBadge">{buildMultiplicityLabel(build.build)}</span>
       {previewCard && (
         <div className="casino-capturePreviewCard">
-          <div className="casino-card">
-            <CardFace card={previewCard} />
-          </div>
+          <CasinoCardFace card={previewCard} />
         </div>
       )}
     </motion.button>
@@ -721,15 +692,15 @@ export default function CasinoBoard({
         <div className="casino-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
           <span className="casino-seatPillName">{isMe ? 'You' : player.name}</span>
         </div>
-        <div className="river-seatPillLabels">
-          <span className="river-seatCell river-seatCell--bid" title="Clean tables">CT</span>
-          <span className="river-seatCell river-seatCell--tricks" title="Cards">Crds</span>
-          <span className="river-seatCell river-seatCell--total">Tot</span>
+        <div className="radial-seatPillLabels">
+          <span className="radial-seatCell radial-seatCell--bid" title="Clean tables">CT</span>
+          <span className="radial-seatCell radial-seatCell--tricks" title="Cards">Crds</span>
+          <span className="radial-seatCell radial-seatCell--total">Tot</span>
         </div>
-        <div className="river-seatPillValues">
-          <span className="river-seatCell river-seatCell--bid">{player.sweepCount}</span>
-          <span className="river-seatCell river-seatCell--tricks">{player.capturedCards.length}</span>
-          <span className="river-seatCell river-seatCell--total">{s.scores[player.id] ?? 0}</span>
+        <div className="radial-seatPillValues">
+          <span className="radial-seatCell radial-seatCell--bid">{player.sweepCount}</span>
+          <span className="radial-seatCell radial-seatCell--tricks">{player.capturedCards.length}</span>
+          <span className="radial-seatCell radial-seatCell--total">{s.scores[player.id] ?? 0}</span>
         </div>
       </div>
     );
@@ -949,9 +920,7 @@ export default function CasinoBoard({
                         transform: isSelected ? `translateY(-${handLayout.selectedLift}px)` : 'translateY(0px)',
                       }}
                     >
-                      <div className={`casino-card ${!isMyTurn ? 'casino-card--disabled' : ''} ${isSelected ? 'casino-card--selected' : ''}`}>
-                        <CardFace card={card} />
-                      </div>
+                      <CasinoCardFace card={card} disabled={!isMyTurn} selected={isSelected} />
                     </span>
                   </motion.button>
                 );
