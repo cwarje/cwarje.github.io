@@ -132,6 +132,15 @@ describe('tens deal', () => {
 });
 
 describe('tens play', () => {
+  it('allows playing two identical hand cards in one turn', () => {
+    const p0 = player('p0', [card('clubs', 9), card('clubs', 9), card('hearts', 9)]);
+    const state = baseState([p0, player('p1', [])]);
+    expect(validatePlays(state, 0, [
+      { card: card('clubs', 9), source: 'hand' },
+      { card: card('clubs', 9), source: 'hand' },
+    ])).toBe(true);
+  });
+
   it('allows leading any rank on empty center', () => {
     const p0 = player('p0', [card('hearts', 5), card('clubs', 5)]);
     const state = baseState([p0, player('p1', [card('spades', 3)])]);
@@ -247,11 +256,27 @@ describe('tens play', () => {
     const next = processTensAction(state, {
       type: 'play-cards',
       plays: [{ card: card('hearts', 10), source: 'hand' }],
-      clearWithWild: true,
     }, 'p0') as TensState;
 
     expect(next.centerPile).toHaveLength(0);
     expect(next.discardCount).toBe(3);
+    expect(next.currentPlayerIndex).toBe(0);
+  });
+
+  it('wild ten clears instead of pickup when center rank is lower', () => {
+    const p0 = player('p0', [card('hearts', 10)]);
+    const state = baseState([p0, player('p1', [card('spades', 3)])], {
+      centerPile: [card('clubs', 8)],
+      lastPlayRank: 8,
+    });
+    const next = processTensAction(state, {
+      type: 'play-cards',
+      plays: [{ card: card('hearts', 10), source: 'hand' }],
+    }, 'p0') as TensState;
+
+    expect(next.centerPile).toHaveLength(0);
+    expect(next.players[0].hand).toHaveLength(0);
+    expect(next.discardCount).toBe(2);
     expect(next.currentPlayerIndex).toBe(0);
   });
 

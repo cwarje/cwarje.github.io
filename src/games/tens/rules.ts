@@ -127,20 +127,17 @@ export function validatePlays(
   state: TensState,
   playerIndex: number,
   plays: { card: Card; source: PlaySource; pileIndex?: number }[],
-  options?: { allowWildClear?: boolean },
 ): boolean {
   if (plays.length === 0) return false;
   const player = state.players[playerIndex];
   if (!player) return false;
 
   const available = listPlayableCards(player);
-
-  const used = new Set<string>();
+  let remaining = [...available];
   for (const play of plays) {
-    const key = `${play.source}-${play.pileIndex ?? 'h'}-${play.card.suit}-${play.card.rank}`;
-    if (used.has(key)) return false;
-    used.add(key);
-    if (!available.some(entry => matchesPlay(entry, play))) return false;
+    const idx = remaining.findIndex(entry => matchesPlay(entry, play));
+    if (idx === -1) return false;
+    remaining.splice(idx, 1);
   }
 
   const ranks = new Set(plays.map(p => p.card.rank));
@@ -148,7 +145,7 @@ export function validatePlays(
 
   const rank = plays[0].card.rank;
 
-  if (options?.allowWildClear && rank === 10 && plays.some(p => p.card.rank === 10)) {
+  if (rank === 10) {
     return true;
   }
 

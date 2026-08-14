@@ -53,7 +53,7 @@ export interface TensState {
 }
 
 export type TensAction =
-  | { type: 'play-cards'; plays: SelectedCardPlay[]; clearWithWild?: boolean }
+  | { type: 'play-cards'; plays: SelectedCardPlay[] }
   | { type: 'start-next-round' }
   | { type: 'show-final-results' };
 

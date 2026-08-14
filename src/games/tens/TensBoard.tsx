@@ -43,6 +43,7 @@ interface ElementSize {
 }
 
 const SEAT_EDGE_GAP_PX = 8;
+const SEAT_RADIUS_Y_SCALE = 0.9;
 const OPPONENT_HAND_CARD_WIDTH = 45;
 const OPPONENT_HAND_CARD_HEIGHT = 68;
 const OPPONENT_HAND_MAX_SPREAD = 160;
@@ -74,12 +75,38 @@ function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY
   return { seatRadiusX: 30, seatRadiusY: 29 };
 }
 
+function handCardKey(handIndex: number): string {
+  return `hand-${handIndex}`;
+}
+
 function cardKey(card: Card, source: SelectedCardPlay['source'], pileIndex?: number): string {
   return `${source}-${pileIndex ?? 'h'}-${card.suit}-${card.rank}`;
 }
 
 function TensFlipCard({ card, faceDown, disabled = false }: { card?: Card | null; faceDown: boolean; disabled?: boolean }) {
   return <FlipCard card={card ?? undefined} faceDown={faceDown || !card} disabled={disabled} size="sm" />;
+}
+
+function matchesSelectedPlay(
+  entry: { card: Card; source: SelectedCardPlay['source']; pileIndex?: number },
+  play: SelectedCardPlay,
+): boolean {
+  if (!cardEquals(entry.card, play.card)) return false;
+  if (entry.source !== play.source) return false;
+  if (play.source === 'hand') return true;
+  return entry.pileIndex === play.pileIndex;
+}
+
+function remainingPlaySlots(
+  groupPlays: { card: Card; source: SelectedCardPlay['source']; pileIndex?: number }[],
+  selectedPlays: SelectedCardPlay[],
+) {
+  const remaining = [...groupPlays];
+  for (const play of selectedPlays) {
+    const idx = remaining.findIndex(entry => matchesSelectedPlay(entry, play));
+    if (idx >= 0) remaining.splice(idx, 1);
+  }
+  return remaining;
 }
 
 export default function TensBoard({
@@ -144,6 +171,10 @@ export default function TensBoard({
           };
         })()
       : fallbackRadii;
+    const scaledRadii = {
+      seatRadiusX: radii.seatRadiusX,
+      seatRadiusY: radii.seatRadiusY * SEAT_RADIUS_Y_SCALE,
+    };
 
     return Array.from({ length: playerCount }, (_, relativeIndex) => {
       const playerIndex = (anchorIndex + relativeIndex) % playerCount;
@@ -154,8 +185,8 @@ export default function TensBoard({
         relativeIndex,
         playerIndex,
         player,
-        seatLeft: 50 + radii.seatRadiusX * Math.cos(angleInRadians),
-        seatTop: 50 + radii.seatRadiusY * Math.sin(angleInRadians),
+        seatLeft: 50 + scaledRadii.seatRadiusX * Math.cos(angleInRadians),
+        seatTop: 50 + scaledRadii.seatRadiusY * Math.sin(angleInRadians),
       };
     }).filter(layout => !!layout.player);
   }, [state.players, anchorIndex, tableSize.width, tableSize.height, seatPillSize.width, seatPillSize.height]);
@@ -258,12 +289,14 @@ export default function TensBoard({
     isMyTurn &&
     state.phase === 'playing';
 
+  const hasActionButtons = canInteract && !!myPlayer;
+
   const selectedPlays = useMemo((): SelectedCardPlay[] => {
     if (!myPlayer) return [];
     const allTopsPlayed = allPileTopsPlayed(myPlayer);
     const plays: SelectedCardPlay[] = [];
-    visibleHand.forEach((card) => {
-      const key = cardKey(card, 'hand');
+    visibleHand.forEach((card, handIndex) => {
+      const key = handCardKey(handIndex);
       if (selectedKeys.has(key)) plays.push({ card, source: 'hand' });
     });
     myPlayer.tablePiles.forEach((pile, pileIndex) => {
@@ -281,22 +314,22 @@ export default function TensBoard({
     return validatePlays(state, myIndex, selectedPlays);
   }, [canInteract, myIndex, selectedPlays, state]);
 
-  const canWildClear = useMemo(() => {
-    if (!canInteract || myIndex < 0) return false;
-    return selectedPlays.length > 0
-      && selectedPlays.every(p => p.card.rank === 10)
-      && validatePlays(state, myIndex, selectedPlays, { allowWildClear: true });
-  }, [canInteract, myIndex, selectedPlays, state]);
-
   const legalGroups = useMemo(() => {
     if (myIndex < 0) return [];
     return listLegalPlayGroups(state, myIndex);
   }, [state, myIndex]);
 
-  const isCardSelectable = (card: Card, source: SelectedCardPlay['source'], pileIndex?: number): boolean => {
+  const isCardSelectable = (
+    card: Card,
+    source: SelectedCardPlay['source'],
+    pileIndex?: number,
+    handIndex?: number,
+  ): boolean => {
     if (!canInteract || !myPlayer) return false;
-    const key = cardKey(card, source, pileIndex);
+    const key = source === 'hand' ? handCardKey(handIndex ?? -1) : cardKey(card, source, pileIndex);
     if (selectedKeys.has(key)) return true;
+    if (selectedPlays.length >= 4) return false;
+
     if (selectedPlays.length === 0) {
       return legalGroups.some(group =>
         group.plays.some(p =>
@@ -306,21 +339,34 @@ export default function TensBoard({
         ),
       );
     }
+
+    const hasPileBottomSelection = selectedPlays.some(p => p.source === 'pile-bottom');
+    const hasHandSelection = selectedPlays.some(p => p.source === 'hand');
+    if (source === 'hand' && hasPileBottomSelection) return false;
+    if (source === 'pile-bottom' && hasHandSelection) return false;
+
     const selectedRank = selectedPlays[0]?.card.rank;
     if (card.rank !== selectedRank) return false;
-    return legalGroups.some(group =>
-      group.rank === selectedRank &&
-      group.plays.some(p =>
-        p.source === source &&
-        (source === 'hand' || p.pileIndex === pileIndex) &&
-        cardEquals(p.card, card),
-      ),
+
+    const group = legalGroups.find(g => g.rank === selectedRank);
+    if (!group) return false;
+
+    const remaining = remainingPlaySlots(group.plays, selectedPlays);
+    return remaining.some(p =>
+      p.source === source &&
+      (source === 'hand' || p.pileIndex === pileIndex) &&
+      cardEquals(p.card, card),
     );
   };
 
-  const toggleSelection = (card: Card, source: SelectedCardPlay['source'], pileIndex?: number) => {
-    if (!isCardSelectable(card, source, pileIndex) && !selectedKeys.has(cardKey(card, source, pileIndex))) return;
-    const key = cardKey(card, source, pileIndex);
+  const toggleSelection = (
+    card: Card,
+    source: SelectedCardPlay['source'],
+    pileIndex?: number,
+    handIndex?: number,
+  ) => {
+    const key = source === 'hand' ? handCardKey(handIndex ?? -1) : cardKey(card, source, pileIndex);
+    if (!isCardSelectable(card, source, pileIndex, handIndex) && !selectedKeys.has(key)) return;
     setSelectedKeys(prev => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -329,9 +375,9 @@ export default function TensBoard({
     });
   };
 
-  const submitPlay = (clearWithWild = false) => {
-    if (!canSubmitPlay && !clearWithWild) return;
-    onAction({ type: 'play-cards', plays: selectedPlays, clearWithWild });
+  const submitPlay = () => {
+    if (!canSubmitPlay) return;
+    onAction({ type: 'play-cards', plays: selectedPlays });
     setSelectedKeys(new Set());
   };
 
@@ -344,10 +390,8 @@ export default function TensBoard({
     const turnLabel = current.id === myId ? 'Your turn' : `${current.name}'s turn`;
     const rankLabel = state.lastPlayRank === null
       ? 'Center open'
-      : `Must play ${rankDisplay(state.lastPlayRank)} or lower (Ace low)`;
-    const pileLabel = state.centerPile.length > 0 ? ` · Center: ${state.centerPile.length}` : '';
-    const discardLabel = state.discardCount > 0 ? ` · Cleared: ${state.discardCount}` : '';
-    return `${turnLabel} · ${rankLabel}${pileLabel}${discardLabel}`;
+      : `Must play ${rankDisplay(state.lastPlayRank)} or lower`;
+    return `${turnLabel} · ${rankLabel}`;
   }, [state, myId]);
 
   const renderOpponentHandFan = (player: TensPlayer) => {
@@ -561,79 +605,78 @@ export default function TensBoard({
         </div>
       </div>
 
-      <div className="radial-headsUp" aria-live="polite">
-        <p className="radial-headsUpText">{headsUpContent ?? '\u00a0'}</p>
+      <div className="twelve-statusBlock">
+        <div className="radial-headsUp" aria-live="polite">
+          <p
+            className={`radial-headsUpText ${state.phase === 'round-end' ? 'radial-headsUpText--roundEnd' : ''} ${hasActionButtons ? 'twelve-headsUpText--withAction' : ''}`}
+          >
+            {hasActionButtons ? (
+              <span className="tens-headsUpInline">
+                <span>{headsUpContent ?? '\u00a0'}</span>
+                <button
+                  type="button"
+                  onClick={submitPlay}
+                  disabled={!canSubmitPlay}
+                  className="tens-playButton tens-playButton--inline"
+                >
+                  Play{selectedPlays.length > 0 ? ` (${selectedPlays.length})` : ''}
+                </button>
+              </span>
+            ) : (
+              headsUpContent ?? '\u00a0'
+            )}
+          </p>
+        </div>
       </div>
 
       {myPlayer && (
-        <div className="space-y-3">
-          <div ref={handContainerRef} className={`radial-hand ${isHandZoomed ? 'radial-hand--zoom' : ''}`}>
-            <div
-              className={`radial-handSpread ${isThrowingCards ? 'card-toss-handSpread--hidden' : ''}`}
-              style={{
-                width: `${handLayout.spreadWidth}px`,
-                height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
-                transition: 'width 0.16s ease',
-              }}
-            >
-              {visibleHand.map((cardFace, i) => {
-                const key = cardKey(cardFace, 'hand');
-                const selected = selectedKeys.has(key);
-                const selectable = isCardSelectable(cardFace, 'hand');
-                const isLast = i === visibleHand.length - 1;
-                const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
+        <div ref={handContainerRef} className={`radial-hand ${isHandZoomed ? 'radial-hand--zoom' : ''}`}>
+          <div
+            className={`radial-handSpread ${isThrowingCards ? 'card-toss-handSpread--hidden' : ''}`}
+            style={{
+              width: `${handLayout.spreadWidth}px`,
+              height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
+              transition: 'width 0.16s ease',
+            }}
+          >
+            {visibleHand.map((cardFace, i) => {
+              const key = handCardKey(i);
+              const selected = selectedKeys.has(key);
+              const selectable = isCardSelectable(cardFace, 'hand', undefined, i);
+              const isLast = i === visibleHand.length - 1;
+              const hitboxWidth = isLast ? handLayout.cardWidth : handLayout.step;
 
-                return (
-                  <motion.button
-                    key={`${cardFace.suit}-${cardFace.rank}`}
-                    type="button"
-                    initial={deal.isDealing ? { scale: 0.6, opacity: 0 } : reduceMotion ? false : { y: 50, opacity: 0 }}
-                    animate={deal.isDealing ? { scale: 1, opacity: 1 } : { y: 0, opacity: 1 }}
-                    transition={deal.isDealing ? { duration: 0.2, ease: [0.22, 1, 0.36, 1] } : { delay: i * 0.02 }}
-                    onClick={() => toggleSelection(cardFace, 'hand')}
-                    disabled={!canInteract || (!selectable && !selected)}
-                    className="radial-handHitbox"
+              return (
+                <motion.button
+                  key={key}
+                  type="button"
+                  initial={deal.isDealing ? { scale: 0.6, opacity: 0 } : reduceMotion ? false : { y: 50, opacity: 0 }}
+                  animate={deal.isDealing ? { scale: 1, opacity: 1 } : { y: 0, opacity: 1 }}
+                  transition={deal.isDealing ? { duration: 0.2, ease: [0.22, 1, 0.36, 1] } : { delay: i * 0.02 }}
+                  onClick={() => toggleSelection(cardFace, 'hand', undefined, i)}
+                  disabled={!canInteract || (!selectable && !selected)}
+                  className="radial-handHitbox"
+                  style={{
+                    left: `${i * handLayout.step}px`,
+                    width: `${hitboxWidth}px`,
+                    height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
+                    zIndex: i + 1,
+                  }}
+                  aria-label={`${selected ? 'Deselect' : 'Select'} ${rankDisplay(cardFace.rank)} of ${cardFace.suit}`}
+                >
+                  <span
+                    className={`radial-handCardWrap ${canInteract && (selectable || selected) ? (selected ? '' : 'radial-handCardWrap--active') : ''}`}
                     style={{
-                      left: `${i * handLayout.step}px`,
-                      width: `${hitboxWidth}px`,
-                      height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
-                      zIndex: i + 1,
+                      width: `${handLayout.cardWidth}px`,
+                      height: `${handLayout.cardHeight}px`,
+                      transform: selected ? `translateY(-${handLayout.selectedLift}px)` : 'translateY(0px)',
                     }}
-                    aria-label={`${selected ? 'Deselect' : 'Select'} ${rankDisplay(cardFace.rank)} of ${cardFace.suit}`}
                   >
-                    <span
-                      className={`radial-handCardWrap ${canInteract && (selectable || selected) ? (selected ? '' : 'radial-handCardWrap--active') : ''}`}
-                      style={{
-                        width: `${handLayout.cardWidth}px`,
-                        height: `${handLayout.cardHeight}px`,
-                        transform: selected ? `translateY(-${handLayout.selectedLift}px)` : 'translateY(0px)',
-                      }}
-                    >
-                      <CardFace card={cardFace} disabled={!canInteract || (!selectable && !selected)} selected={selected} />
-                    </span>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="radial-actionRow tens-actionRow">
-            <button
-              type="button"
-              onClick={() => submitPlay(false)}
-              disabled={!canSubmitPlay}
-              className="tens-playButton"
-            >
-              Play{selectedPlays.length > 0 ? ` (${selectedPlays.length})` : ''}
-            </button>
-            <button
-              type="button"
-              onClick={() => submitPlay(true)}
-              disabled={!canWildClear}
-              className="tens-clearButton"
-            >
-              Clear with 10
-            </button>
+                    <CardFace card={cardFace} disabled={!canInteract || (!selectable && !selected)} selected={selected} />
+                  </span>
+                </motion.button>
+              );
+            })}
           </div>
         </div>
       )}

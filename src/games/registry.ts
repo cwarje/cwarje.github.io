@@ -854,7 +854,6 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
       ],
       howToPlay: [
         'Select matching cards in your hand or on your piles, then tap Play.',
-        'Use Clear with 10 when you want to wipe the center pile with a ten.',
         'Dump high cards early, but watch the tens — they are powerful and expensive if you get stuck holding them.',
       ],
     },

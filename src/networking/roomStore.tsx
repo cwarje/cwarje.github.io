@@ -1460,7 +1460,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const TWELVE_ANNOUNCEMENT_DELAY = 4000; // ms to show trump/tjog announcement
   const TWELVE_ROUND_END_DELAY = 6500; // ms to show round summary before next round
   const TWELVE_FINAL_RESULTS_DELAY = 6000; // ms to hold final round summary before end screen
-  const TENS_BOT_DELAY = 900;
+  const TENS_BOT_DELAY = 1400;
   const TENS_ROUND_END_DELAY = 6500;
   const TENS_FINAL_RESULTS_DELAY = 6000;
   const CROSS_CRIB_ROUND_END_DELAY = 10000; // ms to show round summary before next round

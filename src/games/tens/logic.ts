@@ -332,21 +332,12 @@ function handlePlayCards(state: TensState, playerId: string, action: Extract<Ten
     return state;
   }
 
-  if (!validatePlays(state, playerIndex, action.plays, { allowWildClear: action.clearWithWild })) {
+  if (!validatePlays(state, playerIndex, action.plays)) {
     return state;
   }
 
-  if (action.clearWithWild && action.plays.every(p => p.card.rank === 10)) {
+  if (action.plays.every(p => p.card.rank === 10)) {
     return applyPlayResult(state, playerIndex, action.plays, { clearWithWild: true });
-  }
-
-  const rank = action.plays[0].card.rank;
-  if (action.clearWithWild && rank === 10) {
-    return applyPlayResult(state, playerIndex, action.plays, { clearWithWild: true });
-  }
-
-  if (!wouldPickup(rank, state.lastPlayRank) && !validatePlays(state, playerIndex, action.plays)) {
-    return state;
   }
 
   return applyPlayResult(state, playerIndex, action.plays, {});
@@ -477,11 +468,9 @@ export function runTensBotTurn(state: unknown): unknown {
   const plays = chooseBotPlays(s, playerIndex);
   if (!plays || plays.length === 0) return s;
 
-  const useWildClear = plays.every(p => p.card.rank === 10) && s.centerPile.length > 0;
   return processTensAction(s, {
     type: 'play-cards',
     plays,
-    clearWithWild: useWildClear,
   }, player.id);
 }
 
