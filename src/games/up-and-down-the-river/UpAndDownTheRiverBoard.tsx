@@ -396,7 +396,6 @@ export default function UpAndDownTheRiverBoard({ state, myId, onAction, isHandZo
   const renderSeatPill = (seatLayout: RiverSeatLayout, shouldMeasure = false) => {
     const player = seatLayout.player;
     const isCurrentTurn =
-      !isKnocking &&
       state.phase === 'playing' &&
       state.players[state.currentPlayerIndex]?.id === player.id &&
       !state.trickWinner;
