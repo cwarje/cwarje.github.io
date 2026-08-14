@@ -1462,7 +1462,6 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const TWELVE_ROUND_END_DELAY = 6500; // ms to show round summary before next round
   const TWELVE_FINAL_RESULTS_DELAY = 6000; // ms to hold final round summary before end screen
   const TENS_BOT_DELAY = 1400;
-  const TENS_ANNOUNCEMENT_DELAY = tensAnnouncementDelayMs();
   const TENS_ROUND_END_DELAY = 6500;
   const TENS_FINAL_RESULTS_DELAY = 6000;
   const CROSS_CRIB_ROUND_END_DELAY = 10000; // ms to show round summary before next round
@@ -1812,6 +1811,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       if (ts.phase === 'game-over') return;
 
       if (ts.phase === 'announcement') {
+        const announcementDelay = tensAnnouncementDelayMs(ts.actionAnnouncement?.outcome ?? 'normal');
         botTimerRef.current = setTimeout(() => {
           const currentGs = gameStateRef.current as TensState | null;
           const currentRoom = roomRef.current;
@@ -1827,7 +1827,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             setGameState(next);
             broadcastGameState(next);
           }
-        }, TENS_ANNOUNCEMENT_DELAY);
+        }, announcementDelay);
         return;
       }
 

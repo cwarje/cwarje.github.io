@@ -4,6 +4,7 @@ import {
   type ElementMetrics,
   type Point,
 } from '../golf/golfAnimMetrics';
+import type { TensPlayOutcome } from './types';
 
 export { getElementMetrics, FLY_DURATION_MS, type ElementMetrics, type Point };
 
@@ -36,9 +37,12 @@ export function centerStackOffset(displayIndex: number): Point {
 }
 
 /** Host announcement duration — covers fly-in, center hold, and fly-out. */
-export function tensAnnouncementDelayMs(): number {
+export function tensAnnouncementDelayMs(outcome: TensPlayOutcome = 'normal'): number {
   const playFly = FLY_DURATION_MS + PLAY_STAGGER_MS * (MAX_PLAY_CARDS - 1);
+  if (outcome === 'normal') {
+    return playFly + CENTER_HOLD_MS + ANNOUNCEMENT_BUFFER_MS;
+  }
   const outcomeFly = OUTCOME_FLY_DURATION_MS + OUTCOME_STAGGER_MS * (MAX_CENTER_CARDS - 1);
-  const maxHold = Math.max(CENTER_HOLD_MS, CLEAR_HOLD_MS);
-  return playFly + maxHold + outcomeFly + ANNOUNCEMENT_BUFFER_MS;
+  const holdMs = outcome === 'pickup' ? CENTER_HOLD_MS : CLEAR_HOLD_MS;
+  return playFly + holdMs + outcomeFly + ANNOUNCEMENT_BUFFER_MS;
 }
