@@ -41,6 +41,8 @@ import { cribCardsToSelect } from '../games/cross-crib/types';
 import type { CribbageState } from '../games/cribbage/types';
 import type { CasinoState } from '../games/casino/types';
 import type { CucumberState } from '../games/cucumber/types';
+import type { TensState } from '../games/tens/types';
+import { CARDS_PER_PLAYER } from '../games/tens/types';
 import type { GolfState } from '../games/golf/types';
 import { dealHoldDurationMs, registerDealHoldExtender } from '../games/shared/dealTiming';
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
@@ -170,6 +172,11 @@ function getRoundDealInfo(gameType: GameType | null, state: unknown): { signatur
       if (s.phase === 'hand-end' && s.gameOver) return null;
       return { signature: `cucumber-${s.handNumber}`, cardCount: sumHand(s.players) };
     }
+    case 'tens': {
+      const s = state as TensState;
+      if (s.phase === 'round-end' && s.gameOver) return null;
+      return { signature: `tens-${s.roundNumber}`, cardCount: s.players.length * CARDS_PER_PLAYER };
+    }
     case 'golf': {
       const s = state as GolfState;
       if (s.phase === 'game-over') return null;
@@ -248,6 +255,17 @@ function applyProfileToGameState(
     }
     case 'cucumber': {
       const current = state as CucumberState;
+      let changed = false;
+      const players = current.players.map((player) => {
+        if (player.id !== playerId) return player;
+        if (player.name === playerName && player.color === playerColor) return player;
+        changed = true;
+        return { ...player, name: playerName, color: playerColor };
+      });
+      return changed ? { ...current, players } : current;
+    }
+    case 'tens': {
+      const current = state as TensState;
       let changed = false;
       const players = current.players.map((player) => {
         if (player.id !== playerId) return player;
@@ -1442,6 +1460,9 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const TWELVE_ANNOUNCEMENT_DELAY = 4000; // ms to show trump/tjog announcement
   const TWELVE_ROUND_END_DELAY = 6500; // ms to show round summary before next round
   const TWELVE_FINAL_RESULTS_DELAY = 6000; // ms to hold final round summary before end screen
+  const TENS_BOT_DELAY = 900;
+  const TENS_ROUND_END_DELAY = 6500;
+  const TENS_FINAL_RESULTS_DELAY = 6000;
   const CROSS_CRIB_ROUND_END_DELAY = 10000; // ms to show round summary before next round
   const CROSS_CRIB_BOT_DELAY = 900; // ms between bot card placements
   const CROSS_CRIB_CRIB_REVEAL_STEP_MS = 750; // ms between each crib card flip
@@ -1779,6 +1800,60 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
           }
         }, UP_RIVER_BOT_DELAY);
+      }
+      return;
+    }
+
+    // ── Tens bot scheduling ──
+    if (room.gameType === 'tens') {
+      const ts = gameState as TensState;
+      if (ts.phase === 'game-over') return;
+
+      if (ts.phase === 'round-end') {
+        const roundEndAction = ts.gameOver
+          ? ({ type: 'show-final-results' } as const)
+          : ({ type: 'start-next-round' } as const);
+        const roundEndDelay = ts.gameOver ? TENS_FINAL_RESULTS_DELAY : TENS_ROUND_END_DELAY;
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current as TensState | null;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom || currentGs.phase !== 'round-end') return;
+          if (currentGs.gameOver !== ts.gameOver) return;
+
+          const next = processGameAction('tens', currentGs, roundEndAction, '');
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('tens', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, roundEndDelay);
+        return;
+      }
+
+      const currentPlayer = ts.players[ts.currentPlayerIndex];
+      if (currentPlayer?.isBot) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom) return;
+
+          const next = runSingleBotTurn('tens', currentGs);
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('tens', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          } else {
+            setDealHoldTick(tick => tick + 1);
+          }
+        }, TENS_BOT_DELAY);
       }
       return;
     }

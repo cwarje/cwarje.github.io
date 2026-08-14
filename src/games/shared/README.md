@@ -44,6 +44,7 @@ In multiplayer playing-card games, you can click an **opponent's seat pill** to 
 | Cribbage | `CribbageBoard.tsx` | `hand.length` |
 | Casino | `CasinoBoard.tsx` | `hand.length` |
 | Cucumber | `CucumberBoard.tsx` | `hand.length` |
+| 10s | `TensBoard.tsx` | `hand.length` |
 
 ### Module layout
 
@@ -123,6 +124,7 @@ These boards use the deal animation (all use a radial seat layout with the local
 | Mobilization | `MobilizationBoard.tsx` | `roundIndex` | All hands | — |
 | Poker | `PokerBoard.tsx` | `handNumber` | Hole cards only | — (community cards are mid-hand) |
 | Cucumber | `CucumberBoard.tsx` | `handNumber` | All hands (active players only) | — |
+| 10s | `TensBoard.tsx` | `roundNumber` | All hands | Per-seat table piles (bottom + top) |
 | Golf | `GolfBoard.tsx` | `holeNumber` | — | Six table slots per seat |
 
 ### Module layout

@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Dice5, Heart, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers, Flag, Target } from 'lucide-react';
+import { Dice5, Heart, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers, Flag, Target, Spade } from 'lucide-react';
 import type { GameType, Player, GameStartOptions, TableEvent, TableEventInput } from '../networking/types';
 
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
@@ -38,6 +38,13 @@ import {
   runCucumberBotTurn,
   getCucumberWinners,
 } from './cucumber/logic';
+import {
+  createTensState,
+  processTensAction,
+  isTensOver,
+  runTensBotTurn,
+  getTensWinners,
+} from './tens/logic';
 import { createGolfState, processGolfAction, isGolfOver, runGolfBotTurn, getGolfWinners } from './golf/logic';
 import {
   createMinigolfState,
@@ -59,6 +66,7 @@ import CrossCribBoard from './cross-crib/CrossCribBoard';
 import CribbageBoard from './cribbage/CribbageBoard';
 import CasinoBoard from './casino/CasinoBoard';
 import CucumberBoard from './cucumber/CucumberBoard';
+import TensBoard from './tens/TensBoard';
 import GolfBoard from './golf/GolfBoard';
 import MinigolfBoard from './minigolf/MinigolfBoard';
 
@@ -80,8 +88,10 @@ import UpRiverToolbarExtra from './up-and-down-the-river/UpRiverToolbarExtra';
 import TwelveTitleExtra from './twelve/TwelveTitleExtra';
 import MobilizationTitleExtra from './mobilization/MobilizationTitleExtra';
 import CucumberTitleExtra from './cucumber/CucumberTitleExtra';
+import TensTitleExtra from './tens/TensTitleExtra';
 import GolfTitleExtra from './golf/GolfTitleExtra';
 import CucumberOptions from './cucumber/CucumberOptions';
+import TensOptions from './tens/TensOptions';
 import { PigIcon } from '../components/icons/PigIcon';
 import { CribbagePegHolesIcon } from '../components/icons/CribbagePegHolesIcon';
 import { CucumberIcon } from '../components/icons/CucumberIcon';
@@ -826,6 +836,55 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     hudTitleLines: ['Cucumber'],
   },
 
+  tens: {
+    title: '10s',
+    shortDescription: 'Clear the center pile with sets of four — but tens in your hand at the end cost 25.',
+    playersLabel: '3–10 Players',
+    minPlayers: 3,
+    maxPlayers: 10,
+    info: {
+      goal: 'Go out first each round with the lowest total score when someone reaches the game threshold.',
+      rules: [
+        'Each player gets 20 cards: four face-down table piles with a face-up card on each, plus twelve in hand.',
+        'On your turn, play one or more cards of the same rank from your hand or exposed pile tops.',
+        'The next player must play equal or lower rank (Ace low, King high). Playing higher takes the entire center pile into your hand.',
+        'Four or more cards of the same rank in the center clears the pile and earns an extra turn.',
+        'Tens are wild: play a ten anytime to clear the center pile and take another turn. Tens left in your hand at round end score 25 points each.',
+        'When a pile top is played, the face-down card beneath flips and must be played before your turn ends.',
+      ],
+      howToPlay: [
+        'Select matching cards in your hand or on your piles, then tap Play.',
+        'Use Clear with 10 when you want to wipe the center pile with a ten.',
+        'Dump high cards early, but watch the tens — they are powerful and expensive if you get stuck holding them.',
+      ],
+    },
+    icon: Spade,
+    theme: {
+      gradient: 'from-rose-500/45 to-red-700/45',
+      cardBorder: 'border-rose-500/40',
+      hoverBorder: 'hover:border-rose-500/50',
+      playersTag: 'bg-rose-500/25 text-rose-100 border border-rose-500/30',
+      iconColor: 'text-rose-300',
+      buttonColors: 'bg-rose-600 hover:bg-rose-500',
+      panelBg: 'bg-rose-950',
+      labelColor: 'text-rose-200',
+    },
+    createState: createTensState,
+    processAction: processTensAction,
+    isOver: isTensOver,
+    runBotTurn: runTensBotTurn,
+    getWinners: getTensWinners,
+    Board: TensBoard,
+    OptionsPanel: TensOptions,
+    TitleExtra: TensTitleExtra,
+    fullBoard: true,
+    hasHandZoom: true,
+    hasCardDealing: true,
+    production: true,
+    showNewBadge: true,
+    hudTitleLines: ['10s'],
+  },
+
   golf: {
     title: 'Golf',
     shortDescription: 'Six table cards, draw and swap, column pairs cancel — lowest score after 9 holes wins.',
@@ -882,6 +941,7 @@ export function gameHasCardDealing(gameType: GameType | null): boolean {
 
 /** All registered game types */
 export const ALL_GAME_TYPES: GameType[] = [
+  'tens',
   'minigolf',
   'cucumber',
   'golf',
@@ -900,6 +960,7 @@ export const ALL_GAME_TYPES: GameType[] = [
 
 /** Game types shown in production (homepage order) */
 export const PRODUCTION_GAME_TYPES: GameType[] = [
+  'tens',
   'minigolf',
   'cucumber',
   'golf',

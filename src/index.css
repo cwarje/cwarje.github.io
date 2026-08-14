@@ -4566,3 +4566,151 @@
   }
 }
 
+/* ── 10s (Tens) ── */
+
+.tens-seatPill {
+  grid-template-rows: auto auto;
+}
+
+.tens-seatScoreRow {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  background: #ffffff;
+  color: #111827;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.2;
+  border-bottom-left-radius: calc(var(--seat-pill-inner-radius, 11px));
+  border-bottom-right-radius: calc(var(--seat-pill-inner-radius, 11px));
+}
+
+.tens-pileButton--selected {
+  outline: 2px solid #fb7185;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.tens-board .twelve-pileButton .poker-card,
+.tens-board .twelve-pileButton .card-back,
+.tens-board .twelve-pileButton .card-flip,
+.tens-board .twelve-pileButton .card-flip.card-flip--sm,
+.tens-board .twelve-pileButton .card-face {
+  width: 100%;
+  height: 100%;
+}
+
+.tens-board .twelve-pileButton .card-faceRank {
+  font-size: 1.1rem;
+}
+
+.tens-board .twelve-pileButton .card-faceSuit {
+  font-size: 1.05rem;
+}
+
+.tens-board .twelve-pileButton .card-faceCorner {
+  font-size: 0.62rem;
+}
+
+.tens-board .twelve-pileButton .card-face,
+.tens-board .twelve-pileButton .card-flipFront {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 6px 8px 6px 3px;
+  gap: 3px;
+}
+
+.tens-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.tens-centerStack {
+  position: relative;
+  width: var(--radial-slot-w);
+  height: var(--radial-slot-h);
+}
+
+.tens-centerCard {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+}
+
+.tens-board .radial-center:not(.radial-center--zoom) .card-faceRank {
+  font-size: 1.45rem;
+}
+
+.tens-board .radial-center:not(.radial-center--zoom) .card-faceSuit {
+  font-size: 1.38rem;
+}
+
+.tens-board .radial-center .card-face {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 6px 8px 6px 3px;
+  gap: 3px;
+}
+
+.tens-discardBadge {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tens-discardBack {
+  width: 36px;
+  height: 54px;
+  border-radius: 6px;
+  opacity: 0.85;
+}
+
+.tens-discardCount {
+  position: absolute;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.tens-actionRow {
+  justify-content: center;
+  gap: 12px;
+}
+
+.tens-playButton,
+.tens-clearButton {
+  border-radius: 9999px;
+  padding: 10px 18px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.tens-playButton {
+  background: #e11d48;
+  color: #fff;
+}
+
+.tens-clearButton {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.tens-playButton:disabled,
+.tens-clearButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (min-width: 640px) {
+  .tens-seatScoreRow {
+    font-size: 0.85rem;
+  }
+}
+
