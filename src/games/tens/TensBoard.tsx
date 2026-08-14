@@ -131,7 +131,7 @@ function announcementHudMessage(
     return (
       <>
         {nameEl}
-        {` cleared the center with four ${rankDisplay(rank ?? 0)}s${extraTurnSuffix}`}
+        {` cleared with four ${rankDisplay(rank ?? 0)}s${extraTurnSuffix}`}
       </>
     );
   }
@@ -142,7 +142,7 @@ function announcementHudMessage(
         {nameEl}
         {' played '}
         {playedCardsHudMessage(playedCards)}
-        {` and cleared the center${extraTurnSuffix}`}
+        {` and cleared${extraTurnSuffix}`}
       </>
     );
   }
@@ -515,10 +515,8 @@ export default function TensBoard({
     const current = state.players[state.currentPlayerIndex];
     if (!current) return null;
     const turnLabel = current.id === myId ? 'Your turn' : `${current.name}'s turn`;
-    const rankLabel = state.lastPlayRank === null
-      ? 'Center open'
-      : `Must play ${rankDisplay(state.lastPlayRank)} or lower`;
-    return `${turnLabel} · ${rankLabel}`;
+    if (state.lastPlayRank === null) return turnLabel;
+    return `${turnLabel} · Must play ${rankDisplay(state.lastPlayRank)} or lower`;
   }, [state, myId]);
 
   const renderOpponentHandFan = (player: TensPlayer) => {
