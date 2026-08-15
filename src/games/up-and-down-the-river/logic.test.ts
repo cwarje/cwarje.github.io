@@ -169,7 +169,28 @@ describe('perfect bid restriction', () => {
 
     const result = processUpRiverAction(state, { type: 'place-bid', bid: 1 }, 'p3') as UpRiverState;
     expect(result.players[3].bid).toBe(1);
-    expect(result.phase).toBe('playing');
+    expect(result.phase).toBe('bid-reveal');
+  });
+
+  it('moves from sequential bid-reveal to playing after finish-bid-reveal', () => {
+    const state = biddingState({
+      players: [
+        player('p0', 2),
+        player('p1', 1),
+        player('p2', 0),
+        player('p3', 1),
+      ],
+      currentPlayerIndex: 3,
+      dealerIndex: 3,
+      currentRoundCardCount: 5,
+      allowPerfectBids: false,
+      phase: 'bid-reveal',
+    });
+
+    const playingState = processUpRiverAction(state, { type: 'finish-bid-reveal' }, '') as UpRiverState;
+    expect(playingState.phase).toBe('playing');
+    expect(playingState.currentPlayerIndex).toBe(0);
+    expect(playingState.players.every(p => p.bid !== null)).toBe(true);
   });
 
   it('does not restrict non-last bidders when allowPerfectBids is false', () => {

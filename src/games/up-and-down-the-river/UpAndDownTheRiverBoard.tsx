@@ -428,8 +428,13 @@ export default function UpAndDownTheRiverBoard({
       state.phase === 'playing' &&
       state.players[state.currentPlayerIndex]?.id === player.id &&
       !state.trickWinner;
+    const isSequentialBidTurn =
+      !isKnocking &&
+      state.phase === 'bidding' &&
+      state.players[state.currentPlayerIndex]?.id === player.id;
     const needsKnockingBid =
       isKnocking && state.phase === 'bidding' && state.submittedBids[player.id] === undefined;
+    const isActiveTurn = isCurrentTurn || isSequentialBidTurn;
     const isMe = player.id === myId;
     const bidMatched = player.bid !== null && player.bid === player.tricksWon;
     const seatPillStateClass = state.phase === 'round-end'
@@ -440,14 +445,16 @@ export default function UpAndDownTheRiverBoard({
         ? isMe
           ? 'radial-seatPill--activeSelf'
           : ''
-        : isCurrentTurn
+        : isActiveTurn
           ? isMe
             ? 'radial-seatPill--activeSelf'
             : 'radial-seatPill--activeOther'
           : '';
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
-    const bidText = player.bid === null ? '-' : String(player.bid);
+    const showBidOnPill =
+      isKnocking || (state.phase !== 'bidding' && state.phase !== 'bid-reveal');
+    const bidText = !showBidOnPill || player.bid === null ? '-' : String(player.bid);
     const tossProps = getSeatPillTossProps({
       playerId: player.id,
       playerName: player.name,
@@ -599,6 +606,35 @@ export default function UpAndDownTheRiverBoard({
           </div>
         </div>
 
+        {!isKnocking && (state.phase === 'bidding' || state.phase === 'bid-reveal') && (
+          <div className="upriver-bidRevealLayer" aria-live="polite">
+            {seatLayouts.map((layout) => {
+              const bid = layout.player.bid;
+              if (bid === null) return null;
+              const revealPosition = getBidRevealPosition(layout.seatLeft, layout.seatTop);
+              return (
+                <div
+                  key={`seq-bid-${layout.player.id}`}
+                  className="upriver-bidRevealAnchor"
+                  style={{
+                    left: `${revealPosition.left}%`,
+                    top: `${revealPosition.top}%`,
+                  }}
+                >
+                  <motion.span
+                    className="upriver-bidRevealNumber"
+                    initial={{ opacity: 0, scale: 0.6 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {bid}
+                  </motion.span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {state.phase === 'bid-countdown' && state.bidCountdown > 0 && (
           <div className="upriver-bidCountdown" aria-live="polite">
             <div className="upriver-bidCountdownAnchor">
@@ -615,7 +651,7 @@ export default function UpAndDownTheRiverBoard({
           </div>
         )}
 
-        {state.phase === 'bid-reveal' && (
+        {state.phase === 'bid-reveal' && isKnocking && (
           <div className="upriver-bidRevealLayer" aria-live="polite">
             {seatLayouts.map((layout) => {
               const bid = state.submittedBids[layout.player.id];

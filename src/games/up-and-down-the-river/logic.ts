@@ -248,8 +248,8 @@ export function processUpRiverAction(state: unknown, action: unknown, playerId: 
         return {
           ...s,
           players: updatedPlayers,
-          phase: 'playing',
-          currentPlayerIndex: s.leaderIndex,
+          phase: 'bid-reveal',
+          bidCountdown: 0,
         };
       }
 
@@ -274,8 +274,15 @@ export function processUpRiverAction(state: unknown, action: unknown, playerId: 
     }
 
     case 'finish-bid-reveal': {
-      if (s.phase !== 'bid-reveal' || s.upRiverBiddingStyle !== 'knocking') return state;
-      return applyKnockingBidReveal(s);
+      if (s.phase !== 'bid-reveal') return state;
+      if (s.upRiverBiddingStyle === 'knocking') {
+        return applyKnockingBidReveal(s);
+      }
+      return {
+        ...s,
+        phase: 'playing',
+        currentPlayerIndex: s.leaderIndex,
+      };
     }
 
     case 'play-card': {

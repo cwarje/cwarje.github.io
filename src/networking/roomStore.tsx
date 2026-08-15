@@ -1459,6 +1459,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const UP_RIVER_ROUND_END_DELAY = 5000; // ms to show bid result borders before next round
   const UP_RIVER_BID_COUNTDOWN_MS = 1000; // ms per knocking bid countdown tick
   const UP_RIVER_BID_REVEAL_MS = 7000; // ms to show knocking bid reveal before play
+  const UP_RIVER_SEQUENTIAL_BID_PAUSE_MS = 2000; // ms to show last sequential bid before play
   const GOLF_BOT_DELAY = 1800; // ms before Golf bot draw/swap/discard steps
   const MOBILIZATION_BOT_DELAY = 900; // ms between Mobilization bot actions
   const MOBILIZATION_SOLITAIRE_REVEAL_DELAY = 3000; // ms to show last Solitaire play / pig pass
@@ -1686,6 +1687,10 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (urs.phase === 'bid-reveal') {
+        const bidRevealDelay =
+          urs.upRiverBiddingStyle === 'knocking'
+            ? UP_RIVER_BID_REVEAL_MS
+            : UP_RIVER_SEQUENTIAL_BID_PAUSE_MS;
         botTimerRef.current = setTimeout(() => {
           const currentGs = gameStateRef.current as UpRiverState | null;
           const currentRoom = roomRef.current;
@@ -1696,7 +1701,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             setGameState(next);
             broadcastGameState(next);
           }
-        }, UP_RIVER_BID_REVEAL_MS);
+        }, bidRevealDelay);
         return;
       }
 
