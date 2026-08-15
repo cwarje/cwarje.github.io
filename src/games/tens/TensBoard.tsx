@@ -111,7 +111,10 @@ function announcementHudMessage(
   const displayName = actor.id === myId ? 'You' : actor.name;
   const nameEl = <span style={{ color: getPlayerHudTextColor(actor.color) }}>{displayName}</span>;
   const playedCards = ann.plays.map(p => p.card);
-  const extraTurnSuffix = ann.outcome !== 'normal' ? ' · plays again' : '';
+  const extraTurnSuffix =
+    ann.outcome === 'set-clear' || ann.outcome === 'wild-clear'
+      ? ' · plays again'
+      : '';
 
   if (ann.outcome === 'pickup') {
     const pickupCount = ann.centerAfterPlay.length;

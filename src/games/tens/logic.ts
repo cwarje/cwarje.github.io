@@ -285,7 +285,6 @@ function applyPlayResult(
       ...players[playerIndex],
       hand: sortHand([...players[playerIndex].hand, ...centerAfterPlay]),
     };
-    extraTurnPending = true;
     outcome = 'pickup';
   } else {
     lastPlayRank = playedRank;

@@ -198,7 +198,7 @@ describe('tens play', () => {
     expect(next.currentPlayerIndex).toBe(0);
   });
 
-  it('pickup moves center pile into hand and grants extra turn', () => {
+  it('pickup moves center pile into hand and passes turn', () => {
     const p0 = player('p0', [card('hearts', 13)]);
     const state = baseState([p0, player('p1', [card('spades', 3)])], {
       centerPile: [card('clubs', 8), card('diamonds', 4)],
@@ -213,7 +213,7 @@ describe('tens play', () => {
     expect(next.players[0].hand.length).toBe(3);
     expect(next.phase).toBe('announcement');
     expect(next.actionAnnouncement?.outcome).toBe('pickup');
-    expect(next.currentPlayerIndex).toBe(0);
+    expect(next.currentPlayerIndex).toBe(1);
   });
 
   it('keeps pile bottom face down and unplayable after top is played', () => {
