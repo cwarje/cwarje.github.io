@@ -13,7 +13,8 @@ export type GameType =
   | 'cucumber'
   | 'golf'
   | 'minigolf'
-  | 'tens';
+  | 'tens'
+  | 'backgammon';
 export type PlayerColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet' | 'dark-purple';
 export type HeartsTargetScore = 50 | 100;
 export type FarkleTargetScore = 3000 | 5000 | 10000;

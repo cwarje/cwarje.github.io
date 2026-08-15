@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Dice5, Heart, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers, Flag, Target, Spade } from 'lucide-react';
+import { Dice5, Heart, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers, Flag, Target, Spade, Triangle } from 'lucide-react';
 import type { GameType, Player, GameStartOptions, TableEvent, TableEventInput } from '../networking/types';
 
 import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
@@ -53,6 +53,13 @@ import {
   runMinigolfBotTurn,
   getMinigolfWinners,
 } from './minigolf/logic';
+import {
+  createBackgammonState,
+  processBackgammonActionUnknown,
+  isBackgammonOverUnknown,
+  runBackgammonBotTurnUnknown,
+  getBackgammonWinnersUnknown,
+} from './backgammon/logic';
 
 import YahtzeeBoard from './yahtzee/YahtzeeBoard';
 import FarkleBoard from './farkle/FarkleBoard';
@@ -69,6 +76,7 @@ import CucumberBoard from './cucumber/CucumberBoard';
 import TensBoard from './tens/TensBoard';
 import GolfBoard from './golf/GolfBoard';
 import MinigolfBoard from './minigolf/MinigolfBoard';
+import BackgammonBoard from './backgammon/BackgammonBoard';
 
 import HeartsOptions from './hearts/HeartsOptions';
 import FarkleOptions from './farkle/FarkleOptions';
@@ -90,6 +98,7 @@ import MobilizationTitleExtra from './mobilization/MobilizationTitleExtra';
 import CucumberTitleExtra from './cucumber/CucumberTitleExtra';
 import TensTitleExtra from './tens/TensTitleExtra';
 import GolfTitleExtra from './golf/GolfTitleExtra';
+import BackgammonTitleExtra from './backgammon/BackgammonTitleExtra';
 import CucumberOptions from './cucumber/CucumberOptions';
 import TensOptions from './tens/TensOptions';
 import { PigIcon } from '../components/icons/PigIcon';
@@ -892,8 +901,53 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     hasCardDealing: true,
     randomizeSeatOrder: true,
     production: true,
-    showNewBadge: true,
     hudTitleLines: ['10s'],
+  },
+
+  backgammon: {
+    title: 'Backgammon',
+    shortDescription: 'Race your fifteen checkers home — hit blots, block points, and bear off first to win.',
+    playersLabel: '2 Players',
+    minPlayers: 2,
+    maxPlayers: 2,
+    allowedPlayerCounts: [2],
+    info: {
+      goal: 'Bear off all fifteen checkers before your opponent.',
+      rules: [
+        'Two players alternate turns rolling two dice and moving checkers toward their home board.',
+        'A checker moves the number of pips shown on a die along your direction. Doubles grant four moves of that value.',
+        'Landing on a point with a single opponent checker hits it to the bar; that checker must re-enter before other moves.',
+        'Two or more checkers on a point block it. You must use both dice when possible; if only one die can be played, you must use the higher one.',
+        'Once all your checkers are in your home board, you may bear them off. First to bear off all fifteen wins.',
+      ],
+      howToPlay: [
+        'Tap Roll dice on your turn, then tap a highlighted checker and a destination point.',
+        'Tap the bar to move checkers that were hit. Tap the bear-off tray when bearing off is legal.',
+        'Green highlights show valid destinations; gold shows your selected checker.',
+      ],
+    },
+    icon: Triangle,
+    theme: {
+      gradient: 'from-amber-800/50 to-stone-700/50',
+      cardBorder: 'border-amber-700/40',
+      hoverBorder: 'hover:border-amber-600/50',
+      playersTag: 'bg-amber-800/30 text-amber-100 border border-amber-600/30',
+      iconColor: 'text-amber-200',
+      buttonColors: 'bg-amber-700 hover:bg-amber-600',
+      panelBg: 'bg-stone-950',
+      labelColor: 'text-amber-100',
+    },
+    createState: createBackgammonState,
+    processAction: processBackgammonActionUnknown,
+    isOver: isBackgammonOverUnknown,
+    runBotTurn: runBackgammonBotTurnUnknown,
+    getWinners: getBackgammonWinnersUnknown,
+    Board: BackgammonBoard,
+    TitleExtra: BackgammonTitleExtra,
+    fullBoard: true,
+    production: true,
+    showNewBadge: true,
+    hudTitleLines: ['Back', 'gammon'],
   },
 
   golf: {
@@ -953,6 +1007,7 @@ export function gameHasCardDealing(gameType: GameType | null): boolean {
 
 /** All registered game types */
 export const ALL_GAME_TYPES: GameType[] = [
+  'backgammon',
   'tens',
   'minigolf',
   'cucumber',
@@ -972,6 +1027,7 @@ export const ALL_GAME_TYPES: GameType[] = [
 
 /** Game types shown in production (homepage order) */
 export const PRODUCTION_GAME_TYPES: GameType[] = [
+  'backgammon',
   'tens',
   'minigolf',
   'cucumber',

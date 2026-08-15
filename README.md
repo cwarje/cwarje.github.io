@@ -22,6 +22,7 @@ Current game types (from `src/games/registry.ts` and `src/networking/types.ts`):
 - `minigolf` (1-8 players; real-time top-down mini golf — host picks 3, 9, or 18 randomly generated holes, simultaneous play, lowest total strokes wins; persistent XP/levels — see [Minigolf progression](#minigolf-progression-xp-and-levels))
 - `settler` (3-4 players)
 - `cross-crib` (2 or 4 players only)
+- `backgammon` (2 players only; bear off all fifteen checkers to win)
 
 **Production** home page and game picker use `PRODUCTION_GAME_TYPES` in `registry.ts` (see that file for the current ordered list).
 

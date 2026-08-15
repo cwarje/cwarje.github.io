@@ -31,6 +31,7 @@ import { isMobilizationDevJumpAction, type MobilizationState } from '../games/mo
 import type { TwelveState } from '../games/twelve/types';
 import type { SettlerState } from '../games/settler/types';
 import type { MinigolfState } from '../games/minigolf/types';
+import type { BackgammonState } from '../games/backgammon/types';
 import {
   applySettlerIdleTimeout,
   reconcileSettlerTurnDeadlineAfterAction,
@@ -341,6 +342,17 @@ function applyProfileToGameState(
         changed = true;
         return { ...player, name: playerName, color: playerColor };
       });
+      return changed ? { ...current, players } : current;
+    }
+    case 'backgammon': {
+      const current = state as BackgammonState;
+      let changed = false;
+      const players = current.players.map((player) => {
+        if (player.id !== playerId) return player;
+        if (player.name === playerName && player.color === playerColor) return player;
+        changed = true;
+        return { ...player, name: playerName, color: playerColor };
+      }) as BackgammonState['players'];
       return changed ? { ...current, players } : current;
     }
     case 'cribbage': {
@@ -1449,6 +1461,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const YAHTZEE_BOT_ROLL_DELAY = 2000;  // ms between each bot roll in Yahtzee
   const YAHTZEE_BOT_HOLD_DELAY = 1200;  // ms to show held dice before bot rerolls in Yahtzee
   const YAHTZEE_BOT_SCORE_DELAY = 4000; // ms to show dice before bot scores
+  const BACKGAMMON_BOT_DELAY = 700;
   const FARKLE_BOT_DELAY = 900; // ms before bot banks in Farkle
   const FARKLE_BOT_CHOOSE_DELAY = 2000; // ms before bot chooses dice to keep
   const FARKLE_BOT_ROLL_DELAY = 2000; // ms before bot re-rolls
@@ -2515,6 +2528,32 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
           }
         }, delay);
+      }
+    }
+
+    // ── Backgammon bot scheduling ──
+    if (room.gameType === 'backgammon') {
+      const bs = gameState as BackgammonState;
+      if (bs.phase === 'finished') return;
+
+      const currentPlayer = bs.players[bs.currentPlayerIndex];
+      if (currentPlayer?.isBot) {
+        botTimerRef.current = setTimeout(() => {
+          const currentGs = gameStateRef.current;
+          const currentRoom = roomRef.current;
+          if (!currentGs || !currentRoom) return;
+
+          const next = runSingleBotTurn('backgammon', currentGs);
+          if (next !== currentGs) {
+            setGameState(next);
+            broadcastGameState(next);
+            if (checkGameOver('backgammon', next)) {
+              const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+              setRoom(finishedRoom);
+              broadcastRoomState(finishedRoom);
+            }
+          }
+        }, BACKGAMMON_BOT_DELAY);
       }
     }
 
