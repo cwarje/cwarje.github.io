@@ -407,15 +407,34 @@ export default function TensBoard({
     else seatRefs.current.delete(playerId);
   }, []);
 
-  const canInteract =
+  const canInteractPlaying =
     !deal.isDealing &&
     isMyTurn &&
     state.phase === 'playing';
 
+  const canInteractFollowUp =
+    !deal.isDealing &&
+    isMyTurn &&
+    state.phase === 'reveal-follow-up' &&
+    !!state.revealFollowUp;
+
+  const canInteract = canInteractPlaying || canInteractFollowUp;
+
   const hasActionButtons = canInteract && !!myPlayer;
+
+  const followUpRank = state.revealFollowUp?.rank;
 
   const selectedPlays = useMemo((): SelectedCardPlay[] => {
     if (!myPlayer) return [];
+    if (state.phase === 'reveal-follow-up' && followUpRank !== undefined) {
+      const plays: SelectedCardPlay[] = [];
+      visibleHand.forEach((card, handIndex) => {
+        if (card.rank !== followUpRank) return;
+        const key = handCardKey(handIndex);
+        if (selectedKeys.has(key)) plays.push({ card, source: 'hand' });
+      });
+      return plays;
+    }
     const allTopsPlayed = allPileTopsPlayed(myPlayer);
     const plays: SelectedCardPlay[] = [];
     visibleHand.forEach((card, handIndex) => {
@@ -430,12 +449,17 @@ export default function TensBoard({
       if (selectedKeys.has(key)) plays.push({ card: playable.card, source, pileIndex });
     });
     return plays;
-  }, [myPlayer, selectedKeys, visibleHand]);
+  }, [myPlayer, selectedKeys, visibleHand, state.phase, followUpRank]);
 
   const canSubmitPlay = useMemo(() => {
-    if (!canInteract || myIndex < 0 || selectedPlays.length === 0) return false;
+    if (!canInteractPlaying || myIndex < 0 || selectedPlays.length === 0) return false;
     return validatePlays(state, myIndex, selectedPlays);
-  }, [canInteract, myIndex, selectedPlays, state]);
+  }, [canInteractPlaying, myIndex, selectedPlays, state]);
+
+  const canSubmitFollowUp = useMemo(() => {
+    if (!canInteractFollowUp || selectedPlays.length === 0 || !followUpRank) return false;
+    return selectedPlays.every(p => p.source === 'hand' && p.card.rank === followUpRank);
+  }, [canInteractFollowUp, selectedPlays, followUpRank]);
 
   const legalGroups = useMemo(() => {
     if (myIndex < 0) return [];
@@ -448,7 +472,15 @@ export default function TensBoard({
     pileIndex?: number,
     handIndex?: number,
   ): boolean => {
-    if (!canInteract || !myPlayer) return false;
+    if (state.phase === 'reveal-follow-up' && state.revealFollowUp) {
+      if (!canInteractFollowUp || !myPlayer || source !== 'hand') return false;
+      const key = handCardKey(handIndex ?? -1);
+      if (selectedKeys.has(key)) return true;
+      if (selectedPlays.length >= 4) return false;
+      return card.rank === state.revealFollowUp.rank;
+    }
+
+    if (!canInteractPlaying || !myPlayer) return false;
     const key = source === 'hand' ? handCardKey(handIndex ?? -1) : cardKey(card, source, pileIndex);
     if (selectedKeys.has(key)) return true;
     if (selectedPlays.length >= 4) return false;
@@ -504,6 +536,18 @@ export default function TensBoard({
     setSelectedKeys(new Set());
   };
 
+  const submitFollowUp = () => {
+    if (!canSubmitFollowUp) return;
+    onAction({ type: 'play-reveal-follow-up', plays: selectedPlays });
+    setSelectedKeys(new Set());
+  };
+
+  const skipFollowUp = () => {
+    if (!canInteractFollowUp) return;
+    onAction({ type: 'skip-reveal-follow-up' });
+    setSelectedKeys(new Set());
+  };
+
   const headsUpContent = useMemo((): ReactNode => {
     if (state.phase === 'round-end') {
       return state.roundSummary || 'Round over';
@@ -517,6 +561,14 @@ export default function TensBoard({
 
     const current = state.players[state.currentPlayerIndex];
     if (!current) return null;
+
+    if (state.phase === 'reveal-follow-up' && state.revealFollowUp) {
+      if (current.id === myId) {
+        return `Play matching ${rankDisplay(state.revealFollowUp.rank)}s from hand, or Skip`;
+      }
+      return `${current.name} is playing matching cards`;
+    }
+
     const turnLabel = current.id === myId ? 'Your turn' : `${current.name}'s turn`;
     if (state.lastPlayRank === null) return turnLabel;
     return `${turnLabel} · Must play ${rankDisplay(state.lastPlayRank)} or lower`;
@@ -575,7 +627,7 @@ export default function TensBoard({
   const renderSeatPill = (seatLayout: SeatLayout, shouldMeasure = false) => {
     const player = seatLayout.player;
     const isCurrentTurn = state.players[state.currentPlayerIndex]?.id === player.id
-      && state.phase === 'playing';
+      && (state.phase === 'playing' || state.phase === 'reveal-follow-up');
     const isMe = player.id === myId;
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
@@ -774,14 +826,34 @@ export default function TensBoard({
             {hasActionButtons ? (
               <span className="tens-headsUpInline">
                 <span>{headsUpContent ?? '\u00a0'}</span>
-                <button
-                  type="button"
-                  onClick={submitPlay}
-                  disabled={!canSubmitPlay}
-                  className="tens-playButton tens-playButton--inline"
-                >
-                  Play{selectedPlays.length > 0 ? ` (${selectedPlays.length})` : ''}
-                </button>
+                {canInteractFollowUp ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={submitFollowUp}
+                      disabled={!canSubmitFollowUp}
+                      className="tens-playButton tens-playButton--inline"
+                    >
+                      Play{selectedPlays.length > 0 ? ` (${selectedPlays.length})` : ''}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={skipFollowUp}
+                      className="tens-playButton tens-playButton--inline tens-playButton--skip"
+                    >
+                      Skip
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={submitPlay}
+                    disabled={!canSubmitPlay}
+                    className="tens-playButton tens-playButton--inline"
+                  >
+                    Play{selectedPlays.length > 0 ? ` (${selectedPlays.length})` : ''}
+                  </button>
+                )}
               </span>
             ) : (
               headsUpContent ?? '\u00a0'

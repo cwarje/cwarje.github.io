@@ -24,7 +24,12 @@ export interface TensPlayer {
   totalScore: number;
 }
 
-export type TensPhase = 'playing' | 'announcement' | 'round-end' | 'game-over';
+export type TensPhase = 'playing' | 'reveal-follow-up' | 'announcement' | 'round-end' | 'game-over';
+
+export interface TensRevealFollowUp {
+  rank: Rank;
+  committedPlays: SelectedCardPlay[];
+}
 
 export type TensPlayOutcome = 'normal' | 'pickup' | 'set-clear' | 'wild-clear';
 
@@ -63,10 +68,13 @@ export interface TensState {
   gameOver: boolean;
   winners: string[];
   actionAnnouncement: TensActionAnnouncement | null;
+  revealFollowUp: TensRevealFollowUp | null;
 }
 
 export type TensAction =
   | { type: 'play-cards'; plays: SelectedCardPlay[] }
+  | { type: 'play-reveal-follow-up'; plays: SelectedCardPlay[] }
+  | { type: 'skip-reveal-follow-up' }
   | { type: 'finish-action-announcement' }
   | { type: 'start-next-round' }
   | { type: 'show-final-results' };

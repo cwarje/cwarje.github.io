@@ -75,6 +75,7 @@ function baseState(players: TensPlayer[], overrides: Partial<TensState> = {}): T
     gameOver: false,
     winners: [],
     actionAnnouncement: null,
+    revealFollowUp: null,
     ...overrides,
   };
 }
@@ -258,6 +259,156 @@ describe('tens play', () => {
       { card: card('clubs', 5), source: 'pile-bottom', pileIndex: 0 },
       { card: card('diamonds', 5), source: 'hand' },
     ])).toBe(true);
+
+    const afterReveal = processTensAction(allTopsCleared, {
+      type: 'play-cards',
+      plays: [{ card: card('clubs', 5), source: 'pile-bottom', pileIndex: 0 }],
+    }, 'p0') as TensState;
+
+    expect(afterReveal.phase).toBe('reveal-follow-up');
+    expect(afterReveal.revealFollowUp?.rank).toBe(5);
+    expect(afterReveal.centerPile).toHaveLength(1);
+    expect(afterReveal.players[0].hand).toHaveLength(1);
+    expect(afterReveal.lastPlayRank).toBe(10);
+
+    const afterSkip = processTensAction(afterReveal, { type: 'skip-reveal-follow-up' }, 'p0') as TensState;
+    expect(afterSkip.phase).toBe('announcement');
+    expect(afterSkip.revealFollowUp).toBeNull();
+    expect(afterSkip.actionAnnouncement?.outcome).toBe('normal');
+    expect(afterSkip.centerPile).toHaveLength(1);
+  });
+
+  it('enters reveal follow-up when pile bottom played and hand has same rank', () => {
+    const piles: FrontPile[] = [
+      { bottomCard: card('clubs', 6), topCard: null, bottomFaceUp: false },
+      ...emptyPiles().slice(1),
+    ];
+    const p0 = player('p0', [card('hearts', 6), card('diamonds', 6)], piles);
+    const state = baseState([p0, player('p1', [])], {
+      centerPile: [card('spades', 6), card('clubs', 6)],
+      lastPlayRank: 6,
+    });
+
+    const afterReveal = processTensAction(state, {
+      type: 'play-cards',
+      plays: [{ card: card('clubs', 6), source: 'pile-bottom', pileIndex: 0 }],
+    }, 'p0') as TensState;
+
+    expect(afterReveal.phase).toBe('reveal-follow-up');
+    expect(afterReveal.centerPile).toHaveLength(3);
+
+    const afterFollowUp = processTensAction(afterReveal, {
+      type: 'play-reveal-follow-up',
+      plays: [
+        { card: card('hearts', 6), source: 'hand' },
+        { card: card('diamonds', 6), source: 'hand' },
+      ],
+    }, 'p0') as TensState;
+
+    expect(afterFollowUp.phase).toBe('round-end');
+    expect(afterFollowUp.centerPile).toHaveLength(0);
+    expect(afterFollowUp.roundOutPlayerId).toBe('p0');
+  });
+
+  it('resolves set clear through reveal follow-up when player keeps cards', () => {
+    const piles: FrontPile[] = [
+      { bottomCard: card('clubs', 6), topCard: null, bottomFaceUp: false },
+      ...emptyPiles().slice(1),
+    ];
+    const p0 = player('p0', [card('hearts', 6), card('diamonds', 6), card('spades', 3)], piles);
+    const state = baseState([p0, player('p1', [])], {
+      centerPile: [card('spades', 6), card('clubs', 6)],
+      lastPlayRank: 6,
+    });
+
+    const afterReveal = processTensAction(state, {
+      type: 'play-cards',
+      plays: [{ card: card('clubs', 6), source: 'pile-bottom', pileIndex: 0 }],
+    }, 'p0') as TensState;
+
+    const afterFollowUp = processTensAction(afterReveal, {
+      type: 'play-reveal-follow-up',
+      plays: [
+        { card: card('hearts', 6), source: 'hand' },
+        { card: card('diamonds', 6), source: 'hand' },
+      ],
+    }, 'p0') as TensState;
+
+    expect(afterFollowUp.phase).toBe('announcement');
+    expect(afterFollowUp.centerPile).toHaveLength(0);
+    expect(afterFollowUp.actionAnnouncement?.outcome).toBe('set-clear');
+    expect(afterFollowUp.actionAnnouncement?.plays).toHaveLength(3);
+    expect(afterFollowUp.players[0].hand).toHaveLength(1);
+  });
+
+  it('skips reveal follow-up when pile bottom played with no matching hand cards', () => {
+    const piles: FrontPile[] = [
+      { bottomCard: card('clubs', 4), topCard: null, bottomFaceUp: false },
+      ...emptyPiles().slice(1),
+    ];
+    const p0 = player('p0', [card('hearts', 7)], piles);
+    const state = baseState([p0, player('p1', [])], { lastPlayRank: 10 });
+
+    const next = processTensAction(state, {
+      type: 'play-cards',
+      plays: [{ card: card('clubs', 4), source: 'pile-bottom', pileIndex: 0 }],
+    }, 'p0') as TensState;
+
+    expect(next.phase).toBe('announcement');
+    expect(next.revealFollowUp).toBeNull();
+    expect(next.actionAnnouncement?.outcome).toBe('normal');
+  });
+
+  it('rejects invalid reveal follow-up plays', () => {
+    const state = baseState([player('p0', [card('hearts', 6), card('diamonds', 5)])], {
+      phase: 'reveal-follow-up',
+      revealFollowUp: {
+        rank: 5,
+        committedPlays: [{ card: card('clubs', 5), source: 'pile-bottom', pileIndex: 0 }],
+      },
+      centerPile: [card('clubs', 5)],
+    });
+
+    const wrongRank = processTensAction(state, {
+      type: 'play-reveal-follow-up',
+      plays: [{ card: card('hearts', 6), source: 'hand' }],
+    }, 'p0') as TensState;
+    expect(wrongRank).toBe(state);
+
+    const notInHand = processTensAction(state, {
+      type: 'play-reveal-follow-up',
+      plays: [{ card: card('spades', 5), source: 'hand' }],
+    }, 'p0') as TensState;
+    expect(notInHand).toBe(state);
+  });
+
+  it('bot completes reveal follow-up with matching hand cards', () => {
+    const piles: FrontPile[] = [
+      { bottomCard: card('clubs', 7), topCard: null, bottomFaceUp: false },
+      ...emptyPiles().slice(1),
+    ];
+    const botPlayer = {
+      ...player('bot', [card('hearts', 7), card('diamonds', 7)], piles),
+      isBot: true,
+    };
+    const afterReveal = processTensAction(
+      baseState([botPlayer, player('p1', [])], {
+        centerPile: [card('spades', 7), card('diamonds', 7)],
+        lastPlayRank: 9,
+      }),
+      {
+        type: 'play-cards',
+        plays: [{ card: card('clubs', 7), source: 'pile-bottom', pileIndex: 0 }],
+      },
+      'bot',
+    ) as TensState;
+
+    expect(afterReveal.phase).toBe('reveal-follow-up');
+
+    const afterBot = runTensBotTurn(afterReveal) as TensState;
+    expect(afterBot.phase).toBe('announcement');
+    expect(afterBot.actionAnnouncement?.outcome).toBe('set-clear');
+    expect(afterBot.actionAnnouncement?.plays).toHaveLength(2);
   });
 
   it('wild ten clears the center pile', () => {

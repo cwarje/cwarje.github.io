@@ -195,6 +195,7 @@ function startRound(
     gameOver: false,
     winners: [],
     actionAnnouncement: null,
+    revealFollowUp: null,
   };
 }
 
@@ -224,6 +225,7 @@ function endRound(state: TensState, outPlayerId: string): TensState {
       winners: getLowestScoreWinners(updatedPlayers),
       extraTurnPending: false,
       actionAnnouncement: null,
+      revealFollowUp: null,
     };
   }
 
@@ -237,14 +239,81 @@ function endRound(state: TensState, outPlayerId: string): TensState {
     gameOver: false,
     extraTurnPending: false,
     actionAnnouncement: null,
+    revealFollowUp: null,
   };
+}
+
+function shouldEnterRevealFollowUp(player: TensPlayer, plays: SelectedCardPlay[]): boolean {
+  if (!plays.some(p => p.source === 'pile-bottom')) return false;
+
+  const rank = plays[0]?.card.rank;
+  if (!rank) return false;
+
+  const handPlaysInAction = plays.filter(p => p.source === 'hand');
+  const playedHandKeys = new Set(
+    handPlaysInAction.map(p => `${p.card.suit}-${p.card.rank}`),
+  );
+
+  return player.hand.some(
+    c => c.rank === rank && !playedHandKeys.has(`${c.suit}-${c.rank}`),
+  );
+}
+
+function commitRevealPlays(
+  state: TensState,
+  playerIndex: number,
+  plays: SelectedCardPlay[],
+): TensState {
+  const rank = plays[0]?.card.rank;
+  if (!rank) return state;
+
+  let current = state.players[playerIndex];
+  for (const play of plays) {
+    current = removeCardFromPlayer(current, play);
+  }
+
+  const players = [...state.players];
+  players[playerIndex] = current;
+
+  return {
+    ...state,
+    players,
+    centerPile: [...state.centerPile, ...plays.map(p => p.card)],
+    phase: 'reveal-follow-up',
+    revealFollowUp: { rank, committedPlays: plays },
+  };
+}
+
+function validateRevealFollowUpPlays(
+  state: TensState,
+  playerIndex: number,
+  plays: SelectedCardPlay[],
+): boolean {
+  const followUp = state.revealFollowUp;
+  if (!followUp || plays.length === 0) return false;
+
+  if (plays.some(p => p.source !== 'hand' || p.card.rank !== followUp.rank)) {
+    return false;
+  }
+
+  const player = state.players[playerIndex];
+  if (!player) return false;
+
+  let remaining = [...player.hand];
+  for (const play of plays) {
+    const idx = remaining.findIndex(c => cardEquals(c, play.card));
+    if (idx === -1) return false;
+    remaining.splice(idx, 1);
+  }
+
+  return true;
 }
 
 function applyPlayResult(
   state: TensState,
   playerIndex: number,
   plays: SelectedCardPlay[],
-  options: { clearWithWild?: boolean },
+  options: { clearWithWild?: boolean; fromRevealFollowUp?: boolean },
 ): TensState {
   const playerId = state.players[playerIndex]?.id;
   if (!playerId) return state;
@@ -252,15 +321,29 @@ function applyPlayResult(
   let players = [...state.players];
   let current = state.players[playerIndex];
 
-  for (const play of plays) {
-    current = removeCardFromPlayer(current, play);
+  let allPlays: SelectedCardPlay[];
+  let centerAfterPlay: Card[];
+
+  if (options.fromRevealFollowUp) {
+    const committed = state.revealFollowUp?.committedPlays ?? [];
+    allPlays = [...committed, ...plays];
+    for (const play of plays) {
+      current = removeCardFromPlayer(current, play);
+    }
+    centerAfterPlay = [...state.centerPile, ...plays.map(p => p.card)];
+  } else {
+    allPlays = plays;
+    for (const play of plays) {
+      current = removeCardFromPlayer(current, play);
+    }
+    centerAfterPlay = [...state.centerPile, ...plays.map(p => p.card)];
   }
+
   players[playerIndex] = current;
 
-  const playedRank = plays[0]?.card.rank;
+  const playedRank = allPlays[0]?.card.rank;
   if (!playedRank) return state;
 
-  const centerAfterPlay = [...state.centerPile, ...plays.map(p => p.card)];
   let centerPile = centerAfterPlay;
   let lastPlayRank = state.lastPlayRank;
   let discardCount = state.discardCount;
@@ -300,7 +383,7 @@ function applyPlayResult(
 
   const actionAnnouncement: TensActionAnnouncement = {
     playerId,
-    plays,
+    plays: allPlays,
     outcome,
     centerAfterPlay,
     ...(discardCountBeforeClear !== undefined ? { discardCountBeforeClear } : {}),
@@ -317,6 +400,7 @@ function applyPlayResult(
         extraTurnPending: false,
         phase: 'playing',
         actionAnnouncement: null,
+        revealFollowUp: null,
       },
       playerId,
     );
@@ -336,7 +420,51 @@ function applyPlayResult(
     phase: 'announcement',
     currentPlayerIndex: nextPlayerIndex,
     actionAnnouncement,
+    revealFollowUp: null,
   };
+}
+
+function finalizeRevealFollowUp(
+  state: TensState,
+  playerIndex: number,
+  handPlays: SelectedCardPlay[],
+): TensState {
+  const allPlays = [...(state.revealFollowUp?.committedPlays ?? []), ...handPlays];
+  const clearWithWild = allPlays.length > 0 && allPlays.every(p => p.card.rank === 10);
+  return applyPlayResult(state, playerIndex, handPlays, {
+    clearWithWild,
+    fromRevealFollowUp: true,
+  });
+}
+
+function handlePlayRevealFollowUp(
+  state: TensState,
+  playerId: string,
+  action: Extract<TensAction, { type: 'play-reveal-follow-up' }>,
+): TensState {
+  if (state.phase !== 'reveal-follow-up' || !state.revealFollowUp) return state;
+
+  const playerIndex = state.players.findIndex(p => p.id === playerId);
+  if (playerIndex === -1 || state.players[playerIndex].id !== state.players[state.currentPlayerIndex]?.id) {
+    return state;
+  }
+
+  if (!validateRevealFollowUpPlays(state, playerIndex, action.plays)) {
+    return state;
+  }
+
+  return finalizeRevealFollowUp(state, playerIndex, action.plays);
+}
+
+function handleSkipRevealFollowUp(state: TensState, playerId: string): TensState {
+  if (state.phase !== 'reveal-follow-up' || !state.revealFollowUp) return state;
+
+  const playerIndex = state.players.findIndex(p => p.id === playerId);
+  if (playerIndex === -1 || state.players[playerIndex].id !== state.players[state.currentPlayerIndex]?.id) {
+    return state;
+  }
+
+  return finalizeRevealFollowUp(state, playerIndex, []);
 }
 
 function handlePlayCards(state: TensState, playerId: string, action: Extract<TensAction, { type: 'play-cards' }>): TensState {
@@ -349,6 +477,11 @@ function handlePlayCards(state: TensState, playerId: string, action: Extract<Ten
 
   if (!validatePlays(state, playerIndex, action.plays)) {
     return state;
+  }
+
+  const player = state.players[playerIndex];
+  if (shouldEnterRevealFollowUp(player, action.plays)) {
+    return commitRevealPlays(state, playerIndex, action.plays);
   }
 
   if (action.plays.every(p => p.card.rank === 10)) {
@@ -373,6 +506,16 @@ export function processTensAction(state: unknown, action: unknown, playerId: str
     return handlePlayCards(s, playerId, a);
   }
 
+  if (a.type === 'play-reveal-follow-up') {
+    if (!playerId) return s;
+    return handlePlayRevealFollowUp(s, playerId, a);
+  }
+
+  if (a.type === 'skip-reveal-follow-up') {
+    if (!playerId) return s;
+    return handleSkipRevealFollowUp(s, playerId);
+  }
+
   if (a.type === 'finish-action-announcement') {
     if (playerId) return s;
     if (s.phase !== 'announcement') return s;
@@ -380,6 +523,7 @@ export function processTensAction(state: unknown, action: unknown, playerId: str
       ...s,
       phase: 'playing',
       actionAnnouncement: null,
+      revealFollowUp: null,
     };
   }
 
@@ -518,6 +662,38 @@ function chooseBotPlays(state: TensState, playerIndex: number): SelectedCardPlay
   return [{ card: fallback.card, source: fallback.source, pileIndex: fallback.pileIndex }];
 }
 
+function chooseBotRevealFollowUp(state: TensState, playerIndex: number): SelectedCardPlay[] {
+  const followUp = state.revealFollowUp;
+  if (!followUp) return [];
+
+  const player = state.players[playerIndex];
+  if (!player) return [];
+
+  const handPlays: PlayableCard[] = player.hand
+    .filter(c => c.rank === followUp.rank)
+    .map(card => ({ card, source: 'hand' as const }));
+
+  if (handPlays.length === 0) return [];
+
+  const group: LegalPlayGroup = { rank: followUp.rank, plays: handPlays };
+  const selected = selectCardsForRank(group, state.centerPile);
+  const sameRankInCenter = state.centerPile.filter(c => c.rank === followUp.rank).length;
+
+  if (followUp.rank === 10) {
+    return handPlays.map(p => ({ card: p.card, source: 'hand' as const }));
+  }
+
+  if (sameRankInCenter + selected.length >= 4) {
+    return selected.map(p => ({ card: p.card, source: 'hand' as const }));
+  }
+
+  if (selected.length > 0) {
+    return selected.map(p => ({ card: p.card, source: 'hand' as const }));
+  }
+
+  return [];
+}
+
 export function runTensBotTurn(state: unknown): unknown {
   const s = state as TensState;
   if (s.phase === 'round-end' || s.phase === 'game-over') return s;
@@ -525,6 +701,15 @@ export function runTensBotTurn(state: unknown): unknown {
   const playerIndex = s.currentPlayerIndex;
   const player = s.players[playerIndex];
   if (!player?.isBot) return s;
+
+  if (s.phase === 'reveal-follow-up') {
+    const plays = chooseBotRevealFollowUp(s, playerIndex);
+    if (plays.length === 0) {
+      return processTensAction(s, { type: 'skip-reveal-follow-up' }, player.id);
+    }
+    return processTensAction(s, { type: 'play-reveal-follow-up', plays }, player.id);
+  }
+
   if (s.phase !== 'playing') return s;
 
   const plays = chooseBotPlays(s, playerIndex);

@@ -254,14 +254,22 @@ export function useTensPlayAnimation(options: {
     const playFlights: TensPlayFlight[] = [];
     const prevCenterLength = prev.centerPile.length;
     const fullPileLength = ann.centerAfterPlay.length;
+    const playsToAnimate = prev.phase === 'reveal-follow-up'
+      ? ann.plays.filter(p => p.source === 'hand')
+      : ann.plays;
+    let flightIndex = 0;
     for (let i = 0; i < ann.plays.length; i++) {
       const play = ann.plays[i]!;
+      if (prev.phase === 'reveal-follow-up' && play.source !== 'hand') {
+        continue;
+      }
       const sourceMetrics = resolveSourceMetrics(ann.playerId, play, prev) ?? {
         center: centerTarget,
         width: flyWidth,
         height: flyHeight,
       };
-      const stackIndex = prevCenterLength + i;
+      const stackIndex = prevCenterLength + flightIndex;
+      flightIndex += 1;
       const stackOffset = centerStackOffset(centerStackDisplayIndex(fullPileLength, stackIndex));
       playFlights.push({
         id: `play-${playKey(play)}`,
@@ -273,7 +281,7 @@ export function useTensPlayAnimation(options: {
         },
         width: flyWidth,
         height: flyHeight,
-        delayMs: i * PLAY_STAGGER_MS,
+        delayMs: (flightIndex - 1) * PLAY_STAGGER_MS,
         durationMs: FLY_DURATION_MS,
       });
     }
@@ -320,7 +328,7 @@ export function useTensPlayAnimation(options: {
       outcomeFlights,
       outcome: ann.outcome,
       centerAfterPlay: ann.centerAfterPlay,
-      playedCards: ann.plays.map(p => p.card),
+      playedCards: playsToAnimate.map(p => p.card),
       discardCountBeforeClear: isClearOutcome(ann.outcome)
         ? clearDiscardCountBefore(ann, prev.discardCount)
         : 0,
