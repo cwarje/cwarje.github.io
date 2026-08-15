@@ -68,4 +68,28 @@ describe('GAME_REGISTRY contract', () => {
       }).not.toThrow();
     }
   });
+
+  it('randomizes seat order only for radial seat-pill games', () => {
+    const seatPillGames: GameType[] = [
+      'hearts',
+      'poker',
+      'up-and-down-the-river',
+      'twelve',
+      'cross-crib',
+      'cribbage',
+      'mobilization',
+      'casino',
+      'cucumber',
+      'golf',
+      'tens',
+    ];
+    const nonSeatPillGames: GameType[] = ['yahtzee', 'farkle', 'settler', 'minigolf'];
+
+    for (const gameType of seatPillGames) {
+      expect(GAME_REGISTRY[gameType].randomizeSeatOrder).toBe(true);
+    }
+    for (const gameType of nonSeatPillGames) {
+      expect(GAME_REGISTRY[gameType].randomizeSeatOrder).not.toBe(true);
+    }
+  });
 });

@@ -170,6 +170,8 @@ export interface GameDefinition {
   hasHandZoom?: boolean;
   /** When true, the game uses the shared card-dealing animation and dealer speed setting. */
   hasCardDealing?: boolean;
+  /** When true, shuffle player seat order at game start (radial seat-pill games). */
+  randomizeSeatOrder?: boolean;
   production?: boolean;
   hudTitleLines?: string[];
   /** When true, the floating HUD title is hidden until `isOver(state)` is true. */
@@ -328,6 +330,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: true,
     hasCardDealing: true,
+    randomizeSeatOrder: true,
     production: true,
   },
 
@@ -376,6 +379,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: true,
     hasCardDealing: true,
+    randomizeSeatOrder: true,
     production: true,
   },
 
@@ -432,6 +436,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: true,
     hasCardDealing: true,
+    randomizeSeatOrder: true,
     production: true,
     hudTitleLines: ['Up and Down', 'the River'],
   },
@@ -482,6 +487,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: true,
     hasCardDealing: true,
+    randomizeSeatOrder: true,
     production: true,
     hudTitleLines: ['Mobilization'],
     TitleExtra: MobilizationTitleExtra,
@@ -535,6 +541,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: true,
     hasCardDealing: true,
+    randomizeSeatOrder: true,
     production: true,
   },
 
@@ -629,6 +636,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: true,
     hasCardDealing: true,
+    randomizeSeatOrder: true,
     production: true,
     hudTitleLines: ['Cross Crib'],
     TitleExtra: CrossCribTitleExtra,
@@ -679,6 +687,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: true,
     hasCardDealing: true,
+    randomizeSeatOrder: true,
     production: true,
     hudTitleLines: ['Cribbage'],
   },
@@ -734,6 +743,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: true,
     hasCardDealing: true,
+    randomizeSeatOrder: true,
     production: true,
     hudTitleLines: ['Casino'],
   },
@@ -832,6 +842,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: true,
     hasCardDealing: true,
+    randomizeSeatOrder: true,
     production: true,
     hudTitleLines: ['Cucumber'],
   },
@@ -879,6 +890,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: true,
     hasCardDealing: true,
+    randomizeSeatOrder: true,
     production: true,
     showNewBadge: true,
     hudTitleLines: ['10s'],
@@ -929,6 +941,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     fullBoard: true,
     hasHandZoom: false,
     hasCardDealing: true,
+    randomizeSeatOrder: true,
     production: true,
     hudTitleLines: ['Golf'],
   },

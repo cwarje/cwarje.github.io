@@ -49,6 +49,7 @@ import { dealHoldDurationMs, registerDealHoldExtender } from '../games/shared/de
 import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 import { shouldBotBank } from '../games/farkle/logic';
 import { GAME_REGISTRY } from '../games/registry';
+import { shufflePlayers } from '../games/shared/shufflePlayers';
 import { readMinigolfXp, writeMinigolfXp } from '../games/minigolf/progress';
 
 function createBotId(): string {
@@ -1278,6 +1279,10 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         );
         players = [...players, ...createBotsFromFavorites(resolved, players)];
       }
+    }
+
+    if (gameDef.randomizeSeatOrder && players.length > 1) {
+      players = shufflePlayers(players);
     }
 
     const totalPlayers = players.length;
