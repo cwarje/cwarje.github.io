@@ -3,9 +3,12 @@ import { FLY_DURATION_MS } from '../golf/golfAnimMetrics';
 import {
   CENTER_HOLD_MS,
   CLEAR_HOLD_MS,
+  NORMAL_ANNOUNCEMENT_MS,
   OUTCOME_FLY_DURATION_MS,
   OUTCOME_STAGGER_MS,
   PLAY_STAGGER_MS,
+  normalCenterHoldMs,
+  playFlyMs,
   tensAnnouncementDelayMs,
 } from './tensAnimMetrics';
 
@@ -16,9 +19,27 @@ const ANNOUNCEMENT_BUFFER_MS = 500;
 const playFly = FLY_DURATION_MS + PLAY_STAGGER_MS * (MAX_PLAY_CARDS - 1);
 const outcomeFly = OUTCOME_FLY_DURATION_MS + OUTCOME_STAGGER_MS * (MAX_CENTER_CARDS - 1);
 
+describe('playFlyMs', () => {
+  it('returns fly duration for a single card', () => {
+    expect(playFlyMs(1)).toBe(FLY_DURATION_MS);
+  });
+
+  it('staggers multi-card plays', () => {
+    expect(playFlyMs(4)).toBe(playFly);
+  });
+});
+
+describe('normalCenterHoldMs', () => {
+  it('fills remaining announcement time after fly-in', () => {
+    expect(normalCenterHoldMs(1)).toBe(NORMAL_ANNOUNCEMENT_MS - FLY_DURATION_MS);
+    expect(normalCenterHoldMs(4)).toBe(NORMAL_ANNOUNCEMENT_MS - playFly);
+  });
+});
+
 describe('tensAnnouncementDelayMs', () => {
-  it('uses fly-in + center hold only for normal plays', () => {
-    expect(tensAnnouncementDelayMs('normal')).toBe(playFly + CENTER_HOLD_MS + ANNOUNCEMENT_BUFFER_MS);
+  it('uses flat 2000ms for normal plays', () => {
+    expect(tensAnnouncementDelayMs('normal')).toBe(NORMAL_ANNOUNCEMENT_MS);
+    expect(tensAnnouncementDelayMs('normal')).toBe(2000);
   });
 
   it('includes outcome fly for pickup', () => {

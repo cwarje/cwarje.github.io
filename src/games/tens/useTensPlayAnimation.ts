@@ -14,6 +14,7 @@ import { cardEquals } from './rules';
 import {
   CENTER_HOLD_MS,
   CLEAR_HOLD_MS,
+  normalCenterHoldMs,
   FLY_DURATION_MS,
   OUTCOME_FLY_DURATION_MS,
   OUTCOME_STAGGER_MS,
@@ -359,7 +360,9 @@ export function useTensPlayAnimation(options: {
     const holdMs =
       animation.outcome === 'set-clear' || animation.outcome === 'wild-clear'
         ? CLEAR_HOLD_MS
-        : CENTER_HOLD_MS;
+        : animation.outcome === 'normal'
+          ? normalCenterHoldMs(animation.playFlights.length)
+          : CENTER_HOLD_MS;
     const timer = setTimeout(() => {
       if (animation.outcome === 'normal') {
         completeAnimation();
