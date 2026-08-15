@@ -1,10 +1,13 @@
 import type { GameStartOptions, Player } from '../../networking/types';
 import {
   BALL_RADIUS,
+  COURSE_H,
+  COURSE_W,
   CUP_RADIUS,
   LANDMINE_EXPLOSION_RADIUS,
   LANDMINE_TRIGGER_RADIUS,
   TEE_STARTING_AREA_RADIUS,
+  WALL_THICKNESS,
   courseBorderWalls,
   generateCourses,
   generateHole,
@@ -54,6 +57,81 @@ export function isBallAtRest(ball: MinigolfBall): boolean {
   return ball.vx === 0 && ball.vy === 0;
 }
 
+function playfieldBounds(course: MinigolfCourse): { minX: number; maxX: number; minY: number; maxY: number } {
+  const hasSolidBorder = course.walls.some(isCourseBorderRect);
+  if (hasSolidBorder) {
+    return {
+      minX: WALL_THICKNESS + BALL_RADIUS,
+      maxX: COURSE_W - WALL_THICKNESS - BALL_RADIUS,
+      minY: WALL_THICKNESS + BALL_RADIUS,
+      maxY: COURSE_H - WALL_THICKNESS - BALL_RADIUS,
+    };
+  }
+  return {
+    minX: BALL_RADIUS,
+    maxX: COURSE_W - BALL_RADIUS,
+    minY: BALL_RADIUS,
+    maxY: COURSE_H - BALL_RADIUS,
+  };
+}
+
+/** True when the ball center is outside the playable course rectangle. */
+export function isBallOutOfPlayfield(ball: MinigolfBall, course?: MinigolfCourse): boolean {
+  if (course) {
+    const bounds = playfieldBounds(course);
+    return (
+      ball.x < bounds.minX ||
+      ball.x > bounds.maxX ||
+      ball.y < bounds.minY ||
+      ball.y > bounds.maxY
+    );
+  }
+  return (
+    ball.x < BALL_RADIUS ||
+    ball.x > COURSE_W - BALL_RADIUS ||
+    ball.y < BALL_RADIUS ||
+    ball.y > COURSE_H - BALL_RADIUS
+  );
+}
+
+function constrainBallToPlayfield(ball: MinigolfBall, course: MinigolfCourse): boolean {
+  const { minX, maxX, minY, maxY } = playfieldBounds(course);
+  let changed = false;
+
+  if (ball.x < minX) {
+    ball.x = minX;
+    changed = true;
+  } else if (ball.x > maxX) {
+    ball.x = maxX;
+    changed = true;
+  }
+  if (ball.y < minY) {
+    ball.y = minY;
+    changed = true;
+  } else   if (ball.y > maxY) {
+    ball.y = maxY;
+    changed = true;
+  }
+
+  return changed;
+}
+
+function recoverBallIfOutOfPlayfield(ball: MinigolfBall, course: MinigolfCourse): void {
+  if (!constrainBallToPlayfield(ball, course)) return;
+  resolveBallWallCollisions(ball, course.walls);
+  constrainBallToPlayfield(ball, course);
+}
+
+function resolveBallWallCollisions(ball: MinigolfBall, walls: MinigolfRect[]): void {
+  for (let pass = 0; pass < 3; pass++) {
+    let hitAny = false;
+    for (const wall of walls) {
+      if (collideBallWithRect(ball, wall)) hitAny = true;
+    }
+    if (!hitAny) break;
+  }
+}
+
 function collideBallWithRect(ball: MinigolfBall, rect: MinigolfRect): boolean {
   const nx = Math.max(rect.x, Math.min(ball.x, rect.x + rect.w));
   const ny = Math.max(rect.y, Math.min(ball.y, rect.y + rect.h));
@@ -71,7 +149,6 @@ function collideBallWithRect(ball: MinigolfBall, rect: MinigolfRect): boolean {
     normalX = dx / dist;
     normalY = dy / dist;
   } else {
-    // Ball center is inside the rect: push out along the smallest penetration axis.
     const left = ball.x - rect.x;
     const right = rect.x + rect.w - ball.x;
     const top = ball.y - rect.y;
@@ -215,15 +292,9 @@ function stepBallsWithCollisions(
       balls[i].y += balls[i].vy * stepDt;
     }
 
-    for (let pass = 0; pass < 3; pass++) {
-      let hitAny = false;
-      for (let i = 0; i < balls.length; i++) {
-        if (done[i]) continue;
-        for (const wall of course.walls) {
-          if (collideBallWithRect(balls[i], wall)) hitAny = true;
-        }
-      }
-      if (!hitAny) break;
+    for (let i = 0; i < balls.length; i++) {
+      if (done[i]) continue;
+      resolveBallWallCollisions(balls[i], course.walls);
     }
 
     for (let pass = 0; pass < 3; pass++) {
@@ -239,8 +310,19 @@ function stepBallsWithCollisions(
       if (!hitAny) break;
     }
 
+    for (let i = 0; i < balls.length; i++) {
+      if (done[i]) continue;
+      resolveBallWallCollisions(balls[i], course.walls);
+      recoverBallIfOutOfPlayfield(balls[i], course);
+    }
+
     if (triggered) {
       checkAndDetonateLandmines(balls, course, landmineMotion, triggered);
+      for (let i = 0; i < balls.length; i++) {
+        if (done[i]) continue;
+        resolveBallWallCollisions(balls[i], course.walls);
+        recoverBallIfOutOfPlayfield(balls[i], course);
+      }
     }
 
     for (let i = 0; i < balls.length; i++) {
@@ -425,7 +507,7 @@ function ballInLandmineExplosionRange(ball: MinigolfBall, pos: MinigolfVec): boo
   return Math.hypot(ball.x - pos.x, ball.y - pos.y) <= LANDMINE_EXPLOSION_RADIUS + BALL_RADIUS;
 }
 
-function applyLandmineKnockback(ball: MinigolfBall, pos: MinigolfVec): void {
+function applyLandmineKnockback(ball: MinigolfBall, pos: MinigolfVec, course: MinigolfCourse): void {
   let dx = ball.x - pos.x;
   let dy = ball.y - pos.y;
   let dist = Math.hypot(dx, dy);
@@ -439,18 +521,20 @@ function applyLandmineKnockback(ball: MinigolfBall, pos: MinigolfVec): void {
   const nudge = LANDMINE_EXPLOSION_RADIUS + BALL_RADIUS + 0.1;
   ball.x = pos.x + (dx / dist) * nudge;
   ball.y = pos.y + (dy / dist) * nudge;
+  recoverBallIfOutOfPlayfield(ball, course);
 }
 
 function detonateLandmine(
   pos: MinigolfVec,
   mineIndex: number,
   balls: MinigolfBall[],
+  course: MinigolfCourse,
   triggered: Set<number>,
 ): void {
   triggered.add(mineIndex);
   for (const ball of balls) {
     if (ballInLandmineExplosionRange(ball, pos)) {
-      applyLandmineKnockback(ball, pos);
+      applyLandmineKnockback(ball, pos, course);
     }
   }
 }
@@ -468,7 +552,7 @@ function checkAndDetonateLandmines(
     const mine = landmines[i];
     const pos = landminePosition(mine, landmineMotion?.[i]);
     if (balls.some((ball) => ballInLandmineTriggerRange(ball, pos))) {
-      detonateLandmine(pos, i, balls, triggered);
+      detonateLandmine(pos, i, balls, course, triggered);
     }
   }
 }
@@ -527,11 +611,17 @@ export function stepBall(
 ): { holed: boolean; inWater?: boolean } {
   const { friction } = getMinigolfTheme(theme);
   let speed = Math.hypot(ball.vx, ball.vy);
-  if (speed <= 0) return { holed: false };
+  if (speed <= 0) {
+    recoverBallIfOutOfPlayfield(ball, course);
+    return { holed: false };
+  }
 
   applySurfaceFriction(ball, course, theme, dtScale);
   speed = Math.hypot(ball.vx, ball.vy);
-  if (speed <= 0) return { holed: false };
+  if (speed <= 0) {
+    recoverBallIfOutOfPlayfield(ball, course);
+    return { holed: false };
+  }
 
   const travel = speed * dtScale;
   const steps = Math.max(1, Math.ceil(travel / (BALL_RADIUS * 0.75)));
@@ -541,18 +631,14 @@ export function stepBall(
     ball.x += ball.vx * stepDt;
     ball.y += ball.vy * stepDt;
 
-    // Resolve collisions; a corner can touch two rects in one substep.
-    for (let pass = 0; pass < 3; pass++) {
-      let hitAny = false;
-      for (const wall of course.walls) {
-        if (collideBallWithRect(ball, wall)) hitAny = true;
-      }
-      if (!hitAny) break;
-    }
+    resolveBallWallCollisions(ball, course.walls);
 
     if (triggered) {
       checkAndDetonateLandmines([ball], course, landmineMotion, triggered);
+      resolveBallWallCollisions(ball, course.walls);
     }
+
+    recoverBallIfOutOfPlayfield(ball, course);
 
     if (friction.sandTrapMult != null) {
       applySandTrapSlowdown(ball, course, stepDt, friction.sandTrapMult);
@@ -572,6 +658,8 @@ export function stepBall(
       return { holed: false, inWater: true };
     }
   }
+
+  recoverBallIfOutOfPlayfield(ball, course);
 
   return { holed: false };
 }
@@ -827,6 +915,19 @@ function updatePlayerBeforePhysics(
   }
 
   if (isBallAtRest(p.ball)) {
+    if (isBallOutOfPlayfield(p.ball, course)) {
+      return {
+        player: {
+          ...p,
+          ball: { x: p.lastStrokePos.x, y: p.lastStrokePos.y, vx: 0, vy: 0 },
+          strokes: p.strokes + 1,
+          botNextStrokeTick: -1,
+        },
+        changed: true,
+        needsPhysics: false,
+      };
+    }
+
     if (p.strokes >= course.par + STROKE_CAP_OVER_PAR) {
       return {
         player: withRecordedScore({ ...p, gaveUp: true }, holeIndex, giveUpScore(course.par)),

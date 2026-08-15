@@ -26,6 +26,7 @@ import {
   getMinigolfWinners,
   initLandmineMotion,
   isBallAtRest,
+  isBallOutOfPlayfield,
   isMinigolfOver,
   processMinigolfAction,
   runMinigolfBotTurn,
@@ -390,6 +391,72 @@ describe('minigolf physics', () => {
     expect(ball.x).toBeGreaterThan(WALL_THICKNESS);
     expect(ball.x).toBeLessThan(COURSE_W - WALL_THICKNESS);
     expect(isBallAtRest(ball)).toBe(true);
+  });
+
+  it('pulls a ball back inside when it starts outside the left wall', () => {
+    const course = openCourse();
+    const ball: MinigolfBall = { x: -2, y: 70, vx: -1, vy: 0 };
+    for (let i = 0; i < 40; i++) {
+      stepBall(ball, course, 1);
+    }
+    expect(isBallOutOfPlayfield(ball, course)).toBe(false);
+    expect(ball.x).toBeGreaterThan(WALL_THICKNESS);
+  });
+
+  it('respawns an out-of-bounds ball at rest to its last stroke with a penalty', () => {
+    const course = openCourse(3);
+    const lastStrokePos = { x: course.tee.x, y: course.tee.y };
+    let state = makeState(1);
+    state = {
+      ...state,
+      courses: [course, ...state.courses.slice(1)],
+      players: state.players.map((p) =>
+        p.id === 'p1'
+          ? {
+              ...p,
+              ball: { x: -5, y: 70, vx: 0, vy: 0 },
+              lastStrokePos,
+              strokes: 2,
+            }
+          : p,
+      ),
+    };
+
+    state = tick(state);
+    const p1 = state.players.find((p) => p.id === 'p1')!;
+    expect(isBallOutOfPlayfield(p1.ball, course)).toBe(false);
+    expect(p1.ball.x).toBe(lastStrokePos.x);
+    expect(p1.ball.y).toBe(lastStrokePos.y);
+    expect(p1.strokes).toBe(3);
+  });
+
+  it('keeps balls in bounds when ball collisions are enabled', () => {
+    const course = openCourse();
+    let state = makeState(2);
+    state = {
+      ...state,
+      ballCollisions: true,
+      courses: [course, course, course],
+      players: [
+        {
+          ...state.players[0],
+          ball: { x: 8, y: 70, vx: -4.2, vy: 0 },
+          lastStrokePos: { x: 8, y: 70 },
+        },
+        {
+          ...state.players[1],
+          ball: { x: 5, y: 70, vx: 0, vy: 0 },
+          lastStrokePos: { x: 5, y: 70 },
+        },
+      ],
+    };
+
+    for (let i = 0; i < 120; i++) {
+      state = tick(state);
+      for (const p of state.players) {
+        expect(isBallOutOfPlayfield(p.ball, course)).toBe(false);
+      }
+    }
   });
 
   it('captures a slow ball rolling over the cup', () => {
