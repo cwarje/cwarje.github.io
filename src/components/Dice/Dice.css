@@ -10,9 +10,16 @@
   );
 }
 
+.backgammon-roll-area {
+  --dice-stage-width: calc(
+    (var(--dice-size, 3.5rem) * 5) + (var(--dice-gap, 1.5rem) * 4)
+  );
+}
+
 @media (max-width: 639px) {
   .yahtzee-roll-area,
-  .farkle-roll-area {
+  .farkle-roll-area,
+  .backgammon-roll-area {
     --dice-size: 3.25rem;
     --dice-gap: 1.25rem;
   }

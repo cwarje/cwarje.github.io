@@ -128,6 +128,7 @@ export default function GamePage() {
               <gameDef.TitleExtra
                 state={gameState}
                 isHandZoomed={gameDef?.hasHandZoom ? isHandZoomed : undefined}
+                myId={myId}
               />
             )}
           </div>

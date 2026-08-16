@@ -60,7 +60,6 @@ function switchToNextPlayer(state: BackgammonState): BackgammonState {
     phase: 'pre-roll',
     dice: null,
     movesRemaining: [],
-    lastMove: undefined,
   };
 }
 

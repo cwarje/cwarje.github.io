@@ -197,7 +197,7 @@ export function applyMove(state: BackgammonState, from: MoveFrom, to: MoveTo, di
   const idx = next.movesRemaining.indexOf(dieUsed);
   if (idx >= 0) next.movesRemaining.splice(idx, 1);
 
-  next.lastMove = { from, to, dieUsed, hit };
+  next.lastMove = { from, to, dieUsed, hit, side };
   return next;
 }
 

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type TransitionEvent } from 'react';
+import { motion } from 'framer-motion';
+import { RotateCcw } from 'lucide-react';
 import {
   Dice,
   faceOrientations,
@@ -7,7 +9,8 @@ import {
   type CubeOrientation,
   type DiceValue,
 } from '../../components/Dice';
-import { PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
+import { PLAYER_COLOR_HEX } from '../../networking/playerColors';
+import { buildMoveAnimations, shouldHideChecker, type CheckerMoveAnimation } from './animations';
 import { getLegalMovesForUi } from './logic';
 import {
   barLayout,
@@ -16,9 +19,11 @@ import {
   checkerStackOffset,
   defaultPointLayouts,
   pointTrianglePath,
+  topStackIndex,
   type PointLayout,
 } from './layout';
 import type { BackgammonAction, BackgammonState, MoveFrom, MoveTo, Side } from './types';
+import { currentSide } from './types';
 
 interface BackgammonBoardProps {
   state: unknown;
@@ -62,16 +67,26 @@ function spinTowardFace(previous: CubeOrientation, target: CubeOrientation): Cub
   };
 }
 
-function BackgammonDiceSlot({
+function BackgammonRollArea({
   dice,
   showRollButton,
   onRoll,
   movesRemaining,
+  showEndTurn,
+  onEndTurn,
+  showClearSelection,
+  onClearSelection,
+  onRollingChange,
 }: {
   dice: { d1: number; d2: number } | null;
   showRollButton: boolean;
   onRoll: () => void;
   movesRemaining: number[];
+  showEndTurn: boolean;
+  onEndTurn: () => void;
+  showClearSelection: boolean;
+  onClearSelection: () => void;
+  onRollingChange?: (rolling: boolean) => void;
 }) {
   const [isRolling, setIsRolling] = useState(false);
   const [orientations, setOrientations] = useState<[CubeOrientation, CubeOrientation]>(() =>
@@ -79,9 +94,18 @@ function BackgammonDiceSlot({
   );
   const prevDiceRef = useRef<{ d1: number; d2: number } | null>(null);
 
+  // Detect new dice synchronously during render so move hints stay hidden until
+  // the roll animation finishes (same idea as Yahtzee gating scores with !isRolling).
+  const prevDice = prevDiceRef.current;
+  const diceJustChanged =
+    dice !== null &&
+    (prevDice === null || prevDice.d1 !== dice.d1 || prevDice.d2 !== dice.d2);
+  const awaitingRollAnimation = isRolling || diceJustChanged;
+
   useEffect(() => {
     if (!dice) {
       prevDiceRef.current = null;
+      setIsRolling(false);
       setOrientations(createNeutralOrientations());
       return;
     }
@@ -99,6 +123,10 @@ function BackgammonDiceSlot({
     }
   }, [dice]);
 
+  useEffect(() => {
+    onRollingChange?.(awaitingRollAnimation);
+  }, [awaitingRollAnimation, onRollingChange]);
+
   const handleRollEnd = (event: TransitionEvent<HTMLDivElement>) => {
     if (event.propertyName !== 'transform' || !isRolling || !dice) return;
     prevDiceRef.current = { d1: dice.d1, d2: dice.d2 };
@@ -106,47 +134,110 @@ function BackgammonDiceSlot({
   };
 
   const handleRollClick = () => {
-    if (isRolling) return;
+    if (awaitingRollAnimation) return;
     setIsRolling(true);
     onRoll();
   };
 
+  const hasSecondaryActions = showEndTurn;
+
   return (
-    <div className="backgammon-diceSlot">
-      {dice && (
-        <div className="backgammon-diceRow dice-stage">
-          <Dice
-            orientation={orientations[0]}
-            rolling={isRolling}
-            disabled
-            size="2.75rem"
-            onTransitionEnd={handleRollEnd}
-            ariaLabel={`Die ${dice.d1}`}
-          />
-          <Dice
-            orientation={orientations[1]}
-            rolling={isRolling}
-            disabled
-            size="2.75rem"
-            ariaLabel={`Die ${dice.d2}`}
-          />
-          {movesRemaining.length > 0 && !isRolling && (
-            <span className="backgammon-movesLeft">Pips left: {movesRemaining.join(', ')}</span>
-          )}
+    <>
+      {hasSecondaryActions && (
+        <div className="flex w-full flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={onEndTurn}
+            className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-500"
+          >
+            End turn
+          </button>
         </div>
       )}
 
-      {showRollButton && (
-        <button
-          type="button"
-          className="backgammon-rollBtn"
-          onClick={handleRollClick}
-          disabled={isRolling}
-        >
-          {isRolling ? 'Rolling…' : 'Roll dice'}
-        </button>
-      )}
-    </div>
+      <div className="dice-stage">
+        {dice && (
+          <>
+            <Dice
+              orientation={orientations[0]}
+              rolling={awaitingRollAnimation}
+              disabled
+              onTransitionEnd={handleRollEnd}
+              ariaLabel={`Die ${dice.d1}`}
+            />
+            <Dice
+              orientation={orientations[1]}
+              rolling={awaitingRollAnimation}
+              disabled
+              ariaLabel={`Die ${dice.d2}`}
+            />
+          </>
+        )}
+      </div>
+
+      <div className="yahtzee-controls-slot min-h-12 flex w-full items-center justify-center">
+        {showRollButton ? (
+          <button
+            type="button"
+            onClick={handleRollClick}
+            disabled={awaitingRollAnimation}
+            className="yahtzee-roll-button flex items-center gap-2 px-6 py-3 rounded-xl text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer bg-primary-600 hover:bg-primary-500"
+          >
+            <RotateCcw className={`w-4 h-4 ${awaitingRollAnimation ? 'animate-spin' : ''}`} />
+            {awaitingRollAnimation ? 'Rolling...' : 'Roll dice'}
+          </button>
+        ) : dice && movesRemaining.length > 0 && !awaitingRollAnimation ? (
+          <div className="backgammon-moveControls flex min-h-12 w-full max-w-[var(--dice-stage-width)] flex-nowrap items-center justify-center gap-2">
+            {showClearSelection && (
+              <button
+                type="button"
+                onClick={onClearSelection}
+                className="yahtzee-roll-button flex min-h-12 w-auto shrink-0 items-center rounded-xl bg-primary-600 px-3 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-500"
+              >
+                Clear selection
+              </button>
+            )}
+            <p className="backgammon-movesLeft yahtzee-roll-button m-0 flex min-h-12 w-auto shrink-0 items-center justify-center px-4 py-3 text-sm font-medium">
+              Pips left: {movesRemaining.join(', ')}
+            </p>
+          </div>
+        ) : showClearSelection ? (
+          <button
+            type="button"
+            onClick={onClearSelection}
+            className="yahtzee-roll-button flex min-h-12 items-center rounded-xl bg-primary-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-500"
+          >
+            Clear selection
+          </button>
+        ) : (
+          <div aria-hidden className="h-12" />
+        )}
+      </div>
+    </>
+  );
+}
+
+const MotionCircle = motion.circle;
+
+function AnimatedChecker({
+  animation,
+  onComplete,
+}: {
+  animation: CheckerMoveAnimation;
+  onComplete: (id: number) => void;
+}) {
+  return (
+    <MotionCircle
+      r={11}
+      fill={animation.color}
+      stroke="#1f2937"
+      strokeWidth={1.2}
+      className="backgammon-checker backgammon-checker--animating"
+      initial={{ cx: animation.from.x, cy: animation.from.y }}
+      animate={{ cx: animation.to.x, cy: animation.to.y }}
+      transition={{ duration: 0.42, ease: [0.33, 1, 0.68, 1] }}
+      onAnimationComplete={() => onComplete(animation.id)}
+    />
   );
 }
 
@@ -154,29 +245,71 @@ export default function BackgammonBoard({ state, myId, onAction }: BackgammonBoa
   const s = state as BackgammonState;
   const myPlayer = s.players.find((p) => p.id === myId);
   const mySide: Side = myPlayer?.side ?? 'white';
-  const myIndex = s.players.findIndex((p) => p.id === myId);
   const current = s.players[s.currentPlayerIndex];
   const isMyTurn = current?.id === myId;
+  const turnSide = currentSide(s);
 
   const [selectedFrom, setSelectedFrom] = useState<MoveFrom | null>(null);
+  const [isDiceRolling, setIsDiceRolling] = useState(false);
+  const [animations, setAnimations] = useState<CheckerMoveAnimation[]>([]);
+  const animIdRef = useRef(0);
+  const lastMoveKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isMyTurn || s.phase !== 'moving') {
+      setSelectedFrom(null);
+    }
+  }, [isMyTurn, s.phase, s.currentPlayerIndex]);
+
+  useEffect(() => {
+    if (!s.lastMove) return;
+    const key = JSON.stringify(s.lastMove);
+    if (key === lastMoveKeyRef.current) return;
+    lastMoveKeyRef.current = key;
+
+    const movingSide = s.lastMove.side;
+    const movingPlayer = s.players.find((p) => p.side === movingSide)!;
+    const opponentPlayer = s.players.find((p) => p.side !== movingSide)!;
+    const getLayout = (index: number) => layoutForPoint(index, mySide);
+
+    const newAnimations = buildMoveAnimations(
+      s.lastMove,
+      s,
+      movingSide,
+      PLAYER_COLOR_HEX[movingPlayer.color],
+      PLAYER_COLOR_HEX[opponentPlayer.color],
+      getLayout,
+      () => ++animIdRef.current
+    );
+    setAnimations((prev) => [...prev, ...newAnimations]);
+  }, [s.lastMove, s, mySide]);
+
+  const removeAnimation = useCallback((id: number) => {
+    setAnimations((prev) => prev.filter((anim) => anim.id !== id));
+  }, []);
 
   const legalMoves = useMemo(
     () => (isMyTurn && s.phase === 'moving' ? getLegalMovesForUi(s, myId) : []),
     [s, myId, isMyTurn]
   );
 
+  const moveHints = useMemo(
+    () => (isDiceRolling ? [] : legalMoves),
+    [legalMoves, isDiceRolling]
+  );
+
   const destinationsForSelected = useMemo(() => {
     if (selectedFrom == null) return new Set<string>();
     return new Set(
-      legalMoves.filter((m) => m.from === selectedFrom).map((m) => moveKey(m.from, m.to))
+      moveHints.filter((m) => m.from === selectedFrom).map((m) => moveKey(m.from, m.to))
     );
-  }, [legalMoves, selectedFrom]);
+  }, [moveHints, selectedFrom]);
 
   const sourcesWithMoves = useMemo(() => {
     const set = new Set<string>();
-    for (const m of legalMoves) set.add(String(m.from));
+    for (const m of moveHints) set.add(String(m.from));
     return set;
-  }, [legalMoves]);
+  }, [moveHints]);
 
   const dispatch = useCallback(
     (action: BackgammonAction) => {
@@ -186,29 +319,29 @@ export default function BackgammonBoard({ state, myId, onAction }: BackgammonBoa
   );
 
   const handlePointClick = (logicalIndex: number) => {
-    if (!isMyTurn || s.phase !== 'moving') return;
+    if (!isMyTurn || s.phase !== 'moving' || isDiceRolling) return;
 
-    const asDest = legalMoves.find((m) => m.to === logicalIndex);
+    const asDest = moveHints.find((m) => m.to === logicalIndex);
     if (selectedFrom != null && asDest && asDest.from === selectedFrom) {
       dispatch({ type: 'move', from: selectedFrom, to: logicalIndex });
       setSelectedFrom(null);
       return;
     }
 
-    const asSource = legalMoves.some((m) => m.from === logicalIndex);
+    const asSource = moveHints.some((m) => m.from === logicalIndex);
     if (asSource) {
       setSelectedFrom(logicalIndex);
     }
   };
 
   const handleBarClick = (side: Side) => {
-    if (!isMyTurn || s.phase !== 'moving' || side !== current?.side) return;
+    if (!isMyTurn || s.phase !== 'moving' || isDiceRolling || side !== current?.side) return;
     if (sourcesWithMoves.has('bar')) setSelectedFrom('bar');
   };
 
   const handleBearOffClick = () => {
-    if (!isMyTurn || s.phase !== 'moving' || selectedFrom == null) return;
-    const move = legalMoves.find((m) => m.from === selectedFrom && m.to === 'off');
+    if (!isMyTurn || s.phase !== 'moving' || isDiceRolling || selectedFrom == null) return;
+    const move = moveHints.find((m) => m.from === selectedFrom && m.to === 'off');
     if (move) {
       dispatch({ type: 'move', from: selectedFrom, to: 'off' });
       setSelectedFrom(null);
@@ -219,8 +352,9 @@ export default function BackgammonBoard({ state, myId, onAction }: BackgammonBoa
   const bar = barLayout();
   const leftTray = bearOffTray('left');
   const rightTray = bearOffTray('right');
-
-  const opponent = s.players[myIndex === 0 ? 1 : 0];
+  const barHitSize = 44;
+  const barHitX = bar.x + bar.width / 2 - barHitSize / 2;
+  const barHitY = bar.y + bar.height / 2 - barHitSize / 2;
 
   const renderCheckers = (logicalIndex: number, layout: PointLayout) => {
     const whiteCount = signedCount(s.points, logicalIndex, 'white');
@@ -237,6 +371,17 @@ export default function BackgammonBoard({ state, myId, onAction }: BackgammonBoa
       Array.from({ length: Math.min(count, 5) }, (_, i) => {
         const off = checkerStackOffset(i, layout.pointsDown);
         const showMore = count > 5 && i === 4;
+        const isTopChecker = i === topStackIndex(count);
+        const isSelected =
+          isTopChecker &&
+          side === turnSide &&
+          selectedFrom === logicalIndex &&
+          isMyTurn &&
+          s.phase === 'moving';
+        const hidden = shouldHideChecker(animations, 'point', side, i, logicalIndex);
+
+        if (hidden) return null;
+
         return (
           <circle
             key={`${logicalIndex}-${side}-${i}`}
@@ -246,7 +391,7 @@ export default function BackgammonBoard({ state, myId, onAction }: BackgammonBoa
             fill={color}
             stroke="#1f2937"
             strokeWidth={1.2}
-            className="backgammon-checker"
+            className={`backgammon-checker${isSelected ? ' backgammon-checker--selected' : ''}`}
           >
             {showMore && (
               <title>{count} checkers</title>
@@ -292,17 +437,31 @@ export default function BackgammonBoard({ state, myId, onAction }: BackgammonBoa
   const renderBarCheckers = (side: Side, count: number, xOffset: number) => {
     if (count === 0) return null;
     const color = PLAYER_COLOR_HEX[s.players[side === 'white' ? 0 : 1]!.color];
-    return Array.from({ length: Math.min(count, 3) }, (_, i) => (
-      <circle
-        key={`bar-${side}-${i}`}
-        cx={bar.x + bar.width / 2 + xOffset}
-        cy={bar.y + bar.height / 2 + i * 14 - 14}
-        r={10}
-        fill={color}
-        stroke="#1f2937"
-        strokeWidth={1.2}
-      />
-    ));
+    return Array.from({ length: Math.min(count, 3) }, (_, i) => {
+      const isTopChecker = i === Math.max(0, Math.min(count, 3) - 1);
+      const isSelected =
+        isTopChecker &&
+        side === turnSide &&
+        selectedFrom === 'bar' &&
+        isMyTurn &&
+        s.phase === 'moving';
+      const hidden = shouldHideChecker(animations, 'bar', side, i);
+
+      if (hidden) return null;
+
+      return (
+        <circle
+          key={`bar-${side}-${i}`}
+          cx={bar.x + bar.width / 2 + xOffset}
+          cy={bar.y + bar.height / 2 + i * 14 - 14}
+          r={10}
+          fill={color}
+          stroke="#1f2937"
+          strokeWidth={1.2}
+          className={`backgammon-checker${isSelected ? ' backgammon-checker--selected' : ''}`}
+        />
+      );
+    });
   };
 
   const diceValues = s.dice ? { d1: s.dice[0], d2: s.dice[1] } : null;
@@ -310,41 +469,41 @@ export default function BackgammonBoard({ state, myId, onAction }: BackgammonBoa
     selectedFrom != null && destinationsForSelected.has(moveKey(selectedFrom, 'off'));
 
   return (
-    <div className="backgammon-boardWrap">
-      <div className="backgammon-statusBar">
-        <span style={{ color: getPlayerHudTextColor(myPlayer?.color ?? 'red') }}>
-          You ({mySide}) · {s.off[mySide]} off
-        </span>
-        <span className="backgammon-statusBar-opponent">
-          {opponent?.name} · {s.off[opponent?.side ?? 'black']} off
-        </span>
-        <span className="backgammon-statusBar-turn">
-          {s.phase === 'finished'
-            ? 'Game over'
-            : isMyTurn
-              ? s.phase === 'pre-roll'
-                ? 'Your roll'
-                : 'Your move'
-              : `${current?.name}'s turn`}
-        </span>
-      </div>
-
-      <div className="backgammon-main">
-        <svg viewBox={boardViewBox()} className="backgammon-svg" role="img" aria-label="Backgammon board">
+    <div className="backgammon-board h-full flex flex-col">
+      <div className="backgammon-boardArea flex-1 min-h-0 flex items-center justify-center">
+        <svg
+          viewBox={boardViewBox()}
+          className="backgammon-svg"
+          preserveAspectRatio="xMidYMid meet"
+          role="img"
+          aria-label="Backgammon board"
+        >
           <rect x={0} y={0} width={400} height={520} className="backgammon-frame" rx={8} />
           <rect x={leftTray.x} y={leftTray.y} width={leftTray.width} height={leftTray.height} className="backgammon-tray" />
           <rect x={rightTray.x} y={rightTray.y} width={rightTray.width} height={rightTray.height} className="backgammon-tray" />
 
           {Array.from({ length: 24 }, (_, i) => renderPoint(i))}
 
-          <rect
-            x={bar.x}
-            y={bar.y}
-            width={bar.width}
-            height={bar.height}
-            className={`backgammon-bar ${sourcesWithMoves.has('bar') ? 'backgammon-bar--active' : ''}`}
-            onClick={() => handleBarClick(current?.side ?? 'white')}
-          />
+          <g onClick={() => handleBarClick(current?.side ?? 'white')}>
+            <rect
+              x={barHitX}
+              y={barHitY}
+              width={barHitSize}
+              height={barHitSize}
+              fill="transparent"
+              className="backgammon-barHit"
+            />
+            <rect
+              x={bar.x}
+              y={bar.y}
+              width={bar.width}
+              height={bar.height}
+              className={`backgammon-bar ${
+                sourcesWithMoves.has('bar') ? 'backgammon-bar--active' : ''
+              } ${selectedFrom === 'bar' ? 'backgammon-bar--selected' : ''}`}
+              pointerEvents="none"
+            />
+          </g>
           {renderBarCheckers('white', s.bar.white, -6)}
           {renderBarCheckers('black', s.bar.black, 6)}
 
@@ -352,30 +511,36 @@ export default function BackgammonBoard({ state, myId, onAction }: BackgammonBoa
             className={`backgammon-bearOff ${bearOffHighlight ? 'backgammon-bearOff--dest' : ''}`}
             onClick={handleBearOffClick}
           >
-            <rect x={rightTray.x + 1} y={rightTray.y + 8} width={12} height={80} rx={2} fill="transparent" />
+            <rect
+              x={rightTray.x}
+              y={rightTray.y}
+              width={rightTray.width}
+              height={rightTray.height}
+              rx={2}
+              fill="transparent"
+            />
+          </g>
+
+          <g className="backgammon-animationLayer" pointerEvents="none">
+            {animations.map((animation) => (
+              <AnimatedChecker key={animation.id} animation={animation} onComplete={removeAnimation} />
+            ))}
           </g>
         </svg>
+      </div>
 
-        <div className="backgammon-controls">
-          <BackgammonDiceSlot
-            dice={s.phase === 'moving' ? diceValues : null}
-            showRollButton={canRoll}
-            onRoll={() => dispatch({ type: 'roll' })}
-            movesRemaining={s.movesRemaining}
-          />
-
-          {isMyTurn && s.phase === 'moving' && legalMoves.length === 0 && (
-            <button type="button" className="backgammon-rollBtn" onClick={() => dispatch({ type: 'end-turn' })}>
-              End turn
-            </button>
-          )}
-
-          {selectedFrom != null && (
-            <button type="button" className="backgammon-clearBtn" onClick={() => setSelectedFrom(null)}>
-              Clear selection
-            </button>
-          )}
-        </div>
+      <div className="backgammon-roll-area yahtzee-roll-area mt-auto flex flex-col items-center gap-4 pb-1">
+        <BackgammonRollArea
+          dice={s.phase === 'moving' ? diceValues : null}
+          showRollButton={canRoll}
+          onRoll={() => dispatch({ type: 'roll' })}
+          movesRemaining={s.movesRemaining}
+          showEndTurn={isMyTurn && s.phase === 'moving' && !isDiceRolling && legalMoves.length === 0}
+          onEndTurn={() => dispatch({ type: 'end-turn' })}
+          showClearSelection={selectedFrom != null}
+          onClearSelection={() => setSelectedFrom(null)}
+          onRollingChange={setIsDiceRolling}
+        />
       </div>
     </div>
   );

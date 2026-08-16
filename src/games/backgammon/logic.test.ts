@@ -107,6 +107,24 @@ describe('processBackgammonAction', () => {
     expect(isBackgammonOver(next)).toBe(true);
     expect(getBackgammonWinners(next)).toEqual(['p1']);
   });
+
+  it('preserves lastMove when turn ends after final die', () => {
+    let state = createBackgammonState(makePlayers());
+    state = {
+      ...cloneState(state),
+      points: Array(24).fill(0),
+      currentPlayerIndex: 0,
+      phase: 'moving',
+      dice: [2, 4],
+      movesRemaining: [2],
+    };
+    state.points[10] = 1;
+
+    const next = processBackgammonAction(state, { type: 'move', from: 10, to: 8 }, 'p1');
+    expect(next.currentPlayerIndex).toBe(1);
+    expect(next.phase).toBe('pre-roll');
+    expect(next.lastMove).toEqual({ from: 10, to: 8, dieUsed: 2, hit: false, side: 'white' });
+  });
 });
 
 describe('doubles', () => {

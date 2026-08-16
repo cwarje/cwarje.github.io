@@ -73,6 +73,36 @@ export function checkerStackOffset(stackIndex: number, pointsDown: boolean): { d
   };
 }
 
+export function topStackIndex(count: number): number {
+  return Math.max(0, Math.min(count, 5) - 1);
+}
+
+export function pointCheckerPosition(layout: PointLayout, stackIndex: number): { x: number; y: number } {
+  const off = checkerStackOffset(stackIndex, layout.pointsDown);
+  return { x: layout.stackX + off.dx, y: layout.stackY + off.dy };
+}
+
+export function barCheckerPosition(
+  bar: { x: number; y: number; width: number; height: number },
+  stackIndex: number,
+  xOffset: number
+): { x: number; y: number } {
+  return {
+    x: bar.x + bar.width / 2 + xOffset,
+    y: bar.y + bar.height / 2 + stackIndex * 14 - 14,
+  };
+}
+
+export function bearOffCheckerPosition(
+  tray: { x: number; y: number; width: number; height: number },
+  stackIndex: number
+): { x: number; y: number } {
+  return {
+    x: tray.x + tray.width / 2,
+    y: tray.y + tray.height - 14 - stackIndex * 8,
+  };
+}
+
 export function barLayout(): { x: number; y: number; width: number; height: number } {
   return {
     x: MARGIN + 6 * POINT_W,

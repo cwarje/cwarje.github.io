@@ -1461,7 +1461,11 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const YAHTZEE_BOT_ROLL_DELAY = 2000;  // ms between each bot roll in Yahtzee
   const YAHTZEE_BOT_HOLD_DELAY = 1200;  // ms to show held dice before bot rerolls in Yahtzee
   const YAHTZEE_BOT_SCORE_DELAY = 4000; // ms to show dice before bot scores
-  const BACKGAMMON_BOT_DELAY = 700;
+  const BACKGAMMON_DICE_ROLL_MS = 1200; // matches Dice.css .dice-cube.rolling
+  const BACKGAMMON_CHECKER_MOVE_MS = 420; // matches AnimatedChecker transition
+  const BACKGAMMON_BOT_ROLL_DELAY = 1800;
+  const BACKGAMMON_BOT_FIRST_MOVE_DELAY = BACKGAMMON_DICE_ROLL_MS + 800; // ~2000ms
+  const BACKGAMMON_BOT_MOVE_DELAY = BACKGAMMON_CHECKER_MOVE_MS + 900; // ~1320ms
   const FARKLE_BOT_DELAY = 900; // ms before bot banks in Farkle
   const FARKLE_BOT_CHOOSE_DELAY = 2000; // ms before bot chooses dice to keep
   const FARKLE_BOT_ROLL_DELAY = 2000; // ms before bot re-rolls
@@ -2538,6 +2542,12 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
       const currentPlayer = bs.players[bs.currentPlayerIndex];
       if (currentPlayer?.isBot) {
+        const delay =
+          bs.phase === 'pre-roll'
+            ? BACKGAMMON_BOT_ROLL_DELAY
+            : bs.lastMove
+              ? BACKGAMMON_BOT_MOVE_DELAY
+              : BACKGAMMON_BOT_FIRST_MOVE_DELAY;
         botTimerRef.current = setTimeout(() => {
           const currentGs = gameStateRef.current;
           const currentRoom = roomRef.current;
@@ -2553,7 +2563,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
               broadcastRoomState(finishedRoom);
             }
           }
-        }, BACKGAMMON_BOT_DELAY);
+        }, delay);
       }
     }
 

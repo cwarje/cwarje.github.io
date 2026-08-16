@@ -147,6 +147,7 @@ export interface GameOptionsPanelProps {
 export interface GameHudProps {
   state: unknown;
   isHandZoomed?: boolean;
+  myId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -901,6 +902,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     hasCardDealing: true,
     randomizeSeatOrder: true,
     production: true,
+    showNewBadge: true,
     hudTitleLines: ['10s'],
   },
 

@@ -24,6 +24,7 @@ export interface LastMove {
   to: MoveTo;
   dieUsed: number;
   hit?: boolean;
+  side: Side;
 }
 
 export interface BackgammonState {
