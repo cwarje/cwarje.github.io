@@ -2896,6 +2896,44 @@
   transform: translate(2px, 2px);
 }
 
+.twelve-pileReveal {
+  width: 100%;
+  height: 100%;
+  perspective: 900px;
+}
+
+.twelve-pileRevealInner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+
+.twelve-pileRevealFace {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+.twelve-pileRevealFace--front {
+  transform: rotateY(180deg);
+}
+
+.twelve-pileRevealFace .card-face,
+.twelve-pileRevealFace .card-back {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.twelve-pileReveal--revealed {
+  perspective: none;
+}
+
+.twelve-pileReveal--revealed .twelve-pileRevealFace--back {
+  visibility: hidden;
+}
+
 .twelve-pilePlaceholder {
   width: 100%;
   height: 100%;
@@ -4051,19 +4089,49 @@
 /* Keep Twelve pile cards and placeholders exactly aligned with pile slots. */
 .twelve-pileButton .poker-card,
 .twelve-pileButton .card-back,
+.twelve-pileButton .card-back.card-back--sm,
 .twelve-pileButton .card-flip,
+.twelve-pileButton .card-flip.twelve-pileFlip,
 .twelve-pileButton .card-flip.card-flip--sm,
+.twelve-pileButton .card-flipInner,
+.twelve-pileButton .twelve-pileReveal,
+.twelve-pileButton .twelve-pileRevealInner,
 .twelve-pileButton .card-face {
   width: 100%;
   height: 100%;
 }
 
 .twelve-pileButton .card-face,
+.twelve-pileButton .card-face.card-face--compact,
+.twelve-pileButton .twelve-pileRevealFace .card-face,
+.twelve-pileButton .twelve-pileRevealFace .card-face.card-face--compact,
+.twelve-pileButton .twelve-pileBottom > .card-face,
+.twelve-pileButton .twelve-pileBottom > .card-face.card-face--compact,
+.twelve-pileButton .twelve-pileTop > .card-face,
+.twelve-pileButton .twelve-pileTop > .card-face.card-face--compact,
 .twelve-pileButton .card-flipFront {
   align-items: flex-start;
   justify-content: flex-start;
   padding: 6px 8px 6px 3px;
   gap: 3px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.twelve-pileButton .card-flipFront .card-face,
+.twelve-pileButton .card-flipFront .card-face.card-face--compact,
+.twelve-pileButton .card-flipBack .card-back {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* Casino rules set .card-face to 1.45em / .card-face--compact to 1.2em; pile slots are 45×68px. */
+.twelve-pileBottom > .card-back {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .card-flipInner {

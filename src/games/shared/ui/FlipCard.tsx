@@ -11,10 +11,12 @@ interface FlipCardProps {
   faceUp?: boolean;
   disabled?: boolean;
   size?: 'sm' | 'md';
+  compact?: boolean;
   skipFlip?: boolean;
   flipDurationMs?: number;
   className?: string;
   frontClassName?: string;
+  onFlipComplete?: () => void;
 }
 
 export function FlipCard({
@@ -23,10 +25,12 @@ export function FlipCard({
   faceUp,
   disabled = false,
   size = 'md',
+  compact,
   skipFlip = false,
   flipDurationMs = DEFAULT_FLIP_DURATION_MS,
   className = '',
   frontClassName = '',
+  onFlipComplete,
 }: FlipCardProps) {
   const showBack = faceUp !== undefined ? !faceUp : faceDown || !card;
   const sizeClass = size === 'sm' ? 'card-flip--sm' : '';
@@ -55,12 +59,13 @@ export function FlipCard({
         initial={initialRotate}
         animate={animateRotate}
         transition={transition}
+        onAnimationComplete={() => onFlipComplete?.()}
       >
         <div className="card-flipBack">
           <CardBack />
         </div>
         <div className={`card-flipFront ${frontClassName}`.trim()}>
-          <CardFace card={card} disabled={disabled} compact={size === 'sm'} />
+          <CardFace card={card} disabled={disabled} compact={compact ?? size === 'sm'} />
         </div>
       </motion.div>
     </div>

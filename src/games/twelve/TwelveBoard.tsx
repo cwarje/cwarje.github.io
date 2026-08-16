@@ -10,8 +10,8 @@ import { useDealerDealAnimation, type DealSeat, type DealExtraTarget } from '../
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 import { CardTossLayers } from '../shared/CardTossLayers';
 import { useCardToss } from '../shared/useCardToss';
+import { CardBack } from '../shared/ui/CardBack';
 import { CardFace } from '../shared/ui/CardFace';
-import { FlipCard } from '../shared/ui/FlipCard';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
 import { SUIT_COLORS, SUIT_SYMBOLS } from '../shared/ui/cardConstants';
 
@@ -98,8 +98,60 @@ function getOpponentHandLayout(cardCount: number): OpponentHandLayout {
   return { cardWidth, cardHeight, step, spreadWidth };
 }
 
-function TwelveFlipCard({ card, faceDown, disabled = false }: { card?: Card | null; faceDown: boolean; disabled?: boolean }) {
-  return <FlipCard card={card ?? undefined} faceDown={faceDown || !card} disabled={disabled} size="sm" />;
+function getPileBottomKey(playerId: string, pileIndex: number): string {
+  return `${playerId}-pile-${pileIndex}`;
+}
+
+const PILE_FLIP_DURATION_S = 0.45;
+
+function TwelvePileBottomCard({
+  card,
+  faceUp,
+  disabled = false,
+  skipFlipAnim = false,
+}: {
+  card: Card;
+  faceUp: boolean;
+  disabled?: boolean;
+  /** True for reduced motion or piles already face-up when the board mounted (reconnect). */
+  skipFlipAnim?: boolean;
+}) {
+  const [revealed, setRevealed] = useState(skipFlipAnim);
+
+  useEffect(() => {
+    if (!faceUp) {
+      setRevealed(false);
+      return;
+    }
+    if (skipFlipAnim) setRevealed(true);
+  }, [faceUp, skipFlipAnim]);
+
+  if (!faceUp) {
+    return <CardBack />;
+  }
+
+  if (skipFlipAnim) {
+    return <CardFace card={card} disabled={disabled} compact />;
+  }
+
+  return (
+    <div className={`twelve-pileReveal ${revealed ? 'twelve-pileReveal--revealed' : ''}`}>
+      <motion.div
+        className="twelve-pileRevealInner"
+        initial={{ rotateY: 0 }}
+        animate={{ rotateY: 180 }}
+        transition={{ duration: PILE_FLIP_DURATION_S, ease: 'easeInOut' }}
+        onAnimationComplete={() => setRevealed(true)}
+      >
+        <div className="twelve-pileRevealFace twelve-pileRevealFace--back">
+          <CardBack />
+        </div>
+        <div className="twelve-pileRevealFace twelve-pileRevealFace--front">
+          <CardFace card={card} disabled={disabled} compact />
+        </div>
+      </motion.div>
+    </div>
+  );
 }
 
 export default function TwelveBoard({
@@ -121,6 +173,7 @@ export default function TwelveBoard({
   const [tableSize, setTableSize] = useState<ElementSize>({ width: 0, height: 0 });
   const [seatPillElement, setSeatPillElement] = useState<HTMLButtonElement | null>(null);
   const [seatPillSize, setSeatPillSize] = useState<ElementSize>({ width: 0, height: 0 });
+  const [pileSkipFlipAnim, setPileSkipFlipAnim] = useState<Set<string>>(() => new Set());
   const reduceMotion = useReducedMotion();
 
   const {
@@ -528,6 +581,18 @@ export default function TwelveBoard({
     return () => resizeObserver.disconnect();
   }, []);
 
+  useEffect(() => {
+    const skip = new Set<string>();
+    state.players.forEach(player => {
+      player.frontPiles.forEach((pile, pileIndex) => {
+        if (pile.bottomFaceUp) {
+          skip.add(getPileBottomKey(player.id, pileIndex));
+        }
+      });
+    });
+    setPileSkipFlipAnim(skip);
+  }, [state.roundNumber]);
+
   const handLayout = useMemo(() => {
     const cardCount = visibleHand.length;
     const available = Math.max(handWidth - 8, 220);
@@ -832,6 +897,9 @@ export default function TwelveBoard({
                     !!pile.bottomCard && deal.isExtraRevealed(`${layout.player.id}-pile-${pileIndex}-bottom`);
                   const topShown =
                     !!pile.topCard && deal.isExtraRevealed(`${layout.player.id}-pile-${pileIndex}-top`);
+                  const pileBottomKey = getPileBottomKey(layout.player.id, pileIndex);
+                  const skipPileFlipAnim =
+                    reduceMotion === true || pileSkipFlipAnim.has(pileBottomKey);
                   return (
                     <button
                       key={`${layout.player.id}-pile-${pileIndex}`}
@@ -843,7 +911,13 @@ export default function TwelveBoard({
                     >
                       <div className="twelve-pileBottom">
                         {bottomShown ? (
-                          <TwelveFlipCard card={pile.bottomCard!} faceDown={!pile.bottomFaceUp} disabled={!canPlayPile} />
+                          <TwelvePileBottomCard
+                            key={`${pileBottomKey}-${pile.bottomCard!.suit}-${pile.bottomCard!.rank}`}
+                            card={pile.bottomCard!}
+                            faceUp={pile.bottomFaceUp}
+                            disabled={!canPlayPile}
+                            skipFlipAnim={skipPileFlipAnim}
+                          />
                         ) : (
                           <div className="twelve-pilePlaceholder" />
                         )}
