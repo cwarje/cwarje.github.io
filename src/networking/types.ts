@@ -32,7 +32,6 @@ export type MinigolfCourseTheme =
   | 'chocolate'
   | 'cemetery'
   | 'jungle'
-  | 'space'
   | 'sahara'
   | 'farm'
   | 'australia'

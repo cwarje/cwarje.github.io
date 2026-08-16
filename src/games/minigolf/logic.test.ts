@@ -1171,7 +1171,7 @@ describe('minigolf dev regenerate hole', () => {
     let call = 0;
     vi.spyOn(Math, 'random').mockImplementation(() => {
       call++;
-      // First call drives pickRandomCourseTheme → index 2 (tundra) of 13 themes.
+      // First call drives pickRandomCourseTheme → index 2 (tundra) of 12 themes.
       return call === 1 ? 2.5 / MINIGOLF_COURSE_THEMES.length : 0.5;
     });
 

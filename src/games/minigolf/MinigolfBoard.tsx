@@ -228,34 +228,6 @@ function drawFoliageWalls(
   ctx.restore();
 }
 
-function drawStarfieldWalls(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  scale: number,
-) {
-  const speckSize = Math.max(1, 0.7 * scale);
-  const seedBase = Math.round(x * 17 + y * 31 + w * 7 + h * 13);
-  const speckCount = Math.max(4, Math.floor((w * h) / (12 * scale * scale)));
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x, y, w, h);
-  ctx.clip();
-
-  for (let i = 0; i < speckCount; i++) {
-    const fx = sandSpeckFraction(seedBase + i * 3);
-    const fy = sandSpeckFraction(seedBase + i * 3 + 1);
-    const tone = sandSpeckFraction(seedBase + i * 3 + 2);
-    ctx.fillStyle = tone < 0.5 ? '#ffd966' : '#fff4b0';
-    ctx.fillRect(x + fx * (w - speckSize), y + fy * (h - speckSize), speckSize, speckSize);
-  }
-
-  ctx.restore();
-}
-
 function drawFencePosts(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -395,8 +367,6 @@ function drawWallRect(
     drawSandstoneBricks(ctx, x, y, w, h, palette, scale);
   } else if (theme === 'jungle') {
     drawFoliageWalls(ctx, x, y, w, h, palette, scale);
-  } else if (theme === 'space') {
-    drawStarfieldWalls(ctx, x, y, w, h, scale);
   } else {
     drawWoodPlanks(ctx, x, y, w, h, palette, scale);
   }

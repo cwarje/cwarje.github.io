@@ -5,7 +5,6 @@ export type MinigolfCourseTheme =
   | 'chocolate'
   | 'cemetery'
   | 'jungle'
-  | 'space'
   | 'sahara'
   | 'farm'
   | 'australia'
@@ -22,7 +21,6 @@ export const MINIGOLF_COURSE_THEMES: readonly MinigolfCourseTheme[] = [
   'chocolate',
   'cemetery',
   'jungle',
-  'space',
   'sahara',
   'farm',
   'australia',
@@ -249,31 +247,6 @@ export const MINIGOLF_THEMES: Record<MinigolfCourseTheme, MinigolfThemeConfig> =
       summaryPanelBorder: 'rgba(160, 220, 160, 0.2)',
     },
   },
-  space: {
-    label: 'Space',
-    hazardKind: 'water',
-    obstacleEmojis: ['✨', '🪐', '🛸'],
-    friction: { mult: 0.978, linear: 0.003 },
-    generation: { gateChance: 0.55, hazardBlockChance: 0.5 },
-    palette: {
-      fairwayBase: '#1a1a1a',
-      fairwayAlt: '#121212',
-      wallFill: '#000000',
-      wallEdge: '#1a1a1a',
-      hazardFill: '#000000',
-      hazardEdge: '#2a2a2a',
-      hazardHighlight: '#505058',
-      sandTrapFill: '#f8ecc0',
-      sandTrapEdge: '#d8bc78',
-      cupFill: '#0a0a0a',
-      teeStroke: 'rgba(255,255,255,0.25)',
-    },
-    chrome: {
-      boardBg: '#08080a',
-      summaryPanelBg: 'rgba(10, 10, 14, 0.95)',
-      summaryPanelBorder: 'rgba(255, 220, 120, 0.15)',
-    },
-  },
   sahara: {
     label: 'Sahara',
     hazardKind: 'water',
@@ -463,7 +436,7 @@ const HORIZONTAL_OBSTACLE_EMOJIS = new Set<string>([
 ]);
 
 /** Floaters, fliers, and jellyfish — patrol vertically without flipping. */
-const VERTICAL_OBSTACLE_EMOJIS = new Set<string>(['👻', '🛸', '🪼']);
+const VERTICAL_OBSTACLE_EMOJIS = new Set<string>(['👻', '🪼']);
 
 export function getObstacleMotionKind(emoji: string): ObstacleMotionKind | null {
   if (HORIZONTAL_OBSTACLE_EMOJIS.has(emoji)) return 'horizontal';
