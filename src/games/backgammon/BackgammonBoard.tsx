@@ -77,7 +77,7 @@ function BackgammonRollArea({
   onEndTurn,
   showClearSelection,
   onClearSelection,
-  onRollingChange,
+  onDiceSettled,
 }: {
   dice: { d1: number; d2: number } | null;
   showRollButton: boolean;
@@ -87,7 +87,7 @@ function BackgammonRollArea({
   onEndTurn: () => void;
   showClearSelection: boolean;
   onClearSelection: () => void;
-  onRollingChange?: (rolling: boolean) => void;
+  onDiceSettled?: () => void;
 }) {
   const [isRolling, setIsRolling] = useState(false);
   const [settledDice, setSettledDice] = useState<{ d1: number; d2: number } | null>(null);
@@ -123,14 +123,11 @@ function BackgammonRollArea({
     }
   }, [dice, settledDice]);
 
-  useEffect(() => {
-    onRollingChange?.(awaitingRollAnimation);
-  }, [awaitingRollAnimation, onRollingChange]);
-
   const handleRollEnd = (event: TransitionEvent<HTMLDivElement>) => {
     if (event.propertyName !== 'transform' || !isRolling || !dice) return;
     setSettledDice({ d1: dice.d1, d2: dice.d2 });
     setIsRolling(false);
+    onDiceSettled?.();
   };
 
   const handleRollClick = () => {
@@ -250,10 +247,18 @@ export default function BackgammonBoard({ state, myId, onAction, isHost = false 
   const turnSide = currentSide(s);
 
   const [selectedFrom, setSelectedFrom] = useState<MoveFrom | null>(null);
-  const [isDiceRolling, setIsDiceRolling] = useState(false);
+  const [settledDice, setSettledDice] = useState<[number, number] | null>(null);
+  const [rollPending, setRollPending] = useState(false);
   const [animations, setAnimations] = useState<CheckerMoveAnimation[]>([]);
   const animIdRef = useRef(0);
   const lastMoveKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!s.dice) {
+      setSettledDice(null);
+      setRollPending(false);
+    }
+  }, [s.dice]);
 
   useEffect(() => {
     if (!isMyTurn || s.phase !== 'moving') {
@@ -293,9 +298,15 @@ export default function BackgammonBoard({ state, myId, onAction, isHost = false 
     [s, myId, isMyTurn]
   );
 
+  const diceUnsettled =
+    s.phase === 'moving' &&
+    s.dice !== null &&
+    (settledDice === null || settledDice[0] !== s.dice[0] || settledDice[1] !== s.dice[1]);
+  const hideMoveHints = rollPending || diceUnsettled;
+
   const moveHints = useMemo(
-    () => (isDiceRolling ? [] : legalMoves),
-    [legalMoves, isDiceRolling]
+    () => (hideMoveHints ? [] : legalMoves),
+    [legalMoves, hideMoveHints]
   );
 
   const destinationsForSelected = useMemo(() => {
@@ -319,7 +330,7 @@ export default function BackgammonBoard({ state, myId, onAction, isHost = false 
   );
 
   const handlePointClick = (logicalIndex: number) => {
-    if (!isMyTurn || s.phase !== 'moving' || isDiceRolling) return;
+    if (!isMyTurn || s.phase !== 'moving' || hideMoveHints) return;
 
     const asDest = moveHints.find((m) => m.to === logicalIndex);
     if (selectedFrom != null && asDest && asDest.from === selectedFrom) {
@@ -335,12 +346,12 @@ export default function BackgammonBoard({ state, myId, onAction, isHost = false 
   };
 
   const handleBarClick = (side: Side) => {
-    if (!isMyTurn || s.phase !== 'moving' || isDiceRolling || side !== current?.side) return;
+    if (!isMyTurn || s.phase !== 'moving' || hideMoveHints || side !== current?.side) return;
     if (sourcesWithMoves.has('bar')) setSelectedFrom('bar');
   };
 
   const handleBearOffClick = () => {
-    if (!isMyTurn || s.phase !== 'moving' || isDiceRolling || selectedFrom == null) return;
+    if (!isMyTurn || s.phase !== 'moving' || hideMoveHints || selectedFrom == null) return;
     const move = moveHints.find((m) => m.from === selectedFrom && m.to === 'off');
     if (move) {
       dispatch({ type: 'move', from: selectedFrom, to: 'off' });
@@ -634,13 +645,19 @@ export default function BackgammonBoard({ state, myId, onAction, isHost = false 
         <BackgammonRollArea
           dice={s.phase === 'moving' ? diceValues : null}
           showRollButton={canRoll}
-          onRoll={() => dispatch({ type: 'roll' })}
+          onRoll={() => {
+            setRollPending(true);
+            dispatch({ type: 'roll' });
+          }}
           movesRemaining={s.movesRemaining}
-          showEndTurn={isMyTurn && s.phase === 'moving' && !isDiceRolling && legalMoves.length === 0}
+          showEndTurn={isMyTurn && s.phase === 'moving' && !hideMoveHints && legalMoves.length === 0}
           onEndTurn={() => dispatch({ type: 'end-turn' })}
           showClearSelection={selectedFrom != null}
           onClearSelection={() => setSelectedFrom(null)}
-          onRollingChange={setIsDiceRolling}
+          onDiceSettled={() => {
+            if (s.dice) setSettledDice([s.dice[0], s.dice[1]]);
+            setRollPending(false);
+          }}
         />
       </div>
     </div>
