@@ -518,8 +518,6 @@
 
 .cribbage-board .cribbage-stockCardBack {
   padding: 0;
-  border: none;
-  background: transparent;
 }
 
 .cribbage-board .cribbage-stockCardBack.card-back {
