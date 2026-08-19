@@ -22,7 +22,7 @@ import {
   topStackIndex,
   type PointLayout,
 } from './layout';
-import type { BackgammonAction, BackgammonState, MoveFrom, MoveTo, Side } from './types';
+import type { BackgammonAction, BackgammonState, MoveFrom, MoveTo, Side, BackgammonPlayer } from './types';
 import { currentSide } from './types';
 
 interface BackgammonBoardProps {
@@ -90,22 +90,22 @@ function BackgammonRollArea({
   onRollingChange?: (rolling: boolean) => void;
 }) {
   const [isRolling, setIsRolling] = useState(false);
+  const [settledDice, setSettledDice] = useState<{ d1: number; d2: number } | null>(null);
   const [orientations, setOrientations] = useState<[CubeOrientation, CubeOrientation]>(() =>
     createNeutralOrientations()
   );
-  const prevDiceRef = useRef<{ d1: number; d2: number } | null>(null);
 
-  // Detect new dice synchronously during render so move hints stay hidden until
-  // the roll animation finishes (same idea as Yahtzee gating scores with !isRolling).
-  const prevDice = prevDiceRef.current;
-  const diceJustChanged =
-    dice !== null &&
-    (prevDice === null || prevDice.d1 !== dice.d1 || prevDice.d2 !== dice.d2);
-  const awaitingRollAnimation = isRolling || diceJustChanged;
+  // Compare against settled dice (updated when the roll animation finishes) so move
+  // hints stay hidden on the same frame new dice arrive — same idea as Yahtzee gating
+  // scores with !isRolling.
+  const awaitingRollAnimation =
+    isRolling ||
+    (dice !== null &&
+      (settledDice === null || settledDice.d1 !== dice.d1 || settledDice.d2 !== dice.d2));
 
   useEffect(() => {
     if (!dice) {
-      prevDiceRef.current = null;
+      setSettledDice(null);
       setIsRolling(false);
       setOrientations(createNeutralOrientations());
       return;
@@ -113,16 +113,15 @@ function BackgammonRollArea({
 
     const d1 = dice.d1 as DiceValue;
     const d2 = dice.d2 as DiceValue;
-    const prev = prevDiceRef.current;
 
-    if (prev === null || prev.d1 !== d1 || prev.d2 !== d2) {
+    if (settledDice === null || settledDice.d1 !== d1 || settledDice.d2 !== d2) {
       setIsRolling(true);
       setOrientations((prevO) => [
         spinTowardFace(prevO[0], faceOrientations[d1]),
         spinTowardFace(prevO[1], faceOrientations[d2]),
       ]);
     }
-  }, [dice]);
+  }, [dice, settledDice]);
 
   useEffect(() => {
     onRollingChange?.(awaitingRollAnimation);
@@ -130,7 +129,7 @@ function BackgammonRollArea({
 
   const handleRollEnd = (event: TransitionEvent<HTMLDivElement>) => {
     if (event.propertyName !== 'transform' || !isRolling || !dice) return;
-    prevDiceRef.current = { d1: dice.d1, d2: dice.d2 };
+    setSettledDice({ d1: dice.d1, d2: dice.d2 });
     setIsRolling(false);
   };
 
@@ -478,7 +477,7 @@ export default function BackgammonBoard({ state, myId, onAction, isHost = false 
     const isSeriesComplete = s.seriesOver;
     const isMatchFormat = s.matchFormat === 'best-of-3';
 
-    const winnerLabelFor = (winners: typeof s.players) =>
+    const winnerLabelFor = (winners: BackgammonPlayer[]) =>
       winners.length === 0
         ? null
         : winners.some((p) => p.id === myId)
