@@ -77,6 +77,7 @@ import TensBoard from './tens/TensBoard';
 import GolfBoard from './golf/GolfBoard';
 import MinigolfBoard from './minigolf/MinigolfBoard';
 import BackgammonBoard from './backgammon/BackgammonBoard';
+import BackgammonOptions from './backgammon/BackgammonOptions';
 
 import HeartsOptions from './hearts/HeartsOptions';
 import FarkleOptions from './farkle/FarkleOptions';
@@ -939,17 +940,18 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
       panelBg: 'bg-stone-950',
       labelColor: 'text-amber-100',
     },
-    createState: createBackgammonState,
+    createState: (players, options) => createBackgammonState(players, options),
     processAction: processBackgammonActionUnknown,
     isOver: isBackgammonOverUnknown,
     runBotTurn: runBackgammonBotTurnUnknown,
     getWinners: getBackgammonWinnersUnknown,
     Board: BackgammonBoard,
     TitleExtra: BackgammonTitleExtra,
+    OptionsPanel: BackgammonOptions,
     fullBoard: true,
     production: true,
     showNewBadge: true,
-    hudTitleLines: ['Back', 'gammon'],
+    hudTitleLines: ['Backgammon'],
   },
 
   golf: {

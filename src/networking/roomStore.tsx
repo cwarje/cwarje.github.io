@@ -102,6 +102,11 @@ function isGolfHostControlAction(payload: unknown): boolean {
   return actionType === 'start-next-hole' || actionType === 'show-final-results';
 }
 
+function isBackgammonStartNextGameAction(payload: unknown): boolean {
+  if (typeof payload !== 'object' || payload === null) return false;
+  return (payload as { type?: unknown }).type === 'start-next-game';
+}
+
 function isCribbageAdvanceShowAction(payload: unknown): boolean {
   if (typeof payload !== 'object' || payload === null) return false;
   return (payload as { type?: unknown }).type === 'advance-show';
@@ -637,6 +642,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           if (
             currentRoom.gameType === 'golf'
             && isGolfHostControlAction(msg.payload)
+            && senderDeviceId !== currentRoom.hostId
+          ) {
+            return;
+          }
+          if (
+            currentRoom.gameType === 'backgammon'
+            && isBackgammonStartNextGameAction(msg.payload)
             && senderDeviceId !== currentRoom.hostId
           ) {
             return;
@@ -1357,6 +1369,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       if (
         currentRoom.gameType === 'golf'
         && isGolfHostControlAction(payload)
+        && myId !== currentRoom.hostId
+      ) {
+        return;
+      }
+      if (
+        currentRoom.gameType === 'backgammon'
+        && isBackgammonStartNextGameAction(payload)
         && myId !== currentRoom.hostId
       ) {
         return;

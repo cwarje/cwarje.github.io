@@ -1,4 +1,4 @@
-import type { GameStartOptions, Player } from '../../networking/types';
+import type { BackgammonMatchFormat, GameStartOptions, Player } from '../../networking/types';
 import {
   applyMove,
   checkWin,
@@ -35,10 +35,24 @@ function toBackgammonPlayer(player: Player, side: Side): BackgammonPlayer {
   };
 }
 
-export function createBackgammonState(players: Player[], _options?: GameStartOptions): BackgammonState {
+function winsNeededForFormat(format: BackgammonMatchFormat): number {
+  return format === 'best-of-3' ? 2 : 1;
+}
+
+function createMatchWins(players: Player[]): Record<string, number> {
+  const matchWins: Record<string, number> = {};
+  for (const player of players) {
+    matchWins[player.id] = 0;
+  }
+  return matchWins;
+}
+
+export function createBackgammonState(players: Player[], options?: GameStartOptions): BackgammonState {
   if (players.length !== 2) {
     throw new Error('Backgammon requires exactly 2 players');
   }
+
+  const matchFormat = options?.backgammonMatchFormat ?? 'single';
 
   return {
     players: [toBackgammonPlayer(players[0]!, 'white'), toBackgammonPlayer(players[1]!, 'black')],
@@ -50,6 +64,12 @@ export function createBackgammonState(players: Player[], _options?: GameStartOpt
     dice: null,
     movesRemaining: [],
     winnerIds: null,
+    matchFormat,
+    winsNeeded: winsNeededForFormat(matchFormat),
+    matchWins: createMatchWins(players),
+    gamesPlayed: 0,
+    seriesOver: false,
+    seriesWinnerIds: null,
   };
 }
 
@@ -67,10 +87,41 @@ function finishIfWon(state: BackgammonState, side: Side): BackgammonState {
   if (!checkWin(state, side)) return state;
   const winnerIndex = side === 'white' ? 0 : 1;
   const winner = state.players[winnerIndex] ?? state.players[state.currentPlayerIndex];
+  const winnerId = winner.id;
+  const newMatchWins = {
+    ...state.matchWins,
+    [winnerId]: (state.matchWins[winnerId] ?? 0) + 1,
+  };
+  const wins = newMatchWins[winnerId] ?? 0;
+  const seriesComplete = wins >= state.winsNeeded;
+
   return {
     ...state,
     phase: 'finished',
-    winnerIds: [winner.id],
+    winnerIds: [winnerId],
+    matchWins: newMatchWins,
+    gamesPlayed: state.gamesPlayed + 1,
+    seriesOver: seriesComplete,
+    seriesWinnerIds: seriesComplete ? [winnerId] : null,
+  };
+}
+
+function startNextGame(state: BackgammonState): BackgammonState {
+  if (state.phase !== 'finished' || state.seriesOver) return state;
+
+  const nextStarter: 0 | 1 = state.gamesPlayed % 2 === 0 ? 0 : 1;
+
+  return {
+    ...state,
+    currentPlayerIndex: nextStarter,
+    phase: 'pre-roll',
+    points: createStartingPoints(),
+    bar: { white: 0, black: 0 },
+    off: { white: 0, black: 0 },
+    dice: null,
+    movesRemaining: [],
+    winnerIds: null,
+    lastMove: undefined,
   };
 }
 
@@ -149,6 +200,10 @@ export function processBackgammonAction(
   action: BackgammonAction,
   playerId: string
 ): BackgammonState {
+  if (action.type === 'start-next-game') {
+    return startNextGame(state);
+  }
+
   if (state.phase === 'finished') return state;
 
   const current = state.players[state.currentPlayerIndex];
@@ -183,11 +238,11 @@ export function processBackgammonAction(
 }
 
 export function isBackgammonOver(state: BackgammonState): boolean {
-  return state.phase === 'finished';
+  return state.seriesOver;
 }
 
 export function runBackgammonBotTurn(state: BackgammonState): BackgammonState {
-  if (state.phase === 'finished') return state;
+  if (state.phase === 'finished' || state.seriesOver) return state;
 
   const current = state.players[state.currentPlayerIndex];
   if (!current?.isBot) return state;
@@ -215,7 +270,8 @@ export function runBackgammonBotTurn(state: BackgammonState): BackgammonState {
 }
 
 export function getBackgammonWinners(state: BackgammonState): string[] {
-  return state.winnerIds ?? [];
+  if (!state.seriesOver) return [];
+  return state.seriesWinnerIds ?? [];
 }
 
 // Engine-facing wrappers

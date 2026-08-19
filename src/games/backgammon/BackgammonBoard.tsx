@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type TransitionEvent } from 'react';
 import { motion } from 'framer-motion';
-import { RotateCcw } from 'lucide-react';
+import { Play, RotateCcw } from 'lucide-react';
 import {
   Dice,
   faceOrientations,
@@ -29,6 +29,7 @@ interface BackgammonBoardProps {
   state: unknown;
   myId: string;
   onAction: (action: unknown) => void;
+  isHost?: boolean;
 }
 
 function signedCount(points: number[], index: number, side: Side): number {
@@ -241,7 +242,7 @@ function AnimatedChecker({
   );
 }
 
-export default function BackgammonBoard({ state, myId, onAction }: BackgammonBoardProps) {
+export default function BackgammonBoard({ state, myId, onAction, isHost = false }: BackgammonBoardProps) {
   const s = state as BackgammonState;
   const myPlayer = s.players.find((p) => p.id === myId);
   const mySide: Side = myPlayer?.side ?? 'white';
@@ -467,6 +468,107 @@ export default function BackgammonBoard({ state, myId, onAction }: BackgammonBoa
   const diceValues = s.dice ? { d1: s.dice[0], d2: s.dice[1] } : null;
   const bearOffHighlight =
     selectedFrom != null && destinationsForSelected.has(moveKey(selectedFrom, 'off'));
+
+  if (s.phase === 'finished') {
+    const winnerIds = s.winnerIds ?? [];
+    const gameWinners = s.players.filter((p) => winnerIds.includes(p.id));
+    const seriesWinners = s.seriesWinnerIds
+      ? s.players.filter((p) => s.seriesWinnerIds!.includes(p.id))
+      : [];
+    const isSeriesComplete = s.seriesOver;
+    const isMatchFormat = s.matchFormat === 'best-of-3';
+
+    const winnerLabelFor = (winners: typeof s.players) =>
+      winners.length === 0
+        ? null
+        : winners.some((p) => p.id === myId)
+          ? 'You win!'
+          : winners.length === 1
+            ? `${winners[0].name} wins!`
+            : `${winners.map((p) => p.name).join(', ')} win!`;
+
+    const gameWinnerLabel = winnerLabelFor(gameWinners);
+    const seriesWinnerLabel = winnerLabelFor(seriesWinners);
+    const headlineLabel = isSeriesComplete ? seriesWinnerLabel : gameWinnerLabel;
+
+    const offCount = (player: (typeof s.players)[number]) =>
+      player.side === 'white' ? s.off.white : s.off.black;
+
+    const matchWinCount = (player: (typeof s.players)[number]) => s.matchWins[player.id] ?? 0;
+
+    const sortedPlayers = [...s.players].sort((a, b) => {
+      if (isMatchFormat) return matchWinCount(b) - matchWinCount(a);
+      return offCount(b) - offCount(a);
+    });
+
+    const showTrophy = isSeriesComplete;
+    const endTitle = isMatchFormat && isSeriesComplete ? 'Match Over' : 'Game Over';
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="backgammon-board h-full flex flex-col items-center justify-center space-y-6 text-center"
+      >
+        {showTrophy && (
+          <span className="text-7xl block mx-auto" aria-hidden>
+            🏆
+          </span>
+        )}
+        <h2 className="text-3xl font-extrabold text-white">{endTitle}</h2>
+        {headlineLabel && <p className="text-xl text-white/90">{headlineLabel}</p>}
+        {isMatchFormat && (
+          <p className="text-sm text-white/70">
+            Match score · first to {s.winsNeeded} wins
+          </p>
+        )}
+        <div className="space-y-3 w-full max-w-md px-4">
+          {sortedPlayers.map((player, i) => (
+            <div
+              key={player.id}
+              className={`flex items-center justify-between gap-4 px-5 py-3 rounded-xl ${
+                i === 0 && (isSeriesComplete || !isMatchFormat)
+                  ? 'bg-amber-500/10 border border-amber-500/20'
+                  : 'glass-light'
+              }`}
+            >
+              <div className="flex items-center gap-3 text-left">
+                {(isSeriesComplete || !isMatchFormat) && (
+                  <span
+                    className={`text-lg font-bold ${i === 0 ? 'text-amber-400' : 'text-white/60'}`}
+                  >
+                    #{i + 1}
+                  </span>
+                )}
+                <span className="text-white font-medium">{player.name}</span>
+              </div>
+              <span className="text-xl font-bold text-white text-right">
+                {isMatchFormat
+                  ? `${matchWinCount(player)} won`
+                  : `${offCount(player)} off`}
+              </span>
+            </div>
+          ))}
+        </div>
+        {!isSeriesComplete && isMatchFormat && (
+          <div className="w-full max-w-md px-4">
+            {isHost ? (
+              <button
+                type="button"
+                onClick={() => onAction({ type: 'start-next-game' })}
+                className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-amber-700 text-white font-bold text-lg hover:bg-amber-600 cursor-pointer"
+              >
+                <Play className="w-5 h-5" />
+                Next Game
+              </button>
+            ) : (
+              <p className="text-sm text-white/70">Waiting for host to start the next game...</p>
+            )}
+          </div>
+        )}
+      </motion.div>
+    );
+  }
 
   return (
     <div className="backgammon-board h-full flex flex-col">

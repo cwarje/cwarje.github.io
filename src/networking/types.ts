@@ -41,6 +41,7 @@ export type MinigolfCourseTheme =
 export type MinigolfThemeOption = 'classic' | 'random';
 export type MinigolfHoleCount = 3 | 9 | 18;
 export type DealerSpeed = 'slow' | 'medium' | 'fast';
+export type BackgammonMatchFormat = 'single' | 'best-of-3';
 export interface GameStartOptions {
   targetScore?: HeartsTargetScore;
   farkleTargetScore?: FarkleTargetScore;
@@ -56,6 +57,7 @@ export interface GameStartOptions {
   minigolfObstacles?: boolean;
   minigolfTheme?: MinigolfThemeOption;
   minigolfHoleCount?: MinigolfHoleCount;
+  backgammonMatchFormat?: BackgammonMatchFormat;
   botCount?: number;
   selectedBots?: { id: string; name: string; color: PlayerColor }[];
 }

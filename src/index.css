@@ -5069,18 +5069,6 @@
   }
 }
 
-.backgammon-titleExtra {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.backgammon-titleExtra-turn {
-  opacity: 0.9;
-}
-
 .backgammon-bearOff--dest rect {
   stroke: #22c55e;
   stroke-width: 2;

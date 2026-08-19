@@ -15,12 +15,15 @@ export default function BackgammonTitleExtra({ state, myId }: GameHudProps) {
           : 'Your move'
         : `${current.name}'s turn`;
 
+  const matchScoreLabel =
+    s.matchFormat === 'best-of-3'
+      ? `${s.players[0]?.name}: ${s.matchWins[s.players[0]?.id ?? ''] ?? 0} · ${s.players[1]?.name}: ${s.matchWins[s.players[1]?.id ?? ''] ?? 0}`
+      : `${s.players[0]?.name}: ${s.off.white} off · ${s.players[1]?.name}: ${s.off.black} off`;
+
   return (
-    <div className="backgammon-titleExtra">
-      <span>
-        {s.players[0]?.name}: {s.off.white} off · {s.players[1]?.name}: {s.off.black} off
-      </span>
-      {turnLabel && <span className="backgammon-titleExtra-turn">{turnLabel}</span>}
+    <div className="mt-1 space-y-0.5">
+      <p className="text-xs sm:text-sm text-white/80">{matchScoreLabel}</p>
+      {turnLabel && <p className="text-xs sm:text-sm text-white/80">{turnLabel}</p>}
     </div>
   );
 }

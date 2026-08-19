@@ -26,6 +26,16 @@ describe('createBackgammonState', () => {
     expect(state.phase).toBe('pre-roll');
     expect(state.players[0]?.side).toBe('white');
     expect(state.players[1]?.side).toBe('black');
+    expect(state.matchFormat).toBe('single');
+    expect(state.winsNeeded).toBe(1);
+    expect(state.matchWins).toEqual({ p1: 0, p2: 0 });
+    expect(state.seriesOver).toBe(false);
+  });
+
+  it('supports best-of-3 match format', () => {
+    const state = createBackgammonState(makePlayers(), { backgammonMatchFormat: 'best-of-3' });
+    expect(state.matchFormat).toBe('best-of-3');
+    expect(state.winsNeeded).toBe(2);
   });
 
   it('requires exactly 2 players', () => {
@@ -104,10 +114,76 @@ describe('processBackgammonAction', () => {
     };
 
     const next = processBackgammonAction(state, { type: 'move', from: 0, to: 'off' }, 'p1');
+    expect(next.phase).toBe('finished');
+    expect(next.seriesOver).toBe(true);
     expect(isBackgammonOver(next)).toBe(true);
     expect(getBackgammonWinners(next)).toEqual(['p1']);
   });
+});
 
+function makeNearWinState(): ReturnType<typeof createBackgammonState> {
+  const points = Array(24).fill(0);
+  points[0] = 1;
+  let state = createBackgammonState(makePlayers(), { backgammonMatchFormat: 'best-of-3' });
+  state = {
+    ...cloneState(state),
+    points,
+    bar: { white: 0, black: 0 },
+    off: { white: 14, black: 0 },
+    currentPlayerIndex: 0,
+    phase: 'moving',
+    dice: [1, 2],
+    movesRemaining: [1],
+  };
+  return state;
+}
+
+describe('best-of-3 match format', () => {
+  it('does not end the match after the first game', () => {
+    const next = processBackgammonAction(makeNearWinState(), { type: 'move', from: 0, to: 'off' }, 'p1');
+    expect(next.phase).toBe('finished');
+    expect(next.seriesOver).toBe(false);
+    expect(next.matchWins.p1).toBe(1);
+    expect(isBackgammonOver(next)).toBe(false);
+    expect(getBackgammonWinners(next)).toEqual([]);
+  });
+
+  it('starts the next game with a fresh board', () => {
+    const afterWin = processBackgammonAction(makeNearWinState(), { type: 'move', from: 0, to: 'off' }, 'p1');
+    const next = processBackgammonAction(afterWin, { type: 'start-next-game' }, 'p1');
+    expect(next.phase).toBe('pre-roll');
+    expect(next.points).toEqual(createStartingPoints());
+    expect(next.off).toEqual({ white: 0, black: 0 });
+    expect(next.matchWins.p1).toBe(1);
+    expect(next.currentPlayerIndex).toBe(1);
+  });
+
+  it('ends the match after two wins', () => {
+    let state = makeNearWinState();
+    state = processBackgammonAction(state, { type: 'move', from: 0, to: 'off' }, 'p1');
+    state = processBackgammonAction(state, { type: 'start-next-game' }, 'p1');
+
+    const points = Array(24).fill(0);
+    points[0] = 1;
+    state = {
+      ...cloneState(state),
+      points,
+      off: { white: 14, black: 0 },
+      currentPlayerIndex: 0,
+      phase: 'moving',
+      dice: [1, 2],
+      movesRemaining: [1],
+    };
+
+    const next = processBackgammonAction(state, { type: 'move', from: 0, to: 'off' }, 'p1');
+    expect(next.seriesOver).toBe(true);
+    expect(next.matchWins.p1).toBe(2);
+    expect(isBackgammonOver(next)).toBe(true);
+    expect(getBackgammonWinners(next)).toEqual(['p1']);
+  });
+});
+
+describe('processBackgammonAction continued', () => {
   it('preserves lastMove when turn ends after final die', () => {
     let state = createBackgammonState(makePlayers());
     state = {

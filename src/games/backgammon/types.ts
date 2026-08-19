@@ -1,4 +1,4 @@
-import type { PlayerColor } from '../../networking/types';
+import type { BackgammonMatchFormat, PlayerColor } from '../../networking/types';
 
 /** 0 = point 1 … 23 = point 24 */
 export type PointIndex = number;
@@ -39,13 +39,20 @@ export interface BackgammonState {
   /** Remaining die pips to consume this turn (doubles → 4 entries) */
   movesRemaining: number[];
   winnerIds: string[] | null;
+  matchFormat: BackgammonMatchFormat;
+  winsNeeded: number;
+  matchWins: Record<string, number>;
+  gamesPlayed: number;
+  seriesOver: boolean;
+  seriesWinnerIds: string[] | null;
   lastMove?: LastMove;
 }
 
 export type BackgammonAction =
   | { type: 'roll' }
   | { type: 'move'; from: MoveFrom; to: MoveTo }
-  | { type: 'end-turn' };
+  | { type: 'end-turn' }
+  | { type: 'start-next-game' };
 
 export interface LegalMove {
   from: MoveFrom;
