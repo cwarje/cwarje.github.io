@@ -112,6 +112,23 @@ function getTrickSlotPlacement(playerCount: number, relativeIndex: number): Tric
   };
 }
 
+function renderLeaderLeadsParenthetical(leader: UpRiverPlayer, myId: string): ReactNode {
+  return (
+    <>
+      {' ('}
+      {leader.id === myId ? (
+        'you lead'
+      ) : (
+        <>
+          <span style={{ color: getPlayerHudTextColor(leader.color) }}>{leader.name}</span>
+          {' leads'}
+        </>
+      )}
+      {')'}
+    </>
+  );
+}
+
 export default function UpAndDownTheRiverBoard({
   state,
   myId,
@@ -306,8 +323,17 @@ export default function UpAndDownTheRiverBoard({
     }
 
     if (state.phase === 'bidding') {
+      const leader = state.players[state.leaderIndex];
       if (isKnocking) {
-        if (!hasSubmittedKnockingBid) return 'Select your bid';
+        if (!hasSubmittedKnockingBid) {
+          if (!leader) return 'Select your bid';
+          return (
+            <>
+              Select your bid
+              {renderLeaderLeadsParenthetical(leader, myId)}
+            </>
+          );
+        }
         const waitingOn = state.players.filter(
           player => !player.isBot && state.submittedBids[player.id] === undefined,
         );
@@ -330,7 +356,15 @@ export default function UpAndDownTheRiverBoard({
         return 'Revealing bids...';
       }
 
-      if (isMyTurn) return 'Your turn to bid';
+      if (isMyTurn) {
+        if (!leader) return 'Your turn to bid';
+        return (
+          <>
+            Your turn to bid
+            {renderLeaderLeadsParenthetical(leader, myId)}
+          </>
+        );
+      }
       const waitingPlayer = state.players[state.currentPlayerIndex];
       if (!waitingPlayer) return null;
       return (
@@ -360,6 +394,7 @@ export default function UpAndDownTheRiverBoard({
     state.trickWinner,
     state.upRiverBiddingStyle,
     state.submittedBids,
+    state.leaderIndex,
     isMyTurn,
     isKnocking,
     hasSubmittedKnockingBid,

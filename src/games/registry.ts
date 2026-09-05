@@ -94,6 +94,7 @@ import CribbageTitleExtra from './cribbage/CribbageTitleExtra';
 import CasinoTitleExtra from './casino/CasinoTitleExtra';
 import CasinoToolbarExtra from './casino/CasinoToolbarExtra';
 import UpRiverToolbarExtra from './up-and-down-the-river/UpRiverToolbarExtra';
+import UpRiverTitleExtra from './up-and-down-the-river/UpRiverTitleExtra';
 import TwelveTitleExtra from './twelve/TwelveTitleExtra';
 import MobilizationTitleExtra from './mobilization/MobilizationTitleExtra';
 import CucumberTitleExtra from './cucumber/CucumberTitleExtra';
@@ -443,6 +444,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     getWinners: getUpRiverWinners,
     Board: UpAndDownTheRiverBoard,
     OptionsPanel: UpRiverOptions,
+    TitleExtra: UpRiverTitleExtra,
     ToolbarExtra: UpRiverToolbarExtra,
     fullBoard: true,
     hasHandZoom: true,
