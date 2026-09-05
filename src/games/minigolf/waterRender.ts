@@ -175,7 +175,7 @@ function drawAnimatedLava(
     const drift = Math.sin(phase + i * 1.7) * 3 * scale;
     const by = baseY + drift;
     ctx.fillStyle = palette.hazardHighlight;
-    ctx.globalAlpha = 0.25 + ((i * 11) % 30) / 100;
+    ctx.globalAlpha = 0.40 + ((i * 11) % 30) / 100;
     ctx.beginPath();
     ctx.ellipse(bx + bubbleSize / 2, by, bubbleSize * 0.6, bubbleSize * 0.4, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -183,7 +183,7 @@ function drawAnimatedLava(
 
   const glowY = innerY + innerH * 0.4 + Math.sin(phase * 0.8) * 2 * scale;
   ctx.fillStyle = palette.hazardHighlight;
-  ctx.globalAlpha = 0.2;
+  ctx.globalAlpha = 0.35;
   ctx.fillRect(innerX, glowY, innerW, Math.max(2, 3 * scale));
   ctx.globalAlpha = 1;
 }
