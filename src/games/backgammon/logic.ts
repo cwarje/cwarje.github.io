@@ -1,11 +1,11 @@
 import type { BackgammonMatchFormat, GameStartOptions, Player } from '../../networking/types';
+import { pickBestBotMove } from './botEvaluation';
 import {
   applyMove,
   checkWin,
   cloneState,
   createStartingPoints,
   diceToMovesRemaining,
-  getAllLegalTurnSequences,
   getLegalMovesForRemainingDice,
   hasAnyLegalMove,
   isValidMove,
@@ -14,7 +14,6 @@ import type {
   BackgammonAction,
   BackgammonPlayer,
   BackgammonState,
-  LegalMove,
   Side,
 } from './types';
 import { CHECKERS_PER_PLAYER, currentSide, sideForPlayerIndex } from './types';
@@ -153,42 +152,6 @@ function handleRoll(state: BackgammonState): BackgammonState {
   return next;
 }
 
-function scoreMove(state: BackgammonState, move: LegalMove): number {
-  let score = 0;
-  if (move.hit) score += 100;
-  if (move.to === 'off') score += 50;
-  if (typeof move.to === 'number') {
-    const side = currentSide(state);
-    const selfCount =
-      side === 'white'
-        ? Math.max(0, state.points[move.to] ?? 0)
-        : Math.max(0, -(state.points[move.to] ?? 0));
-    if (selfCount === 1) score += 30;
-    if (side === 'white' && move.to <= 5) score += 10;
-    if (side === 'black' && move.to >= 18) score += 10;
-    score += side === 'white' ? 24 - move.to : move.to;
-  }
-  return score;
-}
-
-function pickBestMove(state: BackgammonState): LegalMove | null {
-  const sequences = getAllLegalTurnSequences(state);
-  if (sequences.length === 0 || sequences[0]!.length === 0) return null;
-
-  let best: LegalMove | null = null;
-  let bestScore = -Infinity;
-  for (const seq of sequences) {
-    const move = seq[0];
-    if (!move) continue;
-    const s = scoreMove(state, move);
-    if (s > bestScore) {
-      bestScore = s;
-      best = move;
-    }
-  }
-  return best;
-}
-
 export function getLegalMovesForUi(state: BackgammonState, playerId: string): LegalMove[] {
   const idx = state.players.findIndex((p) => p.id === playerId);
   if (idx < 0 || idx !== state.currentPlayerIndex || state.phase !== 'moving') return [];
@@ -255,7 +218,7 @@ export function runBackgammonBotTurn(state: BackgammonState): BackgammonState {
     if (!hasAnyLegalMove(state)) {
       return processBackgammonAction(state, { type: 'end-turn' }, current.id);
     }
-    const move = pickBestMove(state);
+    const move = pickBestBotMove(state);
     if (!move) {
       return processBackgammonAction(state, { type: 'end-turn' }, current.id);
     }
