@@ -14,6 +14,7 @@ import type {
   BackgammonAction,
   BackgammonPlayer,
   BackgammonState,
+  LegalMove,
   Side,
 } from './types';
 import { CHECKERS_PER_PLAYER, currentSide, sideForPlayerIndex } from './types';
