@@ -905,7 +905,6 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     hasCardDealing: true,
     randomizeSeatOrder: true,
     production: true,
-    showNewBadge: true,
     hudTitleLines: ['10s'],
   },
 
@@ -952,7 +951,6 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     OptionsPanel: BackgammonOptions,
     fullBoard: true,
     production: true,
-    showNewBadge: true,
     hudTitleLines: ['Backgammon'],
   },
 
