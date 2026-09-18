@@ -1649,6 +1649,25 @@
   opacity: 1;
 }
 
+html.birthday-mode .card-toss-seatPillButton,
+html.birthday-mode .golf-seatPill {
+  position: relative;
+  overflow: visible;
+}
+
+html.birthday-mode .card-toss-seatPillButton::after,
+html.birthday-mode .golf-seatPill::after {
+  content: '';
+  position: absolute;
+  top: -30px;
+  right: -2px;
+  width: 34px;
+  height: 36px;
+  background: var(--seat-pill-party-hat-url) center / contain no-repeat;
+  pointer-events: none;
+  z-index: 1;
+}
+
 .radial-seatPill--mobilization2col .radial-seatPillLabels,
 .radial-seatPill--mobilization2col .radial-seatPillValues {
   grid-template-columns: repeat(2, minmax(0, 1fr));
