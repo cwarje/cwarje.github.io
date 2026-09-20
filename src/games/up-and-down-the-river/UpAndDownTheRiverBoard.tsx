@@ -1,7 +1,12 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { TableEvent, TableEventInput } from '../../networking/types';
+import type { Player, TableEvent, TableEventInput } from '../../networking/types';
+import {
+  getSeatPillHatPropsForLobbyPlayer,
+  mergeSeatPillHatClassName,
+  mergeSeatPillHatStyle,
+} from '../../hats/hats';
 import type { Card, UpRiverPlayer, UpRiverState } from './types';
 import { isValidUpRiverPlay } from './rules';
 import { getForbiddenPerfectBid } from './logic';
@@ -21,6 +26,7 @@ interface UpRiverBoardProps {
   isHandZoomed?: boolean;
   sendTableEvent?: (event: TableEventInput) => void;
   lastTableEvent?: TableEvent | null;
+  lobbyPlayers?: Player[];
 }
 
 interface RiverSeatLayout {
@@ -136,6 +142,7 @@ export default function UpAndDownTheRiverBoard({
   isHandZoomed = false,
   sendTableEvent,
   lastTableEvent,
+  lobbyPlayers,
 }: UpRiverBoardProps) {
   const myIndex = state.players.findIndex(player => player.id === myId);
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
@@ -505,7 +512,14 @@ export default function UpAndDownTheRiverBoard({
         ref={shouldMeasure ? setSeatPillElement : undefined}
         onClick={tossProps.onClick}
         disabled={tossProps.disabled}
-        className={`radial-seatPill card-toss-seatPillButton ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`}
+        className={mergeSeatPillHatClassName(
+          `radial-seatPill card-toss-seatPillButton ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`,
+          getSeatPillHatPropsForLobbyPlayer(player.id, lobbyPlayers).className,
+        )}
+        style={mergeSeatPillHatStyle(
+          undefined,
+          getSeatPillHatPropsForLobbyPlayer(player.id, lobbyPlayers).style,
+        )}
         aria-label={tossProps['aria-label']}
       >
         <div className="radial-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>

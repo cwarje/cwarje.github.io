@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import GameCard from '../components/GameCard';
 import GameStartOptionsPanel from '../components/GameStartOptionsPanel';
+import HatsCard from '../components/HatsCard';
+import HatsShopPanel from '../components/HatsShopPanel';
 import RoomCodeInput from '../components/RoomCodeInput';
 import { useToast } from '../components/Toast';
 import { useRoomContext } from '../networking/roomStore';
@@ -37,6 +39,7 @@ export default function Home() {
   const [colorInput, setColorInput] = useState<PlayerColor>(playerColor);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [expandedGameType, setExpandedGameType] = useState<GameType | null>(null);
+  const [hatsExpanded, setHatsExpanded] = useState(false);
   const [pendingJoinCode, setPendingJoinCode] = useState<string | null>(null);
   const [infoGameType, setInfoGameType] = useState<GameType | null>(null);
   const lobbyCreatingRef = useRef(false);
@@ -141,13 +144,21 @@ export default function Home() {
     const count = room.players.length;
     const gameDef = GAME_REGISTRY[gameType];
     if (count > gameDef.maxPlayers) return;
+    setHatsExpanded(false);
     setExpandedGameType((current) => (current === gameType ? null : gameType));
+  };
+
+  const handleSelectHats = () => {
+    if (!room) return;
+    setExpandedGameType(null);
+    setHatsExpanded((current) => !current);
   };
 
   const handleStartGame = (gameType: GameType, options?: GameStartOptions) => {
     if (!isHost || !room) return;
     startGame(gameType, options);
     setExpandedGameType(null);
+    setHatsExpanded(false);
   };
 
   const playerCount = room?.players.length ?? 0;
@@ -207,18 +218,38 @@ export default function Home() {
         className="space-y-4"
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className={`relative flex flex-col min-w-0 w-full ${hatsExpanded ? 'z-30' : 'z-0'}`}
+          >
+            <HatsCard
+              onSelect={handleSelectHats}
+              disabled={!room}
+              isExpanded={hatsExpanded}
+            />
+            <AnimatePresence>
+              {hatsExpanded && room && (
+                <HatsShopPanel
+                  key="hats-shop"
+                  className="absolute left-0 right-0 top-full z-30"
+                />
+              )}
+            </AnimatePresence>
+          </motion.div>
           {gameTypesToShow.map((game, i) => {
             const gameDef = GAME_REGISTRY[game];
             const tooManyPlayers = room ? playerCount > gameDef.maxPlayers : false;
             const isDisabled = room ? (!isHost || tooManyPlayers) : false;
-            const isExpanded = expandedGameType === game;
+            const isExpanded = expandedGameType === game && !hatsExpanded;
 
             return (
               <motion.div
                 key={game}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 + i * 0.1 }}
+                transition={{ delay: 0.2 + (i + 1) * 0.1 }}
                 className={`relative flex flex-col min-w-0 w-full ${isExpanded ? 'z-30' : 'z-0'}`}
               >
                 <GameCard

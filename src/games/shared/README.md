@@ -24,6 +24,7 @@ Reusable components and CSS classes for radial card games:
 | `upriver-*` | Up and Down the River–specific UI (trump card, bidding) |
 | `hearts-*`, `poker-*`, etc. | Game-specific board chrome only |
 | `card-toss-*` | Shared cosmetic card throw (fly + splat layers, seat pill button) |
+| `seat-pill--hat` | Optional per-player hat overlay on seat pills (from lobby hat selection) |
 
 Site-wide visual standards: Hearts green felt (`#3e963e`), corner card faces, patterned backs, `AutoFitSeatName` on all radial games.
 

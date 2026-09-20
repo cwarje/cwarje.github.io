@@ -53,6 +53,7 @@ function createRoomContext(overrides: Partial<RoomContextValue> = {}): RoomConte
     endGame: vi.fn(),
     setDealerSpeed: vi.fn(),
     updateMinigolfXp: vi.fn(),
+    updateSelectedHat: vi.fn(),
     error: null,
     clearError: vi.fn(),
     connecting: false,
@@ -70,6 +71,8 @@ describe('Home', () => {
         <Home />
       </MemoryRouter>,
     );
+
+    expect(screen.getByRole('heading', { name: 'Hats' })).toBeInTheDocument();
 
     for (const gameType of PRODUCTION_GAME_TYPES) {
       expect(

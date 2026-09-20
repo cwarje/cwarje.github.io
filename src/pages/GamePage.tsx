@@ -185,6 +185,7 @@ export default function GamePage() {
               isHost={isHost}
               isHandZoomed={isHandZoomed}
               onLeave={handleLeave}
+              lobbyPlayers={room.players}
             />
           )}
         </motion.div>

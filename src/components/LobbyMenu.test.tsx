@@ -70,6 +70,7 @@ function createRoomContext(overrides: Partial<RoomContextValue> = {}): RoomConte
     endGame: vi.fn(),
     setDealerSpeed: vi.fn(),
     updateMinigolfXp: vi.fn(),
+    updateSelectedHat: vi.fn(),
     error: null,
     clearError: vi.fn(),
     connecting: false,

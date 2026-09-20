@@ -13,7 +13,12 @@ import {
 import { classifyCribbageSkunk, cribbageCribOwnerLabel } from './logic';
 import { legalPeggingPlays, scoreCribShow, scoreShowHand } from './rules';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
-import type { TableEvent, TableEventInput } from '../../networking/types';
+import type { Player, TableEvent, TableEventInput } from '../../networking/types';
+import {
+  getSeatPillHatPropsForLobbyPlayer,
+  mergeSeatPillHatClassName,
+  mergeSeatPillHatStyle,
+} from '../../hats/hats';
 import { CardFace } from '../shared/ui/CardFace';
 import { CardBack } from '../shared/ui/CardBack';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
@@ -94,6 +99,7 @@ interface CribbageBoardProps {
   isHandZoomed?: boolean;
   sendTableEvent?: (event: TableEventInput) => void;
   lastTableEvent?: TableEvent | null;
+  lobbyPlayers?: Player[];
 }
 
 function scoreForSeat(s: CribbageState, seat: number): number {
@@ -111,6 +117,7 @@ export default function CribbageBoard({
   isHandZoomed = false,
   sendTableEvent,
   lastTableEvent,
+  lobbyPlayers,
 }: CribbageBoardProps) {
   const s = state as CribbageState;
   const myIndex = s.players.findIndex(p => p.id === myId);
@@ -681,6 +688,7 @@ export default function CribbageBoard({
       seatLeft: layout.seatLeft,
       seatTop: layout.seatTop,
     });
+    const seatPillHat = getSeatPillHatPropsForLobbyPlayer(player.id, lobbyPlayers);
 
     return (
       <button
@@ -688,7 +696,11 @@ export default function CribbageBoard({
         ref={shouldMeasure ? setSeatPillElement : undefined}
         onClick={tossProps.onClick}
         disabled={tossProps.disabled}
-        className={`cribbage-seatPill card-toss-seatPillButton ${activeSeatPillClass} ${player.id === myId ? 'cribbage-seatPill--me' : ''}`}
+        className={mergeSeatPillHatClassName(
+          `cribbage-seatPill card-toss-seatPillButton ${activeSeatPillClass} ${player.id === myId ? 'cribbage-seatPill--me' : ''}`,
+          seatPillHat.className,
+        )}
+        style={mergeSeatPillHatStyle(undefined, seatPillHat.style)}
         aria-label={tossProps['aria-label']}
       >
         <div className="cribbage-seatPillTop" style={pillTopStyle}>

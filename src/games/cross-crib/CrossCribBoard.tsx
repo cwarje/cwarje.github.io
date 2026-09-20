@@ -6,7 +6,12 @@ import { cribCardsToSelect } from './types';
 import { cardEquals } from './rules';
 import { getCribHandScore } from './logic';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
-import type { TableEvent, TableEventInput } from '../../networking/types';
+import type { Player, TableEvent, TableEventInput } from '../../networking/types';
+import {
+  getSeatPillHatPropsForLobbyPlayer,
+  mergeSeatPillHatClassName,
+  mergeSeatPillHatStyle,
+} from '../../hats/hats';
 import { useDealerDealAnimation, type DealSeat, type DealExtraTarget } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 import { CardTossLayers } from '../shared/CardTossLayers';
@@ -22,6 +27,7 @@ interface CrossCribBoardProps {
   isHandZoomed?: boolean;
   sendTableEvent?: (event: TableEventInput) => void;
   lastTableEvent?: TableEvent | null;
+  lobbyPlayers?: Player[];
 }
 
 interface SeatLayout {
@@ -54,6 +60,7 @@ export default function CrossCribBoard({
   isHandZoomed = false,
   sendTableEvent,
   lastTableEvent,
+  lobbyPlayers,
 }: CrossCribBoardProps) {
   const s = state as CrossCribState;
   const myIndex = s.players.findIndex(p => p.id === myId);
@@ -316,6 +323,7 @@ export default function CrossCribBoard({
       seatLeft: layout.seatLeft,
       seatTop: layout.seatTop,
     });
+    const seatPillHat = getSeatPillHatPropsForLobbyPlayer(player.id, lobbyPlayers);
 
     return (
       <button
@@ -323,7 +331,11 @@ export default function CrossCribBoard({
         ref={shouldMeasure ? setSeatPillElement : undefined}
         onClick={tossProps.onClick}
         disabled={tossProps.disabled}
-        className={`radial-seatPill card-toss-seatPillButton ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`}
+        className={mergeSeatPillHatClassName(
+          `radial-seatPill card-toss-seatPillButton ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`,
+          seatPillHat.className,
+        )}
+        style={mergeSeatPillHatStyle(undefined, seatPillHat.style)}
         aria-label={tossProps['aria-label']}
       >
         <div className="radial-seatPillTop" style={pillTopStyle}>

@@ -11,7 +11,12 @@ import {
   isValidMobilizationTrickPlay,
 } from './rules';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
-import type { TableEvent, TableEventInput } from '../../networking/types';
+import type { Player, TableEvent, TableEventInput } from '../../networking/types';
+import {
+  getSeatPillHatPropsForLobbyPlayer,
+  mergeSeatPillHatClassName,
+  mergeSeatPillHatStyle,
+} from '../../hats/hats';
 import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 import { CardTossLayers } from '../shared/CardTossLayers';
@@ -28,6 +33,7 @@ interface MobilizationBoardProps {
   isHost?: boolean;
   sendTableEvent?: (event: TableEventInput) => void;
   lastTableEvent?: TableEvent | null;
+  lobbyPlayers?: Player[];
 }
 
 interface SeatLayout {
@@ -115,6 +121,7 @@ export default function MobilizationBoard({
   isHost = false,
   sendTableEvent,
   lastTableEvent,
+  lobbyPlayers,
 }: MobilizationBoardProps) {
   const myIndex = state.players.findIndex(player => player.id === myId);
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
@@ -449,7 +456,14 @@ export default function MobilizationBoard({
         ref={shouldMeasure ? setSeatPillElement : undefined}
         onClick={tossProps.onClick}
         disabled={tossProps.disabled}
-        className={`radial-seatPill card-toss-seatPillButton radial-seatPill--mobilization2col ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`}
+        className={mergeSeatPillHatClassName(
+          `radial-seatPill card-toss-seatPillButton radial-seatPill--mobilization2col ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`,
+          getSeatPillHatPropsForLobbyPlayer(player.id, lobbyPlayers).className,
+        )}
+        style={mergeSeatPillHatStyle(
+          undefined,
+          getSeatPillHatPropsForLobbyPlayer(player.id, lobbyPlayers).style,
+        )}
         aria-label={tossProps['aria-label']}
       >
         <div

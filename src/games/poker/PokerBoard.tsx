@@ -3,7 +3,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, ChevronUp, ChevronDown, Play, LogOut } from 'lucide-react';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor, normalizePlayerColor } from '../../networking/playerColors';
-import type { TableEvent, TableEventInput } from '../../networking/types';
+import type { Player, TableEvent, TableEventInput } from '../../networking/types';
+import {
+  getSeatPillHatPropsForLobbyPlayer,
+  mergeSeatPillHatClassName,
+  mergeSeatPillHatStyle,
+} from '../../hats/hats';
 import type { PokerState, PokerAction, Card, PokerPlayer } from './types';
 import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
@@ -55,6 +60,7 @@ interface PokerBoardProps {
   isHandZoomed?: boolean;
   sendTableEvent?: (event: TableEventInput) => void;
   lastTableEvent?: TableEvent | null;
+  lobbyPlayers?: Player[];
 }
 
 export default function PokerBoard({
@@ -66,6 +72,7 @@ export default function PokerBoard({
   isHandZoomed = false,
   sendTableEvent,
   lastTableEvent,
+  lobbyPlayers,
 }: PokerBoardProps) {
   const [raiseAmount, setRaiseAmount] = useState<number>(0);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -249,12 +256,17 @@ export default function PokerBoard({
       seatTop: layout.seatTop,
     });
 
+    const seatPillHat = getSeatPillHatPropsForLobbyPlayer(player.id, lobbyPlayers);
     return (
       <button
         type="button"
         onClick={tossProps.onClick}
         disabled={tossProps.disabled}
-        className={`poker-seatPill card-toss-seatPillButton ${activeClass} ${isMe ? 'poker-seatPill--me' : ''} ${foldedClass}`}
+        className={mergeSeatPillHatClassName(
+          `poker-seatPill card-toss-seatPillButton ${activeClass} ${isMe ? 'poker-seatPill--me' : ''} ${foldedClass}`,
+          seatPillHat.className,
+        )}
+        style={mergeSeatPillHatStyle(undefined, seatPillHat.style)}
         aria-label={tossProps['aria-label']}
       >
         <div className="poker-seatPillTop" style={{ backgroundColor: seatColor }}>

@@ -1649,21 +1649,21 @@
   opacity: 1;
 }
 
-html.birthday-mode .card-toss-seatPillButton,
-html.birthday-mode .golf-seatPill {
+.card-toss-seatPillButton.seat-pill--hat,
+.golf-seatPill.seat-pill--hat {
   position: relative;
   overflow: visible;
 }
 
-html.birthday-mode .card-toss-seatPillButton::after,
-html.birthday-mode .golf-seatPill::after {
+.card-toss-seatPillButton.seat-pill--hat::after,
+.golf-seatPill.seat-pill--hat::after {
   content: '';
   position: absolute;
   top: -30px;
   right: -2px;
   width: 34px;
   height: 36px;
-  background: var(--seat-pill-party-hat-url) center / contain no-repeat;
+  background: var(--seat-pill-hat-url) center / contain no-repeat;
   pointer-events: none;
   z-index: 1;
 }

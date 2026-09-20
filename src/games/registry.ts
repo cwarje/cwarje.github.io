@@ -137,6 +137,7 @@ export interface BoardProps {
   onLeave?: () => void;
   sendTableEvent?: (event: TableEventInput) => void;
   lastTableEvent?: TableEvent | null;
+  lobbyPlayers?: Player[];
 }
 
 export interface GameOptionsPanelProps {

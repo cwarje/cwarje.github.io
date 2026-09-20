@@ -42,6 +42,7 @@ export type MinigolfThemeOption = 'classic' | 'random';
 export type MinigolfHoleCount = 3 | 9 | 18;
 export type DealerSpeed = 'slow' | 'medium' | 'fast';
 export type BackgammonMatchFormat = 'single' | 'best-of-3';
+export type HatId = 'none' | 'party' | 'chef' | 'captain' | 'beanie' | 'cowboy';
 export interface GameStartOptions {
   targetScore?: HeartsTargetScore;
   farkleTargetScore?: FarkleTargetScore;
@@ -70,6 +71,7 @@ export interface Player {
   isHost: boolean;
   connected: boolean;
   minigolfXp?: number;
+  selectedHat?: HatId;
 }
 
 export interface TableEvent {
@@ -86,8 +88,8 @@ export type TableEventInput = Omit<TableEvent, 'gameType' | 'fromPlayerId' | 'cr
 
 // Messages from client to host
 export type ClientMessage =
-  | { type: 'join'; playerName: string; playerColor: PlayerColor; deviceId: string; minigolfXp?: number }
-  | { type: 'update-profile'; playerName: string; playerColor: PlayerColor; deviceId: string; minigolfXp?: number }
+  | { type: 'join'; playerName: string; playerColor: PlayerColor; deviceId: string; minigolfXp?: number; selectedHat?: HatId }
+  | { type: 'update-profile'; playerName: string; playerColor: PlayerColor; deviceId: string; minigolfXp?: number; selectedHat?: HatId }
   | { type: 'action'; payload: unknown; deviceId: string }
   | { type: 'table-event'; event: TableEventInput; deviceId: string }
   | { type: 'leave' }
@@ -122,6 +124,7 @@ export interface RoomContextValue {
   joinRoom: (roomCode: string, playerName: string, playerColor: PlayerColor) => Promise<void>;
   updateProfile: (playerName: string, playerColor: PlayerColor) => void;
   updateMinigolfXp: (xp: number) => void;
+  updateSelectedHat: (hatId: HatId) => void;
   rejoinRoom: (roomCode: string) => Promise<void>;
   leaveRoom: () => void;
   removePlayer: (playerId: string) => void;

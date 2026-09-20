@@ -16,6 +16,7 @@ import type {
   TableEvent,
   TableEventInput,
   DealerSpeed,
+  HatId,
 } from './types';
 import { readStoredDealerSpeed, normalizeDealerSpeed } from './dealerSpeed';
 import { normalizePlayerColor } from './playerColors';
@@ -51,7 +52,13 @@ import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 import { shouldBotBank } from '../games/farkle/logic';
 import { GAME_REGISTRY } from '../games/registry';
 import { shufflePlayers } from '../games/shared/shufflePlayers';
-import { readMinigolfXp, writeMinigolfXp } from '../games/minigolf/progress';
+import { getMinigolfLevel, readMinigolfXp, writeMinigolfXp } from '../games/minigolf/progress';
+import {
+  readSelectedHat,
+  resolveNetworkSelectedHat,
+  sanitizeSelectedHat,
+  writeSelectedHat,
+} from '../hats/hats';
 
 function createBotId(): string {
   return `bot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -513,6 +520,12 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
             // Update connection and mark connected
             connectionsRef.current.set(clientDeviceId, conn);
+            const reconnectXp = msg.minigolfXp !== undefined ? msg.minigolfXp : (existingPlayer.minigolfXp ?? 0);
+            const reconnectHat = resolveNetworkSelectedHat(
+              reconnectXp,
+              msg.selectedHat,
+              existingPlayer.selectedHat,
+            );
             const updatedRoom = {
               ...currentRoom,
               players: currentRoom.players.map(p =>
@@ -523,6 +536,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
                       name: msg.playerName,
                       color: msg.playerColor,
                       ...(msg.minigolfXp !== undefined ? { minigolfXp: msg.minigolfXp } : {}),
+                      selectedHat: reconnectHat,
                     }
                   : p
               ),
@@ -546,6 +560,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
           } else {
             // New player
+            const joinXp = msg.minigolfXp ?? 0;
             const newPlayer: Player = {
               id: clientDeviceId,
               name: msg.playerName,
@@ -553,7 +568,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
               isBot: false,
               isHost: false,
               connected: true,
-              minigolfXp: msg.minigolfXp ?? 0,
+              minigolfXp: joinXp,
+              selectedHat: resolveNetworkSelectedHat(joinXp, msg.selectedHat),
             };
             connectionsRef.current.set(clientDeviceId, conn);
             const updatedRoom = {
@@ -569,6 +585,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           const senderDeviceId = peerDeviceMapRef.current.get(conn.peer);
           if (!senderDeviceId || senderDeviceId !== msg.deviceId) return;
 
+          const profilePlayer = currentRoom.players.find((p) => p.id === senderDeviceId);
+          const profileXp = msg.minigolfXp !== undefined
+            ? msg.minigolfXp
+            : (profilePlayer?.minigolfXp ?? 0);
+          const profileHat = msg.selectedHat !== undefined
+            ? resolveNetworkSelectedHat(profileXp, msg.selectedHat)
+            : sanitizeSelectedHat(profilePlayer?.selectedHat, getMinigolfLevel(profileXp));
           const updatedRoom = {
             ...currentRoom,
             players: currentRoom.players.map((player) =>
@@ -578,6 +601,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
                     name: msg.playerName,
                     color: msg.playerColor,
                     ...(msg.minigolfXp !== undefined ? { minigolfXp: msg.minigolfXp } : {}),
+                    selectedHat: profileHat,
                   }
                 : player
             ),
@@ -844,6 +868,10 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             playerColor: storedColor,
             deviceId,
             minigolfXp: readMinigolfXp(),
+            selectedHat: sanitizeSelectedHat(
+              readSelectedHat(),
+              getMinigolfLevel(readMinigolfXp()),
+            ),
           } as ClientMessage);
         });
 
@@ -902,6 +930,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       peerRef.current = peer;
       setMyId(deviceId);
 
+      const hostMinigolfXp = readMinigolfXp();
       const hostPlayer: Player = {
         id: deviceId,
         name: playerName,
@@ -909,7 +938,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         isBot: false,
         isHost: true,
         connected: true,
-        minigolfXp: readMinigolfXp(),
+        minigolfXp: hostMinigolfXp,
+        selectedHat: sanitizeSelectedHat(readSelectedHat(), getMinigolfLevel(hostMinigolfXp)),
       };
 
       const newRoom: RoomState = {
@@ -1058,6 +1088,10 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
               playerColor,
               deviceId,
               minigolfXp: readMinigolfXp(),
+              selectedHat: sanitizeSelectedHat(
+                readSelectedHat(),
+                getMinigolfLevel(readMinigolfXp()),
+              ),
             } as ClientMessage);
           });
 
@@ -1151,12 +1185,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
     const player = currentRoom.players.find((p) => p.id === myId);
     if (!player || player.isBot) return;
-    if (player.minigolfXp === normalized) return;
+    const sanitizedHat = sanitizeSelectedHat(player.selectedHat, getMinigolfLevel(normalized));
+    if (player.minigolfXp === normalized && player.selectedHat === sanitizedHat) return;
 
     const updatedRoom = {
       ...currentRoom,
       players: currentRoom.players.map((p) =>
-        p.id === myId ? { ...p, minigolfXp: normalized } : p
+        p.id === myId ? { ...p, minigolfXp: normalized, selectedHat: sanitizedHat } : p
       ),
     };
     setRoom(updatedRoom);
@@ -1174,6 +1209,46 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           playerColor: player.color,
           deviceId: myId,
           minigolfXp: normalized,
+          selectedHat: sanitizedHat,
+        } as ClientMessage);
+      }
+    });
+  }, [myId, isHost, broadcastRoomState]);
+
+  const updateSelectedHat = useCallback((hatId: HatId) => {
+    const normalizedXp = readMinigolfXp();
+    const sanitized = sanitizeSelectedHat(hatId, getMinigolfLevel(normalizedXp));
+    writeSelectedHat(sanitized);
+
+    const currentRoom = roomRef.current;
+    if (!currentRoom || !myId) return;
+
+    const player = currentRoom.players.find((p) => p.id === myId);
+    if (!player || player.isBot) return;
+    if (player.selectedHat === sanitized) return;
+
+    const updatedRoom = {
+      ...currentRoom,
+      players: currentRoom.players.map((p) =>
+        p.id === myId ? { ...p, selectedHat: sanitized } : p
+      ),
+    };
+    setRoom(updatedRoom);
+
+    if (isHost) {
+      broadcastRoomState(updatedRoom);
+      return;
+    }
+
+    connectionsRef.current.forEach((conn) => {
+      if (conn.open) {
+        conn.send({
+          type: 'update-profile',
+          playerName: player.name,
+          playerColor: player.color,
+          deviceId: myId,
+          minigolfXp: player.minigolfXp ?? normalizedXp,
+          selectedHat: sanitized,
         } as ClientMessage);
       }
     });
@@ -2784,6 +2859,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         joinRoom,
         updateProfile,
         updateMinigolfXp,
+        updateSelectedHat,
         rejoinRoom,
         leaveRoom,
         removePlayer,

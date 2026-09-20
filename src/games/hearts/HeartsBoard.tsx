@@ -1,7 +1,12 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { TableEvent, TableEventInput } from '../../networking/types';
+import type { Player, TableEvent, TableEventInput } from '../../networking/types';
+import {
+  getSeatPillHatPropsForLobbyPlayer,
+  mergeSeatPillHatClassName,
+  mergeSeatPillHatStyle,
+} from '../../hats/hats';
 import type { HeartsState, Card, HeartsPlayer } from './types';
 import { isValidHeartsPlay } from './rules';
 import { getHeartsPassCount, getPassDirectionLabel } from './logic';
@@ -89,6 +94,7 @@ interface HeartsBoardProps {
   isHandZoomed?: boolean;
   sendTableEvent?: (event: TableEventInput) => void;
   lastTableEvent?: TableEvent | null;
+  lobbyPlayers?: Player[];
 }
 
 export default function HeartsBoard({
@@ -98,6 +104,7 @@ export default function HeartsBoard({
   isHandZoomed = false,
   sendTableEvent,
   lastTableEvent,
+  lobbyPlayers,
 }: HeartsBoardProps) {
   const myIndex = state.players.findIndex(p => p.id === myId);
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
@@ -416,13 +423,18 @@ export default function HeartsBoard({
       seatLeft: seatLayout.seatLeft,
       seatTop: seatLayout.seatTop,
     });
+    const seatPillHat = getSeatPillHatPropsForLobbyPlayer(player.id, lobbyPlayers);
     return (
       <button
         type="button"
         ref={shouldMeasure ? setSeatPillElement : undefined}
         onClick={tossProps.onClick}
         disabled={tossProps.disabled}
-        className={`radial-seatPill card-toss-seatPillButton ${activeSeatPillClass} ${isMe ? 'radial-seatPill--me' : ''}`}
+        className={mergeSeatPillHatClassName(
+          `radial-seatPill card-toss-seatPillButton ${activeSeatPillClass} ${isMe ? 'radial-seatPill--me' : ''}`,
+          seatPillHat.className,
+        )}
+        style={mergeSeatPillHatStyle(undefined, seatPillHat.style)}
         aria-label={tossProps['aria-label']}
       >
         <div className="radial-seatPillTop" style={{ backgroundColor: seatColor }}>

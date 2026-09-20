@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import type { TableEvent, TableEventInput } from '../../networking/types';
+import type { Player, TableEvent, TableEventInput } from '../../networking/types';
+import {
+  getSeatPillHatPropsForLobbyPlayer,
+  mergeSeatPillHatClassName,
+  mergeSeatPillHatStyle,
+} from '../../hats/hats';
 import type { Card, SelectedCardPlay, TensActionAnnouncement, TensPlayer, TensState } from './types';
 import {
   allPileTopsPlayed,
@@ -30,6 +35,7 @@ interface TensBoardProps {
   isHandZoomed?: boolean;
   sendTableEvent?: (event: TableEventInput) => void;
   lastTableEvent?: TableEvent | null;
+  lobbyPlayers?: Player[];
 }
 
 interface SeatLayout {
@@ -192,6 +198,7 @@ export default function TensBoard({
   isHandZoomed = false,
   sendTableEvent,
   lastTableEvent,
+  lobbyPlayers,
 }: TensBoardProps) {
   const myIndex = state.players.findIndex(p => p.id === myId);
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
@@ -650,7 +657,14 @@ export default function TensBoard({
         }}
         onClick={tossProps.onClick}
         disabled={!canTossCards}
-        className={`radial-seatPill card-toss-seatPillButton tens-seatPill ${isCurrentTurn ? (isMe ? 'radial-seatPill--activeSelf' : 'radial-seatPill--activeOther') : ''} ${isMe ? 'radial-seatPill--me' : ''}`}
+        className={mergeSeatPillHatClassName(
+          `radial-seatPill card-toss-seatPillButton tens-seatPill ${isCurrentTurn ? (isMe ? 'radial-seatPill--activeSelf' : 'radial-seatPill--activeOther') : ''} ${isMe ? 'radial-seatPill--me' : ''}`,
+          getSeatPillHatPropsForLobbyPlayer(player.id, lobbyPlayers).className,
+        )}
+        style={mergeSeatPillHatStyle(
+          undefined,
+          getSeatPillHatPropsForLobbyPlayer(player.id, lobbyPlayers).style,
+        )}
         aria-label={tossProps['aria-label']}
       >
         <div className="radial-seatPillTop tens-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>

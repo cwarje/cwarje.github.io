@@ -28,7 +28,12 @@ import {
   PLAYER_COLOR_HEX,
   getPlayerHudTextColor,
 } from '../../networking/playerColors';
-import type { TableEvent, TableEventInput } from '../../networking/types';
+import type { Player, TableEvent, TableEventInput } from '../../networking/types';
+import {
+  getSeatPillHatPropsForLobbyPlayer,
+  mergeSeatPillHatClassName,
+  mergeSeatPillHatStyle,
+} from '../../hats/hats';
 import { useLastDealFlash } from './useLastDealFlash';
 import { useDealerDealAnimation, type DealSeat, type DealExtraTarget } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
@@ -45,6 +50,7 @@ interface CasinoBoardProps {
   isHandZoomed?: boolean;
   sendTableEvent?: (event: TableEventInput) => void;
   lastTableEvent?: TableEvent | null;
+  lobbyPlayers?: Player[];
 }
 
 interface CasinoSeatLayout {
@@ -203,6 +209,7 @@ export default function CasinoBoard({
   isHandZoomed = false,
   sendTableEvent,
   lastTableEvent,
+  lobbyPlayers,
 }: CasinoBoardProps) {
   const s = state as CasinoState;
   const myIndex = s.players.findIndex(p => p.id === myId);
@@ -720,13 +727,18 @@ export default function CasinoBoard({
       seatLeft: layout.seatLeft,
       seatTop: layout.seatTop,
     });
+    const seatPillHat = getSeatPillHatPropsForLobbyPlayer(player.id, lobbyPlayers);
     return (
       <button
         type="button"
         ref={shouldMeasure ? setSeatPillElement : undefined}
         onClick={tossProps.onClick}
         disabled={tossProps.disabled}
-        className={`casino-seatPill card-toss-seatPillButton ${activeClass} ${isMe ? 'casino-seatPill--me' : ''}`}
+        className={mergeSeatPillHatClassName(
+          `casino-seatPill card-toss-seatPillButton ${activeClass} ${isMe ? 'casino-seatPill--me' : ''}`,
+          seatPillHat.className,
+        )}
+        style={mergeSeatPillHatStyle(undefined, seatPillHat.style)}
         aria-label={tossProps['aria-label']}
       >
         <div className="casino-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>

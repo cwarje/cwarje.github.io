@@ -27,6 +27,12 @@ import { GolfFlipAnimationLayer } from './GolfFlipAnimationLayer';
 import { useGolfDiscardAnimation } from './useGolfDiscardAnimation';
 import { useGolfSwapAnimation } from './useGolfSwapAnimation';
 import { useGolfFlipAnimation } from './useGolfFlipAnimation';
+import type { Player } from '../../networking/types';
+import {
+  getSeatPillHatPropsForLobbyPlayer,
+  mergeSeatPillHatClassName,
+  mergeSeatPillHatStyle,
+} from '../../hats/hats';
 
 function GolfFlipCard({ card, faceDown, disabled = false }: { card?: Card | null; faceDown: boolean; disabled?: boolean }) {
   return <FlipCard card={card ?? undefined} faceDown={faceDown || !card} disabled={disabled} size="sm" />;
@@ -37,6 +43,7 @@ interface GolfBoardProps {
   myId: string;
   onAction: (action: unknown) => void;
   isHost?: boolean;
+  lobbyPlayers?: Player[];
 }
 
 interface SeatLayout {
@@ -61,7 +68,7 @@ function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY
   return { seatRadiusX: 34, seatRadiusY: 30 };
 }
 
-export default function GolfBoard({ state, myId, onAction, isHost = false }: GolfBoardProps) {
+export default function GolfBoard({ state, myId, onAction, isHost = false, lobbyPlayers }: GolfBoardProps) {
   const myIndex = state.players.findIndex(player => player.id === myId);
   const anchorIndex = myIndex >= 0 ? myIndex : 0;
   const isMyTurn = myIndex >= 0 && state.currentPlayerIndex === myIndex && state.phase === 'playing';
@@ -304,9 +311,14 @@ export default function GolfBoard({ state, myId, onAction, isHost = false }: Gol
     const seatColor = PLAYER_COLOR_HEX[player.color] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
     const seatTextColor = DARK_PLAYER_COLORS.has(player.color) ? '#ffffff' : '#111827';
 
+    const seatPillHat = getSeatPillHatPropsForLobbyPlayer(player.id, lobbyPlayers);
     return (
       <div
-        className={`radial-seatPill golf-seatPill ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`}
+        className={mergeSeatPillHatClassName(
+          `radial-seatPill golf-seatPill ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`,
+          seatPillHat.className,
+        )}
+        style={mergeSeatPillHatStyle(undefined, seatPillHat.style)}
       >
         <div className="radial-seatPillTop" style={{ backgroundColor: seatColor, color: seatTextColor }}>
           <RadialSeatName
