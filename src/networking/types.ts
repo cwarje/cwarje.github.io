@@ -42,7 +42,18 @@ export type MinigolfThemeOption = 'classic' | 'random';
 export type MinigolfHoleCount = 3 | 9 | 18;
 export type DealerSpeed = 'slow' | 'medium' | 'fast';
 export type BackgammonMatchFormat = 'single' | 'best-of-3';
-export type HatId = 'none' | 'party' | 'chef' | 'captain' | 'beanie' | 'cowboy';
+export type HatId =
+  | 'none'
+  | 'party'
+  | 'chef'
+  | 'captain'
+  | 'beanie'
+  | 'cowboy'
+  | 'propeller'
+  | 'tophat'
+  | 'fedora'
+  | 'partycowboy'
+  | 'luffy';
 export interface GameStartOptions {
   targetScore?: HeartsTargetScore;
   farkleTargetScore?: FarkleTargetScore;

@@ -62,7 +62,7 @@ export default function HatsShopPanel({ className }: HatsShopPanelProps) {
                 aria-selected={selected}
                 disabled={!unlocked}
                 onClick={() => handleSelect(hat.id)}
-                className={`flex flex-col items-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition-colors ${
+                className={`relative flex flex-col items-center rounded-xl border px-3 py-3 text-sm font-medium transition-colors ${
                   selected
                     ? 'border-white/60 bg-white/20 text-white'
                     : unlocked
@@ -70,6 +70,20 @@ export default function HatsShopPanel({ className }: HatsShopPanelProps) {
                       : 'border-white/10 bg-black/20 text-white/40 cursor-not-allowed'
                 }`}
               >
+                {!unlocked && unlockLabel ? (
+                  <>
+                    <Lock
+                      className="pointer-events-none absolute top-1.5 left-1.5 h-3 w-3 shrink-0 text-white/50"
+                      aria-hidden
+                    />
+                    <span
+                      className="pointer-events-none absolute top-1.5 right-1.5 text-[10px] font-semibold uppercase tracking-wide text-white/50"
+                      aria-hidden
+                    >
+                      {unlockLabel}
+                    </span>
+                  </>
+                ) : null}
                 <div className="flex h-16 w-16 items-end justify-center">
                   {hat.imageUrl ? (
                     <img
@@ -81,12 +95,6 @@ export default function HatsShopPanel({ className }: HatsShopPanelProps) {
                     <span className="text-xs uppercase tracking-wide text-white/50">None</span>
                   )}
                 </div>
-                {!unlocked && unlockLabel ? (
-                  <span className="flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/50">
-                    <Lock className="h-3 w-3" aria-hidden />
-                    {unlockLabel}
-                  </span>
-                ) : null}
               </button>
             );
           })}

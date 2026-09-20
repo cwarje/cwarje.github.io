@@ -6,6 +6,11 @@ import chefHatUrl from '../assets/chef-hat.png';
 import captainHatUrl from '../assets/captain-hat.png';
 import beanieHatUrl from '../assets/beanie-hat.png';
 import cowboyHatUrl from '../assets/cowboy-hat.png';
+import propellerHatUrl from '../assets/propeller-hat.png';
+import tophatHatUrl from '../assets/tophat-hat.png';
+import fedoraHatUrl from '../assets/fedora-hat.png';
+import partycowboyHatUrl from '../assets/partycowboy-hat.png';
+import luffyHatUrl from '../assets/luffy-hat.png';
 
 export const SELECTED_HAT_STORAGE_KEY = 'selectedHat';
 
@@ -19,10 +24,15 @@ export interface HatDefinition {
 export const HAT_CATALOG: HatDefinition[] = [
   { id: 'none', label: 'No hat', requiredLevel: 0 },
   { id: 'party', label: 'Party hat', imageUrl: partyHatUrl, requiredLevel: 0 },
-  { id: 'chef', label: 'Chef hat', imageUrl: chefHatUrl, requiredLevel: 10 },
-  { id: 'captain', label: 'Captain hat', imageUrl: captainHatUrl, requiredLevel: 20 },
-  { id: 'beanie', label: 'Beanie', imageUrl: beanieHatUrl, requiredLevel: 30 },
-  { id: 'cowboy', label: 'Cowboy hat', imageUrl: cowboyHatUrl, requiredLevel: 40 },
+  { id: 'cowboy', label: 'Cowboy hat', imageUrl: cowboyHatUrl, requiredLevel: 10 },
+  { id: 'chef', label: 'Chef hat', imageUrl: chefHatUrl, requiredLevel: 20 },
+  { id: 'fedora', label: 'Fedora', imageUrl: fedoraHatUrl, requiredLevel: 30 },
+  { id: 'beanie', label: 'Beanie', imageUrl: beanieHatUrl, requiredLevel: 40 },
+  { id: 'propeller', label: 'Propeller hat', imageUrl: propellerHatUrl, requiredLevel: 50 },
+  { id: 'captain', label: 'Captain hat', imageUrl: captainHatUrl, requiredLevel: 60 },
+  { id: 'luffy', label: 'Luffy hat', imageUrl: luffyHatUrl, requiredLevel: 70 },
+  { id: 'tophat', label: 'Top hat', imageUrl: tophatHatUrl, requiredLevel: 80 },
+  { id: 'partycowboy', label: 'Party cowboy hat', imageUrl: partycowboyHatUrl, requiredLevel: 90 },
 ];
 
 const HAT_IDS = new Set<HatId>(HAT_CATALOG.map((h) => h.id));
