@@ -12,8 +12,11 @@ import { useRoomContext } from '../networking/roomStore';
 import type { GameStartOptions, GameType, Player, PlayerColor } from '../networking/types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 import { GAME_REGISTRY, ALL_GAME_TYPES, PRODUCTION_GAME_TYPES } from '../games/registry';
+import { XP_PER_LEVEL, getLevelProgress, readPlayerXp } from '../xp/progress';
 
 const gameTypesToShow = import.meta.env.DEV ? ALL_GAME_TYPES : PRODUCTION_GAME_TYPES;
+const devButtonClass =
+  'rounded-md border border-amber-300/60 bg-amber-500/20 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/30 cursor-pointer';
 
 function playerTextColor(color: PlayerColor): string {
   return PLAYER_COLOR_HEX[normalizePlayerColor(color)] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
@@ -29,7 +32,7 @@ function ColoredPlayerName({ player }: { player: Player }) {
 
 export default function Home() {
   const navigate = useNavigate();
-  const { room, isHost, createLobby, joinRoom, startGame, connecting, error, clearError } = useRoomContext();
+  const { room, isHost, myPlayer, createLobby, joinRoom, startGame, connecting, error, clearError, updatePlayerXp } = useRoomContext();
   const { toast } = useToast();
   const [playerName] = useState(() => {
     return localStorage.getItem('playerName') || '';
@@ -169,6 +172,10 @@ export default function Home() {
   const showHostLobbyMessage = room && isHost && waitingPlayers.length > 0;
   const infoGameDef = infoGameType ? GAME_REGISTRY[infoGameType] : null;
 
+  const xp = myPlayer?.xp ?? readPlayerXp();
+  const { level } = getLevelProgress(xp);
+  const showDevLevelControls = import.meta.env.DEV;
+
   return (
     <div className="space-y-10">
       {/* Join bar or waiting message — fixed height so game cards don't shift */}
@@ -197,6 +204,30 @@ export default function Home() {
           <RoomCodeInput onJoin={handleJoinRoom} loading={connecting} />
         )}
       </motion.div>
+
+      {showDevLevelControls && (
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-[11px] font-semibold text-amber-200/90">
+            Dev: Level {level} ({xp} XP)
+          </span>
+          <button
+            type="button"
+            className={devButtonClass}
+            aria-label="Decrease level by one"
+            onClick={() => updatePlayerXp(Math.max(0, xp - XP_PER_LEVEL))}
+          >
+            −1 Lv
+          </button>
+          <button
+            type="button"
+            className={devButtonClass}
+            aria-label="Increase level by one"
+            onClick={() => updatePlayerXp(xp + XP_PER_LEVEL)}
+          >
+            +1 Lv
+          </button>
+        </div>
+      )}
 
       {/* Error */}
       {error && (

@@ -19,11 +19,47 @@ import {
   getPlayerHudTextColor,
   normalizePlayerColor,
 } from '../../networking/playerColors';
+import type { HatId, Player } from '../../networking/types';
+import { HAT_CATALOG, getLobbyPlayerSanitizedHatId } from '../../hats/hats';
 
 interface MinigolfBoardProps {
   state: MinigolfState;
   myId: string;
   onAction: (action: unknown) => void;
+  lobbyPlayers?: Player[];
+}
+
+const hatImagesById = new Map<HatId, HTMLImageElement>();
+
+function ensureHatImagesLoaded(): void {
+  for (const def of HAT_CATALOG) {
+    if (!def.imageUrl || hatImagesById.has(def.id)) continue;
+    const img = new Image();
+    img.src = def.imageUrl;
+    hatImagesById.set(def.id, img);
+  }
+}
+
+ensureHatImagesLoaded();
+
+function ballHatDimensions(ballPx: number): { w: number; h: number } {
+  const w = ballPx * 2.2;
+  const h = w * (36 / 34);
+  return { w, h };
+}
+
+function drawBallHat(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  ballPx: number,
+  sinkYOffset: number,
+): void {
+  const { w, h } = ballHatDimensions(ballPx);
+  const drawX = x - w * 0.48 + ballPx * 0.15;
+  const drawY = y - ballPx - h * 0.72 + sinkYOffset;
+  ctx.drawImage(img, drawX, drawY, w, h);
 }
 
 interface AimDrag {
@@ -1139,7 +1175,7 @@ function Scorecard({
   );
 }
 
-export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardProps) {
+export default function MinigolfBoard({ state, myId, onAction, lobbyPlayers }: MinigolfBoardProps) {
   const { lastAward } = usePlayerXpAwardContext();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1156,6 +1192,7 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
   const aimRef = useRef<AimDrag | null>(null);
   const fitRef = useRef<BoardFit | null>(null);
   const myIdRef = useRef(myId);
+  const lobbyPlayersRef = useRef(lobbyPlayers);
 
   const course = state.courses[state.holeIndex];
   const me = state.players.find((p) => p.id === myId);
@@ -1186,6 +1223,10 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
   useEffect(() => {
     myIdRef.current = myId;
   }, [myId]);
+
+  useEffect(() => {
+    lobbyPlayersRef.current = lobbyPlayers;
+  }, [lobbyPlayers]);
 
   useEffect(() => {
     setScorecardOpen(false);
@@ -1461,6 +1502,13 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
           ctx.strokeStyle = '#ffffff';
           ctx.stroke();
         }
+
+        const hatId = getLobbyPlayerSanitizedHatId(p.id, lobbyPlayersRef.current);
+        const hatImg = hatImagesById.get(hatId);
+        if (hatImg?.complete) {
+          drawBallHat(ctx, hatImg, x, y, ballPx, sinkYOffset);
+        }
+
         ctx.restore();
 
         if (!isMe) {
@@ -1469,7 +1517,11 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
           ctx.textAlign = 'center';
           ctx.textBaseline = 'bottom';
           ctx.fillStyle = 'rgba(255,255,255,0.85)';
-          ctx.fillText(p.name, x, y - ballPx - 2);
+          const nameY =
+            hatId !== 'none' && hatImg?.complete
+              ? y - ballPx - 2 - ballHatDimensions(ballPx).h * 0.5
+              : y - ballPx - 2;
+          ctx.fillText(p.name, x, nameY);
         }
       }
 

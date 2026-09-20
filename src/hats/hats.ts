@@ -110,17 +110,23 @@ export interface LobbyPlayerHatLookup {
   selectedHat?: HatId;
 }
 
+export function getLobbyPlayerSanitizedHatId(
+  playerId: string,
+  lobbyPlayers: LobbyPlayerHatLookup[] | undefined,
+): HatId {
+  const lobbyPlayer = lobbyPlayers?.find((p) => p.id === playerId);
+  if (!lobbyPlayer || lobbyPlayer.isBot) {
+    return 'none';
+  }
+  const level = getLevel(lobbyPlayer.xp ?? 0);
+  return sanitizeSelectedHat(lobbyPlayer.selectedHat, level);
+}
+
 export function getSeatPillHatPropsForLobbyPlayer(
   playerId: string,
   lobbyPlayers: LobbyPlayerHatLookup[] | undefined,
 ): { className: string; style?: CSSProperties } {
-  const lobbyPlayer = lobbyPlayers?.find((p) => p.id === playerId);
-  if (!lobbyPlayer || lobbyPlayer.isBot) {
-    return { className: '' };
-  }
-  const level = getLevel(lobbyPlayer.xp ?? 0);
-  const hatId = sanitizeSelectedHat(lobbyPlayer.selectedHat, level);
-  return getSeatPillHatProps(hatId);
+  return getSeatPillHatProps(getLobbyPlayerSanitizedHatId(playerId, lobbyPlayers));
 }
 
 export function mergeSeatPillHatClassName(baseClassName: string, hatClassName: string): string {
