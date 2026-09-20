@@ -2,6 +2,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { RoomContextValue, RoomState } from '../networking/types';
 import { createInitialGameState } from '../games/gameEngine';
+import type { HeartsState } from '../games/hearts/types';
 import { createMinigolfState } from '../games/minigolf/logic';
 import GamePage from './GamePage';
 
@@ -143,7 +144,7 @@ describe('GamePage', () => {
       createRoomContext({
         room: createRoomState({ gameType: 'hearts', phase: 'finished' }),
         gameState: {
-          ...createInitialGameState('hearts', [hostPlayer]),
+          ...(createInitialGameState('hearts', [hostPlayer]) as HeartsState),
           gameOver: true,
         },
         returnToLobby,
