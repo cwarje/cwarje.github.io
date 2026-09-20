@@ -20,7 +20,7 @@ export default function ProgressCard({ xp }: ProgressCardProps) {
       <span
         className={`absolute top-3 right-3 rounded-md px-2.5 py-1 text-xs font-medium uppercase tracking-wider ${theme.playersTag}`}
       >
-        Level
+        Level {level}
       </span>
       <div className="flex flex-1 items-center justify-start">
         <div className="flex min-w-0 flex-1 items-center gap-4">
