@@ -38,7 +38,7 @@ export default function ProgressCard({ xp }: ProgressCardProps) {
               aria-label={`Level ${level} progress`}
             >
               <div
-                className="h-full rounded-full bg-gradient-to-r from-primary-600 to-primary-500 transition-[width] duration-300 ease-out"
+                className={`h-full rounded-full ${theme.progressBarFill} transition-[width] duration-300 ease-out`}
                 style={{ width: `${fillPercent}%` }}
               />
             </div>
