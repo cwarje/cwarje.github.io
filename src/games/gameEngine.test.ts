@@ -3,10 +3,12 @@ import { ALL_GAME_TYPES, GAME_REGISTRY } from './registry';
 import {
   checkGameOver,
   createInitialGameState,
+  gameStateMatchesRoom,
   getGameWinners,
   processGameAction,
   runSingleBotTurn,
 } from './gameEngine';
+import { createMinigolfState } from './minigolf/logic';
 
 const PLAYER_COLORS: PlayerColor[] = [
   'red',
@@ -59,6 +61,17 @@ describe('gameEngine', () => {
         processGameAction(gameType, state, { type: '__invalid_action__' }, players[0].id);
       }).not.toThrow();
     }
+  });
+
+  it('detects minigolf state shape for room sync', () => {
+    const players = createPlayers(2);
+    const minigolf = createMinigolfState(players);
+    const hearts = createInitialGameState('hearts', players);
+
+    expect(gameStateMatchesRoom('minigolf', minigolf)).toBe(true);
+    expect(gameStateMatchesRoom('hearts', hearts)).toBe(true);
+    expect(gameStateMatchesRoom('minigolf', hearts)).toBe(false);
+    expect(gameStateMatchesRoom('hearts', minigolf)).toBe(false);
   });
 
   it('can run a single bot turn safely for every game', () => {

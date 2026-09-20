@@ -5,6 +5,7 @@ import { Home, Loader2, Search } from 'lucide-react';
 import { useRoomContext } from '../networking/roomStore';
 import { useToast } from '../components/Toast';
 import LobbyMenu from '../components/LobbyMenu';
+import { gameStateMatchesRoom } from '../games/gameEngine';
 import { GAME_REGISTRY } from '../games/registry';
 import { PlayerXpAwardProvider } from '../xp/PlayerXpAwardContext';
 
@@ -64,7 +65,14 @@ export default function GamePage() {
     }
   }, [room?.phase, navigate]);
 
-  if (!room || !gameState) {
+  const gameType = room?.gameType;
+  const gameStateReady =
+    !!room
+    && !!gameType
+    && gameState != null
+    && gameStateMatchesRoom(gameType, gameState);
+
+  if (!gameStateReady) {
     return (
       <div className="text-center py-20">
         <p className="text-gray-400">{connecting ? 'Reconnecting...' : 'Loading game...'}</p>
@@ -72,7 +80,7 @@ export default function GamePage() {
     );
   }
 
-  const gameDef = room.gameType ? GAME_REGISTRY[room.gameType] : null;
+  const gameDef = GAME_REGISTRY[gameType];
   const isFinished = room.phase === 'finished';
 
   const gameIsOver = gameDef?.isOver(gameState) ?? false;

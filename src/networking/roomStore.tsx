@@ -21,7 +21,14 @@ import type {
 import { readStoredDealerSpeed, normalizeDealerSpeed } from './dealerSpeed';
 import { normalizePlayerColor } from './playerColors';
 import { readFavoriteBots, resolveBotsForCount, type FavoriteBot } from './favoriteBots';
-import { createInitialGameState, processGameAction, checkGameOver, runSingleBotTurn, getGameWinners } from '../games/gameEngine';
+import {
+  createInitialGameState,
+  processGameAction,
+  checkGameOver,
+  runSingleBotTurn,
+  getGameWinners,
+  gameStateMatchesRoom,
+} from '../games/gameEngine';
 import type { HeartsState } from '../games/hearts/types';
 import { getHeartsPassCount } from '../games/hearts/logic';
 import type { PokerState } from '../games/poker/types';
@@ -403,6 +410,22 @@ function applyProfileToGameState(
     default:
       return state;
   }
+}
+
+function syncRoomAndGameState(
+  nextRoom: RoomState,
+  currentGameState: unknown,
+): { room: RoomState; gameState: unknown } {
+  if (nextRoom.phase === 'lobby' || !nextRoom.gameType) {
+    return { room: nextRoom, gameState: null };
+  }
+  if (
+    currentGameState != null
+    && !gameStateMatchesRoom(nextRoom.gameType, currentGameState)
+  ) {
+    return { room: nextRoom, gameState: null };
+  }
+  return { room: nextRoom, gameState: currentGameState };
 }
 
 const RoomContext = createContext<RoomContextValue | null>(null);
@@ -820,10 +843,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           conn.on('data', (data) => {
             const msg = data as HostMessage;
             switch (msg.type) {
-              case 'room-state':
-                setRoom(msg.state);
+              case 'room-state': {
+                const synced = syncRoomAndGameState(msg.state, gameStateRef.current);
+                setRoom(synced.room);
+                setGameState(synced.gameState);
                 if (!done) { done = true; clearTimeout(timeout); resolve(); }
                 break;
+              }
               case 'game-state':
                 setGameState(msg.state);
                 break;
@@ -1037,10 +1063,13 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             conn.on('data', (data) => {
               const msg = data as HostMessage;
               switch (msg.type) {
-                case 'room-state':
-                  setRoom(msg.state);
+                case 'room-state': {
+                  const synced = syncRoomAndGameState(msg.state, gameStateRef.current);
+                  setRoom(synced.room);
+                  setGameState(synced.gameState);
                   if (!resolved) { resolved = true; clearTimeout(timeout); resolve(); }
                   break;
+                }
                 case 'game-state':
                   setGameState(msg.state);
                   break;
@@ -1400,8 +1429,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     const startedRoom = { ...room, players, gameType, phase: 'playing' as const };
     setRoom(startedRoom);
     setGameState(gs);
-    broadcastRoomState(startedRoom);
     broadcastGameState(gs);
+    broadcastRoomState(startedRoom);
   }, [isHost, room, broadcastRoomState, broadcastGameState]);
 
   // Send action (client)

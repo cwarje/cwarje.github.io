@@ -43,3 +43,21 @@ export function runSingleBotTurn(gameType: GameType, state: unknown): unknown {
 export function getGameWinners(gameType: GameType, gameState: unknown): string[] {
   return GAME_REGISTRY[gameType].getWinners(gameState);
 }
+
+function looksLikeMinigolfState(state: Record<string, unknown>): boolean {
+  return Array.isArray(state.courses) && typeof state.holeIndex === 'number';
+}
+
+/** True when serialized game state belongs to the given room game type. */
+export function gameStateMatchesRoom(gameType: GameType, state: unknown): boolean {
+  if (state == null || typeof state !== 'object') return false;
+  const record = state as Record<string, unknown>;
+
+  if (gameType === 'minigolf') {
+    return looksLikeMinigolfState(record);
+  }
+  if (looksLikeMinigolfState(record)) {
+    return false;
+  }
+  return true;
+}

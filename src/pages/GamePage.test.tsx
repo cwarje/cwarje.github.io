@@ -1,6 +1,7 @@
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { RoomContextValue, RoomState } from '../networking/types';
+import { createInitialGameState } from '../games/gameEngine';
 import { createMinigolfState } from '../games/minigolf/logic';
 import GamePage from './GamePage';
 
@@ -47,9 +48,12 @@ const hostPlayer = {
 };
 
 function createRoomContext(overrides: Partial<RoomContextValue> = {}): RoomContextValue {
+  const room = overrides.room ?? createRoomState({ gameType: 'hearts' });
+  const gameState = overrides.gameState
+    ?? createInitialGameState('hearts', room.players);
   return {
-    room: createRoomState(),
-    gameState: { demo: true },
+    room,
+    gameState,
     isHost: true,
     myId: 'host-1',
     myPlayer: null,
@@ -88,9 +92,34 @@ function renderGamePage() {
 }
 
 describe('GamePage', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+        unobserve = vi.fn();
+        constructor(_callback: ResizeObserverCallback) {}
+      },
+    );
+  });
+
   it('shows loading state when room data is missing', () => {
     mockUseRoomContext.mockReturnValue(
       createRoomContext({ room: null, gameState: null, connecting: false }),
+    );
+
+    renderGamePage();
+
+    expect(screen.getByText('Loading game...')).toBeInTheDocument();
+  });
+
+  it('shows loading when room is minigolf but game state is still from a card game', () => {
+    mockUseRoomContext.mockReturnValue(
+      createRoomContext({
+        room: createRoomState({ gameType: 'minigolf' }),
+        gameState: { phase: 'playing', players: [], currentPlayerIndex: 0 },
+      }),
     );
 
     renderGamePage();
@@ -112,7 +141,11 @@ describe('GamePage', () => {
     const returnToLobby = vi.fn();
     mockUseRoomContext.mockReturnValue(
       createRoomContext({
-        room: createRoomState({ phase: 'finished' }),
+        room: createRoomState({ gameType: 'hearts', phase: 'finished' }),
+        gameState: {
+          ...createInitialGameState('hearts', [hostPlayer]),
+          gameOver: true,
+        },
         returnToLobby,
       }),
     );
