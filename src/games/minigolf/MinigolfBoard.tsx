@@ -57,7 +57,7 @@ function drawBallHat(
   sinkYOffset: number,
 ): void {
   const { w, h } = ballHatDimensions(ballPx);
-  const drawX = x - w * 0.48 + ballPx * 0.15;
+  const drawX = x - w / 2;
   const drawY = y - ballPx - h * 0.72 + sinkYOffset;
   ctx.drawImage(img, drawX, drawY, w, h);
 }
