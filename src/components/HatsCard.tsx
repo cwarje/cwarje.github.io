@@ -31,7 +31,7 @@ export default function HatsCard({ onSelect, disabled, isExpanded }: HatsCardPro
       <span
         className={`absolute top-3 right-3 px-2.5 py-1 rounded-md text-xs font-medium uppercase tracking-wider ${theme.playersTag}`}
       >
-        You
+        Change
       </span>
       <div className="flex-1 flex items-center justify-start">
         <div className="flex items-center gap-4">

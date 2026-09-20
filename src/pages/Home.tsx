@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import GameCard from '../components/GameCard';
 import GameStartOptionsPanel from '../components/GameStartOptionsPanel';
 import HatsCard from '../components/HatsCard';
+import ProgressCard from '../components/ProgressCard';
 import HatsShopPanel from '../components/HatsShopPanel';
 import RoomCodeInput from '../components/RoomCodeInput';
 import { useToast } from '../components/Toast';
@@ -253,6 +254,14 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
+            className="relative flex min-w-0 w-full flex-col z-0"
+          >
+            <ProgressCard xp={xp} />
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
             className={`relative flex flex-col min-w-0 w-full ${hatsExpanded ? 'z-30' : 'z-0'}`}
           >
             <HatsCard
@@ -280,7 +289,7 @@ export default function Home() {
                 key={game}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 + (i + 1) * 0.1 }}
+                transition={{ delay: 0.3 + (i + 1) * 0.1 }}
                 className={`relative flex flex-col min-w-0 w-full ${isExpanded ? 'z-30' : 'z-0'}`}
               >
                 <GameCard

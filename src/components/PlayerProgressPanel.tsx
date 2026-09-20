@@ -4,12 +4,14 @@ interface PlayerProgressPanelProps {
   xp: number;
   className?: string;
   showDoubleXpWeekendBadge?: boolean;
+  hideTitle?: boolean;
 }
 
 export default function PlayerProgressPanel({
   xp,
   className,
   showDoubleXpWeekendBadge = true,
+  hideTitle = false,
 }: PlayerProgressPanelProps) {
   const { level, xpIntoLevel, xpForNextLevel } = getLevelProgress(xp);
   const fillPercent = Math.min(100, (xpIntoLevel / xpForNextLevel) * 100);
@@ -17,7 +19,7 @@ export default function PlayerProgressPanel({
 
   return (
     <div className={`minigolf-progressCard ${className ?? ''}`.trim()}>
-      <h4 className="minigolf-progressTitle">Progress</h4>
+      {!hideTitle && <h4 className="minigolf-progressTitle">Progress</h4>}
       <p className="minigolf-progressLevel">Level {level}</p>
       <div
         className="minigolf-progressMeter"

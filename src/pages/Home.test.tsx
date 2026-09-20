@@ -72,6 +72,8 @@ describe('Home', () => {
       </MemoryRouter>,
     );
 
+    expect(screen.getByRole('heading', { name: '1' })).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Hats' })).toBeInTheDocument();
 
     for (const gameType of PRODUCTION_GAME_TYPES) {

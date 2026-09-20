@@ -10,7 +10,6 @@ import {
 } from '../hats/hats';
 import { HATS_SECTION_THEME } from '../hats/hatsTheme';
 import { readPlayerXp } from '../xp/progress';
-import PlayerProgressPanel from './PlayerProgressPanel';
 
 interface HatsShopPanelProps {
   className?: string;
@@ -42,8 +41,7 @@ export default function HatsShopPanel({ className }: HatsShopPanelProps) {
       role="region"
       aria-label="Hat shop"
     >
-      <div className="p-4 pt-2 pb-5 space-y-4">
-        <PlayerProgressPanel xp={xp} />
+      <div className="p-4 pt-2 pb-5">
         <div
           className="grid grid-cols-2 sm:grid-cols-3 gap-3"
           role="listbox"
