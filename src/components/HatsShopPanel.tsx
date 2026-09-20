@@ -4,12 +4,13 @@ import type { HatId } from '../networking/types';
 import { useRoomContext } from '../networking/roomStore';
 import {
   HAT_CATALOG,
-  getMinigolfLevelForPlayer,
+  getPlayerLevelForPlayer,
   isHatUnlocked,
   sanitizeSelectedHat,
 } from '../hats/hats';
 import { HATS_SECTION_THEME } from '../hats/hatsTheme';
-import { readMinigolfXp } from '../games/minigolf/progress';
+import { readPlayerXp } from '../xp/progress';
+import PlayerProgressPanel from './PlayerProgressPanel';
 
 interface HatsShopPanelProps {
   className?: string;
@@ -19,8 +20,8 @@ export default function HatsShopPanel({ className }: HatsShopPanelProps) {
   const { myPlayer, updateSelectedHat } = useRoomContext();
   const theme = HATS_SECTION_THEME;
 
-  const xp = myPlayer?.minigolfXp ?? readMinigolfXp();
-  const level = getMinigolfLevelForPlayer({ minigolfXp: xp });
+  const xp = myPlayer?.xp ?? readPlayerXp();
+  const level = getPlayerLevelForPlayer({ xp });
   const equipped = sanitizeSelectedHat(myPlayer?.selectedHat ?? 'none', level);
 
   const handleSelect = (hatId: HatId) => {
@@ -42,9 +43,7 @@ export default function HatsShopPanel({ className }: HatsShopPanelProps) {
       aria-label="Hat shop"
     >
       <div className="p-4 pt-2 pb-5 space-y-4">
-        <p className={`text-sm font-semibold uppercase tracking-wider ${theme.labelColor}`}>
-          Minigolf level {level}
-        </p>
+        <PlayerProgressPanel xp={xp} />
         <div
           className="grid grid-cols-2 sm:grid-cols-3 gap-3"
           role="listbox"

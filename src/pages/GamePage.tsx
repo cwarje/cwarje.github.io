@@ -6,6 +6,7 @@ import { useRoomContext } from '../networking/roomStore';
 import { useToast } from '../components/Toast';
 import LobbyMenu from '../components/LobbyMenu';
 import { GAME_REGISTRY } from '../games/registry';
+import { PlayerXpAwardProvider } from '../xp/PlayerXpAwardContext';
 
 export default function GamePage() {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -95,6 +96,7 @@ export default function GamePage() {
   const Board = gameDef?.Board;
 
   return (
+    <PlayerXpAwardProvider>
     <div className="relative h-full flex flex-col">
       {/* Reconnecting overlay */}
       <AnimatePresence>
@@ -191,5 +193,6 @@ export default function GamePage() {
         </motion.div>
       </div>
     </div>
+    </PlayerXpAwardProvider>
   );
 }

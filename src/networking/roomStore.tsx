@@ -52,7 +52,7 @@ import { willYahtzeeBotScore } from '../games/yahtzee/logic';
 import { shouldBotBank } from '../games/farkle/logic';
 import { GAME_REGISTRY } from '../games/registry';
 import { shufflePlayers } from '../games/shared/shufflePlayers';
-import { getMinigolfLevel, readMinigolfXp, writeMinigolfXp } from '../games/minigolf/progress';
+import { getLevel, readPlayerXp, writePlayerXp } from '../xp/progress';
 import {
   readSelectedHat,
   resolveNetworkSelectedHat,
@@ -520,7 +520,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
             // Update connection and mark connected
             connectionsRef.current.set(clientDeviceId, conn);
-            const reconnectXp = msg.minigolfXp !== undefined ? msg.minigolfXp : (existingPlayer.minigolfXp ?? 0);
+            const reconnectXp = msg.xp !== undefined ? msg.xp : (existingPlayer.xp ?? 0);
             const reconnectHat = resolveNetworkSelectedHat(
               reconnectXp,
               msg.selectedHat,
@@ -535,7 +535,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
                       connected: true,
                       name: msg.playerName,
                       color: msg.playerColor,
-                      ...(msg.minigolfXp !== undefined ? { minigolfXp: msg.minigolfXp } : {}),
+                      ...(msg.xp !== undefined ? { xp: msg.xp } : {}),
                       selectedHat: reconnectHat,
                     }
                   : p
@@ -560,7 +560,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             }
           } else {
             // New player
-            const joinXp = msg.minigolfXp ?? 0;
+            const joinXp = msg.xp ?? 0;
             const newPlayer: Player = {
               id: clientDeviceId,
               name: msg.playerName,
@@ -568,7 +568,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
               isBot: false,
               isHost: false,
               connected: true,
-              minigolfXp: joinXp,
+              xp: joinXp,
               selectedHat: resolveNetworkSelectedHat(joinXp, msg.selectedHat),
             };
             connectionsRef.current.set(clientDeviceId, conn);
@@ -586,12 +586,12 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           if (!senderDeviceId || senderDeviceId !== msg.deviceId) return;
 
           const profilePlayer = currentRoom.players.find((p) => p.id === senderDeviceId);
-          const profileXp = msg.minigolfXp !== undefined
-            ? msg.minigolfXp
-            : (profilePlayer?.minigolfXp ?? 0);
+          const profileXp = msg.xp !== undefined
+            ? msg.xp
+            : (profilePlayer?.xp ?? 0);
           const profileHat = msg.selectedHat !== undefined
             ? resolveNetworkSelectedHat(profileXp, msg.selectedHat)
-            : sanitizeSelectedHat(profilePlayer?.selectedHat, getMinigolfLevel(profileXp));
+            : sanitizeSelectedHat(profilePlayer?.selectedHat, getLevel(profileXp));
           const updatedRoom = {
             ...currentRoom,
             players: currentRoom.players.map((player) =>
@@ -600,7 +600,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
                     ...player,
                     name: msg.playerName,
                     color: msg.playerColor,
-                    ...(msg.minigolfXp !== undefined ? { minigolfXp: msg.minigolfXp } : {}),
+                    ...(msg.xp !== undefined ? { xp: msg.xp } : {}),
                     selectedHat: profileHat,
                   }
                 : player
@@ -867,10 +867,10 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             playerName: storedName,
             playerColor: storedColor,
             deviceId,
-            minigolfXp: readMinigolfXp(),
+            xp: readPlayerXp(),
             selectedHat: sanitizeSelectedHat(
               readSelectedHat(),
-              getMinigolfLevel(readMinigolfXp()),
+              getLevel(readPlayerXp()),
             ),
           } as ClientMessage);
         });
@@ -930,7 +930,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
       peerRef.current = peer;
       setMyId(deviceId);
 
-      const hostMinigolfXp = readMinigolfXp();
+      const hostXp = readPlayerXp();
       const hostPlayer: Player = {
         id: deviceId,
         name: playerName,
@@ -938,8 +938,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         isBot: false,
         isHost: true,
         connected: true,
-        minigolfXp: hostMinigolfXp,
-        selectedHat: sanitizeSelectedHat(readSelectedHat(), getMinigolfLevel(hostMinigolfXp)),
+        xp: hostXp,
+        selectedHat: sanitizeSelectedHat(readSelectedHat(), getLevel(hostXp)),
       };
 
       const newRoom: RoomState = {
@@ -1087,10 +1087,10 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
               playerName,
               playerColor,
               deviceId,
-              minigolfXp: readMinigolfXp(),
+              xp: readPlayerXp(),
               selectedHat: sanitizeSelectedHat(
                 readSelectedHat(),
-                getMinigolfLevel(readMinigolfXp()),
+                getLevel(readPlayerXp()),
               ),
             } as ClientMessage);
           });
@@ -1176,22 +1176,22 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     });
   }, [myId, isHost, broadcastGameState, broadcastRoomState]);
 
-  const updateMinigolfXp = useCallback((xp: number) => {
+  const updatePlayerXp = useCallback((xp: number) => {
     const normalized = Math.max(0, Math.floor(xp));
-    writeMinigolfXp(normalized);
+    writePlayerXp(normalized);
 
     const currentRoom = roomRef.current;
     if (!currentRoom || !myId) return;
 
     const player = currentRoom.players.find((p) => p.id === myId);
     if (!player || player.isBot) return;
-    const sanitizedHat = sanitizeSelectedHat(player.selectedHat, getMinigolfLevel(normalized));
-    if (player.minigolfXp === normalized && player.selectedHat === sanitizedHat) return;
+    const sanitizedHat = sanitizeSelectedHat(player.selectedHat, getLevel(normalized));
+    if (player.xp === normalized && player.selectedHat === sanitizedHat) return;
 
     const updatedRoom = {
       ...currentRoom,
       players: currentRoom.players.map((p) =>
-        p.id === myId ? { ...p, minigolfXp: normalized, selectedHat: sanitizedHat } : p
+        p.id === myId ? { ...p, xp: normalized, selectedHat: sanitizedHat } : p
       ),
     };
     setRoom(updatedRoom);
@@ -1208,7 +1208,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           playerName: player.name,
           playerColor: player.color,
           deviceId: myId,
-          minigolfXp: normalized,
+          xp: normalized,
           selectedHat: sanitizedHat,
         } as ClientMessage);
       }
@@ -1216,8 +1216,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   }, [myId, isHost, broadcastRoomState]);
 
   const updateSelectedHat = useCallback((hatId: HatId) => {
-    const normalizedXp = readMinigolfXp();
-    const sanitized = sanitizeSelectedHat(hatId, getMinigolfLevel(normalizedXp));
+    const normalizedXp = readPlayerXp();
+    const sanitized = sanitizeSelectedHat(hatId, getLevel(normalizedXp));
     writeSelectedHat(sanitized);
 
     const currentRoom = roomRef.current;
@@ -1247,7 +1247,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           playerName: player.name,
           playerColor: player.color,
           deviceId: myId,
-          minigolfXp: player.minigolfXp ?? normalizedXp,
+          xp: player.xp ?? normalizedXp,
           selectedHat: sanitized,
         } as ClientMessage);
       }
@@ -2858,7 +2858,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         createLobby,
         joinRoom,
         updateProfile,
-        updateMinigolfXp,
+        updatePlayerXp,
         updateSelectedHat,
         rejoinRoom,
         leaveRoom,

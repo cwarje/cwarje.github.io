@@ -1,4 +1,5 @@
 import type { BackgammonMatchFormat, GameStartOptions, Player } from '../../networking/types';
+import { tiersByScoreDesc } from '../../xp/placementTiers';
 import { pickBestBotMove } from './botEvaluation';
 import {
   applyMove,
@@ -257,6 +258,14 @@ export function runBackgammonBotTurnUnknown(state: unknown): unknown {
 
 export function getBackgammonWinnersUnknown(state: unknown): string[] {
   return getBackgammonWinners(state as BackgammonState);
+}
+
+export function getBackgammonXpPlacementTiers(state: unknown): string[][] {
+  const s = state as BackgammonState;
+  if (!s.seriesOver) return [];
+  return tiersByScoreDesc(
+    s.players.map((p) => ({ id: p.id, score: s.matchWins[p.id] ?? 0 })),
+  );
 }
 
 export { sideForPlayerIndex, CHECKERS_PER_PLAYER };

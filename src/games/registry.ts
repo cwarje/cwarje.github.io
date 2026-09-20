@@ -2,41 +2,45 @@ import type { LucideIcon } from 'lucide-react';
 import { Dice5, Heart, Club, ArrowUpDown, Crown, LayoutGrid, Hexagon, Layers, Flag, Target, Spade, Triangle } from 'lucide-react';
 import type { GameType, Player, GameStartOptions, TableEvent, TableEventInput } from '../networking/types';
 
-import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners } from './yahtzee/logic';
-import { createFarkleState, processFarkleAction, isFarkleOver, runFarkleBotTurn, getFarkleWinners } from './farkle/logic';
-import { createHeartsState, processHeartsAction, isHeartsOver, runHeartsBotTurn, getHeartsWinners } from './hearts/logic';
-import { createPokerState, processPokerAction, isPokerOver, runPokerBotTurn, getPokerWinners } from './poker/logic';
-import { createUpRiverState, processUpRiverAction, isUpRiverOver, runUpRiverBotTurn, getUpRiverWinners } from './up-and-down-the-river/logic';
+import { createYahtzeeState, processYahtzeeAction, isYahtzeeOver, runYahtzeeBotTurn, getYahtzeeWinners, getYahtzeeXpPlacementTiers } from './yahtzee/logic';
+import { createFarkleState, processFarkleAction, isFarkleOver, runFarkleBotTurn, getFarkleWinners, getFarkleXpPlacementTiers } from './farkle/logic';
+import { createHeartsState, processHeartsAction, isHeartsOver, runHeartsBotTurn, getHeartsWinners, getHeartsXpPlacementTiers } from './hearts/logic';
+import { createPokerState, processPokerAction, isPokerOver, runPokerBotTurn, getPokerWinners, getPokerXpPlacementTiers } from './poker/logic';
+import { createUpRiverState, processUpRiverAction, isUpRiverOver, runUpRiverBotTurn, getUpRiverWinners, getUpRiverXpPlacementTiers } from './up-and-down-the-river/logic';
 import {
   createMobilizationState,
   processMobilizationAction,
   isMobilizationOver,
   runMobilizationBotTurn,
   getMobilizationWinners,
+  getMobilizationXpPlacementTiers,
 } from './mobilization/logic';
-import { createTwelveState, processTwelveAction, isTwelveOver, runTwelveBotTurn, getTwelveWinners } from './twelve/logic';
+import { createTwelveState, processTwelveAction, isTwelveOver, runTwelveBotTurn, getTwelveWinners, getTwelveXpPlacementTiers } from './twelve/logic';
 import {
   createSettlerStateFromPlayers,
   processSettlerActionUnknown,
   isSettlerOverUnknown,
   runSettlerBotTurnUnknown,
   getSettlerWinnersUnknown,
+  getSettlerXpPlacementTiers,
 } from './settler/logic';
-import { createCrossCribState, processCrossCribAction, isCrossCribOver, runCrossCribBotTurn, getCrossCribWinners } from './cross-crib/logic';
+import { createCrossCribState, processCrossCribAction, isCrossCribOver, runCrossCribBotTurn, getCrossCribWinners, getCrossCribXpPlacementTiers } from './cross-crib/logic';
 import {
   createCribbageState,
   processCribbageAction,
   isCribbageOver,
   runCribbageBotTurn,
   getCribbageWinners,
+  getCribbageXpPlacementTiers,
 } from './cribbage/logic';
-import { createCasinoState, processCasinoAction, isCasinoOver, runCasinoBotTurn, getCasinoWinners } from './casino/logic';
+import { createCasinoState, processCasinoAction, isCasinoOver, runCasinoBotTurn, getCasinoWinners, getCasinoXpPlacementTiers } from './casino/logic';
 import {
   createCucumberState,
   processCucumberAction,
   isCucumberOver,
   runCucumberBotTurn,
   getCucumberWinners,
+  getCucumberXpPlacementTiers,
 } from './cucumber/logic';
 import {
   createTensState,
@@ -44,8 +48,9 @@ import {
   isTensOver,
   runTensBotTurn,
   getTensWinners,
+  getTensXpPlacementTiers,
 } from './tens/logic';
-import { createGolfState, processGolfAction, isGolfOver, runGolfBotTurn, getGolfWinners } from './golf/logic';
+import { createGolfState, processGolfAction, isGolfOver, runGolfBotTurn, getGolfWinners, getGolfXpPlacementTiers } from './golf/logic';
 import {
   createMinigolfState,
   processMinigolfAction,
@@ -59,6 +64,7 @@ import {
   isBackgammonOverUnknown,
   runBackgammonBotTurnUnknown,
   getBackgammonWinnersUnknown,
+  getBackgammonXpPlacementTiers,
 } from './backgammon/logic';
 
 import YahtzeeBoard from './yahtzee/YahtzeeBoard';
@@ -172,6 +178,8 @@ export interface GameDefinition {
   isOver: (state: unknown) => boolean;
   runBotTurn: (state: unknown) => unknown;
   getWinners: (state: unknown) => string[];
+  /** Placement tiers for site-wide XP (1st/2nd); minigolf uses custom awards instead. */
+  getXpPlacementTiers?: (state: unknown) => string[][];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Board: React.ComponentType<any>;
@@ -193,7 +201,7 @@ export interface GameDefinition {
   showNewBadge?: boolean;
   /** Homepage card ribbon for beta games. Red pill with white text; may coexist with showNewBadge on other games. */
   showBetaBadge?: boolean;
-  /** Homepage ribbon on UTC Sat/Sun; also doubles minigolf placement XP those days. */
+  /** Homepage ribbon on UTC Sat/Sun; doubles placement XP site-wide those days. */
   showDoubleXpWeekendBadge?: boolean;
   /** If set, only these total player counts (humans + bots) are valid. */
   allowedPlayerCounts?: number[];
@@ -243,6 +251,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     isOver: isYahtzeeOver,
     runBotTurn: runYahtzeeBotTurn,
     getWinners: getYahtzeeWinners,
+    getXpPlacementTiers: getYahtzeeXpPlacementTiers,
     Board: YahtzeeBoard,
     fullBoard: true,
     production: true,
@@ -291,6 +300,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     isOver: isFarkleOver,
     runBotTurn: runFarkleBotTurn,
     getWinners: getFarkleWinners,
+    getXpPlacementTiers: getFarkleXpPlacementTiers,
     Board: FarkleBoard,
     OptionsPanel: FarkleOptions,
     fullBoard: true,
@@ -337,6 +347,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     isOver: isHeartsOver,
     runBotTurn: runHeartsBotTurn,
     getWinners: getHeartsWinners,
+    getXpPlacementTiers: getHeartsXpPlacementTiers,
     Board: HeartsBoard,
     OptionsPanel: HeartsOptions,
     TitleExtra: HeartsTitleExtra,
@@ -387,6 +398,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     isOver: isPokerOver,
     runBotTurn: runPokerBotTurn,
     getWinners: getPokerWinners,
+    getXpPlacementTiers: getPokerXpPlacementTiers,
     Board: PokerBoard,
     TitleExtra: PokerTitleExtra,
     fullBoard: true,
@@ -443,6 +455,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     isOver: isUpRiverOver,
     runBotTurn: runUpRiverBotTurn,
     getWinners: getUpRiverWinners,
+    getXpPlacementTiers: getUpRiverXpPlacementTiers,
     Board: UpAndDownTheRiverBoard,
     OptionsPanel: UpRiverOptions,
     TitleExtra: UpRiverTitleExtra,
@@ -497,6 +510,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     isOver: isMobilizationOver,
     runBotTurn: runMobilizationBotTurn,
     getWinners: getMobilizationWinners,
+    getXpPlacementTiers: getMobilizationXpPlacementTiers,
     Board: MobilizationBoard,
     fullBoard: true,
     hasHandZoom: true,
@@ -549,6 +563,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     isOver: isTwelveOver,
     runBotTurn: runTwelveBotTurn,
     getWinners: getTwelveWinners,
+    getXpPlacementTiers: getTwelveXpPlacementTiers,
     Board: TwelveBoard,
     OptionsPanel: TwelveOptions,
     TitleExtra: TwelveTitleExtra,
@@ -597,6 +612,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     isOver: isSettlerOverUnknown,
     runBotTurn: runSettlerBotTurnUnknown,
     getWinners: getSettlerWinnersUnknown,
+    getXpPlacementTiers: getSettlerXpPlacementTiers,
     Board: SettlerBoard,
     fullBoard: true,
     production: true,
@@ -646,6 +662,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     isOver: isCrossCribOver,
     runBotTurn: runCrossCribBotTurn,
     getWinners: getCrossCribWinners,
+    getXpPlacementTiers: getCrossCribXpPlacementTiers,
     Board: CrossCribBoard,
     fullBoard: true,
     hasHandZoom: true,
@@ -695,6 +712,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     isOver: isCribbageOver,
     runBotTurn: runCribbageBotTurn,
     getWinners: getCribbageWinners,
+    getXpPlacementTiers: getCribbageXpPlacementTiers,
     Board: CribbageBoard,
     OptionsPanel: CribbageOptions,
     TitleExtra: CribbageTitleExtra,
@@ -750,6 +768,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     isOver: isCasinoOver,
     runBotTurn: runCasinoBotTurn,
     getWinners: getCasinoWinners,
+    getXpPlacementTiers: getCasinoXpPlacementTiers,
     Board: CasinoBoard,
     OptionsPanel: CasinoOptions,
     TitleExtra: CasinoTitleExtra,
@@ -850,6 +869,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     isOver: isCucumberOver,
     runBotTurn: runCucumberBotTurn,
     getWinners: getCucumberWinners,
+    getXpPlacementTiers: getCucumberXpPlacementTiers,
     Board: CucumberBoard,
     OptionsPanel: CucumberOptions,
     TitleExtra: CucumberTitleExtra,
@@ -898,6 +918,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     isOver: isTensOver,
     runBotTurn: runTensBotTurn,
     getWinners: getTensWinners,
+    getXpPlacementTiers: getTensXpPlacementTiers,
     Board: TensBoard,
     OptionsPanel: TensOptions,
     TitleExtra: TensTitleExtra,
@@ -947,6 +968,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     isOver: isBackgammonOverUnknown,
     runBotTurn: runBackgammonBotTurnUnknown,
     getWinners: getBackgammonWinnersUnknown,
+    getXpPlacementTiers: getBackgammonXpPlacementTiers,
     Board: BackgammonBoard,
     TitleExtra: BackgammonTitleExtra,
     OptionsPanel: BackgammonOptions,
@@ -995,6 +1017,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
     isOver: isGolfOver,
     runBotTurn: runGolfBotTurn,
     getWinners: getGolfWinners,
+    getXpPlacementTiers: getGolfXpPlacementTiers,
     Board: GolfBoard,
     TitleExtra: GolfTitleExtra,
     fullBoard: true,

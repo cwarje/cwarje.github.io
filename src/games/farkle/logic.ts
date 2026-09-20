@@ -1,4 +1,5 @@
 import type { FarkleTargetScore, Player } from '../../networking/types';
+import { tiersByScoreDesc } from '../../xp/placementTiers';
 import type { FarkleAction, FarklePlayer, FarkleState } from './types';
 
 const DICE_COUNT = 6;
@@ -314,6 +315,11 @@ export function getFarkleWinners(state: unknown): string[] {
   if (!s.players.length) return [];
   const maxScore = Math.max(...s.players.map((player) => player.totalScore));
   return s.players.filter((player) => player.totalScore === maxScore).map((player) => player.id);
+}
+
+export function getFarkleXpPlacementTiers(state: unknown): string[][] {
+  const s = state as FarkleState;
+  return tiersByScoreDesc(s.players.map((p) => ({ id: p.id, score: p.totalScore })));
 }
 
 export function shouldBotBank(state: FarkleState): boolean {

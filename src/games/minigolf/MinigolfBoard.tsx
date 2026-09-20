@@ -11,15 +11,14 @@ import {
   getMinigolfLevelProgress,
   isMinigolfDoubleXpWeekend,
   readMinigolfXp,
-  writeMinigolfXp,
 } from './progress';
+import { usePlayerXpAwardContext } from '../../xp/PlayerXpAwardContext';
 import { drawIceHazards, drawLavaHazards, drawWaterHazards } from './waterRender';
 import {
   PLAYER_COLOR_HEX,
   getPlayerHudTextColor,
   normalizePlayerColor,
 } from '../../networking/playerColors';
-import { useRoomContext } from '../../networking/roomStore';
 
 interface MinigolfBoardProps {
   state: MinigolfState;
@@ -1141,7 +1140,7 @@ function Scorecard({
 }
 
 export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardProps) {
-  const { updateMinigolfXp } = useRoomContext();
+  const { lastAward } = usePlayerXpAwardContext();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -1150,7 +1149,7 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
   const [localXp, setLocalXp] = useState(() => readMinigolfXp());
   const [gameOverDisplayXp, setGameOverDisplayXp] = useState<number | null>(null);
   const [showGameOverXpAwards, setShowGameOverXpAwards] = useState(false);
-  const awardedRef = useRef(false);
+  const gameOverXpAnimRef = useRef(false);
   const stateRef = useRef<MinigolfState>(state);
   const prevStateRef = useRef<MinigolfState>(state);
   const prevTimeRef = useRef<number>(0);
@@ -1200,47 +1199,39 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
 
   useEffect(() => {
     if (!state.gameOver) {
-      awardedRef.current = false;
+      gameOverXpAnimRef.current = false;
       setGameOverDisplayXp(null);
       setShowGameOverXpAwards(false);
       return;
     }
-    if (awardedRef.current) return;
-    awardedRef.current = true;
-
-    const awards = computeMinigolfXpAwards(
-      stateRef.current.players,
-      stateRef.current.courses.length,
-      stateRef.current.obstacles,
-    );
-    const earned = awards.get(myId) ?? 0;
-    let next: number | undefined;
-
-    if (earned > 0) {
-      const prior = readMinigolfXp();
-      next = prior + earned;
-      writeMinigolfXp(next);
-      updateMinigolfXp(next);
-      setGameOverDisplayXp(prior);
+    const minigolfAward =
+      lastAward?.gameType === 'minigolf' ? lastAward : null;
+    const earned = minigolfAward?.earned ?? 0;
+    if (earned <= 0) {
+      setShowGameOverXpAwards(true);
+      return;
     }
+    if (gameOverXpAnimRef.current || !minigolfAward) return;
+    gameOverXpAnimRef.current = true;
+
+    const prior = minigolfAward.priorXp;
+    const next = prior + earned;
+    setGameOverDisplayXp(prior);
 
     const timer = window.setTimeout(() => {
-      if (next != null) {
-        setLocalXp(next);
-        setGameOverDisplayXp(next);
-      }
+      setLocalXp(next);
+      setGameOverDisplayXp(next);
       setShowGameOverXpAwards(true);
     }, MINIGOLF_GAME_OVER_XP_FILL_DELAY_MS);
 
     return () => {
       window.clearTimeout(timer);
-      if (next != null) {
-        setLocalXp(readMinigolfXp());
-        setGameOverDisplayXp(null);
-      }
-      setShowGameOverXpAwards(false);
     };
-  }, [state.gameOver, myId, updateMinigolfXp]);
+  }, [state.gameOver, lastAward]);
+
+  useEffect(() => {
+    setLocalXp(readMinigolfXp());
+  }, [lastAward]);
 
   const gameOverXpAwards = state.gameOver
     ? computeMinigolfXpAwards(state.players, state.courses.length, state.obstacles)
@@ -1604,7 +1595,7 @@ export default function MinigolfBoard({ state, myId, onAction }: MinigolfBoardPr
               <div className="minigolf-chips">
                 {state.players.map((p) => (
                   <div key={p.id} className="minigolf-hudPill minigolf-hudPill--dark minigolf-chip">
-                    <span className="minigolf-levelBadge">Lv{getMinigolfLevel(p.minigolfXp ?? 0)}</span>
+                    <span className="minigolf-levelBadge">Lv{getMinigolfLevel(p.xp ?? 0)}</span>
                     <span className="minigolf-chipName" style={{ color: getPlayerHudTextColor(p.color) }}>
                       {p.id === myId ? 'You' : p.name}
                     </span>

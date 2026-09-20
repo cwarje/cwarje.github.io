@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { MinigolfPlayer } from './types';
+import { PLAYER_XP_STORAGE_KEY } from '../../xp/progress';
 import {
-  MINIGOLF_XP_STORAGE_KEY,
   computeMinigolfXpAwards,
   getMinigolfLevel,
   getMinigolfLevelProgress,
@@ -34,7 +34,8 @@ function makePlayer(id: string, scores: number[]): MinigolfPlayer {
 
 describe('minigolf progress', () => {
   afterEach(() => {
-    localStorage.removeItem(MINIGOLF_XP_STORAGE_KEY);
+    localStorage.removeItem(PLAYER_XP_STORAGE_KEY);
+    localStorage.removeItem('minigolfXp');
   });
 
   it('reads and writes xp from localStorage', () => {

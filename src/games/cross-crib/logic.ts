@@ -1,4 +1,5 @@
 import type { Player } from '../../networking/types';
+import { tiersByScoreDesc } from '../../xp/placementTiers';
 import type { Card, CrossCribPlayer, CrossCribState, Suit } from './types';
 import { cribCardsToSelect } from './types';
 import { cardEquals, scoreCribbageHand } from './rules';
@@ -445,6 +446,11 @@ export function isCrossCribOver(state: unknown): boolean {
 
 export function getCrossCribWinners(state: unknown): string[] {
   return (state as CrossCribState).winners ?? [];
+}
+
+export function getCrossCribXpPlacementTiers(state: unknown): string[][] {
+  const s = state as CrossCribState;
+  return tiersByScoreDesc(s.players.map((p) => ({ id: p.id, score: p.totalScore })));
 }
 
 function chooseCribDiscardCards(state: CrossCribState, playerIndex: number): Card[] {

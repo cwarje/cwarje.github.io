@@ -1,4 +1,5 @@
 import type { Player } from '../../networking/types';
+import { tiersByScoreDesc } from '../../xp/placementTiers';
 import type { YahtzeeState, YahtzeeAction, YahtzeePlayer, Scorecard, ScoreCategory } from './types';
 
 const ALL_CATEGORIES: ScoreCategory[] = [
@@ -273,6 +274,11 @@ export function getYahtzeeWinners(state: unknown): string[] {
   const s = state as YahtzeeState;
   const maxScore = Math.max(...s.players.map(p => p.totalScore));
   return s.players.filter(p => p.totalScore === maxScore).map(p => p.id);
+}
+
+export function getYahtzeeXpPlacementTiers(state: unknown): string[][] {
+  const s = state as YahtzeeState;
+  return tiersByScoreDesc(s.players.map((p) => ({ id: p.id, score: p.totalScore })));
 }
 
 /** Returns true when the bot's next step will be scoring (not rolling).

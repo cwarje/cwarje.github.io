@@ -1,4 +1,5 @@
 import type { Player, TwelvePileCount } from '../../networking/types';
+import { tiersByScoreDesc } from '../../xp/placementTiers';
 import type { Card, FrontPile, Rank, Suit, TwelveAction, TwelvePlayer, TwelveState } from './types';
 import { cardEquals, cardPointValue, getPilePlayableCard, getTrickWinnerPlayerId, isLegalPlay, listPlayableCards, rankStrength, suitsWithRoyalPair } from './rules';
 
@@ -832,6 +833,11 @@ export function getTwelveWinners(state: unknown): string[] {
 
 export function isTwelveOver(state: unknown): boolean {
   return (state as TwelveState).phase === 'game-over';
+}
+
+export function getTwelveXpPlacementTiers(state: unknown): string[][] {
+  const s = state as TwelveState;
+  return tiersByScoreDesc(s.players.map((p) => ({ id: p.id, score: p.totalScore })));
 }
 
 interface BotPlayOption {

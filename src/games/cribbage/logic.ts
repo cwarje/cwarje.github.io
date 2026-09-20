@@ -1,4 +1,5 @@
 import type { Player } from '../../networking/types';
+import { tiersByScoreDesc } from '../../xp/placementTiers';
 import type { GameStartOptions } from '../../networking/types';
 import type { Card } from '../cross-crib/types';
 import { cardEquals, cardValueFor15 } from '../cross-crib/rules';
@@ -633,6 +634,22 @@ export function isCribbageOver(state: unknown): boolean {
 
 export function getCribbageWinners(state: unknown): string[] {
   return (state as CribbageState).winners;
+}
+
+export function getCribbageXpPlacementTiers(state: unknown): string[][] {
+  const s = state as CribbageState;
+  if (s.teamScores) {
+    const [t0, t1] = s.teamScores;
+    return tiersByScoreDesc(
+      s.players.map((p, i) => ({
+        id: p.id,
+        score: teamIndexForSeat(i) === 0 ? t0 : t1,
+      })),
+    );
+  }
+  return tiersByScoreDesc(
+    s.players.map((p, i) => ({ id: p.id, score: s.playerScores[i] ?? 0 })),
+  );
 }
 
 /** Dealer (2–3p) or dealer team names (4p), for HUD. */

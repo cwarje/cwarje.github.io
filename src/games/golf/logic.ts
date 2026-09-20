@@ -1,4 +1,5 @@
 import type { Player } from '../../networking/types';
+import { tiersByScoreAsc } from '../../xp/placementTiers';
 import type { Card, GolfAction, GolfPlayer, GolfState, Rank, Suit, TableSlot } from './types';
 import { TABLE_SLOT_COUNT, TOTAL_HOLES } from './types';
 import {
@@ -435,6 +436,11 @@ export function isGolfOver(state: unknown): boolean {
 export function getGolfWinners(state: unknown): string[] {
   const s = state as GolfState;
   return s.winners;
+}
+
+export function getGolfXpPlacementTiers(state: unknown): string[][] {
+  const s = state as GolfState;
+  return tiersByScoreAsc(s.players.map((p) => ({ id: p.id, score: p.totalScore })));
 }
 
 function estimateOpponentScore(opponent: GolfPlayer): number {

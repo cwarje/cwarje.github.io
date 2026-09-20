@@ -1,4 +1,5 @@
 import type { Player } from '../../networking/types';
+import { tiersByScoreDesc } from '../../xp/placementTiers';
 import type {
   Card, Suit, Rank, Street,
   PokerPlayer, PokerState, PokerAction,
@@ -744,6 +745,13 @@ export function getPokerWinners(state: unknown): string[] {
   if (activePlayers.length === 0) return [];
   const maxChips = Math.max(...activePlayers.map(p => p.chips));
   return activePlayers.filter(p => p.chips === maxChips).map(p => p.id);
+}
+
+export function getPokerXpPlacementTiers(state: unknown): string[][] {
+  const s = state as PokerState;
+  if (!s.sessionOver) return [];
+  const activePlayers = s.players.filter((p) => !p.leftGame);
+  return tiersByScoreDesc(activePlayers.map((p) => ({ id: p.id, score: p.chips })));
 }
 
 // ────────────────────────────────────────────

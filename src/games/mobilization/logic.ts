@@ -1,4 +1,5 @@
 import type { Player } from '../../networking/types';
+import { tiersByScoreDesc } from '../../xp/placementTiers';
 import type { Card, MobilizationAction, MobilizationPlayer, MobilizationState, Rank, SolitaireColumn, Suit } from './types';
 import {
   applySolitaireBottomPlay,
@@ -513,6 +514,11 @@ export function getMobilizationWinners(state: unknown): string[] {
 
 export function isMobilizationOver(state: unknown): boolean {
   return (state as MobilizationState).gameOver;
+}
+
+export function getMobilizationXpPlacementTiers(state: unknown): string[][] {
+  const s = state as MobilizationState;
+  return tiersByScoreDesc(s.players.map((p) => ({ id: p.id, score: p.totalScore })));
 }
 
 function compareCardLowFirst(a: Card, b: Card): number {

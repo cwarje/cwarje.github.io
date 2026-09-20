@@ -1,4 +1,5 @@
 import type { Player } from '../../networking/types';
+import { tiersByScoreAsc } from '../../xp/placementTiers';
 import type { HeartsState, HeartsAction, HeartsPlayer, Card, Suit, Rank, PassDirection } from './types';
 import { isValidHeartsPlay } from './rules';
 
@@ -382,6 +383,11 @@ export function getHeartsWinners(state: unknown): string[] {
 
 export function isHeartsOver(state: unknown): boolean {
   return (state as HeartsState).gameOver;
+}
+
+export function getHeartsXpPlacementTiers(state: unknown): string[][] {
+  const s = state as HeartsState;
+  return tiersByScoreAsc(s.players.map((p) => ({ id: p.id, score: p.totalScore })));
 }
 
 function collectPlayedCards(state: HeartsState): Card[] {

@@ -1,4 +1,5 @@
 import type { Player, UpRiverBiddingStyle, UpRiverStartMode } from '../../networking/types';
+import { tiersByScoreDesc } from '../../xp/placementTiers';
 import type { Card, Rank, Suit, UpRiverAction, UpRiverPlayer, UpRiverState } from './types';
 import { cardEquals, getTrickWinnerPlayerId, isValidUpRiverPlay } from './rules';
 
@@ -375,6 +376,11 @@ export function getUpRiverWinners(state: unknown): string[] {
 
 export function isUpRiverOver(state: unknown): boolean {
   return (state as UpRiverState).gameOver;
+}
+
+export function getUpRiverXpPlacementTiers(state: unknown): string[][] {
+  const s = state as UpRiverState;
+  return tiersByScoreDesc(s.players.map((p) => ({ id: p.id, score: p.totalScore })));
 }
 
 function getSuitCounts(hand: Card[]): Record<Suit, number> {

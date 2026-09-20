@@ -1,4 +1,5 @@
 import type { GameStartOptions, Player, TensScoreThreshold } from '../../networking/types';
+import { tiersByScoreAsc } from '../../xp/placementTiers';
 import type {
   Card,
   FrontPile,
@@ -549,6 +550,11 @@ export function isTensOver(state: unknown): boolean {
 
 export function getTensWinners(state: unknown): string[] {
   return (state as TensState).winners;
+}
+
+export function getTensXpPlacementTiers(state: unknown): string[][] {
+  const s = state as TensState;
+  return tiersByScoreAsc(s.players.map((p) => ({ id: p.id, score: p.totalScore })));
 }
 
 type LegalPlayGroup = { rank: Rank; plays: PlayableCard[] };

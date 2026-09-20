@@ -1,4 +1,5 @@
 import type { CasinoMatchLength, Player } from '../../networking/types';
+import { tiersByScoreDesc } from '../../xp/placementTiers';
 import type {
   Build,
   Card,
@@ -799,6 +800,13 @@ export function isCasinoOver(state: unknown): boolean {
 
 export function getCasinoWinners(state: unknown): string[] {
   return (state as CasinoState).winners;
+}
+
+export function getCasinoXpPlacementTiers(state: unknown): string[][] {
+  const s = state as CasinoState;
+  return tiersByScoreDesc(
+    s.players.map((p) => ({ id: p.id, score: s.scores[p.id] ?? 0 })),
+  );
 }
 
 function tryLegalGroupTable(

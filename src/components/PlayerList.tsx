@@ -1,6 +1,7 @@
 import { Bot, User, Crown, X, Wifi, WifiOff } from 'lucide-react';
 import type { Player } from '../networking/types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX } from '../networking/playerColors';
+import { getLevel } from '../xp/progress';
 
 interface PlayerListProps {
   players: Player[];
@@ -29,6 +30,11 @@ export default function PlayerList({ players, hostId, isHost, onRemoveBot, onRem
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1 min-w-0">
               <span className="text-xs font-medium text-surface-900 truncate">{player.name}</span>
+              {!player.isBot && (
+                <span className="text-[9px] font-medium px-1 py-px rounded bg-surface-200 text-surface-600 flex-shrink-0">
+                  Lv {getLevel(player.xp ?? 0)}
+                </span>
+              )}
               {player.id === hostId && (
                 <Crown className="w-3 h-3 text-amber-500 flex-shrink-0" />
               )}

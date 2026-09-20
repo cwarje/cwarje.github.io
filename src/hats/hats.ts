@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { HatId, Player } from '../networking/types';
-import { getMinigolfLevel } from '../games/minigolf/progress';
+import { getLevel } from '../xp/progress';
 import partyHatUrl from '../assets/party-hat.png';
 import chefHatUrl from '../assets/chef-hat.png';
 import captainHatUrl from '../assets/captain-hat.png';
@@ -27,8 +27,8 @@ export const HAT_CATALOG: HatDefinition[] = [
 
 const HAT_IDS = new Set<HatId>(HAT_CATALOG.map((h) => h.id));
 
-export function getMinigolfLevelForPlayer(player: Pick<Player, 'minigolfXp'>): number {
-  return getMinigolfLevel(player.minigolfXp ?? 0);
+export function getPlayerLevelForPlayer(player: Pick<Player, 'xp'>): number {
+  return getLevel(player.xp ?? 0);
 }
 
 export function isHatUnlocked(hatId: HatId, level: number): boolean {
@@ -49,11 +49,11 @@ export function normalizeHatId(raw: unknown): HatId {
 }
 
 export function resolveNetworkSelectedHat(
-  minigolfXp: number,
+  xp: number,
   requested: HatId | undefined,
   existing?: HatId,
 ): HatId {
-  const level = getMinigolfLevel(minigolfXp);
+  const level = getLevel(xp);
   if (requested !== undefined) {
     return sanitizeSelectedHat(requested, level);
   }
@@ -106,7 +106,7 @@ export function getSeatPillHatProps(selectedHatId: HatId): {
 export interface LobbyPlayerHatLookup {
   id: string;
   isBot?: boolean;
-  minigolfXp?: number;
+  xp?: number;
   selectedHat?: HatId;
 }
 
@@ -118,7 +118,7 @@ export function getSeatPillHatPropsForLobbyPlayer(
   if (!lobbyPlayer || lobbyPlayer.isBot) {
     return { className: '' };
   }
-  const level = getMinigolfLevel(lobbyPlayer.minigolfXp ?? 0);
+  const level = getLevel(lobbyPlayer.xp ?? 0);
   const hatId = sanitizeSelectedHat(lobbyPlayer.selectedHat, level);
   return getSeatPillHatProps(hatId);
 }

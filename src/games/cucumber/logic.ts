@@ -1,4 +1,5 @@
 import type { GameStartOptions, Player } from '../../networking/types';
+import { tiersByScoreAsc } from '../../xp/placementTiers';
 import type { Card, CucumberAction, CucumberPlayer, CucumberState, Rank, Suit } from './types';
 import { CARDS_PER_HAND, ELIMINATION_THRESHOLD } from './types';
 import {
@@ -565,4 +566,9 @@ export function isCucumberOver(state: unknown): boolean {
 
 export function getCucumberWinners(state: unknown): string[] {
   return (state as CucumberState).winners;
+}
+
+export function getCucumberXpPlacementTiers(state: unknown): string[][] {
+  const s = state as CucumberState;
+  return tiersByScoreAsc(s.players.map((p) => ({ id: p.id, score: p.penaltyScore })));
 }

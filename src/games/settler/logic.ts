@@ -1,4 +1,5 @@
 import type { Player } from '../../networking/types';
+import { tiersByScoreDesc } from '../../xp/placementTiers';
 import { DEFAULT_BOARD_GRAPH, type BoardGraph } from './layout';
 import { harborKindAtVertex, portsFromState, randomPortKindsByCoastalEdgeId } from './ports';
 import type {
@@ -1466,6 +1467,14 @@ export function getSettlerWinners(state: unknown): string[] {
   if (s.phase !== 'finished') return [];
   const max = Math.max(0, ...s.players.map((p) => victoryPoints(s, p.id)));
   return s.players.filter((p) => victoryPoints(s, p.id) === max).map((p) => p.id);
+}
+
+export function getSettlerXpPlacementTiers(state: unknown): string[][] {
+  const s = state as SettlerState;
+  if (s.phase !== 'finished') return [];
+  return tiersByScoreDesc(
+    s.players.map((p) => ({ id: p.id, score: victoryPoints(s, p.id) })),
+  );
 }
 
 // --- Remove a player mid-game: return pieces to bank, fix indices, recompute awards ---

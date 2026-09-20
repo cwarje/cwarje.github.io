@@ -81,7 +81,7 @@ export interface MinigolfPlayer {
   /** Ball position at the start of the most recent stroke; water penalty drop point. */
   lastStrokePos: MinigolfVec;
   /** Synced lobby XP snapshot for HUD level display. */
-  minigolfXp?: number;
+  xp?: number;
 }
 
 export type MinigolfPhase = 'playing' | 'summary' | 'game-over';
