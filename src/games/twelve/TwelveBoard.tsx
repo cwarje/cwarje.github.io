@@ -850,7 +850,7 @@ export default function TwelveBoard({
         onClick={tossProps.onClick}
         disabled={!canTossCards}
         className={mergeSeatPillHatClassName(
-          `radial-seatPill card-toss-seatPillButton ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`,
+          `radial-seatPill radial-seatPill--singleBand card-toss-seatPillButton ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`,
           getSeatPillHatPropsForLobbyPlayer(player.id, lobbyPlayers).className,
         )}
         style={mergeSeatPillHatStyle(

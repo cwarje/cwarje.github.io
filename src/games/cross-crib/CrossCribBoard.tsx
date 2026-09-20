@@ -332,7 +332,7 @@ export default function CrossCribBoard({
         onClick={tossProps.onClick}
         disabled={tossProps.disabled}
         className={mergeSeatPillHatClassName(
-          `radial-seatPill card-toss-seatPillButton ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`,
+          `radial-seatPill radial-seatPill--singleBand card-toss-seatPillButton ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`,
           seatPillHat.className,
         )}
         style={mergeSeatPillHatStyle(undefined, seatPillHat.style)}

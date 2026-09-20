@@ -331,6 +331,11 @@
   border-bottom-right-radius: var(--seat-pill-inner-radius);
 }
 
+.radial-seatPill--singleBand .radial-seatPillTop {
+  border-bottom-left-radius: var(--seat-pill-inner-radius);
+  border-bottom-right-radius: var(--seat-pill-inner-radius);
+}
+
 .radial-seatPill {
   width: min(100%, 132px);
   min-width: 84px;
@@ -1595,6 +1600,10 @@
   overflow: hidden;
 }
 
+.radial-seatPill.radial-seatPill--singleBand {
+  grid-template-rows: auto;
+}
+
 .radial-table--players-5 .radial-seatPill {
   width: min(100%, 120px);
 }
@@ -1664,6 +1673,8 @@
   width: 34px;
   height: 36px;
   background: var(--seat-pill-hat-url) center / contain no-repeat;
+  transform: rotate(12deg);
+  transform-origin: 50% 100%;
   pointer-events: none;
   z-index: 1;
 }
