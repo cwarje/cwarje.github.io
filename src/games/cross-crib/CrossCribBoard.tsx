@@ -19,6 +19,7 @@ import { useCardToss } from '../shared/useCardToss';
 import { CardFace } from '../shared/ui/CardFace';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
 import { rankDisplay } from '../shared/ui/cardConstants';
+import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 
 interface CrossCribBoardProps {
   state: unknown;
@@ -406,21 +407,15 @@ export default function CrossCribBoard({
   }, [s, myId, myCribConfirmed, selectedCrib.length, cribNeed, myIndex, confirmCrib]);
 
   if (s.phase === 'game-over') {
+    const xpAwards = getGameOverXpAwards('cross-crib', s);
     const ranked = [...s.players].sort((a, b) => b.totalScore - a.totalScore);
     if (isTeam) {
       const team0Score = s.players[0]?.totalScore ?? 0;
       const team1Score = s.players[1]?.totalScore ?? 0;
-      const team0 = `${s.players[0]?.name ?? ''} & ${s.players[2]?.name ?? ''}`;
-      const team1 = `${s.players[1]?.name ?? ''} & ${s.players[3]?.name ?? ''}`;
-      const teamRows = team0Score >= team1Score
-        ? [
-            { name: team0, score: team0Score },
-            { name: team1, score: team1Score },
-          ]
-        : [
-            { name: team1, score: team1Score },
-            { name: team0, score: team0Score },
-          ];
+      const teamRows = [
+        { players: [s.players[0], s.players[2]], score: team0Score },
+        { players: [s.players[1], s.players[3]], score: team1Score },
+      ].sort((a, b) => b.score - a.score);
       return (
         <motion.div
           initial={{ opacity: 0 }}
@@ -430,15 +425,35 @@ export default function CrossCribBoard({
           <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
           <h2 className="text-3xl font-extrabold text-white">Game Over</h2>
           <div className="space-y-3 w-full max-w-2xl">
-            {teamRows.map((t, i) => (
-              <div key={i} className="radial-resultRow">
-                <div className="flex items-center gap-3">
-                  <span className="text-lg font-bold">#{i + 1}</span>
-                  <span className="font-semibold">{t.name}</span>
+            {teamRows.map((t, i) => {
+              const p0 = t.players[0];
+              const p1 = t.players[1];
+              return (
+                <div key={i} className="radial-resultRow">
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg font-bold">#{i + 1}</span>
+                    <span className="font-semibold inline-flex flex-wrap items-center gap-x-2">
+                      {p0 && (
+                        <GameOverPlayerName
+                          name={p0.id === myId ? 'You' : p0.name}
+                          playerId={p0.id}
+                          xpAwards={xpAwards}
+                        />
+                      )}
+                      {p0 && p1 && <span>&</span>}
+                      {p1 && (
+                        <GameOverPlayerName
+                          name={p1.id === myId ? 'You' : p1.name}
+                          playerId={p1.id}
+                          xpAwards={xpAwards}
+                        />
+                      )}
+                    </span>
+                  </div>
+                  <span className="text-xl font-bold">{t.score} pts</span>
                 </div>
-                <span className="text-xl font-bold">{t.score} pts</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </motion.div>
       );
@@ -456,7 +471,13 @@ export default function CrossCribBoard({
             <div key={player.id} className="radial-resultRow">
               <div className="flex items-center gap-3">
                 <span className="text-lg font-bold">#{i + 1}</span>
-                <span className="font-semibold">{player.name}</span>
+                <span className="font-semibold">
+                  <GameOverPlayerName
+                    name={player.id === myId ? 'You' : player.name}
+                    playerId={player.id}
+                    xpAwards={xpAwards}
+                  />
+                </span>
               </div>
               <span className="text-xl font-bold">{player.totalScore} pts</span>
             </div>

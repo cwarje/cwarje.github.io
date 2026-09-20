@@ -3682,6 +3682,20 @@
   pointer-events: none;
 }
 
+.gameOver-xpBadge {
+  display: inline-block;
+  padding: 0.12rem 0.4rem;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-primary-600) 65%, transparent);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--color-primary-600) 45%, transparent);
+}
+
 .minigolf-scorecard--compact .minigolf-scorecardPlayerName {
   font-size: clamp(1rem, 3.15vw, 1.2rem);
 }

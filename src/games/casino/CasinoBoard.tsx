@@ -41,6 +41,7 @@ import { CardTossLayers } from '../shared/CardTossLayers';
 import { useCardToss } from '../shared/useCardToss';
 import { CardFace as SharedCardFace } from '../shared/ui/CardFace';
 import { SUIT_COLORS, SUIT_SYMBOLS } from '../shared/ui/cardConstants';
+import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 
 interface CasinoBoardProps {
   state: unknown;
@@ -759,6 +760,7 @@ export default function CasinoBoard({
   };
 
   if (s.phase === 'game-over') {
+    const xpAwards = getGameOverXpAwards('casino', s);
     const winnerNames = s.winners
       .map(id => s.players.find(p => p.id === id)?.name ?? id)
       .join(', ');
@@ -780,8 +782,12 @@ export default function CasinoBoard({
                 const isSelf = p.id === myId;
                 return (
                   <div key={p.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                    <span className="text-sm font-medium" style={{ color: getPlayerHudTextColor(p.color) }}>
-                      {p.name}{isSelf ? ' (You)' : ''}
+                    <span className="text-sm font-medium inline-flex items-center gap-2" style={{ color: getPlayerHudTextColor(p.color) }}>
+                      <GameOverPlayerName
+                        name={isSelf ? 'You' : p.name}
+                        playerId={p.id}
+                        xpAwards={xpAwards}
+                      />
                     </span>
                     <span className="font-bold text-white tabular-nums">{s.scores[p.id] ?? 0}</span>
                   </div>

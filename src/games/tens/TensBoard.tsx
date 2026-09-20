@@ -24,6 +24,7 @@ import { useCardToss } from '../shared/useCardToss';
 import { CardFace } from '../shared/ui/CardFace';
 import { FlipCard } from '../shared/ui/FlipCard';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
+import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 import { SUIT_COLORS, SUIT_SYMBOLS } from '../shared/ui/cardConstants';
 import { TensPlayAnimationLayer } from './TensPlayAnimationLayer';
 import { useTensPlayAnimation } from './useTensPlayAnimation';
@@ -678,6 +679,7 @@ export default function TensBoard({
   };
 
   if (state.phase === 'game-over') {
+    const xpAwards = getGameOverXpAwards('tens', state);
     const sorted = [...state.players].sort((a, b) => a.totalScore - b.totalScore);
     return (
       <motion.div
@@ -690,7 +692,14 @@ export default function TensBoard({
         <div className="space-y-2 w-full max-w-md">
           {sorted.map((player, i) => (
             <div key={player.id} className="flex justify-between rounded-xl bg-white/10 px-4 py-2 text-white">
-              <span>{i + 1}. {player.id === myId ? 'You' : player.name}</span>
+              <span>
+                {i + 1}.{' '}
+                <GameOverPlayerName
+                  name={player.id === myId ? 'You' : player.name}
+                  playerId={player.id}
+                  xpAwards={xpAwards}
+                />
+              </span>
               <span className="font-semibold">{player.totalScore}</span>
             </div>
           ))}

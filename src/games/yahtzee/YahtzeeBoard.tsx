@@ -17,6 +17,7 @@ import {
   type DiceValue,
 } from '../../components/Dice';
 import { DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
+import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 
 const DICE_COUNT = 5;
 
@@ -183,6 +184,7 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
 
   // --- Game Over Screen ---
   if (state.gameOver) {
+    const xpAwards = getGameOverXpAwards('yahtzee', state);
     const sorted = [...state.players].sort((a, b) => b.totalScore - a.totalScore);
     return (
       <motion.div
@@ -210,7 +212,11 @@ export default function YahtzeeBoard({ state, myId, onAction }: YahtzeeBoardProp
                 >
                   #{i + 1}
                 </span>
-                <span className="text-white font-medium">{p.name}</span>
+                <GameOverPlayerName
+                  name={p.id === myId ? 'You' : p.name}
+                  playerId={p.id}
+                  xpAwards={xpAwards}
+                />
               </div>
               <span className="text-xl font-bold text-white text-right">{p.totalScore}</span>
             </div>

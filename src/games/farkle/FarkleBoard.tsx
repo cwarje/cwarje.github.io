@@ -10,6 +10,7 @@ import Dice, {
 import { getPlayerHudTextColor } from '../../networking/playerColors';
 import { scoreKeptDice } from './logic';
 import type { FarkleState } from './types';
+import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 
 interface FarkleBoardProps {
   state: FarkleState;
@@ -200,6 +201,7 @@ export default function FarkleBoard({ state, myId, onAction }: FarkleBoardProps)
   };
 
   if (state.gameOver) {
+    const xpAwards = getGameOverXpAwards('farkle', state);
     const sorted = [...state.players].sort((a, b) => b.totalScore - a.totalScore);
     return (
       <motion.div
@@ -227,7 +229,11 @@ export default function FarkleBoard({ state, myId, onAction }: FarkleBoardProps)
                 >
                   #{i + 1}
                 </span>
-                <span className="text-white font-medium">{player.id === myId ? 'You' : player.name}</span>
+                <GameOverPlayerName
+                  name={player.id === myId ? 'You' : player.name}
+                  playerId={player.id}
+                  xpAwards={xpAwards}
+                />
               </div>
               <span className="text-xl font-bold text-white text-right">{player.totalScore}</span>
             </div>

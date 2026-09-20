@@ -18,6 +18,7 @@ import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAn
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 import { CardTossLayers } from '../shared/CardTossLayers';
 import { useCardToss } from '../shared/useCardToss';
+import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 
 function placementLabel(position: number): string {
   if (position % 100 >= 11 && position % 100 <= 13) return `${position}th`;
@@ -449,6 +450,7 @@ export default function HeartsBoard({
   };
 
   if (state.gameOver) {
+    const xpAwards = getGameOverXpAwards('hearts', state);
     const sorted = [...state.players].sort((a, b) => a.totalScore - b.totalScore);
     const groupedPlacements = sorted.reduce<{ placement: number; score: number; players: HeartsPlayer[] }[]>((groups, player) => {
       const lastGroup = groups[groups.length - 1];
@@ -479,7 +481,18 @@ export default function HeartsBoard({
             <div key={`placement-${group.placement}-${group.score}`} className="hearts-resultRow">
               <div className="flex items-center gap-3">
                 <span className="text-lg font-bold">{placementLabel(group.placement)}</span>
-                <span className="font-semibold">{group.players.map(player => player.name).join(', ')}</span>
+                <span className="font-semibold inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+                  {group.players.map((player, i) => (
+                    <span key={player.id} className="inline-flex items-center gap-2">
+                      {i > 0 && <span className="text-white/80">,</span>}
+                      <GameOverPlayerName
+                        name={player.id === myId ? 'You' : player.name}
+                        playerId={player.id}
+                        xpAwards={xpAwards}
+                      />
+                    </span>
+                  ))}
+                </span>
               </div>
               <span className="text-xl font-bold">{group.score} pts</span>
             </div>

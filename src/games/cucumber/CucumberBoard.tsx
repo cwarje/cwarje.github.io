@@ -17,6 +17,7 @@ import { useCardToss } from '../shared/useCardToss';
 import { CardFace } from '../shared/ui/CardFace';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
 import { rankDisplay } from '../shared/ui/cardConstants';
+import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 
 interface CucumberBoardProps {
   state: CucumberState;
@@ -375,6 +376,7 @@ export default function CucumberBoard({
   const showDevNearLoss = import.meta.env.DEV && !!myPlayer;
 
   if (state.gameOver) {
+    const xpAwards = getGameOverXpAwards('cucumber', state);
     const winners = state.players.filter(p => state.winners.includes(p.id));
     const winnerLabel = winners.length === 0
       ? null
@@ -402,7 +404,13 @@ export default function CucumberBoard({
               <div key={player.id} className="radial-resultRow">
                 <div className="flex items-center gap-3">
                   <span className="text-lg font-bold">#{i + 1}</span>
-                  <span className="font-semibold">{player.name}</span>
+                  <span className="font-semibold">
+                    <GameOverPlayerName
+                      name={player.id === myId ? 'You' : player.name}
+                      playerId={player.id}
+                      xpAwards={xpAwards}
+                    />
+                  </span>
                 </div>
                 <span className="text-xl font-bold">{player.penaltyScore} pts</span>
               </div>

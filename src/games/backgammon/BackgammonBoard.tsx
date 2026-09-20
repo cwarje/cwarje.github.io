@@ -23,6 +23,7 @@ import {
   type PointLayout,
 } from './layout';
 import type { BackgammonAction, BackgammonState, MoveFrom, MoveTo, Side, BackgammonPlayer } from './types';
+import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 import { currentSide } from './types';
 
 interface BackgammonBoardProps {
@@ -480,6 +481,7 @@ export default function BackgammonBoard({ state, myId, onAction, isHost = false 
     selectedFrom != null && destinationsForSelected.has(moveKey(selectedFrom, 'off'));
 
   if (s.phase === 'finished') {
+    const xpAwards = getGameOverXpAwards('backgammon', s);
     const winnerIds = s.winnerIds ?? [];
     const gameWinners = s.players.filter((p) => winnerIds.includes(p.id));
     const seriesWinners = s.seriesWinnerIds
@@ -550,7 +552,11 @@ export default function BackgammonBoard({ state, myId, onAction, isHost = false 
                     #{i + 1}
                   </span>
                 )}
-                <span className="text-white font-medium">{player.name}</span>
+                <GameOverPlayerName
+                  name={player.id === myId ? 'You' : player.name}
+                  playerId={player.id}
+                  xpAwards={xpAwards}
+                />
               </div>
               <span className="text-xl font-bold text-white text-right">
                 {isMatchFormat

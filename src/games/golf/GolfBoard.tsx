@@ -24,6 +24,7 @@ import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 import { GolfDiscardAnimationLayer } from './GolfDiscardAnimationLayer';
 import { GolfSwapAnimationLayer } from './GolfSwapAnimationLayer';
 import { GolfFlipAnimationLayer } from './GolfFlipAnimationLayer';
+import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 import { useGolfDiscardAnimation } from './useGolfDiscardAnimation';
 import { useGolfSwapAnimation } from './useGolfSwapAnimation';
 import { useGolfFlipAnimation } from './useGolfFlipAnimation';
@@ -391,6 +392,7 @@ export default function GolfBoard({ state, myId, onAction, isHost = false, lobby
   };
 
   if (state.phase === 'game-over') {
+    const xpAwards = getGameOverXpAwards('golf', state);
     const winners = state.players.filter(p => state.winners.includes(p.id));
     const winnerLabel = winners.length === 0
       ? null
@@ -421,7 +423,13 @@ export default function GolfBoard({ state, myId, onAction, isHost = false, lobby
               >
                 <div className="flex items-center gap-3">
                   <span className="text-lg font-bold">#{i + 1}</span>
-                  <span className="font-semibold">{player.id === myId ? 'You' : player.name}</span>
+                  <span className="font-semibold">
+                    <GameOverPlayerName
+                      name={player.id === myId ? 'You' : player.name}
+                      playerId={player.id}
+                      xpAwards={xpAwards}
+                    />
+                  </span>
                 </div>
                 <span className="text-xl font-bold">{player.totalScore} pts</span>
               </div>

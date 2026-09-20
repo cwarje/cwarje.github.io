@@ -15,6 +15,7 @@ import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 import { CardTossLayers } from '../shared/CardTossLayers';
 import { useCardToss } from '../shared/useCardToss';
 import { FlipCard } from '../shared/ui/FlipCard';
+import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 
 function PokerCardDisplay({ card, faceDown = false, size = 'md', skipFlip = false }: { card?: Card; faceDown?: boolean; size?: 'sm' | 'md'; skipFlip?: boolean }) {
   return (
@@ -287,6 +288,7 @@ export default function PokerBoard({
 
   // Between-hands / session-over / winners (full-screen overlays when game over)
   if (state.gameOver && state.sessionOver) {
+    const xpAwards = getGameOverXpAwards('poker', state);
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="poker-board h-full flex flex-col items-center justify-center space-y-6 text-center p-6">
         <span className="text-7xl block mx-auto" aria-hidden>🏆</span>
@@ -295,7 +297,14 @@ export default function PokerBoard({
         <div className="space-y-2 w-full max-w-xs">
           {[...state.players].filter(p => !p.leftGame).sort((a, b) => b.chips - a.chips).map((p, i) => (
             <div key={p.id} className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/5 px-4 py-2">
-              <span className="font-medium text-white text-left">{i === 0 && p.chips > 0 ? '👑 ' : ''}{p.id === myId ? 'You' : p.name}</span>
+              <span className="font-medium text-white text-left inline-flex items-center gap-2">
+                {i === 0 && p.chips > 0 ? '👑 ' : ''}
+                <GameOverPlayerName
+                  name={p.id === myId ? 'You' : p.name}
+                  playerId={p.id}
+                  xpAwards={xpAwards}
+                />
+              </span>
               <span className={`font-bold text-right ${p.chips > 0 ? 'text-green-400' : 'text-red-400'}`}>{p.chips} chips</span>
             </div>
           ))}

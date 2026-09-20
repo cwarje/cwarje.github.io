@@ -19,6 +19,7 @@ import { CardBack } from '../shared/ui/CardBack';
 import { CardFace } from '../shared/ui/CardFace';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
 import { SUIT_COLORS, SUIT_SYMBOLS } from '../shared/ui/cardConstants';
+import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 
 interface TwelveBoardProps {
   state: TwelveState;
@@ -702,6 +703,7 @@ export default function TwelveBoard({
   };
 
   if (state.phase === 'game-over') {
+    const xpAwards = getGameOverXpAwards('twelve', state);
     const isTeam = state.players.length === 4;
 
     if (isTeam) {
@@ -723,7 +725,19 @@ export default function TwelveBoard({
               <div key={team.players[0].id} className="radial-resultRow">
                 <div className="flex items-center gap-3">
                   <span className="text-lg font-bold">#{i + 1}</span>
-                  <span className="font-semibold">{team.players[0].name} & {team.players[1].name}</span>
+                  <span className="font-semibold inline-flex flex-wrap items-center gap-x-2">
+                    <GameOverPlayerName
+                      name={team.players[0].id === myId ? 'You' : team.players[0].name}
+                      playerId={team.players[0].id}
+                      xpAwards={xpAwards}
+                    />
+                    <span>&</span>
+                    <GameOverPlayerName
+                      name={team.players[1].id === myId ? 'You' : team.players[1].name}
+                      playerId={team.players[1].id}
+                      xpAwards={xpAwards}
+                    />
+                  </span>
                 </div>
                 <span className="text-xl font-bold">{team.score} pts</span>
               </div>
@@ -747,7 +761,13 @@ export default function TwelveBoard({
             <div key={player.id} className="radial-resultRow">
               <div className="flex items-center gap-3">
                 <span className="text-lg font-bold">#{i + 1}</span>
-                <span className="font-semibold">{player.name}</span>
+                <span className="font-semibold">
+                  <GameOverPlayerName
+                    name={player.id === myId ? 'You' : player.name}
+                    playerId={player.id}
+                    xpAwards={xpAwards}
+                  />
+                </span>
               </div>
               <span className="text-xl font-bold">{player.totalScore} pts</span>
             </div>

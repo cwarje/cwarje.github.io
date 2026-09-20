@@ -18,6 +18,7 @@ import { useCardToss } from '../shared/useCardToss';
 import { CardFace } from '../shared/ui/CardFace';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
 import { rankDisplay } from '../shared/ui/cardConstants';
+import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 
 interface UpRiverBoardProps {
   state: UpRiverState;
@@ -555,6 +556,7 @@ export default function UpAndDownTheRiverBoard({
   const selectedBid = isKnocking ? mySubmittedBid : myPlayer?.bid ?? null;
 
   if (state.gameOver) {
+    const xpAwards = getGameOverXpAwards('up-and-down-the-river', state);
     const rankedPlayers = [...state.players].sort((a, b) => b.totalScore - a.totalScore);
     return (
       <motion.div
@@ -569,7 +571,13 @@ export default function UpAndDownTheRiverBoard({
             <div key={player.id} className="radial-resultRow">
               <div className="flex items-center gap-3">
                 <span className="text-lg font-bold">#{i + 1}</span>
-                <span className="font-semibold">{player.name}</span>
+                <span className="font-semibold">
+                  <GameOverPlayerName
+                    name={player.id === myId ? 'You' : player.name}
+                    playerId={player.id}
+                    xpAwards={xpAwards}
+                  />
+                </span>
               </div>
               <span className="text-xl font-bold">{player.totalScore} pts</span>
             </div>

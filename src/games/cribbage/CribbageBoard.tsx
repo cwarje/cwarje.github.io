@@ -23,6 +23,7 @@ import { CardFace } from '../shared/ui/CardFace';
 import { CardBack } from '../shared/ui/CardBack';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
 import { rankDisplay } from '../shared/ui/cardConstants';
+import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 import { CRIB_HUD_FLIP_DURATION_MS } from '../shared/CribHudFlipCard';
 import CribbagePegBoard from './CribbagePegBoard';
 import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
@@ -718,6 +719,7 @@ export default function CribbageBoard({
   };
 
   if (s.phase === 'game-over') {
+    const xpAwards = getGameOverXpAwards('cribbage', s);
     const winnerSet = new Set(s.winners);
     const teamHasWinner = (team: 0 | 1): boolean =>
       s.players.some((p, seat) => winnerSet.has(p.id) && teamIndexForSeat(seat) === team);
@@ -755,7 +757,11 @@ export default function CribbageBoard({
                 key={p.id}
                 className={`flex justify-between rounded-xl px-4 py-2 ${won ? 'bg-amber-500/20 text-amber-100' : 'bg-white/5 text-white/80'}`}
               >
-                <span>{p.name}</span>
+                <GameOverPlayerName
+                  name={p.id === myId ? 'You' : p.name}
+                  playerId={p.id}
+                  xpAwards={xpAwards}
+                />
                 <span className="font-bold inline-flex items-center gap-2">
                   <span>{sc}</span>
                   {skunkLabel && (
