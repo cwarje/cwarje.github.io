@@ -780,7 +780,12 @@ export default function CribbageBoard({
 
   return (
     <div ref={boardRef} className="radial-board cribbage-board relative flex flex-col h-full min-h-0 text-white">
-      <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
+      <DealAnimationLayer
+        flights={deal.flights}
+        dealCenter={deal.dealCenter}
+        remaining={deal.flights.length}
+        isShuffling={deal.isShuffling}
+      />
       <CardTossLayers
         cardTossBursts={cardTossBursts}
         seatCardSplats={seatCardSplats}

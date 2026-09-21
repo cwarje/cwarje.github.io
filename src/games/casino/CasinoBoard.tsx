@@ -874,7 +874,12 @@ export default function CasinoBoard({
 
   return (
     <div ref={boardRef} className={`casino-board casino-board--players-${s.players.length} relative space-y-3 sm:space-y-4`}>
-      <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
+      <DealAnimationLayer
+        flights={deal.flights}
+        dealCenter={deal.dealCenter}
+        remaining={deal.flights.length}
+        isShuffling={deal.isShuffling}
+      />
       <CardTossLayers
         cardTossBursts={cardTossBursts}
         seatCardSplats={seatCardSplats}

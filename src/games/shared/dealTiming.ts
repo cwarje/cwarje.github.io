@@ -9,6 +9,9 @@ export const DEAL_TOTAL_DEAL_MS = 3000;
 export const DEAL_MIN_STEP_MS = 55;
 export const DEAL_MAX_STEP_MS = 165;
 
+/** Fixed pre-deal shuffle; not scaled by dealer speed. */
+export const DEAL_SHUFFLE_DURATION_MS = 2000;
+
 const DEAL_SPEED_MULTIPLIERS: Record<DealerSpeed, number> = {
   slow: 4,
   medium: 1,
@@ -40,11 +43,17 @@ export function dealStepMs(plannedCount: number, speed: DealerSpeed = 'medium'):
   return Math.max(minStepMs, Math.min(maxStepMs, totalDealMs / plannedCount));
 }
 
-/** Total time (ms) for the whole deal animation of `plannedCount` cards. */
+/** Total time (ms) for card flights only (excludes shuffle). */
 export function dealAnimationDurationMs(plannedCount: number, speed: DealerSpeed = 'medium'): number {
   if (plannedCount <= 0) return 0;
   const { flightDurationMs } = getDealTimingConfig(speed);
   return Math.round((plannedCount - 1) * dealStepMs(plannedCount, speed) + flightDurationMs);
+}
+
+/** Shuffle + card flights (client deal sequence before cleanup tail). */
+export function dealSequenceDurationMs(plannedCount: number, speed: DealerSpeed = 'medium'): number {
+  if (plannedCount <= 0) return 0;
+  return DEAL_SHUFFLE_DURATION_MS + dealAnimationDurationMs(plannedCount, speed);
 }
 
 /** Matches the post-flight cleanup tail in useDealAnimation. */
@@ -56,7 +65,7 @@ export const DEAL_LAYOUT_GRACE_MS = 400;
 /** How long the host should block turn scheduling after a deal begins animating. */
 export function dealHoldDurationMs(plannedCount: number, speed: DealerSpeed = 'medium'): number {
   if (plannedCount <= 0) return 0;
-  return dealAnimationDurationMs(plannedCount, speed) + DEAL_ANIMATION_TAIL_MS + DEAL_LAYOUT_GRACE_MS;
+  return dealSequenceDurationMs(plannedCount, speed) + DEAL_ANIMATION_TAIL_MS + DEAL_LAYOUT_GRACE_MS;
 }
 
 type DealHoldExtender = (untilMs: number) => void;

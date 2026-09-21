@@ -3,9 +3,11 @@ import {
   DEAL_FLIGHT_DURATION_MS,
   DEAL_MAX_STEP_MS,
   DEAL_MIN_STEP_MS,
+  DEAL_SHUFFLE_DURATION_MS,
   DEAL_TOTAL_DEAL_MS,
   dealAnimationDurationMs,
   dealHoldDurationMs,
+  dealSequenceDurationMs,
   getDealTimingConfig,
 } from './dealTiming';
 
@@ -38,5 +40,25 @@ describe('dealTiming', () => {
     expect(slowHold).toBeGreaterThan(mediumHold);
     expect(mediumHold).toBeGreaterThan(fastHold);
     expect(slowHold - mediumHold).toBe(dealAnimationDurationMs(cardCount, 'slow') - dealAnimationDurationMs(cardCount, 'medium'));
+  });
+
+  it('dealSequenceDurationMs includes fixed shuffle time for all speeds', () => {
+    const cardCount = 13;
+    for (const speed of ['slow', 'medium', 'fast'] as const) {
+      expect(dealSequenceDurationMs(cardCount, speed)).toBe(
+        DEAL_SHUFFLE_DURATION_MS + dealAnimationDurationMs(cardCount, speed),
+      );
+    }
+  });
+
+  it('shuffle duration in hold is the same for slow, medium, and fast', () => {
+    const cardCount = 13;
+    const shuffleInHold = (speed: 'slow' | 'medium' | 'fast') =>
+      dealHoldDurationMs(cardCount, speed) - dealAnimationDurationMs(cardCount, speed);
+    expect(shuffleInHold('slow')).toBe(shuffleInHold('medium'));
+    expect(shuffleInHold('medium')).toBe(shuffleInHold('fast'));
+    expect(shuffleInHold('medium')).toBe(
+      DEAL_SHUFFLE_DURATION_MS + 120 + 400, // shuffle + tail + layout grace
+    );
   });
 });

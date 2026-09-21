@@ -547,7 +547,12 @@ export default function HeartsBoard({
 
   return (
     <div ref={boardRef} className={`hearts-board hearts-board--players-${state.players.length} relative space-y-4 sm:space-y-5`}>
-      <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
+      <DealAnimationLayer
+        flights={deal.flights}
+        dealCenter={deal.dealCenter}
+        remaining={deal.flights.length}
+        isShuffling={deal.isShuffling}
+      />
       <CardTossLayers
         cardTossBursts={cardTossBursts}
         seatCardSplats={seatCardSplats}

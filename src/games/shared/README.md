@@ -163,6 +163,7 @@ sequenceDiagram
   host->>room: broadcast new game-state (dealt hands/table)
   room->>board: game-state update
   board->>hook: dealKey changed
+  hook->>layer: dealer shuffles at dealCenter (2s)
   hook->>hook: plan flights (extras first, then round-robin hands)
   hook->>layer: flights + dealCenter
   loop each card
@@ -173,13 +174,14 @@ sequenceDiagram
 ```
 
 1. **Trigger** — Each board passes a `dealKey` string that changes exactly when a fresh deal occurs (e.g. round number). When `dealKey` changes, the hook resets and starts a new animation.
-2. **Coordinates** — `boardRef` and `tableRef` provide layout bounds. Seat and extra targets are percentage positions (`seatLeft`, `seatTop`) on the table, converted to board-relative pixels (same approach as Tolva's card-toss).
-3. **Deal order** — **Table/extra cards are dealt first**, one flight per extra target, in array order. Then hand cards are dealt **round-robin** across seats until each seat's `count` is satisfied.
-4. **Flying cards** — `DealAnimationLayer` renders a depleting center stack and framer-motion flights. Each flight has a staggered `delay` so cards leave the stack one at a time.
-5. **Reveal gating** — When a flight arrives (`delay + flightDuration`):
+2. **Shuffle** — After layout is measured, the dealer and center stack appear and shuffle for **2 seconds** (`DEAL_SHUFFLE_DURATION_MS`, fixed regardless of lobby dealer speed). Hands and table slots stay gated until dealing begins.
+3. **Coordinates** — `boardRef` and `tableRef` provide layout bounds. Seat and extra targets are percentage positions (`seatLeft`, `seatTop`) on the table, converted to board-relative pixels (same approach as Tolva's card-toss).
+4. **Deal order** — **Table/extra cards are dealt first**, one flight per extra target, in array order. Then hand cards are dealt **round-robin** across seats until each seat's `count` is satisfied.
+5. **Flying cards** — `DealAnimationLayer` renders a depleting center stack and framer-motion flights. Each flight has a staggered `delay` so cards leave the stack one at a time.
+6. **Reveal gating** — When a flight arrives (`delay + flightDuration`):
    - Hand cards increment `revealCounts[playerId]`. Boards call `deal.revealedFor(myId, fullCount)` to slice the local hand and grow the spread width as cards appear (sorted order unchanged).
    - Table/extra cards set `revealedExtras[extraId]`. Boards call `deal.isExtraRevealed(id)` to swap placeholders for real cards one at a time.
-6. **Cleanup** — After the last flight finishes, `isDealing` becomes false and the overlay is removed. Full game state is shown.
+7. **Cleanup** — After the last flight finishes, `isDealing` becomes false and the overlay is removed. Full game state is shown.
 
 ### Hook API
 
@@ -192,7 +194,8 @@ const deal = useDealAnimation({
   extraTargets: [{ id, seatLeft, seatTop, faceUp? }], // optional
 });
 
-deal.isDealing;                          // true while animation is active
+deal.isDealing;                          // true while animation is active (shuffle + deal)
+deal.isShuffling;                        // true during the 2s pre-deal shuffle
 deal.flights;                            // for DealAnimationLayer
 deal.dealCenter;                         // stack origin point
 deal.revealedFor(playerId, fallback);    // hand cards visible so far
@@ -203,7 +206,7 @@ Boards should:
 
 - Attach `ref={boardRef}` on the outer board wrapper (`position: relative`).
 - Attach `ref={tableRef}` on the table element used for seat percentages.
-- Render `<DealAnimationLayer flights={...} dealCenter={...} remaining={...} />`.
+- Render `<DealAnimationLayer flights={...} dealCenter={...} remaining={...} isShuffling={deal.isShuffling} />`.
 - Gate local hand rendering on `revealedFor`.
 - Gate table/extra slots on `isExtraRevealed` and show **empty placeholders** while dealing.
 - Disable player actions while `deal.isDealing` where applicable (bids, plays, etc.).
@@ -221,11 +224,13 @@ Games that deal to the table or piles pass `extraTargets` with stable `id` strin
 
 `dealTiming.ts` defines constants shared by the animation and the host's turn scheduler:
 
-- `DEAL_FLIGHT_DURATION_MS` (520) — single-card flight time
-- `DEAL_TOTAL_DEAL_MS` (2400) — target total deal duration (adaptive step clamped between min/max)
-- `dealAnimationDurationMs(cardCount)` — deterministic total duration for `cardCount` flights
+- `DEAL_SHUFFLE_DURATION_MS` (2000) — fixed pre-deal shuffle (not scaled by dealer speed)
+- `DEAL_FLIGHT_DURATION_MS` — single-card flight time (scaled by dealer speed)
+- `DEAL_TOTAL_DEAL_MS` — target total deal duration (adaptive step clamped between min/max)
+- `dealSequenceDurationMs(cardCount)` — shuffle + card flights
+- `dealAnimationDurationMs(cardCount)` — card flights only
 
-In `roomStore.tsx`, `getRoundDealInfo()` mirrors each board's `dealKey` and total animated card count (hands + extras). When a new deal signature is detected, the host sets a **deal hold** so bot turns and auto-advances wait until `dealAnimationDurationMs(cardCount)` has elapsed. This keeps gameplay from starting mid-animation even though the animation itself is not networked.
+In `roomStore.tsx`, `getRoundDealInfo()` mirrors each board's `dealKey` and total animated card count (hands + extras). When a new deal signature is detected, the host sets a **deal hold** so bot turns and auto-advances wait until `dealSequenceDurationMs(cardCount)` (plus tail and layout grace) has elapsed. This keeps gameplay from starting mid-animation even though the animation itself is not networked.
 
 When adding deal animation to a new radial game, update `getRoundDealInfo()` with a matching signature and card count.
 

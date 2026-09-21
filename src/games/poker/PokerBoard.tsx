@@ -318,7 +318,12 @@ export default function PokerBoard({
   // Main playing view: table + heads-up + contextual bottom section
   return (
     <div ref={boardRef} className="poker-board relative space-y-3 sm:space-y-4">
-      <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
+      <DealAnimationLayer
+        flights={deal.flights}
+        dealCenter={deal.dealCenter}
+        remaining={deal.flights.length}
+        isShuffling={deal.isShuffling}
+      />
       <CardTossLayers
         cardTossBursts={cardTossBursts}
         seatCardSplats={seatCardSplats}

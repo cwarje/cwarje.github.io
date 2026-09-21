@@ -7,6 +7,7 @@ import {
   DEAL_FLIGHT_DURATION_MS,
   DEAL_MAX_STEP_MS,
   DEAL_MIN_STEP_MS,
+  DEAL_SHUFFLE_DURATION_MS,
   DEAL_TOTAL_DEAL_MS,
   notifyDealAnimationStarted,
 } from './dealTiming';
@@ -49,6 +50,7 @@ export interface DealFlight {
 interface DealRuntime {
   key: string;
   active: boolean;
+  isShuffling: boolean;
   flights: DealFlight[];
   dealCenter: DealPoint | null;
   revealCounts: Record<string, number>;
@@ -72,6 +74,7 @@ export interface UseDealAnimationOptions {
 
 export interface DealAnimationResult {
   isDealing: boolean;
+  isShuffling: boolean;
   flights: DealFlight[];
   dealCenter: DealPoint | null;
   revealCounts: Record<string, number>;
@@ -112,6 +115,7 @@ export function useDealAnimation(options: UseDealAnimationOptions): DealAnimatio
   const [runtime, setRuntime] = useState<DealRuntime>({
     key: dealKey,
     active: shouldAnimate,
+    isShuffling: shouldAnimate,
     flights: [],
     dealCenter: null,
     revealCounts: {},
@@ -124,6 +128,7 @@ export function useDealAnimation(options: UseDealAnimationOptions): DealAnimatio
     setRuntime({
       key: dealKey,
       active: shouldAnimate,
+      isShuffling: shouldAnimate,
       flights: [],
       dealCenter: null,
       revealCounts: {},
@@ -152,7 +157,9 @@ export function useDealAnimation(options: UseDealAnimationOptions): DealAnimatio
     const hasCards = currentSeats.some(seat => seat.count > 0) || currentExtras.length > 0;
 
     if (!hasCards || reduceMotion) {
-      setRuntime(prev => (prev.key === dealKey ? { ...prev, active: false } : prev));
+      setRuntime(prev =>
+        prev.key === dealKey ? { ...prev, active: false, isShuffling: false } : prev,
+      );
       return;
     }
 
@@ -164,7 +171,9 @@ export function useDealAnimation(options: UseDealAnimationOptions): DealAnimatio
         timeoutsRef.current.push(retryTimeout);
         return;
       }
-      setRuntime(prev => (prev.key === dealKey ? { ...prev, active: false } : prev));
+      setRuntime(prev =>
+        prev.key === dealKey ? { ...prev, active: false, isShuffling: false } : prev,
+      );
       return;
     }
 
@@ -213,51 +222,72 @@ export function useDealAnimation(options: UseDealAnimationOptions): DealAnimatio
     }
 
     if (planned.length === 0) {
-      setRuntime(prev => (prev.key === dealKey ? { ...prev, active: false } : prev));
+      setRuntime(prev =>
+        prev.key === dealKey ? { ...prev, active: false, isShuffling: false } : prev,
+      );
       return;
     }
 
     const stepMs = Math.max(minStepMs, Math.min(maxStepMs, totalDealMs / planned.length));
 
-    const flights: DealFlight[] = planned.map((plan, index) => ({
-      id: `${dealKey}-${index}`,
-      start: dealCenter,
-      end: plan.target,
-      delay: (index * stepMs) / 1000,
-      duration: flightDurationMs / 1000,
-      faceUp: plan.faceUp,
-    }));
-
-    setRuntime({ key: dealKey, active: true, flights, dealCenter, revealCounts: {}, revealedExtras: {} });
+    setRuntime({
+      key: dealKey,
+      active: true,
+      isShuffling: true,
+      flights: [],
+      dealCenter,
+      revealCounts: {},
+      revealedExtras: {},
+    });
     notifyDealAnimationStarted(planned.length, dealerSpeed);
 
-    planned.forEach((plan, index) => {
-      if (!plan.playerId && !plan.extraId) return;
-      const arriveAt = index * stepMs + flightDurationMs;
-      const timeout = setTimeout(() => {
-        setRuntime(prev => {
-          if (prev.key !== dealKey) return prev;
-          if (plan.extraId) {
+    const startDealFlights = () => {
+      const flights: DealFlight[] = planned.map((plan, index) => ({
+        id: `${dealKey}-${index}`,
+        start: dealCenter,
+        end: plan.target,
+        delay: (index * stepMs) / 1000,
+        duration: flightDurationMs / 1000,
+        faceUp: plan.faceUp,
+      }));
+
+      setRuntime(prev =>
+        prev.key === dealKey ? { ...prev, isShuffling: false, flights } : prev,
+      );
+
+      planned.forEach((plan, index) => {
+        if (!plan.playerId && !plan.extraId) return;
+        const arriveAt = index * stepMs + flightDurationMs;
+        const timeout = setTimeout(() => {
+          setRuntime(prev => {
+            if (prev.key !== dealKey) return prev;
+            if (plan.extraId) {
+              return {
+                ...prev,
+                revealedExtras: { ...prev.revealedExtras, [plan.extraId]: true },
+              };
+            }
+            const nextCount = (prev.revealCounts[plan.playerId as string] ?? 0) + 1;
             return {
               ...prev,
-              revealedExtras: { ...prev.revealedExtras, [plan.extraId]: true },
+              revealCounts: { ...prev.revealCounts, [plan.playerId as string]: nextCount },
             };
-          }
-          const nextCount = (prev.revealCounts[plan.playerId as string] ?? 0) + 1;
-          return {
-            ...prev,
-            revealCounts: { ...prev.revealCounts, [plan.playerId as string]: nextCount },
-          };
-        });
-      }, arriveAt);
-      timeoutsRef.current.push(timeout);
-    });
+          });
+        }, arriveAt);
+        timeoutsRef.current.push(timeout);
+      });
 
-    const lastDelay = (planned.length - 1) * stepMs;
-    const cleanupTimeout = setTimeout(() => {
-      setRuntime(prev => (prev.key === dealKey ? { ...prev, active: false, flights: [] } : prev));
-    }, lastDelay + flightDurationMs + DEAL_ANIMATION_TAIL_MS);
-    timeoutsRef.current.push(cleanupTimeout);
+      const lastDelay = (planned.length - 1) * stepMs;
+      const cleanupTimeout = setTimeout(() => {
+        setRuntime(prev =>
+          prev.key === dealKey ? { ...prev, active: false, isShuffling: false, flights: [] } : prev,
+        );
+      }, lastDelay + flightDurationMs + DEAL_ANIMATION_TAIL_MS);
+      timeoutsRef.current.push(cleanupTimeout);
+    };
+
+    const shuffleTimeout = setTimeout(startDealFlights, DEAL_SHUFFLE_DURATION_MS);
+    timeoutsRef.current.push(shuffleTimeout);
 
     return () => {
       timeoutsRef.current.forEach(clearTimeout);
@@ -274,9 +304,11 @@ export function useDealAnimation(options: UseDealAnimationOptions): DealAnimatio
   }, []);
 
   const isDealing = runtime.key === dealKey && runtime.active;
+  const isShuffling = isDealing && runtime.isShuffling;
 
   return {
     isDealing,
+    isShuffling,
     flights: runtime.key === dealKey ? runtime.flights : [],
     dealCenter: runtime.dealCenter,
     revealCounts: runtime.key === dealKey ? runtime.revealCounts : {},

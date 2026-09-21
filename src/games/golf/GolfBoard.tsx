@@ -441,7 +441,12 @@ export default function GolfBoard({ state, myId, onAction, isHost = false, lobby
 
   return (
     <div ref={boardRef} className={`golf-board radial-board radial-board--players-${state.players.length} relative`}>
-      <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
+      <DealAnimationLayer
+        flights={deal.flights}
+        dealCenter={deal.dealCenter}
+        remaining={deal.flights.length}
+        isShuffling={deal.isShuffling}
+      />
       <GolfDiscardAnimationLayer
         animation={discardAnim.animation}
         renderCardFace={card => renderCardFace(card)}

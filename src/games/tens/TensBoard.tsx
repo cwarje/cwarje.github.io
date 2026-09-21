@@ -650,7 +650,12 @@ export default function TensBoard({
       ref={boardRef}
       className={`tens-board radial-board radial-board--players-${state.players.length} tens-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}
     >
-      <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
+      <DealAnimationLayer
+        flights={deal.flights}
+        dealCenter={deal.dealCenter}
+        remaining={deal.flights.length}
+        isShuffling={deal.isShuffling}
+      />
       <TensPlayAnimationLayer
         animation={playAnim.animation}
         renderCardFace={renderCenterCardFace}

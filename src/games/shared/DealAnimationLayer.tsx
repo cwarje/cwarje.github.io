@@ -7,16 +7,24 @@ interface DealAnimationLayerProps {
   dealCenter: DealPoint | null;
   /** Number of cards left to deal, used to size the depleting center stack. */
   remaining: number;
+  isShuffling?: boolean;
 }
 
 const STACK_MAX_CARDS = 5;
 const CARD_HALF_WIDTH = 32;
 const CARD_HALF_HEIGHT = 45;
 
-export function DealAnimationLayer({ flights, dealCenter, remaining }: DealAnimationLayerProps) {
-  if (!dealCenter || flights.length === 0) return null;
+export function DealAnimationLayer({
+  flights,
+  dealCenter,
+  remaining,
+  isShuffling = false,
+}: DealAnimationLayerProps) {
+  if (!dealCenter || (!isShuffling && flights.length === 0)) return null;
 
-  const stackCount = Math.max(0, Math.min(STACK_MAX_CARDS, remaining));
+  const stackCount = isShuffling
+    ? STACK_MAX_CARDS
+    : Math.max(0, Math.min(STACK_MAX_CARDS, remaining));
 
   return (
     <div className="deal-animLayer" aria-hidden="true">
@@ -29,7 +37,7 @@ export function DealAnimationLayer({ flights, dealCenter, remaining }: DealAnima
             transform: 'translate(-50%, 0)',
           }}
         >
-          <div className="deal-animStack">
+          <div className={`deal-animStack${isShuffling ? ' deal-animStack--shuffling' : ''}`}>
             {Array.from({ length: stackCount }, (_, i) => (
               <div
                 key={`deal-stack-${i}`}
@@ -78,7 +86,7 @@ export function DealAnimationLayer({ flights, dealCenter, remaining }: DealAnima
         <img
           src="/dealer.png"
           alt=""
-          className="deal-animDealer"
+          className={`deal-animDealer${isShuffling ? ' deal-animDealer--shuffling' : ''}`}
           style={{
             left: dealCenter.x,
             top: dealCenter.y - CARD_HALF_HEIGHT - 6,
