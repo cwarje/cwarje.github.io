@@ -63,7 +63,9 @@ export default function HatPickerGrid() {
                 </span>
               </>
             ) : null}
-            <div className="flex h-16 w-16 items-end justify-center">
+            <div
+              className={`flex h-16 w-16 justify-center ${hat.imageUrl ? 'items-end' : 'items-center'}`}
+            >
               {hat.imageUrl ? (
                 <img
                   src={hat.imageUrl}

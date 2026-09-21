@@ -280,7 +280,7 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                   >
                     <span className="min-w-0 text-left">Change Hat</span>
                     <div
-                      className="flex h-9 w-9 shrink-0 items-end justify-center rounded-md border border-surface-200/80 bg-white"
+                      className={`flex h-9 w-9 shrink-0 justify-center rounded-md border border-surface-200/80 bg-white ${equippedHat.imageUrl ? 'items-end' : 'items-center'}`}
                       aria-hidden
                     >
                       {equippedHat.imageUrl ? (
@@ -290,7 +290,7 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                           className="max-h-8 max-w-8 object-contain"
                         />
                       ) : (
-                        <span className="pb-1 text-[9px] font-semibold uppercase tracking-wide text-surface-400">
+                        <span className="text-[9px] font-semibold uppercase tracking-wide text-surface-400">
                           None
                         </span>
                       )}

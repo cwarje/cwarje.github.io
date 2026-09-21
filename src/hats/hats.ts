@@ -11,6 +11,7 @@ import tophatHatUrl from '../assets/tophat-hat.png';
 import fedoraHatUrl from '../assets/fedora-hat.png';
 import partycowboyHatUrl from '../assets/partycowboy-hat.png';
 import luffyHatUrl from '../assets/luffy-hat.png';
+import crownHatUrl from '../assets/crown-hat.png';
 
 export const SELECTED_HAT_STORAGE_KEY = 'selectedHat';
 
@@ -33,6 +34,7 @@ export const HAT_CATALOG: HatDefinition[] = [
   { id: 'luffy', label: 'Luffy hat', imageUrl: luffyHatUrl, requiredLevel: 70 },
   { id: 'tophat', label: 'Top hat', imageUrl: tophatHatUrl, requiredLevel: 80 },
   { id: 'partycowboy', label: 'Party cowboy hat', imageUrl: partycowboyHatUrl, requiredLevel: 90 },
+  { id: 'crown', label: 'Crown hat', imageUrl: crownHatUrl, requiredLevel: 100 },
 ];
 
 const HAT_IDS = new Set<HatId>(HAT_CATALOG.map((h) => h.id));

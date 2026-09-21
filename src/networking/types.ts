@@ -49,6 +49,7 @@ export type HatId =
   | 'captain'
   | 'beanie'
   | 'cowboy'
+  | 'crown'
   | 'propeller'
   | 'tophat'
   | 'fedora'

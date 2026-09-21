@@ -27,12 +27,15 @@ describe('hats', () => {
     expect(isHatUnlocked('luffy', 70)).toBe(true);
     expect(isHatUnlocked('partycowboy', 89)).toBe(false);
     expect(isHatUnlocked('partycowboy', 90)).toBe(true);
+    expect(isHatUnlocked('crown', 99)).toBe(false);
+    expect(isHatUnlocked('crown', 100)).toBe(true);
   });
 
   it('counts wearable hats at level 49', () => {
     expect(countUnlockedWearableHats(49)).toBe(5);
     expect(countUnlockedWearableHats(9)).toBe(1);
     expect(countUnlockedWearableHats(90)).toBe(10);
+    expect(countUnlockedWearableHats(100)).toBe(11);
   });
 
   it('sanitizes locked selections to none', () => {
