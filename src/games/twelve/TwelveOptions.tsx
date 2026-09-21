@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import type { TwelvePileCount } from '../../networking/types';
 import type { GameOptionsPanelProps } from '../registry';
 
-const PILE_OPTIONS: TwelvePileCount[] = [3, 4, 5, 6];
+const PILE_OPTIONS: TwelvePileCount[] = [0, 3, 4, 5, 6];
 const DEFAULT_PILE_COUNT: TwelvePileCount = 4;
 
 export default function TwelveOptions({ onChange, labelClass, playerCount, botCount }: GameOptionsPanelProps) {

@@ -5,7 +5,7 @@ import { cardEquals, cardPointValue, getPilePlayableCard, getTrickWinnerPlayerId
 
 const SUITS: Suit[] = ['clubs', 'diamonds', 'spades', 'hearts'];
 const RANKS: Rank[] = [6, 7, 8, 9, 10, 11, 12, 13, 14];
-const ALL_PILE_COUNTS: TwelvePileCount[] = [3, 4, 5, 6];
+const ALL_PILE_COUNTS: TwelvePileCount[] = [0, 3, 4, 5, 6];
 const SUIT_SORT_ORDER: Record<Suit, number> = { clubs: 0, diamonds: 1, spades: 2, hearts: 3 };
 
 function createDeck(): Card[] {

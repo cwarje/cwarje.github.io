@@ -531,8 +531,8 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
       goal: 'Reach 12 game points by timing trump and tjog calls, winning round points, and taking the last trick.',
       rules: [
         'Play uses a 36-card deck: 6 through Ace in each suit (2-5 removed). Rank order is 6-9, J, Q, K, 10, A (Aces high).',
-        'At round start, each player gets table piles chosen at launch: one face-down card with one face-up card on top of each pile. Remaining cards are dealt to hand.',
-        'On your turn, play either a hand card or the exposed top card from one of your table piles.',
+        'At round start, choose 0–6 table piles per player (0 deals the full deck to hand). With piles, each pile is one face-down card with one face-up card on top; remaining cards go to hand.',
+        'On your turn, play either a hand card or, if you have piles, the exposed top card from one of your table piles.',
         'You must follow suit if able (from either hand or exposed pile cards). If you cannot and trump is set, you must play trump if possible; otherwise you may play any card.',
         'If trump is set, highest trump wins the trick; otherwise highest card of the lead suit wins.',
         'When a top pile card is played, any newly exposed face-down card flips face up at the start of the next trick.',
@@ -540,7 +540,7 @@ export const GAME_REGISTRY: Record<GameType, GameDefinition> = {
         'Tjog is pronounced like "chog" (soft \'tj\' sound).',
       ],
       howToPlay: [
-        'Choose the pile count at launch, then review your hand and table piles.',
+        'Choose the pile count at launch (0 for hand-only), then review your hand and any table piles.',
         'If it is your turn and you have a royal pair (K+Q same suit), you may set trump (+2) unless your score is 10 or more.',
         'After trump is set, you may call tjog (+1 each suit) for each royal pair suit you have; at 11 you cannot call tjog.',
         'Round points from captured cards: J=2, Q=3, K=4, 10=10, A=11, 6-9=0 (total 120).',
