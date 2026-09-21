@@ -22,6 +22,7 @@ import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 import { CardTossLayers } from '../shared/CardTossLayers';
 import { useCardToss } from '../shared/useCardToss';
 import { CardFace } from '../shared/ui/CardFace';
+import { OpponentHandFan } from '../shared/ui/OpponentHandFan';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
 import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 import { SUIT_COLORS, SUIT_SYMBOLS, rankDisplay } from '../shared/ui/cardConstants';
@@ -654,7 +655,17 @@ export default function MobilizationBoard({
               top: `${layout.seatTop}%`,
             }}
           >
-            {renderSeatPill(layout, layout.relativeIndex === 0)}
+            <div className="radial-seatPillCluster radial-seatPillCluster--raisedHandTall">
+              {layout.player.id !== myId && (
+                <OpponentHandFan
+                  playerId={layout.player.id}
+                  playerName={layout.player.name}
+                  fullCount={layout.player.hand.length}
+                  revealedCount={deal.revealedFor(layout.player.id, layout.player.hand.length)}
+                />
+              )}
+              {renderSeatPill(layout, layout.relativeIndex === 0)}
+            </div>
           </div>
         ))}
 

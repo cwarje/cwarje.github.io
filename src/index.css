@@ -2842,7 +2842,7 @@
   }
 }
 
-/* Twelve board additions */
+/* Tolva / 10s seat stack (pill + table piles) */
 .twelve-seatStack {
   display: flex;
   flex-direction: column;
@@ -2850,43 +2850,69 @@
   gap: 6px;
 }
 
-.twelve-seatPillCluster {
+.radial-seatPillCluster {
+  --opponent-hand-lift: 0px;
   position: relative;
   display: flex;
   justify-content: center;
 }
 
-.twelve-seatPillCluster .card-toss-seatPillButton {
+/* Extra pill rows (scores, stats): raise fan so card backs peek above the pill */
+.radial-seatPillCluster--raisedHand {
+  --opponent-hand-lift: 20px;
+}
+
+/* Name + label row + value row (Mobilization, Casino, Up and Down the River) */
+.radial-seatPillCluster--raisedHandTall {
+  --opponent-hand-lift: 28px;
+}
+
+.radial-seatPillCluster .card-toss-seatPillButton {
   position: relative;
   z-index: 1;
 }
 
-.twelve-opponentHandSpread {
+/* Outer: position in seat cluster. Inner spread: same containing model as .radial-handSpread. */
+.radial-opponentHandAnchor {
   position: absolute;
   left: 50%;
-  bottom: 0;
+  bottom: var(--opponent-hand-lift);
   transform: translateX(-50%);
   z-index: 0;
   pointer-events: none;
   flex-shrink: 0;
 }
 
-.twelve-opponentHandHitbox {
+.radial-opponentHandSpread {
+  position: relative;
+  display: block;
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+.radial-opponentHandHitbox {
   position: absolute;
   top: 0;
   overflow: visible;
   transition: left 0.16s ease, width 0.16s ease;
 }
 
-.twelve-opponentHandCardWrap {
+.radial-opponentHandCardWrap {
   position: absolute;
   left: 0;
   top: 0;
   display: block;
+  overflow: visible;
+}
+
+.radial-opponentHandCardWrap .card-back {
+  width: 100%;
+  height: 100%;
+  max-width: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .twelve-opponentHandHitbox {
+  .radial-opponentHandHitbox {
     transition: none;
   }
 }

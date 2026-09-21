@@ -15,6 +15,7 @@ import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 import { CardTossLayers } from '../shared/CardTossLayers';
 import { useCardToss } from '../shared/useCardToss';
 import { CardFace } from '../shared/ui/CardFace';
+import { OpponentHandFan } from '../shared/ui/OpponentHandFan';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
 import { rankDisplay } from '../shared/ui/cardConstants';
 import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
@@ -444,7 +445,17 @@ export default function CucumberBoard({
             className={`radial-seat ${layout.relativeIndex === 0 ? 'radial-seat--self' : ''}`}
             style={{ left: `${layout.seatLeft}%`, top: `${layout.seatTop}%` }}
           >
-            {renderSeatPill(layout, layout.relativeIndex === 0)}
+            <div className="radial-seatPillCluster radial-seatPillCluster--raisedHand">
+              {layout.player.id !== myId && (
+                <OpponentHandFan
+                  playerId={layout.player.id}
+                  playerName={layout.player.name}
+                  fullCount={layout.player.hand.length}
+                  revealedCount={deal.revealedFor(layout.player.id, layout.player.hand.length)}
+                />
+              )}
+              {renderSeatPill(layout, layout.relativeIndex === 0)}
+            </div>
           </div>
         ))}
 

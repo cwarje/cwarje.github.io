@@ -12,6 +12,7 @@ import { isValidHeartsPlay } from './rules';
 import { getHeartsPassCount, getPassDirectionLabel } from './logic';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 import { CardFace } from '../shared/ui/CardFace';
+import { OpponentHandFan } from '../shared/ui/OpponentHandFan';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
 import { rankDisplay } from '../shared/ui/cardConstants';
 import { useDealerDealAnimation, type DealSeat } from '../shared/useDealerDealAnimation';
@@ -520,7 +521,17 @@ export default function HeartsBoard({
               top: `${layout.seatTop}%`,
             }}
           >
-            {renderSeatPill(layout, layout.relativeIndex === 0)}
+            <div className="radial-seatPillCluster radial-seatPillCluster--raisedHand">
+              {layout.player.id !== myId && (
+                <OpponentHandFan
+                  playerId={layout.player.id}
+                  playerName={layout.player.name}
+                  fullCount={layout.player.hand.length}
+                  revealedCount={deal.revealedFor(layout.player.id, layout.player.hand.length)}
+                />
+              )}
+              {renderSeatPill(layout, layout.relativeIndex === 0)}
+            </div>
           </div>
         ))}
 

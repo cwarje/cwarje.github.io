@@ -13,12 +13,20 @@ Reusable components and CSS classes for radial card games:
 | `CardBack.tsx` | Patterned card back (`.card-back`) used site-wide |
 | `FlipCard.tsx` | 3D flip wrapper (`.card-flip*`) |
 | `RadialSeatName.tsx` | Auto-shrinking seat name via `AutoFitSeatName` |
+| `OpponentHandFan.tsx` | Card-back fan behind opponent seat pills (`.radial-opponentHand*`) |
+
+### Opponent hand at seat
+
+Opponent seats wrap the pill and hand fan in `.radial-seatPillCluster` (fan `z-index: 0`, pill `z-index: 1`). Multi-row pills add `--raisedHand` (20px lift) or `--raisedHandTall` (28px) so card backs peek above the extra rows. Card count during deals follows `deal.revealedFor(playerId, hand.length)` from `useDealerDealAnimation`.
+
+Games using this layout: Tolva (Twelve), 10s, Hearts, Up and Down the River, Mobilization, Cross Crib, Cucumber, Casino.
 
 ### CSS naming conventions
 
 | Prefix | Scope |
 |--------|-------|
 | `radial-*` | Shared radial table layout (seats, hands, center trick grid, HUD rows) |
+| `radial-seatPillCluster` / `radial-opponentHand*` | Opponent hand fan stacked behind seat pills (`Anchor` positions in cluster, `Spread` matches `.radial-handSpread`) |
 | `card-face*` / `card-back` / `card-flip*` | Shared card rendering |
 | `cribHud-*` | Crib/starter HUD strips (Cribbage, Cross Crib) |
 | `upriver-*` | Up and Down the River–specific UI (trump card, bidding) |

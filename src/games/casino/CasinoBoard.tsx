@@ -40,6 +40,7 @@ import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 import { CardTossLayers } from '../shared/CardTossLayers';
 import { useCardToss } from '../shared/useCardToss';
 import { CardFace as SharedCardFace } from '../shared/ui/CardFace';
+import { OpponentHandFan } from '../shared/ui/OpponentHandFan';
 import { SUIT_COLORS, SUIT_SYMBOLS } from '../shared/ui/cardConstants';
 import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 
@@ -886,7 +887,17 @@ export default function CasinoBoard({
             className={`casino-seat ${layout.relativeIndex === 0 ? 'casino-seat--self' : ''}`}
             style={{ left: `${layout.seatLeft}%`, top: `${layout.seatTop}%` }}
           >
-            {renderSeatPill(layout, layout.relativeIndex === 0)}
+            <div className="radial-seatPillCluster radial-seatPillCluster--raisedHandTall">
+              {layout.player.id !== myId && (
+                <OpponentHandFan
+                  playerId={layout.player.id}
+                  playerName={layout.player.name}
+                  fullCount={layout.player.hand.length}
+                  revealedCount={deal.revealedFor(layout.player.id, layout.player.hand.length)}
+                />
+              )}
+              {renderSeatPill(layout, layout.relativeIndex === 0)}
+            </div>
           </div>
         ))}
 

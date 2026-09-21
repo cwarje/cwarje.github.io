@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import type { Player, TableEvent, TableEventInput } from '../../networking/types';
 import {
   getSeatPillHatPropsForLobbyPlayer,
@@ -30,6 +30,7 @@ import { CardTossLayers } from '../shared/CardTossLayers';
 import { useCardToss } from '../shared/useCardToss';
 import { CardFace } from '../shared/ui/CardFace';
 import { FlipCard } from '../shared/ui/FlipCard';
+import { OpponentHandFan } from '../shared/ui/OpponentHandFan';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
 import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 import { SUIT_COLORS, SUIT_SYMBOLS } from '../shared/ui/cardConstants';
@@ -57,27 +58,6 @@ interface SeatLayout {
   player: TensPlayer;
   seatLeft: number;
   seatTop: number;
-}
-
-const OPPONENT_HAND_CARD_WIDTH = 45;
-const OPPONENT_HAND_CARD_HEIGHT = 68;
-const OPPONENT_HAND_MAX_SPREAD = 160;
-
-interface OpponentHandLayout {
-  cardWidth: number;
-  cardHeight: number;
-  step: number;
-  spreadWidth: number;
-}
-
-function getOpponentHandLayout(cardCount: number): OpponentHandLayout {
-  const cardWidth = OPPONENT_HAND_CARD_WIDTH;
-  const cardHeight = OPPONENT_HAND_CARD_HEIGHT;
-  const defaultStep = Math.round(cardWidth * 0.58);
-  const fitStep = cardCount > 1 ? (OPPONENT_HAND_MAX_SPREAD - cardWidth) / (cardCount - 1) : defaultStep;
-  const step = cardCount > 1 ? Math.max(8, Math.min(defaultStep, fitStep)) : defaultStep;
-  const spreadWidth = cardCount > 1 ? cardWidth + step * (cardCount - 1) : cardWidth;
-  return { cardWidth, cardHeight, step, spreadWidth };
 }
 
 function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
@@ -579,56 +559,6 @@ export default function TensBoard({
     return `${turnLabel} · Must play ${rankDisplay(state.lastPlayRank)} or lower`;
   }, [state, myId]);
 
-  const renderOpponentHandFan = (player: TensPlayer) => {
-    const fullCount = player.hand.length;
-    const cardCount = deal.revealedFor(player.id, fullCount);
-    if (cardCount === 0) return null;
-
-    const layout = getOpponentHandLayout(cardCount);
-
-    return (
-      <div
-        className="twelve-opponentHandSpread"
-        aria-label={`${player.name}, ${fullCount} cards in hand`}
-        style={{
-          width: `${layout.spreadWidth}px`,
-          height: `${layout.cardHeight}px`,
-          transition: 'width 0.16s ease',
-        }}
-      >
-        <AnimatePresence initial={false}>
-          {Array.from({ length: cardCount }, (_, i) => {
-            const isLast = i === cardCount - 1;
-            const hitboxWidth = isLast ? layout.cardWidth : layout.step;
-            return (
-              <motion.div
-                key={`${player.id}-hand-slot-${i}`}
-                className="twelve-opponentHandHitbox"
-                style={{
-                  left: `${i * layout.step}px`,
-                  width: `${hitboxWidth}px`,
-                  height: `${layout.cardHeight}px`,
-                  zIndex: i + 1,
-                }}
-                initial={reduceMotion ? false : { opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={reduceMotion ? undefined : { opacity: 0, x: 12, scale: 0.85 }}
-                transition={{ duration: reduceMotion ? 0 : 0.18 }}
-              >
-                <span
-                  className="twelve-opponentHandCardWrap"
-                  style={{ width: `${layout.cardWidth}px`, height: `${layout.cardHeight}px` }}
-                >
-                  <div className="card-back" />
-                </span>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-      </div>
-    );
-  };
-
   const renderSeatPill = (seatLayout: SeatLayout, shouldMeasure = false) => {
     const player = seatLayout.player;
     const isCurrentTurn = state.players[state.currentPlayerIndex]?.id === player.id
@@ -737,8 +667,15 @@ export default function TensBoard({
             style={{ left: `${layout.seatLeft}%`, top: `${layout.seatTop}%` }}
           >
             <div className={`twelve-seatStack ${isHandZoomed ? 'twelve-seatStack--zoom' : ''}`}>
-              <div className="twelve-seatPillCluster">
-                {layout.player.id !== myId && renderOpponentHandFan(layout.player)}
+              <div className="radial-seatPillCluster radial-seatPillCluster--raisedHand">
+                {layout.player.id !== myId && (
+                  <OpponentHandFan
+                    playerId={layout.player.id}
+                    playerName={layout.player.name}
+                    fullCount={layout.player.hand.length}
+                    revealedCount={deal.revealedFor(layout.player.id, layout.player.hand.length)}
+                  />
+                )}
                 {renderSeatPill(layout, layout.relativeIndex === 0)}
               </div>
               <div className="twelve-pileRow">
