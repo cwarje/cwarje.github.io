@@ -1668,7 +1668,7 @@
 .golf-seatPill.seat-pill--hat::after {
   content: '';
   position: absolute;
-  top: -30px;
+  top: -26px;
   right: -2px;
   width: 34px;
   height: 36px;
