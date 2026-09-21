@@ -4128,6 +4128,34 @@
   gap: 3px;
 }
 
+.twelve-board--players-4 .twelve-pileRow {
+  gap: 4px;
+}
+
+.twelve-board--players-4 .twelve-pileButton {
+  width: 38px;
+  height: 58px;
+}
+
+.twelve-board--players-4 .twelve-pileButton .card-faceRank {
+  font-size: 0.95rem;
+}
+
+.twelve-board--players-4 .twelve-pileButton .card-faceSuit {
+  font-size: 0.9rem;
+}
+
+.twelve-board--players-4 .twelve-pileButton .card-faceCorner {
+  width: 1em;
+}
+
+.twelve-board--players-4 .twelve-pileButton .card-face,
+.twelve-board--players-4 .twelve-pileButton .card-flipFront,
+.twelve-board--players-4 .twelve-pileButton .twelve-pileRevealFace .card-face {
+  padding: 5px 6px 5px 2px;
+  gap: 2px;
+}
+
 /* Keep Twelve pile cards and placeholders exactly aligned with pile slots. */
 .twelve-pileButton .poker-card,
 .twelve-pileButton .card-back,
@@ -4712,6 +4740,33 @@
   border-radius: 8px;
 }
 
+.tens-board--players-4 .twelve-pileRow {
+  gap: 4px;
+}
+
+.tens-board--players-4 .twelve-pileButton {
+  width: 38px;
+  height: 58px;
+}
+
+.tens-board--players-4 .twelve-pileButton .card-faceRank {
+  font-size: 0.95rem;
+}
+
+.tens-board--players-4 .twelve-pileButton .card-faceSuit {
+  font-size: 0.9rem;
+}
+
+.tens-board--players-4 .twelve-pileButton .card-faceCorner {
+  width: 1em;
+}
+
+.tens-board--players-4 .twelve-pileButton .card-face,
+.tens-board--players-4 .twelve-pileButton .card-flipFront {
+  padding: 5px 6px 5px 2px;
+  gap: 2px;
+}
+
 .tens-board .twelve-pileButton .poker-card,
 .tens-board .twelve-pileButton .card-back,
 .tens-board .twelve-pileButton .card-flip,
@@ -4746,9 +4801,18 @@
     gap: 3px;
   }
 
+  .tens-board--players-4 .twelve-pileRow {
+    gap: 4px;
+  }
+
   .tens-board .radial-seat:not(.radial-seat--self) .twelve-pileButton {
     width: 32px;
     height: 49px;
+  }
+
+  .tens-board--players-4 .twelve-pileButton {
+    width: 38px;
+    height: 58px;
   }
 
   .tens-board .radial-seat:not(.radial-seat--self) .twelve-pileButton .card-faceRank {

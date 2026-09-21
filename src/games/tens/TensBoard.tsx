@@ -7,7 +7,14 @@ import {
   mergeSeatPillHatClassName,
   mergeSeatPillHatStyle,
 } from '../../hats/hats';
-import type { Card, SelectedCardPlay, TensActionAnnouncement, TensPlayer, TensState } from './types';
+import {
+  PILES_PER_PLAYER,
+  type Card,
+  type SelectedCardPlay,
+  type TensActionAnnouncement,
+  type TensPlayer,
+  type TensState,
+} from './types';
 import {
   allPileTopsPlayed,
   cardEquals,
@@ -28,6 +35,11 @@ import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
 import { SUIT_COLORS, SUIT_SYMBOLS } from '../shared/ui/cardConstants';
 import { TensPlayAnimationLayer } from './TensPlayAnimationLayer';
 import { useTensPlayAnimation } from './useTensPlayAnimation';
+import {
+  computeRadialSeatRadii,
+  SEAT_RADIUS_Y_SCALE,
+  type ElementSize,
+} from '../shared/radialSeatRadii';
 
 interface TensBoardProps {
   state: TensState;
@@ -47,13 +59,6 @@ interface SeatLayout {
   seatTop: number;
 }
 
-interface ElementSize {
-  width: number;
-  height: number;
-}
-
-const SEAT_EDGE_GAP_PX = 8;
-const SEAT_RADIUS_Y_SCALE = 0.9;
 const OPPONENT_HAND_CARD_WIDTH = 45;
 const OPPONENT_HAND_CARD_HEIGHT = 68;
 const OPPONENT_HAND_MAX_SPREAD = 160;
@@ -76,13 +81,13 @@ function getOpponentHandLayout(cardCount: number): OpponentHandLayout {
 }
 
 function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
-  if (playerCount >= 9) return { seatRadiusX: 44, seatRadiusY: 38 };
-  if (playerCount >= 7) return { seatRadiusX: 42, seatRadiusY: 36 };
-  if (playerCount >= 6) return { seatRadiusX: 40, seatRadiusY: 34 };
-  if (playerCount === 5) return { seatRadiusX: 37, seatRadiusY: 32 };
-  if (playerCount === 4) return { seatRadiusX: 35, seatRadiusY: 30 };
-  if (playerCount === 3) return { seatRadiusX: 35, seatRadiusY: 30 };
-  return { seatRadiusX: 30, seatRadiusY: 29 };
+  if (playerCount >= 9) return { seatRadiusX: 46, seatRadiusY: 39 };
+  if (playerCount >= 7) return { seatRadiusX: 44, seatRadiusY: 37 };
+  if (playerCount >= 6) return { seatRadiusX: 42, seatRadiusY: 35 };
+  if (playerCount === 5) return { seatRadiusX: 39, seatRadiusY: 33 };
+  if (playerCount === 4) return { seatRadiusX: 36, seatRadiusY: 29 };
+  if (playerCount === 3) return { seatRadiusX: 37, seatRadiusY: 31 };
+  return { seatRadiusX: 32, seatRadiusY: 30 };
 }
 
 function handCardKey(handIndex: number): string {
@@ -245,21 +250,13 @@ export default function TensBoard({
     const playerCount = state.players.length;
     if (playerCount === 0) return [];
     const fallbackRadii = getLayoutRadii(playerCount);
-    const canUseMeasuredRadii =
-      tableSize.width > 0 &&
-      tableSize.height > 0 &&
-      seatPillSize.width > 0 &&
-      seatPillSize.height > 0;
-    const radii = canUseMeasuredRadii
-      ? (() => {
-          const usableHalfWidth = tableSize.width / 2 - seatPillSize.width / 2 - SEAT_EDGE_GAP_PX;
-          const usableHalfHeight = tableSize.height / 2 - seatPillSize.height / 2 - SEAT_EDGE_GAP_PX;
-          return {
-            seatRadiusX: Math.max(0, Math.min(50, (usableHalfWidth / tableSize.width) * 100)),
-            seatRadiusY: Math.max(0, Math.min(50, (usableHalfHeight / tableSize.height) * 100)),
-          };
-        })()
-      : fallbackRadii;
+    const radii = computeRadialSeatRadii({
+      pilesPerPlayer: PILES_PER_PLAYER,
+      playerCount,
+      tableSize,
+      seatPillSize,
+      fallbackRadii,
+    });
     const scaledRadii = {
       seatRadiusX: radii.seatRadiusX,
       seatRadiusY: radii.seatRadiusY * SEAT_RADIUS_Y_SCALE,

@@ -80,5 +80,11 @@ export type TensAction =
   | { type: 'show-final-results' };
 
 export const PILES_PER_PLAYER = 4;
+
+/** @deprecated Use RADIAL_FOUR_PLAYER_* from ../shared/radialSeatRadii */
+export {
+  RADIAL_FOUR_PLAYER_PILE_ROW_GAP_PX as TENS_FOUR_PLAYER_PILE_ROW_GAP_PX,
+  RADIAL_FOUR_PLAYER_PILE_WIDTH_PX as TENS_FOUR_PLAYER_PILE_WIDTH_PX,
+} from '../shared/radialSeatRadii';
 export const HAND_CARDS_PER_PLAYER = 12;
 export const CARDS_PER_PLAYER = PILES_PER_PLAYER * 2 + HAND_CARDS_PER_PLAYER;

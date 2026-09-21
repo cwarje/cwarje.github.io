@@ -25,6 +25,11 @@ import { CardFace } from '../shared/ui/CardFace';
 import { RadialSeatName } from '../shared/ui/RadialSeatName';
 import { SUIT_COLORS, SUIT_SYMBOLS } from '../shared/ui/cardConstants';
 import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
+import {
+  computeRadialSeatRadii,
+  SEAT_RADIUS_Y_SCALE,
+  type ElementSize,
+} from '../shared/radialSeatRadii';
 
 interface TwelveBoardProps {
   state: TwelveState;
@@ -51,12 +56,6 @@ interface TrickSlotPlacement {
   dy: string;
 }
 
-interface ElementSize {
-  width: number;
-  height: number;
-}
-
-const RIVER_SEAT_EDGE_GAP_PX = 8;
 const TRICK_EXIT_DISTANCE_PX = 72;
 
 const TRICK_SLOT_PLACEMENTS: Record<number, TrickSlotPlacement[]> = {
@@ -78,8 +77,9 @@ const TRICK_SLOT_PLACEMENTS: Record<number, TrickSlotPlacement[]> = {
 };
 
 function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
-  if (playerCount === 2) return { seatRadiusX: 30, seatRadiusY: 29 };
-  if (playerCount === 4) return { seatRadiusX: 35, seatRadiusY: 27 };
+  if (playerCount === 2) return { seatRadiusX: 32, seatRadiusY: 30 };
+  if (playerCount === 3) return { seatRadiusX: 37, seatRadiusY: 31 };
+  if (playerCount === 4) return { seatRadiusX: 36, seatRadiusY: 29 };
   return { seatRadiusX: 34, seatRadiusY: 30 };
 }
 
@@ -210,21 +210,17 @@ export default function TwelveBoard({
     const playerCount = state.players.length;
     if (playerCount === 0) return [];
     const fallbackRadii = getLayoutRadii(playerCount);
-    const canUseMeasuredRadii =
-      tableSize.width > 0 &&
-      tableSize.height > 0 &&
-      seatPillSize.width > 0 &&
-      seatPillSize.height > 0;
-    const radii = canUseMeasuredRadii
-      ? (() => {
-          const usableHalfWidth = tableSize.width / 2 - seatPillSize.width / 2 - RIVER_SEAT_EDGE_GAP_PX;
-          const usableHalfHeight = tableSize.height / 2 - seatPillSize.height / 2 - RIVER_SEAT_EDGE_GAP_PX;
-          return {
-            seatRadiusX: Math.max(0, Math.min(50, (usableHalfWidth / tableSize.width) * 100)),
-            seatRadiusY: Math.max(0, Math.min(50, ((usableHalfHeight / tableSize.height) * 100) * 0.9)),
-          };
-        })()
-      : fallbackRadii;
+    const radii = computeRadialSeatRadii({
+      pilesPerPlayer: state.pileCount,
+      playerCount,
+      tableSize,
+      seatPillSize,
+      fallbackRadii,
+    });
+    const scaledRadii = {
+      seatRadiusX: radii.seatRadiusX,
+      seatRadiusY: radii.seatRadiusY * SEAT_RADIUS_Y_SCALE,
+    };
 
     return Array.from({ length: playerCount }, (_, relativeIndex) => {
       const playerIndex = (anchorIndex + relativeIndex) % playerCount;
@@ -235,11 +231,11 @@ export default function TwelveBoard({
         relativeIndex,
         playerIndex,
         player,
-        seatLeft: 50 + radii.seatRadiusX * Math.cos(angleInRadians),
-        seatTop: 50 + radii.seatRadiusY * Math.sin(angleInRadians),
+        seatLeft: 50 + scaledRadii.seatRadiusX * Math.cos(angleInRadians),
+        seatTop: 50 + scaledRadii.seatRadiusY * Math.sin(angleInRadians),
       };
     }).filter(layout => !!layout.player);
-  }, [state.players, anchorIndex, tableSize.width, tableSize.height, seatPillSize.width, seatPillSize.height]);
+  }, [state.players, state.pileCount, anchorIndex, tableSize.width, tableSize.height, seatPillSize.width, seatPillSize.height]);
 
   const dealSeats = useMemo<DealSeat[]>(
     () =>
@@ -959,7 +955,7 @@ export default function TwelveBoard({
   };
 
   return (
-    <div ref={boardRef} className={`twelve-board radial-board radial-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
+    <div ref={boardRef} className={`twelve-board twelve-board--players-${state.players.length} radial-board radial-board--players-${state.players.length} relative space-y-3 sm:space-y-4`}>
       <DealAnimationLayer flights={deal.flights} dealCenter={deal.dealCenter} remaining={deal.flights.length} />
       {showDevBestCardsButton && (
         <button

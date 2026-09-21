@@ -36,6 +36,7 @@ import type { YahtzeeState } from '../games/yahtzee/types';
 import type { FarkleState } from '../games/farkle/types';
 import type { UpRiverState } from '../games/up-and-down-the-river/types';
 import { isMobilizationDevJumpAction, type MobilizationState } from '../games/mobilization/types';
+import { canAskTeammateTrump } from '../games/twelve/logic';
 import type { TwelveState } from '../games/twelve/types';
 import type { SettlerState } from '../games/settler/types';
 import type { MinigolfState } from '../games/minigolf/types';
@@ -1604,6 +1605,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   const MOBILIZATION_BOT_DELAY = 900; // ms between Mobilization bot actions
   const MOBILIZATION_SOLITAIRE_REVEAL_DELAY = 3000; // ms to show last Solitaire play / pig pass
   const TWELVE_BOT_DELAY = 900; // ms between bot actions
+  const TWELVE_TRUMP_ASK_READ_DELAY = 3000; // ms to read teammate trump-ask HUD before bot acts
   const TWELVE_ANNOUNCEMENT_DELAY = 4000; // ms to show trump/tjog announcement
   const TWELVE_ROUND_END_DELAY = 6500; // ms to show round summary before next round
   const TWELVE_FINAL_RESULTS_DELAY = 6000; // ms to hold final round summary before end screen
