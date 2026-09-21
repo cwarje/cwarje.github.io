@@ -2200,7 +2200,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
                 broadcastRoomState(finishedRoom);
               }
             }
-          }, TWELVE_BOT_DELAY);
+          }, TWELVE_TRUMP_ASK_READ_DELAY);
         }
         return;
       }
@@ -2269,6 +2269,10 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
 
       const currentPlayer = ts.players[ts.currentPlayerIndex];
       if (currentPlayer && currentPlayer.isBot) {
+        const botDelay =
+          canAskTeammateTrump(ts, currentPlayer)
+            ? TWELVE_TRUMP_ASK_READ_DELAY
+            : TWELVE_BOT_DELAY;
         botTimerRef.current = setTimeout(() => {
           const currentGs = gameStateRef.current;
           const currentRoom = roomRef.current;
@@ -2284,7 +2288,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
               broadcastRoomState(finishedRoom);
             }
           }
-        }, TWELVE_BOT_DELAY);
+        }, botDelay);
       }
       return;
     }
