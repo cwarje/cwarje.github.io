@@ -65,6 +65,7 @@ function makeState(players: TwelvePlayer[], currentPlayerIndex: number): TwelveS
     manBid: null,
     postAnnouncement: null,
     roundBonusesSkipped: false,
+    trumpAsk: null,
   };
 }
 
@@ -437,6 +438,121 @@ function halfManFailEndsRoundScenario(): TwelveBotScenarioResult {
   };
 }
 
+function teamAskTrumpYesScenario(): TwelveBotScenarioResult {
+  const p0 = makePlayer('p0', true, [card('hearts', 7)], [], 6);
+  const p1 = makePlayer('p1', true, [card('diamonds', 6)], [], 4);
+  const p2 = makePlayer('p2', true, [card('clubs', 12), card('clubs', 13)], [], 6);
+  const p3 = makePlayer('p3', true, [card('spades', 7)], [], 4);
+
+  const state = makeState([p0, p1, p2, p3], 0);
+  state.lastTrickWinnerId = 'p0';
+
+  const asked = processTwelveAction(state, { type: 'ask-teammate-trump' }, 'p0') as TwelveState;
+  const responded = processTwelveAction(
+    asked,
+    { type: 'respond-teammate-trump', answer: 'yes', suit: 'clubs' },
+    'p2',
+  ) as TwelveState;
+
+  const passed =
+    responded.trumpSuit === 'clubs'
+    && responded.trumpSetterId === 'p2'
+    && responded.players[0].totalScore === 8
+    && responded.players[2].totalScore === 8
+    && responded.players[1].totalScore === 4
+    && responded.players[3].totalScore === 4
+    && responded.phase === 'announcement'
+    && responded.announcement?.kind === 'set-trump';
+
+  return {
+    name: 'team-ask-trump-yes',
+    passed,
+    details: passed
+      ? 'Teammate trump ask accepted; trump set and team scores synced.'
+      : `trump=${String(responded.trumpSuit)} scores=[${responded.players.map(p => p.totalScore)}] phase=${responded.phase}`,
+  };
+}
+
+function teamAskTrumpNoScenario(): TwelveBotScenarioResult {
+  const p0 = makePlayer('p0', true, [card('hearts', 7)], [], 6);
+  const p1 = makePlayer('p1', true, [card('diamonds', 6)], [], 4);
+  const p2 = makePlayer('p2', true, [card('clubs', 7)], [], 6);
+  const p3 = makePlayer('p3', true, [card('spades', 7)], [], 4);
+
+  const state = makeState([p0, p1, p2, p3], 0);
+  state.lastTrickWinnerId = 'p0';
+
+  const asked = processTwelveAction(state, { type: 'ask-teammate-trump' }, 'p0') as TwelveState;
+  const declined = processTwelveAction(
+    asked,
+    { type: 'respond-teammate-trump', answer: 'no' },
+    'p2',
+  ) as TwelveState;
+  const resumed = processTwelveAction(declined, { type: 'finish-announcement' }, 'p0') as TwelveState;
+
+  const passed =
+    resumed.phase === 'playing'
+    && resumed.trumpSuit === null
+    && resumed.currentPlayerIndex === 0
+    && declined.announcement?.kind === 'trump-ask-declined';
+
+  return {
+    name: 'team-ask-trump-no',
+    passed,
+    details: passed
+      ? 'Teammate declined trump; play resumed on asker with no trump set.'
+      : `phase=${resumed.phase} trump=${String(resumed.trumpSuit)} current=${resumed.currentPlayerIndex}`,
+  };
+}
+
+function botRespondTrumpAskScenario(): TwelveBotScenarioResult {
+  const p0 = makePlayer('p0', false, [card('hearts', 7)], [], 6);
+  const p1 = makePlayer('p1', true, [card('diamonds', 6)], [], 4);
+  const p2 = makePlayer('p2', true, [card('clubs', 12), card('clubs', 13)], [], 6);
+  const p3 = makePlayer('p3', true, [card('spades', 7)], [], 4);
+
+  const state = makeState([p0, p1, p2, p3], 0);
+  state.phase = 'trump-ask';
+  state.trumpAsk = { askerId: 'p0', responderId: 'p2' };
+
+  const next = runTwelveBotTurn(state) as TwelveState;
+  const passed =
+    next.phase === 'announcement'
+    && (next.announcement?.kind === 'set-trump' || next.announcement?.kind === 'trump-ask-declined');
+
+  return {
+    name: 'bot-respond-trump-ask',
+    passed,
+    details: passed
+      ? `Bot responded: ${next.announcement?.kind ?? 'none'}`
+      : `phase=${next.phase} announcement=${String(next.announcement?.kind)}`,
+  };
+}
+
+function botAskTeammateTrumpScenario(): TwelveBotScenarioResult {
+  const p0 = makePlayer('p0', true, [card('hearts', 7)], [], 6);
+  const p1 = makePlayer('p1', true, [card('diamonds', 6)], [], 4);
+  const p2 = makePlayer('p2', true, [card('clubs', 12), card('clubs', 13)], [], 6);
+  const p3 = makePlayer('p3', true, [card('spades', 7)], [], 4);
+
+  const state = makeState([p0, p1, p2, p3], 0);
+  state.lastTrickWinnerId = 'p0';
+
+  const next = runTwelveBotTurn(state) as TwelveState;
+  const passed =
+    next.phase === 'trump-ask'
+    && next.trumpAsk?.askerId === 'p0'
+    && next.trumpAsk.responderId === 'p2';
+
+  return {
+    name: 'bot-ask-teammate-trump',
+    passed,
+    details: passed
+      ? 'Bot asker requested trump from teammate.'
+      : `phase=${next.phase} trumpAsk=${JSON.stringify(next.trumpAsk)}`,
+  };
+}
+
 /** Opponent led 10 in suit; bot must win with ace instead of ducking with a low card. */
 function aceOverLedTenScenario(): TwelveBotScenarioResult {
   const bot = makePlayer('p0', true, [card('hearts', 14), card('hearts', 6)], []);
@@ -468,6 +584,10 @@ export function runTwelveBotScenarioChecks(): TwelveBotScenarioResult[] {
     chooseLowestForcedTrumpScenario(),
     teamCardPointAggregationScenario(),
     teamTrumpScoreSyncScenario(),
+    teamAskTrumpYesScenario(),
+    teamAskTrumpNoScenario(),
+    botRespondTrumpAskScenario(),
+    botAskTeammateTrumpScenario(),
     teamWinnerResolutionScenario(),
     teamBonusCountedOnceScenario(),
     halfManFailEndsRoundScenario(),

@@ -1,6 +1,12 @@
 import type { Player } from '../../networking/types';
 import type { TwelveState } from './types';
-import { createTwelveState, processTwelveAction, runTwelveBotTurn } from './logic';
+import {
+  canAskTeammateTrump,
+  createTwelveState,
+  getTeammateIndex,
+  processTwelveAction,
+  runTwelveBotTurn,
+} from './logic';
 import { getTrickWinnerPlayerId, isLegalPlay, listPlayableCards, rankStrength, suitsWithRoyalPair } from './rules';
 
 export interface TwelveBotValidationMetrics {
@@ -39,6 +45,10 @@ function runLegacyTwelveBotTurn(state: TwelveState): TwelveState {
     return processTwelveAction(state, { type: 'flip-exposed' }, '') as TwelveState;
   }
 
+  if (state.phase === 'trump-ask') {
+    return runTwelveBotTurn(state) as TwelveState;
+  }
+
   const currentPlayer = state.players[state.currentPlayerIndex];
   if (!currentPlayer?.isBot) return state;
 
@@ -51,6 +61,21 @@ function runLegacyTwelveBotTurn(state: TwelveState): TwelveState {
     const pairs = suitsWithRoyalPair(currentPlayer);
     if (pairs.length > 0 && Math.random() < 0.55) {
       return processTwelveAction(state, { type: 'set-trump', suit: pairs[0] }, currentPlayer.id) as TwelveState;
+    }
+  }
+
+  if (canAskTeammateTrump(state, currentPlayer)) {
+    const teammateIndex = getTeammateIndex(state.currentPlayerIndex, state.players.length);
+    if (teammateIndex !== null) {
+      const teammate = state.players[teammateIndex];
+      if (teammate.totalScore < 10 && suitsWithRoyalPair(teammate).length > 0) {
+        const canSelfSet =
+          currentPlayer.totalScore <= 9
+          && suitsWithRoyalPair(currentPlayer).length > 0;
+        if (!canSelfSet && Math.random() < 0.6) {
+          return processTwelveAction(state, { type: 'ask-teammate-trump' }, currentPlayer.id) as TwelveState;
+        }
+      }
     }
   }
 
@@ -125,6 +150,9 @@ function resolveRoundBonuses(state: TwelveState): { mostPointsAwarded: boolean; 
 }
 
 function runAssignedBotTurn(state: TwelveState): TwelveState {
+  if (state.phase === 'trump-ask') {
+    return runTwelveBotTurn(state) as TwelveState;
+  }
   const current = state.players[state.currentPlayerIndex];
   if (!current) return state;
   if (isNewBotId(current.id)) return runTwelveBotTurn(state) as TwelveState;
@@ -158,6 +186,11 @@ export function runTwelveBotValidation(gameCount = 40): TwelveBotValidationMetri
 
       if (state.phase === 'announcement') {
         state = processTwelveAction(state, { type: 'finish-announcement' }, state.players[0]?.id ?? '') as TwelveState;
+        continue;
+      }
+
+      if (state.phase === 'trump-ask') {
+        state = runAssignedBotTurn(state) as TwelveState;
         continue;
       }
 

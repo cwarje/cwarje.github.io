@@ -9,7 +9,12 @@ import {
 } from '../../hats/hats';
 import type { Card, Suit, TwelvePlayer, TwelveState } from './types';
 import { cardPointValue, getPilePlayableCard, isLegalPlay, rankDisplay, suitsWithRoyalPair } from './rules';
-import { getTeamRoundCardPoints } from './logic';
+import {
+  canAskTeammateTrump,
+  canRespondTeammateTrumpNo,
+  canRespondTeammateTrumpYes,
+  getTeamRoundCardPoints,
+} from './logic';
 import { DARK_PLAYER_COLORS, DEFAULT_PLAYER_COLOR, PLAYER_COLOR_HEX, getPlayerHudTextColor } from '../../networking/playerColors';
 import { useDealerDealAnimation, type DealSeat, type DealExtraTarget } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
@@ -448,7 +453,41 @@ export default function TwelveBoard({
         </>
       );
     }
+    if (state.phase === 'trump-ask' && state.trumpAsk) {
+      const asker = state.players.find(p => p.id === state.trumpAsk!.askerId);
+      const responder = state.players.find(p => p.id === state.trumpAsk!.responderId);
+      if (!asker || !responder) return null;
+      if (myId === state.trumpAsk.responderId) {
+        return (
+          <>
+            {'Teammate '}
+            <span style={{ color: getPlayerHudTextColor(asker.color) }}>{asker.name}</span>
+            {' asks if you have Trump'}
+          </>
+        );
+      }
+      return (
+        <>
+          {'Player '}
+          <span style={{ color: getPlayerHudTextColor(asker.color) }}>{asker.name}</span>
+          {' asks '}
+          <span style={{ color: getPlayerHudTextColor(responder.color) }}>{responder.name}</span>
+          {' if they have Trump'}
+        </>
+      );
+    }
     if (state.phase === 'announcement' && state.announcement) {
+      if (state.announcement.kind === 'trump-ask-declined') {
+        const responder = state.players.find(p => p.id === state.announcement?.responderId);
+        if (!responder) return null;
+        return (
+          <>
+            <span style={{ color: getPlayerHudTextColor(responder.color) }}>{responder.name}</span>
+            {' does not have Trump'}
+          </>
+        );
+      }
+      if (!('playerId' in state.announcement)) return null;
       const player = state.players.find(p => p.id === state.announcement?.playerId);
       if (!player) return null;
       if (state.announcement.kind === 'set-trump') {
@@ -558,7 +597,7 @@ export default function TwelveBoard({
         <span style={{ color: getPlayerHudTextColor(waitingPlayer.color) }}>{waitingPlayer.name}</span>
       </>
     );
-  }, [state.phase, state.roundCardPoints, state.lastTrickWinnerId, state.announcement, state.trickWinner, state.players, state.currentPlayerIndex, isMyTurn]);
+  }, [state.phase, state.roundCardPoints, state.lastTrickWinnerId, state.announcement, state.trumpAsk, state.trickWinner, state.players, state.currentPlayerIndex, isMyTurn, myId]);
 
   useEffect(() => {
     const element = tableRef.current;
@@ -622,6 +661,16 @@ export default function TwelveBoard({
       })
     : [];
   const canUseActionButtons = state.phase === 'playing' && isMyTurn && !state.trickWinner;
+  const isTrumpAskResponder =
+    state.phase === 'trump-ask'
+    && !!state.trumpAsk
+    && state.trumpAsk.responderId === myId;
+  const canAskTeammate =
+    !!myPlayer && canAskTeammateTrump(state, myPlayer);
+  const responderYesSuits = myPlayer && isTrumpAskResponder
+    ? suitsWithRoyalPair(myPlayer).filter(suit => canRespondTeammateTrumpYes(state, myPlayer, suit))
+    : [];
+  const canRespondTrumpNo = !!myPlayer && isTrumpAskResponder && canRespondTeammateTrumpNo(state, myPlayer);
   const canAnnounceTrumpOrTjog =
     !!myPlayer
     && canUseActionButtons
@@ -649,7 +698,12 @@ export default function TwelveBoard({
   const canCallHalfMan = canDeclareMan && totalTricksInRound >= 6;
   const canCallFullMan = canDeclareMan;
   const hasActionButtons =
-    showSetTrumpActions || showCallTjogActions || canCallHalfMan || canCallFullMan;
+    showSetTrumpActions
+    || showCallTjogActions
+    || canCallHalfMan
+    || canCallFullMan
+    || canAskTeammate
+    || isTrumpAskResponder;
   const showDevBestCardsButton =
     import.meta.env.DEV
     && myIndex >= 0
@@ -695,6 +749,21 @@ export default function TwelveBoard({
     if (myIndex < 0 || !myPlayer) return;
     if (!canCallFullMan) return;
     onAction({ type: 'call-full-man' });
+  };
+
+  const askTeammateTrump = () => {
+    if (!myPlayer || !canAskTeammate) return;
+    onAction({ type: 'ask-teammate-trump' });
+  };
+
+  const respondTeammateTrumpNo = () => {
+    if (!myPlayer || !canRespondTrumpNo) return;
+    onAction({ type: 'respond-teammate-trump', answer: 'no' });
+  };
+
+  const respondTeammateTrumpYes = (suit: Suit) => {
+    if (!myPlayer || !canRespondTeammateTrumpYes(state, myPlayer, suit)) return;
+    onAction({ type: 'respond-teammate-trump', answer: 'yes', suit });
   };
 
   const devGiveBestCards = () => {
@@ -1066,6 +1135,52 @@ export default function TwelveBoard({
                         <span className={SUIT_COLORS[suit]}>{SUIT_SYMBOLS[suit]}</span>
                       </button>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {canAskTeammate && (
+                <div className="twelve-actionGroup">
+                  <span className="twelve-actionLabel">Ask Trump</span>
+                  <div className="twelve-actionButtons">
+                    <button
+                      type="button"
+                      disabled={!canAskTeammate}
+                      onClick={askTeammateTrump}
+                      className="twelve-actionButton"
+                    >
+                      ?
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {isTrumpAskResponder && (
+                <div className="twelve-actionGroup">
+                  <span className="twelve-actionLabel">Trump</span>
+                  <div className="twelve-actionButtons">
+                    {responderYesSuits.map((suit) => (
+                      <button
+                        key={`yes-${suit}`}
+                        type="button"
+                        disabled={!myPlayer || !canRespondTeammateTrumpYes(state, myPlayer, suit)}
+                        onClick={() => respondTeammateTrumpYes(suit)}
+                        className="twelve-actionButton"
+                        title={`Yes ${suit}`}
+                      >
+                        <span className={SUIT_COLORS[suit]}>{SUIT_SYMBOLS[suit]}</span>
+                      </button>
+                    ))}
+                    {canRespondTrumpNo && (
+                      <button
+                        type="button"
+                        disabled={!canRespondTrumpNo}
+                        onClick={respondTeammateTrumpNo}
+                        className="twelve-actionButton"
+                      >
+                        No
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

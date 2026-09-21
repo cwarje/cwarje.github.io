@@ -2178,6 +2178,31 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      if (ts.phase === 'trump-ask') {
+        const responder = ts.trumpAsk
+          ? ts.players.find(player => player.id === ts.trumpAsk!.responderId)
+          : undefined;
+        if (responder?.isBot) {
+          botTimerRef.current = setTimeout(() => {
+            const currentGs = gameStateRef.current;
+            const currentRoom = roomRef.current;
+            if (!currentGs || !currentRoom) return;
+
+            const next = runSingleBotTurn('twelve', currentGs);
+            if (next !== currentGs) {
+              setGameState(next);
+              broadcastGameState(next);
+              if (checkGameOver('twelve', next)) {
+                const finishedRoom = { ...currentRoom, phase: 'finished' as const };
+                setRoom(finishedRoom);
+                broadcastRoomState(finishedRoom);
+              }
+            }
+          }, TWELVE_BOT_DELAY);
+        }
+        return;
+      }
+
       if (ts.phase === 'playing' && ts.trickWinner) {
         botTimerRef.current = setTimeout(() => {
           const currentGs = gameStateRef.current as TwelveState | null;

@@ -26,7 +26,7 @@ export interface TwelvePlayer {
   tjogSuitsCalled: Suit[];
 }
 
-export type TwelvePhase = 'playing' | 'announcement' | 'flipping' | 'round-end' | 'game-over';
+export type TwelvePhase = 'playing' | 'trump-ask' | 'announcement' | 'flipping' | 'round-end' | 'game-over';
 export type PlaySource = 'hand' | 'pile-top' | 'pile-bottom';
 
 export type TwelveManBid = { kind: 'half' | 'full'; playerId: string };
@@ -46,6 +46,11 @@ export type TwelveAnnouncement =
       kind: 'man-outcome';
       playerId: string;
       outcome: TwelveManOutcomeKind;
+    }
+  | {
+      kind: 'trump-ask-declined';
+      askerId: string;
+      responderId: string;
     };
 
 export interface TrickPlay {
@@ -79,6 +84,7 @@ export interface TwelveState {
   manBid: TwelveManBid | null;
   postAnnouncement: 'end-round' | 'end-round-half-man' | null;
   roundBonusesSkipped: boolean;
+  trumpAsk: { askerId: string; responderId: string } | null;
 }
 
 export type TwelveAction =
@@ -89,6 +95,9 @@ export type TwelveAction =
   | { type: 'call-tjog'; suit: Suit }
   | { type: 'call-half-man' }
   | { type: 'call-full-man' }
+  | { type: 'ask-teammate-trump' }
+  | { type: 'respond-teammate-trump'; answer: 'no' }
+  | { type: 'respond-teammate-trump'; answer: 'yes'; suit: Suit }
   | { type: 'finish-announcement' }
   | { type: 'resolve-trick' }
   | { type: 'flip-exposed' }

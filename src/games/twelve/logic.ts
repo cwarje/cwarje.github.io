@@ -327,6 +327,7 @@ function startRound(
     manBid: null,
     postAnnouncement: null,
     roundBonusesSkipped: false,
+    trumpAsk: null,
   };
 }
 
@@ -408,6 +409,7 @@ function endRound(state: TwelveState, options?: { skipRoundBonuses?: boolean }):
     manBid: null,
     postAnnouncement: null,
     roundBonusesSkipped: skipRoundBonuses,
+    trumpAsk: null,
   };
 }
 
@@ -443,6 +445,37 @@ function canCallFullMan(state: TwelveState, player: TwelvePlayer): boolean {
   if (state.trickNumber !== 2) return false;
   if (state.manBid !== null) return false;
   return true;
+}
+
+export function canAskTeammateTrump(state: TwelveState, asker: TwelvePlayer): boolean {
+  if (state.players.length !== 4) return false;
+  if (state.phase !== 'playing') return false;
+  if (state.trickWinner) return false;
+  if (state.currentTrick.length !== 0) return false;
+  if (state.lastTrickWinnerId !== asker.id) return false;
+  if (state.trumpSuit !== null) return false;
+  if (state.trumpAsk !== null) return false;
+  const askerIndex = state.players.findIndex(p => p.id === asker.id);
+  if (askerIndex === -1 || askerIndex !== state.currentPlayerIndex) return false;
+  return getTeammateId(state.players, asker.id) !== null;
+}
+
+export function canRespondTeammateTrumpYes(state: TwelveState, responder: TwelvePlayer, suit: Suit): boolean {
+  if (state.phase !== 'trump-ask' || !state.trumpAsk) return false;
+  if (state.trumpAsk.responderId !== responder.id) return false;
+  if (state.trumpSuit !== null) return false;
+  if (responder.totalScore >= 10) return false;
+  return suitsWithRoyalPair(responder).includes(suit);
+}
+
+export function canRespondTeammateTrumpNo(state: TwelveState, responder: TwelvePlayer): boolean {
+  if (state.phase !== 'trump-ask' || !state.trumpAsk) return false;
+  return state.trumpAsk.responderId === responder.id;
+}
+
+function teammateCanDeclareTrumpSuit(responder: TwelvePlayer, suit: Suit): boolean {
+  if (responder.totalScore >= 10) return false;
+  return suitsWithRoyalPair(responder).includes(suit);
 }
 
 export function createTwelveState(players: Player[], options?: { pileCount?: TwelvePileCount }): TwelveState {
@@ -570,6 +603,66 @@ export function processTwelveAction(state: unknown, action: unknown, playerId: s
           playerId: player.id,
         },
         manBid: { kind: 'full', playerId: player.id },
+      };
+    }
+
+    case 'ask-teammate-trump': {
+      if (s.phase !== 'playing' || s.trickWinner) return state;
+      const playerIndex = s.players.findIndex(player => player.id === playerId);
+      if (playerIndex === -1 || playerIndex !== s.currentPlayerIndex) return state;
+      const player = s.players[playerIndex];
+      if (!canAskTeammateTrump(s, player)) return state;
+      const responderId = getTeammateId(s.players, player.id);
+      if (!responderId) return state;
+      return {
+        ...s,
+        phase: 'trump-ask',
+        trumpAsk: { askerId: player.id, responderId },
+      };
+    }
+
+    case 'respond-teammate-trump': {
+      if (s.phase !== 'trump-ask' || !s.trumpAsk) return state;
+      const responderIndex = s.players.findIndex(player => player.id === playerId);
+      if (responderIndex === -1) return state;
+      const responder = s.players[responderIndex];
+      if (responder.id !== s.trumpAsk.responderId) return state;
+
+      if (a.answer === 'no') {
+        if (!canRespondTeammateTrumpNo(s, responder)) return state;
+        return {
+          ...s,
+          phase: 'announcement',
+          trumpAsk: null,
+          announcement: {
+            kind: 'trump-ask-declined',
+            askerId: s.trumpAsk.askerId,
+            responderId: responder.id,
+          },
+        };
+      }
+
+      if (!canRespondTeammateTrumpYes(s, responder, a.suit)) return state;
+      const newScore = responder.totalScore + 2;
+      const updatedPlayers = [...s.players];
+      updatedPlayers[responderIndex] = { ...responder, totalScore: newScore };
+      const trumpTeammateIdx = getTeammateIndex(responderIndex, s.players.length);
+      if (trumpTeammateIdx !== null) {
+        updatedPlayers[trumpTeammateIdx] = { ...updatedPlayers[trumpTeammateIdx], totalScore: newScore };
+      }
+
+      return {
+        ...s,
+        players: updatedPlayers,
+        phase: 'announcement',
+        trumpAsk: null,
+        announcement: {
+          kind: 'set-trump',
+          playerId: responder.id,
+          suit: a.suit,
+        },
+        trumpSuit: a.suit,
+        trumpSetterId: responder.id,
       };
     }
 
@@ -1423,6 +1516,26 @@ export function runTwelveBotTurn(state: unknown): unknown {
     return processTwelveAction(s, { type: 'flip-exposed' }, '');
   }
 
+  if (s.phase === 'trump-ask' && s.trumpAsk) {
+    const responderIndex = s.players.findIndex(player => player.id === s.trumpAsk!.responderId);
+    if (responderIndex === -1) return state;
+    const responder = s.players[responderIndex];
+    if (!responder.isBot) return state;
+    const choice = chooseSetTrumpSuit(s, responderIndex);
+    if (
+      choice
+      && choice.score >= 7
+      && canRespondTeammateTrumpYes(s, responder, choice.suit)
+    ) {
+      return processTwelveAction(
+        s,
+        { type: 'respond-teammate-trump', answer: 'yes', suit: choice.suit },
+        responder.id,
+      );
+    }
+    return processTwelveAction(s, { type: 'respond-teammate-trump', answer: 'no' }, responder.id);
+  }
+
   const currentPlayer = s.players[s.currentPlayerIndex];
   if (!currentPlayer?.isBot) return state;
 
@@ -1430,6 +1543,25 @@ export function runTwelveBotTurn(state: unknown): unknown {
     const choice = chooseSetTrumpSuit(s, s.currentPlayerIndex);
     if (choice && choice.score >= 8.5) {
       return processTwelveAction(s, { type: 'set-trump', suit: choice.suit }, currentPlayer.id);
+    }
+  }
+
+  if (canAskTeammateTrump(s, currentPlayer)) {
+    const teammateId = getTeammateId(s.players, currentPlayer.id);
+    const teammateIndex = teammateId ? s.players.findIndex(player => player.id === teammateId) : -1;
+    if (teammateIndex >= 0) {
+      const teammate = s.players[teammateIndex];
+      const partnerChoice = chooseSetTrumpSuit(s, teammateIndex);
+      const partnerCanDeclare =
+        !!partnerChoice
+        && teammateCanDeclareTrumpSuit(teammate, partnerChoice.suit);
+      const selfChoice = canSetTrump(s, currentPlayer)
+        ? chooseSetTrumpSuit(s, s.currentPlayerIndex)
+        : null;
+      const willSelfDeclare = !!selfChoice && selfChoice.score >= 8.5;
+      if (partnerCanDeclare && !willSelfDeclare && partnerChoice!.score >= 7) {
+        return processTwelveAction(s, { type: 'ask-teammate-trump' }, currentPlayer.id);
+      }
     }
   }
 
