@@ -20,6 +20,7 @@ import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 import { CardTossLayers } from '../shared/CardTossLayers';
 import { useCardToss } from '../shared/useCardToss';
 import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
+import queenOfSpadesSound from '../../assets/queen-of-spades.mp3';
 
 function placementLabel(position: number): string {
   if (position % 100 >= 11 && position % 100 <= 13) return `${position}th`;
@@ -89,6 +90,14 @@ function cardKey(card: Card): string {
   return `${card.suit}-${card.rank}`;
 }
 
+function isQueenOfSpades(card: Card): boolean {
+  return card.suit === 'spades' && card.rank === 12;
+}
+
+function trickPlayKey(trickNumber: number, playerId: string, card: Card): string {
+  return `${trickNumber}-${playerId}-${cardKey(card)}`;
+}
+
 interface HeartsBoardProps {
   state: HeartsState;
   myId: string;
@@ -122,6 +131,9 @@ export default function HeartsBoard({
   const [seatPillSize, setSeatPillSize] = useState<ElementSize>({ width: 0, height: 0 });
   const handBeforePassRef = useRef<Card[]>([]);
   const prevPhaseRef = useRef(state.phase);
+  const queenOfSpadesAudioRef = useRef<HTMLAudioElement | null>(null);
+  const qosSoundTrickKeySeededRef = useRef(false);
+  const lastQoSSoundTrickKeyRef = useRef<string | null>(null);
   const [receivedCardKeys, setReceivedCardKeys] = useState<Set<string>>(() => new Set());
 
   const {
@@ -169,6 +181,36 @@ export default function HeartsBoard({
     if (!isValidHeartsPlay(state, myIndex, card)) return;
     onAction({ type: 'play-card', card });
   };
+
+  useEffect(() => {
+    queenOfSpadesAudioRef.current = new Audio(queenOfSpadesSound);
+    return () => {
+      queenOfSpadesAudioRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const last = state.currentTrick.at(-1);
+    if (!last) return;
+
+    const key = trickPlayKey(state.trickNumber, last.playerId, last.card);
+
+    if (!qosSoundTrickKeySeededRef.current) {
+      qosSoundTrickKeySeededRef.current = true;
+      lastQoSSoundTrickKeyRef.current = key;
+      return;
+    }
+
+    if (lastQoSSoundTrickKeyRef.current === key) return;
+    lastQoSSoundTrickKeyRef.current = key;
+
+    if (state.phase !== 'playing' || !isQueenOfSpades(last.card)) return;
+
+    const audio = queenOfSpadesAudioRef.current;
+    if (!audio) return;
+    audio.currentTime = 0;
+    void audio.play().catch(() => {});
+  }, [state.currentTrick, state.trickNumber, state.phase]);
 
   useEffect(() => {
     const element = handContainerRef.current;
