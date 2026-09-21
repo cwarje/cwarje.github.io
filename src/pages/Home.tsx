@@ -4,20 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import GameCard from '../components/GameCard';
 import GameStartOptionsPanel from '../components/GameStartOptionsPanel';
-import HatsCard from '../components/HatsCard';
-import ProgressCard from '../components/ProgressCard';
-import HatsShopPanel from '../components/HatsShopPanel';
 import RoomCodeInput from '../components/RoomCodeInput';
 import { useToast } from '../components/Toast';
 import { useRoomContext } from '../networking/roomStore';
 import type { GameStartOptions, GameType, Player, PlayerColor } from '../networking/types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 import { GAME_REGISTRY, ALL_GAME_TYPES, PRODUCTION_GAME_TYPES } from '../games/registry';
-import { XP_PER_LEVEL, getLevelProgress, readPlayerXp } from '../xp/progress';
-
 const gameTypesToShow = import.meta.env.DEV ? ALL_GAME_TYPES : PRODUCTION_GAME_TYPES;
-const devButtonClass =
-  'rounded-md border border-amber-300/60 bg-amber-500/20 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/30 cursor-pointer';
 
 function playerTextColor(color: PlayerColor): string {
   return PLAYER_COLOR_HEX[normalizePlayerColor(color)] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
@@ -33,7 +26,7 @@ function ColoredPlayerName({ player }: { player: Player }) {
 
 export default function Home() {
   const navigate = useNavigate();
-  const { room, isHost, myPlayer, createLobby, joinRoom, startGame, connecting, error, clearError, updatePlayerXp } = useRoomContext();
+  const { room, isHost, createLobby, joinRoom, startGame, connecting, error, clearError } = useRoomContext();
   const { toast } = useToast();
   const [playerName] = useState(() => {
     return localStorage.getItem('playerName') || '';
@@ -43,7 +36,6 @@ export default function Home() {
   const [colorInput, setColorInput] = useState<PlayerColor>(playerColor);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [expandedGameType, setExpandedGameType] = useState<GameType | null>(null);
-  const [hatsExpanded, setHatsExpanded] = useState(false);
   const [pendingJoinCode, setPendingJoinCode] = useState<string | null>(null);
   const [infoGameType, setInfoGameType] = useState<GameType | null>(null);
   const lobbyCreatingRef = useRef(false);
@@ -148,21 +140,13 @@ export default function Home() {
     const count = room.players.length;
     const gameDef = GAME_REGISTRY[gameType];
     if (count > gameDef.maxPlayers) return;
-    setHatsExpanded(false);
     setExpandedGameType((current) => (current === gameType ? null : gameType));
-  };
-
-  const handleSelectHats = () => {
-    if (!room) return;
-    setExpandedGameType(null);
-    setHatsExpanded((current) => !current);
   };
 
   const handleStartGame = (gameType: GameType, options?: GameStartOptions) => {
     if (!isHost || !room) return;
     startGame(gameType, options);
     setExpandedGameType(null);
-    setHatsExpanded(false);
   };
 
   const playerCount = room?.players.length ?? 0;
@@ -172,10 +156,6 @@ export default function Home() {
   const showNonHostLobbyMessage = room && !isHost;
   const showHostLobbyMessage = room && isHost && waitingPlayers.length > 0;
   const infoGameDef = infoGameType ? GAME_REGISTRY[infoGameType] : null;
-
-  const xp = myPlayer?.xp ?? readPlayerXp();
-  const { level } = getLevelProgress(xp);
-  const showDevLevelControls = import.meta.env.DEV;
 
   return (
     <div className="space-y-10">
@@ -206,30 +186,6 @@ export default function Home() {
         )}
       </motion.div>
 
-      {showDevLevelControls && (
-        <div className="flex items-center justify-center gap-2">
-          <span className="text-[11px] font-semibold text-amber-200/90">
-            Dev: Level {level} ({xp} XP)
-          </span>
-          <button
-            type="button"
-            className={devButtonClass}
-            aria-label="Decrease level by one"
-            onClick={() => updatePlayerXp(Math.max(0, xp - XP_PER_LEVEL))}
-          >
-            −1 Lv
-          </button>
-          <button
-            type="button"
-            className={devButtonClass}
-            aria-label="Increase level by one"
-            onClick={() => updatePlayerXp(xp + XP_PER_LEVEL)}
-          >
-            +1 Lv
-          </button>
-        </div>
-      )}
-
       {/* Error */}
       {error && (
         <motion.div
@@ -250,46 +206,18 @@ export default function Home() {
         className="space-y-4"
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="relative flex min-w-0 w-full flex-col z-0"
-          >
-            <ProgressCard xp={xp} />
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className={`relative flex flex-col min-w-0 w-full ${hatsExpanded ? 'z-30' : 'z-0'}`}
-          >
-            <HatsCard
-              onSelect={handleSelectHats}
-              disabled={!room}
-              isExpanded={hatsExpanded}
-            />
-            <AnimatePresence>
-              {hatsExpanded && room && (
-                <HatsShopPanel
-                  key="hats-shop"
-                  className="absolute left-0 right-0 top-full z-30"
-                />
-              )}
-            </AnimatePresence>
-          </motion.div>
           {gameTypesToShow.map((game, i) => {
             const gameDef = GAME_REGISTRY[game];
             const tooManyPlayers = room ? playerCount > gameDef.maxPlayers : false;
             const isDisabled = room ? (!isHost || tooManyPlayers) : false;
-            const isExpanded = expandedGameType === game && !hatsExpanded;
+            const isExpanded = expandedGameType === game;
 
             return (
               <motion.div
                 key={game}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 + (i + 1) * 0.1 }}
+                transition={{ delay: 0.2 + i * 0.1 }}
                 className={`relative flex flex-col min-w-0 w-full ${isExpanded ? 'z-30' : 'z-0'}`}
               >
                 <GameCard

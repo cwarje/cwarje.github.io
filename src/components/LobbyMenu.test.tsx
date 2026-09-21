@@ -221,3 +221,48 @@ describe('LobbyMenu favorite bots', () => {
     expect(screen.queryByRole('button', { name: 'Add bot' })).not.toBeInTheDocument();
   });
 });
+
+describe('LobbyMenu hats', () => {
+  it('shows the equipped hat on the Change hat button', () => {
+    mockUseRoomContext.mockReturnValue(
+      createRoomContext({
+        myPlayer: createPlayer({ selectedHat: 'party' }),
+      }),
+    );
+
+    render(
+      <MemoryRouter>
+        <LobbyMenu />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open lobby' }));
+
+    expect(
+      screen.getByRole('button', { name: 'Change Hat, currently Party hat' }),
+    ).toBeInTheDocument();
+  });
+
+  it('opens hat shop dialog from Change hat on the homepage', () => {
+    renderOpenLobbyMenu();
+
+    fireEvent.click(screen.getByRole('button', { name: /Change Hat/i }));
+
+    expect(screen.getByRole('dialog', { name: 'Choose a hat' })).toBeInTheDocument();
+    expect(screen.getByRole('listbox', { name: 'Choose a hat' })).toBeInTheDocument();
+  });
+
+  it('hides Change hat on the game page', () => {
+    mockUseRoomContext.mockReturnValue(createRoomContext());
+
+    render(
+      <MemoryRouter initialEntries={['/game/ABCD']}>
+        <LobbyMenu variant="icon" />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lobby' }));
+
+    expect(screen.queryByRole('button', { name: 'Change Hat' })).not.toBeInTheDocument();
+  });
+});

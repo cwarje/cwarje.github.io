@@ -1,5 +1,6 @@
 import { Gamepad2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import HeaderLevelProgress from './HeaderLevelProgress';
 import LobbyMenu from './LobbyMenu';
 import { isDoubleXpWeekend } from '../xp/progress';
 
@@ -16,8 +17,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-black">
       {showHeader && (
         <header className="border-b border-white/5 bg-black sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between relative">
-            <Link to="/" className="flex items-center gap-3 group min-w-0">
+          <div className="relative mx-auto grid h-16 max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-4 sm:px-6">
+            <Link to="/" className="flex min-w-0 items-center gap-3 group justify-self-start">
               <div className="flex items-center justify-center shrink-0">
                 <Gamepad2 className="w-8 h-8 text-white" />
               </div>
@@ -30,7 +31,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </span>
               )}
             </Link>
-            <LobbyMenu />
+            <div className="pointer-events-none justify-self-center px-2">
+              <div className="pointer-events-auto">
+                <HeaderLevelProgress />
+              </div>
+            </div>
+            <div className="justify-self-end">
+              <LobbyMenu />
+            </div>
           </div>
         </header>
       )}

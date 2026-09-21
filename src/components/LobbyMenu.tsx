@@ -19,6 +19,14 @@ import {
 } from '../networking/favoriteBots';
 import { DEALER_SPEED_OPTIONS } from '../networking/dealerSpeed';
 import { gameHasCardDealing } from '../games/registry';
+import HatShopModal from './HatShopModal';
+import {
+  HAT_CATALOG,
+  getPlayerLevelForPlayer,
+  readSelectedHat,
+  sanitizeSelectedHat,
+} from '../hats/hats';
+import { readPlayerXp } from '../xp/progress';
 
 type LobbyMenuProps = { variant?: 'default' | 'icon' };
 
@@ -34,6 +42,7 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
   const navigate = useNavigate();
   const isHomePage = useLocation().pathname === '/';
   const [open, setOpen] = useState(false);
+  const [hatShopOpen, setHatShopOpen] = useState(false);
   const [nameInput, setNameInput] = useState(() => localStorage.getItem('playerName') || '');
   const [colorInput, setColorInput] = useState<PlayerColor>(() => normalizePlayerColor(localStorage.getItem('playerColor')));
   const [favoriteBots, setFavoriteBots] = useState<FavoriteBot[]>(() => readCustomBots());
@@ -189,6 +198,10 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
 
   const isIconVariant = variant === 'icon';
   const otherPlayers = hasRoom ? room.players.filter((p) => p.id !== myId) : [];
+  const playerXp = myPlayer?.xp ?? readPlayerXp();
+  const playerLevel = getPlayerLevelForPlayer({ xp: playerXp });
+  const equippedHatId = sanitizeSelectedHat(myPlayer?.selectedHat ?? readSelectedHat(), playerLevel);
+  const equippedHat = HAT_CATALOG.find((h) => h.id === equippedHatId) ?? HAT_CATALOG[0];
   const triggerClassName = isIconVariant
     ? `flex items-center justify-center w-9 h-9 text-white hover:text-white/80 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer group active:scale-90 ${open ? 'scale-90' : ''}`
     : 'flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-sm font-medium text-gray-300 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer';
@@ -254,6 +267,35 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                   </button>
                 </div>
                 <ColorSwatchGrid value={colorInput} onChange={handleSelectColor} />
+                {isHomePage && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false);
+                      setHatShopOpen(true);
+                    }}
+                    aria-label={`Change Hat, currently ${equippedHat.label}`}
+                    className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg border border-surface-200 bg-surface-100 px-3 py-2 text-sm font-medium text-surface-800 transition-colors hover:bg-surface-200"
+                  >
+                    <span className="min-w-0 text-left">Change Hat</span>
+                    <div
+                      className="flex h-9 w-9 shrink-0 items-end justify-center rounded-md border border-surface-200/80 bg-white"
+                      aria-hidden
+                    >
+                      {equippedHat.imageUrl ? (
+                        <img
+                          src={equippedHat.imageUrl}
+                          alt=""
+                          className="max-h-8 max-w-8 object-contain"
+                        />
+                      ) : (
+                        <span className="pb-1 text-[9px] font-semibold uppercase tracking-wide text-surface-400">
+                          None
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                )}
               </div>
 
               {isHomePage && (
@@ -470,6 +512,8 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <HatShopModal open={hatShopOpen} onClose={() => setHatShopOpen(false)} />
     </div>
   );
 }
