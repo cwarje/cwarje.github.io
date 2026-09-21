@@ -316,7 +316,7 @@ export default function GolfBoard({ state, myId, onAction, isHost = false, lobby
     return (
       <div
         className={mergeSeatPillHatClassName(
-          `radial-seatPill golf-seatPill ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`,
+          `radial-seatPill radial-seatPill--singleBand golf-seatPill ${seatPillStateClass} ${isMe ? 'radial-seatPill--me' : ''}`,
           seatPillHat.className,
         )}
         style={mergeSeatPillHatStyle(undefined, seatPillHat.style)}
