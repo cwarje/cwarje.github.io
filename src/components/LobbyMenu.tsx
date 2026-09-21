@@ -27,6 +27,7 @@ import {
   sanitizeSelectedHat,
 } from '../hats/hats';
 import { readPlayerXp } from '../xp/progress';
+import HeaderLevelProgress from './HeaderLevelProgress';
 
 type LobbyMenuProps = { variant?: 'default' | 'icon' };
 
@@ -297,6 +298,13 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
                   </button>
                 )}
               </div>
+
+              {isHomePage && (
+                <div className="px-5 py-4 space-y-2">
+                  <p className="text-[11px] font-medium text-surface-500 uppercase tracking-wider">Level</p>
+                  <HeaderLevelProgress variant="menu" />
+                </div>
+              )}
 
               {isHomePage && (
                 <div className="px-5 py-3 space-y-2">

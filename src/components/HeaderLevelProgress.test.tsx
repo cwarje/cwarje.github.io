@@ -42,9 +42,10 @@ describe('HeaderLevelProgress', () => {
   it('shows level progress from player XP', () => {
     mockUseRoomContext.mockReturnValue(createRoomContext());
 
-    render(<HeaderLevelProgress />);
+    render(<HeaderLevelProgress variant="menu" />);
 
     expect(screen.getByText('Lv 3')).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Level 3 progress' })).toBeInTheDocument();
+    expect(screen.getByText('50 / 100 XP')).toBeInTheDocument();
   });
 });

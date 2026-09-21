@@ -266,3 +266,45 @@ describe('LobbyMenu hats', () => {
     expect(screen.queryByRole('button', { name: 'Change Hat' })).not.toBeInTheDocument();
   });
 });
+
+describe('LobbyMenu level progress', () => {
+  it('shows level progress on the homepage menu', () => {
+    mockUseRoomContext.mockReturnValue(
+      createRoomContext({
+        myPlayer: createPlayer({ xp: 250 }),
+      }),
+    );
+
+    render(
+      <MemoryRouter>
+        <LobbyMenu />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open lobby' }));
+
+    expect(screen.getByText('Level')).toBeInTheDocument();
+    expect(screen.getByText('Lv 3')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Level 3 progress' })).toBeInTheDocument();
+    expect(screen.getByText('50 / 100 XP')).toBeInTheDocument();
+  });
+
+  it('hides level progress on the game page menu', () => {
+    mockUseRoomContext.mockReturnValue(
+      createRoomContext({
+        myPlayer: createPlayer({ xp: 250 }),
+      }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={['/game/ABCD']}>
+        <LobbyMenu variant="icon" />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lobby' }));
+
+    expect(screen.queryByText('Level')).not.toBeInTheDocument();
+    expect(screen.queryByRole('progressbar', { name: 'Level 3 progress' })).not.toBeInTheDocument();
+  });
+});
