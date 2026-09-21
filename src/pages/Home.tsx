@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
+import AnimatedModal from '../components/AnimatedModal';
 import GameCard from '../components/GameCard';
 import GameStartOptionsPanel from '../components/GameStartOptionsPanel';
 import RoomCodeInput from '../components/RoomCodeInput';
@@ -38,9 +39,18 @@ export default function Home() {
   const [expandedGameType, setExpandedGameType] = useState<GameType | null>(null);
   const [pendingJoinCode, setPendingJoinCode] = useState<string | null>(null);
   const [infoGameType, setInfoGameType] = useState<GameType | null>(null);
+  const [displayedInfoGameType, setDisplayedInfoGameType] = useState<GameType | null>(null);
   const lobbyCreatingRef = useRef(false);
 
   const closeInfo = useCallback(() => setInfoGameType(null), []);
+
+  useEffect(() => {
+    if (infoGameType != null) setDisplayedInfoGameType(infoGameType);
+  }, [infoGameType]);
+
+  const handleInfoModalExitComplete = useCallback(() => {
+    if (infoGameType == null) setDisplayedInfoGameType(null);
+  }, [infoGameType]);
 
   useEffect(() => {
     if (!infoGameType) return;
@@ -155,7 +165,8 @@ export default function Home() {
 
   const showNonHostLobbyMessage = room && !isHost;
   const showHostLobbyMessage = room && isHost && waitingPlayers.length > 0;
-  const infoGameDef = infoGameType ? GAME_REGISTRY[infoGameType] : null;
+  const infoDisplayType = infoGameType ?? displayedInfoGameType;
+  const infoGameDef = infoDisplayType ? GAME_REGISTRY[infoDisplayType] : null;
 
   return (
     <div className="space-y-10">
@@ -246,66 +257,50 @@ export default function Home() {
       </motion.div>
 
       {/* Game Info Modal */}
-      <AnimatePresence>
-        {infoGameDef && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={closeInfo}
-            role="dialog"
-            aria-modal="true"
-            aria-label={`About ${infoGameDef.title}`}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className={`bg-gradient-to-br ${infoGameDef.theme.gradient} backdrop-blur-md border ${infoGameDef.theme.cardBorder} rounded-2xl shadow-2xl shadow-black/40 p-6 w-full max-w-md max-h-[80vh] overflow-y-auto space-y-5`}
-              onClick={(e) => e.stopPropagation()}
+      {infoGameDef && (
+        <AnimatedModal
+          open={infoGameType != null}
+          onClose={closeInfo}
+          onExitComplete={handleInfoModalExitComplete}
+          modalKey="game-info"
+          ariaLabel={`About ${infoGameDef.title}`}
+          panelClassName={`${infoGameDef.theme.panelBg} border ${infoGameDef.theme.cardBorder} rounded-2xl shadow-2xl shadow-black/40 p-6 w-full max-w-md max-h-[80vh] overflow-y-auto space-y-5`}
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-white">{infoGameDef.title}</h2>
+            <button
+              onClick={closeInfo}
+              className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 hover:border-white/25 flex items-center justify-center transition-colors cursor-pointer"
+              aria-label="Close"
             >
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-white">{infoGameDef.title}</h2>
-                <button
-                  onClick={closeInfo}
-                  className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 hover:border-white/25 flex items-center justify-center transition-colors cursor-pointer"
-                  aria-label="Close"
-                >
-                  <X className="w-4 h-4 text-gray-400 hover:text-white transition-colors" />
-                </button>
-              </div>
+              <X className="w-4 h-4 text-gray-400 hover:text-white transition-colors" />
+            </button>
+          </div>
 
-              {/* Goal */}
-              <div className="space-y-2">
-                <h3 className={`text-sm font-semibold uppercase tracking-wider ${infoGameDef.theme.labelColor}`}>Goal</h3>
-                <p className="text-sm text-white/80 leading-relaxed">{infoGameDef.info.goal}</p>
-              </div>
+          <div className="space-y-2">
+            <h3 className={`text-sm font-semibold uppercase tracking-wider ${infoGameDef.theme.labelColor}`}>Goal</h3>
+            <p className="text-sm text-white/80 leading-relaxed">{infoGameDef.info.goal}</p>
+          </div>
 
-              {/* How to Play */}
-              <div className="space-y-2">
-                <h3 className={`text-sm font-semibold uppercase tracking-wider ${infoGameDef.theme.labelColor}`}>How to Play</h3>
-                <ol className="space-y-1.5 list-decimal list-inside">
-                  {infoGameDef.info.howToPlay.map((step, i) => (
-                    <li key={i} className="text-sm text-white/80 leading-relaxed">{step}</li>
-                  ))}
-                </ol>
-              </div>
+          <div className="space-y-2">
+            <h3 className={`text-sm font-semibold uppercase tracking-wider ${infoGameDef.theme.labelColor}`}>How to Play</h3>
+            <ol className="space-y-1.5 list-decimal list-inside">
+              {infoGameDef.info.howToPlay.map((step, i) => (
+                <li key={i} className="text-sm text-white/80 leading-relaxed">{step}</li>
+              ))}
+            </ol>
+          </div>
 
-              {/* Rules */}
-              <div className="space-y-2">
-                <h3 className={`text-sm font-semibold uppercase tracking-wider ${infoGameDef.theme.labelColor}`}>Rules</h3>
-                <ul className="space-y-1.5 list-disc list-inside">
-                  {infoGameDef.info.rules.map((rule, i) => (
-                    <li key={i} className="text-sm text-white/80 leading-relaxed">{rule}</li>
-                  ))}
-                </ul>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          <div className="space-y-2">
+            <h3 className={`text-sm font-semibold uppercase tracking-wider ${infoGameDef.theme.labelColor}`}>Rules</h3>
+            <ul className="space-y-1.5 list-disc list-inside">
+              {infoGameDef.info.rules.map((rule, i) => (
+                <li key={i} className="text-sm text-white/80 leading-relaxed">{rule}</li>
+              ))}
+            </ul>
+          </div>
+        </AnimatedModal>
+      )}
 
       {/* Name Prompt Modal */}
       {showNamePrompt && (
