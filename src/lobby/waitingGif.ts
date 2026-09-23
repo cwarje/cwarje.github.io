@@ -24,18 +24,9 @@ const LOBBY_WAITING_GIFS = [
 
 export const LOBBY_WAITING_GIF_COUNT = LOBBY_WAITING_GIFS.length;
 
-function hashRoomCode(roomCode: string): number {
-  let hash = 0;
-  for (const char of roomCode.toUpperCase()) {
-    hash = (Math.imul(31, hash) + char.charCodeAt(0)) >>> 0;
-  }
-  return hash;
-}
+export const LOBBY_WAITING_GIF_URLS: readonly string[] = LOBBY_WAITING_GIFS;
 
-export function lobbyWaitingGifIndex(roomCode: string): number {
-  return hashRoomCode(roomCode) % LOBBY_WAITING_GIF_COUNT;
-}
-
-export function lobbyWaitingGifUrl(roomCode: string): string {
-  return LOBBY_WAITING_GIFS[lobbyWaitingGifIndex(roomCode)];
+export function pickRandomLobbyWaitingGifUrl(): string {
+  const index = Math.floor(Math.random() * LOBBY_WAITING_GIF_COUNT);
+  return LOBBY_WAITING_GIFS[index];
 }

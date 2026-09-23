@@ -1,26 +1,34 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   LOBBY_WAITING_GIF_COUNT,
-  lobbyWaitingGifIndex,
-  lobbyWaitingGifUrl,
+  LOBBY_WAITING_GIF_URLS,
+  pickRandomLobbyWaitingGifUrl,
 } from './waitingGif';
 
 describe('lobbyWaitingGif', () => {
-  it('maps the same room code to the same index and URL', () => {
-    expect(lobbyWaitingGifIndex('abcd')).toBe(lobbyWaitingGifIndex('ABCD'));
-    expect(lobbyWaitingGifUrl('abcd')).toBe(lobbyWaitingGifUrl('ABCD'));
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it('returns an index in range for any code', () => {
-    for (const code of ['AAAA', 'ABCD', 'WXYZ', 'ZZZZ']) {
-      const index = lobbyWaitingGifIndex(code);
-      expect(index).toBeGreaterThanOrEqual(0);
-      expect(index).toBeLessThan(LOBBY_WAITING_GIF_COUNT);
+  it('returns a URL from the lobby GIF set', () => {
+    const url = pickRandomLobbyWaitingGifUrl();
+    expect(LOBBY_WAITING_GIF_URLS).toContain(url);
+  });
+
+  it('uses Math.random to pick an index in range', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.95);
+    expect(pickRandomLobbyWaitingGifUrl()).toBe(LOBBY_WAITING_GIF_URLS[9]);
+
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    expect(pickRandomLobbyWaitingGifUrl()).toBe(LOBBY_WAITING_GIF_URLS[0]);
+  });
+
+  it('never picks an out-of-range index', () => {
+    for (let i = 0; i < LOBBY_WAITING_GIF_COUNT; i += 1) {
+      const random = (i + 0.5) / LOBBY_WAITING_GIF_COUNT;
+      vi.spyOn(Math, 'random').mockReturnValue(random);
+      expect(LOBBY_WAITING_GIF_URLS).toContain(pickRandomLobbyWaitingGifUrl());
+      vi.restoreAllMocks();
     }
-  });
-
-  it('can differ across room codes', () => {
-    const indices = new Set(['ABCD', 'WXYZ', 'QWER', 'HJKL'].map(lobbyWaitingGifIndex));
-    expect(indices.size).toBeGreaterThan(1);
   });
 });

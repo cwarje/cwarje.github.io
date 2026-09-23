@@ -2,7 +2,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import type { RoomContextValue, RoomState } from '../networking/types';
 import { GAME_REGISTRY, PRODUCTION_GAME_TYPES } from '../games/registry';
-import { lobbyWaitingGifUrl } from '../lobby/waitingGif';
+import { LOBBY_WAITING_GIF_URLS } from '../lobby/waitingGif';
 import Home from './Home';
 
 const mockUseRoomContext = vi.fn();
@@ -144,7 +144,7 @@ describe('Home', () => {
     expect(screen.queryByText('Waiting for the host to pick a game...')).not.toBeInTheDocument();
 
     const waitingGif = screen.getByTestId('lobby-waiting-gif');
-    expect(waitingGif).toHaveAttribute('src', lobbyWaitingGifUrl('ABCD'));
+    expect(LOBBY_WAITING_GIF_URLS).toContain(waitingGif.getAttribute('src'));
   });
 
   it('shows singular waiting message for host with one other player', () => {

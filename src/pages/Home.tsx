@@ -11,7 +11,7 @@ import { useRoomContext } from '../networking/roomStore';
 import type { GameStartOptions, GameType, Player, PlayerColor } from '../networking/types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 import { GAME_REGISTRY, ALL_GAME_TYPES, PRODUCTION_GAME_TYPES } from '../games/registry';
-import { lobbyWaitingGifUrl } from '../lobby/waitingGif';
+import { pickRandomLobbyWaitingGifUrl } from '../lobby/waitingGif';
 const gameTypesToShow = import.meta.env.DEV ? ALL_GAME_TYPES : PRODUCTION_GAME_TYPES;
 
 function playerTextColor(color: PlayerColor): string {
@@ -42,6 +42,7 @@ export default function Home() {
   const [infoGameType, setInfoGameType] = useState<GameType | null>(null);
   const [displayedInfoGameType, setDisplayedInfoGameType] = useState<GameType | null>(null);
   const lobbyCreatingRef = useRef(false);
+  const [lobbyWaitingGifSrc, setLobbyWaitingGifSrc] = useState<string | null>(null);
 
   const closeInfo = useCallback(() => setInfoGameType(null), []);
 
@@ -110,6 +111,14 @@ export default function Home() {
     }
   }, [room?.phase, room?.roomCode, navigate]);
 
+  useEffect(() => {
+    if (room && !isHost && room.phase === 'lobby') {
+      setLobbyWaitingGifSrc(pickRandomLobbyWaitingGifUrl());
+    } else {
+      setLobbyWaitingGifSrc(null);
+    }
+  }, [room?.roomCode, room?.phase, isHost]);
+
   const handleConfirmName = async () => {
     const name = saveName(nameInput.trim() || `Player${Math.floor(Math.random() * 9999)}`);
     const color = saveColor(colorInput || DEFAULT_PLAYER_COLOR);
@@ -166,8 +175,6 @@ export default function Home() {
 
   const showNonHostLobbyMessage = room && !isHost;
   const showHostLobbyMessage = room && isHost && waitingPlayers.length > 0;
-  const showNonHostWaitingGif = showNonHostLobbyMessage && room.phase === 'lobby';
-  const lobbyWaitingGifSrc = showNonHostWaitingGif ? lobbyWaitingGifUrl(room.roomCode) : null;
   const infoDisplayType = infoGameType ?? displayedInfoGameType;
   const infoGameDef = infoDisplayType ? GAME_REGISTRY[infoDisplayType] : null;
 
