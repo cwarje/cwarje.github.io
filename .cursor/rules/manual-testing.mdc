@@ -1,0 +1,22 @@
+---
+description: Do not run manual/browser tests; tell the user how to verify
+alwaysApply: true
+---
+
+# Manual testing
+
+Do **not** perform manual or interactive verification yourself. That includes:
+
+- Opening or driving the in-IDE browser (navigate, click, resize, device emulation, screenshots for “does it look right”)
+- Starting dev servers **only** to eyeball UI (fine to run tests/build/lint the user asked for)
+- Claiming visual or UX correctness without the user checking
+
+Instead, when a change needs human verification:
+
+1. Say clearly what **you** already verified (unit tests, typecheck, static review) if anything.
+2. Give the user a **short test plan**: steps, viewport or device notes, and what to look for.
+3. Stop there unless they ask you to run automated checks (e.g. `npm test`).
+
+Example closing:
+
+> I didn’t run the app in the browser. Please check at ≤639px width: open Hearts, confirm opponent card backs behind seat pills are about half size and still peek above multi-row pills.
