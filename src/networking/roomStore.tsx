@@ -28,7 +28,7 @@ import {
   runSingleBotTurn,
   getGameWinners,
 } from '../games/gameEngine';
-import { syncRoomAndGameState } from './syncRoomAndGameState';
+import { isJoinSessionReady, syncRoomAndGameState } from './syncRoomAndGameState';
 import type { HeartsState } from '../games/hearts/types';
 import { getHeartsPassCount } from '../games/hearts/logic';
 import type { PokerState } from '../games/poker/types';
@@ -586,6 +586,20 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
             };
             setRoom(updatedRoom);
             broadcastRoomState(updatedRoom);
+
+            const joinGs =
+              currentRoom.phase !== 'lobby' && currentRoom.gameType && gameStateRef.current
+                ? applyProfileToGameState(
+                    currentRoom.gameType,
+                    gameStateRef.current,
+                    clientDeviceId,
+                    msg.playerName,
+                    msg.playerColor,
+                  )
+                : gameStateRef.current;
+            if (currentRoom.phase !== 'lobby' && joinGs) {
+              conn.send({ type: 'game-state', state: joinGs } as HostMessage);
+            }
           }
           break;
         }
@@ -824,23 +838,34 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
         await new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => reject(new Error('Timeout')), 5000);
           let done = false;
+          let latestRoom: RoomState | null = null;
+
+          const tryResolveJoin = () => {
+            if (done || !latestRoom) return;
+            if (!isJoinSessionReady(latestRoom, gameStateRef.current)) return;
+            done = true;
+            clearTimeout(timeout);
+            resolve();
+          };
 
           conn.on('data', (data) => {
             const msg = data as HostMessage;
             switch (msg.type) {
               case 'room-state': {
+                latestRoom = msg.state;
                 const synced = syncRoomAndGameState(msg.state, gameStateRef.current);
                 setRoom(synced.room);
                 if (synced.clearGameState) {
                   gameStateRef.current = null;
                   setGameState(null);
                 }
-                if (!done) { done = true; clearTimeout(timeout); resolve(); }
+                tryResolveJoin();
                 break;
               }
               case 'game-state':
                 gameStateRef.current = msg.state;
                 setGameState(msg.state);
+                tryResolveJoin();
                 break;
               case 'error':
                 if (!done) { done = true; clearTimeout(timeout); reject(new Error(msg.message)); }
@@ -1048,23 +1073,34 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           await new Promise<void>((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('Timeout waiting for room state')), 10000);
             let resolved = false;
+            let latestRoom: RoomState | null = null;
+
+            const tryResolveJoin = () => {
+              if (resolved || !latestRoom) return;
+              if (!isJoinSessionReady(latestRoom, gameStateRef.current)) return;
+              resolved = true;
+              clearTimeout(timeout);
+              resolve();
+            };
 
             conn.on('data', (data) => {
               const msg = data as HostMessage;
               switch (msg.type) {
                 case 'room-state': {
+                  latestRoom = msg.state;
                   const synced = syncRoomAndGameState(msg.state, gameStateRef.current);
                   setRoom(synced.room);
                   if (synced.clearGameState) {
                     gameStateRef.current = null;
                     setGameState(null);
                   }
-                  if (!resolved) { resolved = true; clearTimeout(timeout); resolve(); }
+                  tryResolveJoin();
                   break;
                 }
                 case 'game-state':
                   gameStateRef.current = msg.state;
                   setGameState(msg.state);
+                  tryResolveJoin();
                   break;
                 case 'table-event':
                   setLastTableEvent(msg.event);
@@ -1316,6 +1352,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     peerDeviceMapRef.current.clear();
     destroyPeer(peerRef.current);
     peerRef.current = null;
+    gameStateRef.current = null;
     setRoom(null);
     setGameState(null);
     setMyId('');

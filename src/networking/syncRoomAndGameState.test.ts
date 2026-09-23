@@ -1,7 +1,7 @@
 import { createInitialGameState } from '../games/gameEngine';
 import { createMinigolfState } from '../games/minigolf/logic';
 import type { Player, RoomState } from './types';
-import { syncRoomAndGameState } from './syncRoomAndGameState';
+import { isJoinSessionReady, syncRoomAndGameState } from './syncRoomAndGameState';
 
 const hostPlayer: Player = {
   id: 'host-1',
@@ -58,5 +58,19 @@ describe('syncRoomAndGameState', () => {
     const hearts = createInitialGameState('hearts', [hostPlayer]);
     const result = syncRoomAndGameState(room, hearts);
     expect(result.clearGameState).toBe(false);
+  });
+});
+
+describe('isJoinSessionReady', () => {
+  it('is ready in lobby without game state', () => {
+    const room = createRoomState({ phase: 'lobby', gameType: null });
+    expect(isJoinSessionReady(room, null)).toBe(true);
+  });
+
+  it('is not ready mid-game until matching game state arrives', () => {
+    const room = createRoomState({ gameType: 'hearts', phase: 'playing' });
+    expect(isJoinSessionReady(room, null)).toBe(false);
+    const hearts = createInitialGameState('hearts', [hostPlayer]);
+    expect(isJoinSessionReady(room, hearts)).toBe(true);
   });
 });

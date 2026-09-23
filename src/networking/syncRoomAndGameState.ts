@@ -16,3 +16,11 @@ export function syncRoomAndGameState(
   }
   return { room: nextRoom, clearGameState: false };
 }
+
+/** True when a client join/reconnect handshake has enough data to enter the game UI. */
+export function isJoinSessionReady(room: RoomState, gameState: unknown): boolean {
+  if (room.phase === 'lobby' || !room.gameType) {
+    return true;
+  }
+  return gameState != null && gameStateMatchesRoom(room.gameType, gameState);
+}
