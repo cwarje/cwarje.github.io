@@ -27,8 +27,8 @@ import {
   checkGameOver,
   runSingleBotTurn,
   getGameWinners,
-  gameStateMatchesRoom,
 } from '../games/gameEngine';
+import { syncRoomAndGameState } from './syncRoomAndGameState';
 import type { HeartsState } from '../games/hearts/types';
 import { getHeartsPassCount } from '../games/hearts/logic';
 import type { PokerState } from '../games/poker/types';
@@ -411,22 +411,6 @@ function applyProfileToGameState(
     default:
       return state;
   }
-}
-
-function syncRoomAndGameState(
-  nextRoom: RoomState,
-  currentGameState: unknown,
-): { room: RoomState; gameState: unknown } {
-  if (nextRoom.phase === 'lobby' || !nextRoom.gameType) {
-    return { room: nextRoom, gameState: null };
-  }
-  if (
-    currentGameState != null
-    && !gameStateMatchesRoom(nextRoom.gameType, currentGameState)
-  ) {
-    return { room: nextRoom, gameState: null };
-  }
-  return { room: nextRoom, gameState: currentGameState };
 }
 
 const RoomContext = createContext<RoomContextValue | null>(null);
@@ -847,11 +831,15 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
               case 'room-state': {
                 const synced = syncRoomAndGameState(msg.state, gameStateRef.current);
                 setRoom(synced.room);
-                setGameState(synced.gameState);
+                if (synced.clearGameState) {
+                  gameStateRef.current = null;
+                  setGameState(null);
+                }
                 if (!done) { done = true; clearTimeout(timeout); resolve(); }
                 break;
               }
               case 'game-state':
+                gameStateRef.current = msg.state;
                 setGameState(msg.state);
                 break;
               case 'error':
@@ -1067,11 +1055,15 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
                 case 'room-state': {
                   const synced = syncRoomAndGameState(msg.state, gameStateRef.current);
                   setRoom(synced.room);
-                  setGameState(synced.gameState);
+                  if (synced.clearGameState) {
+                    gameStateRef.current = null;
+                    setGameState(null);
+                  }
                   if (!resolved) { resolved = true; clearTimeout(timeout); resolve(); }
                   break;
                 }
                 case 'game-state':
+                  gameStateRef.current = msg.state;
                   setGameState(msg.state);
                   break;
                 case 'table-event':
