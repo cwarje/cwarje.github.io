@@ -9,7 +9,7 @@ export interface SeatRadii {
 }
 
 export const SEAT_EDGE_GAP_PX = 8;
-export const SEAT_RADIUS_Y_SCALE = 0.9;
+export const SEAT_RADIUS_Y_SCALE = 1.0;
 
 export const DEFAULT_PILE_SLOT_WIDTH_PX = 45;
 export const DEFAULT_PILE_ROW_GAP_PX = 5;

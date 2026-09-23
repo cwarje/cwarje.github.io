@@ -80,7 +80,7 @@ const TRICK_SLOT_PLACEMENTS: Record<number, TrickSlotPlacement[]> = {
 function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY: number } {
   if (playerCount === 2) return { seatRadiusX: 32, seatRadiusY: 30 };
   if (playerCount === 3) return { seatRadiusX: 37, seatRadiusY: 31 };
-  if (playerCount === 4) return { seatRadiusX: 36, seatRadiusY: 29 };
+  if (playerCount === 4) return { seatRadiusX: 36, seatRadiusY: 36 };
   return { seatRadiusX: 34, seatRadiusY: 30 };
 }
 

@@ -65,7 +65,7 @@ function getLayoutRadii(playerCount: number): { seatRadiusX: number; seatRadiusY
   if (playerCount >= 7) return { seatRadiusX: 44, seatRadiusY: 37 };
   if (playerCount >= 6) return { seatRadiusX: 42, seatRadiusY: 35 };
   if (playerCount === 5) return { seatRadiusX: 39, seatRadiusY: 33 };
-  if (playerCount === 4) return { seatRadiusX: 36, seatRadiusY: 29 };
+  if (playerCount === 4) return { seatRadiusX: 36, seatRadiusY: 36 };
   if (playerCount === 3) return { seatRadiusX: 37, seatRadiusY: 31 };
   return { seatRadiusX: 32, seatRadiusY: 30 };
 }
