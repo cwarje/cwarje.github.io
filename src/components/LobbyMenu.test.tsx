@@ -79,7 +79,7 @@ function createRoomContext(overrides: Partial<RoomContextValue> = {}): RoomConte
   };
 }
 
-function renderOpenLobbyMenu(contextOverrides: Partial<RoomContextValue> = {}) {
+function renderHomeLobbyMenu(contextOverrides: Partial<RoomContextValue> = {}) {
   mockUseRoomContext.mockReturnValue(createRoomContext(contextOverrides));
 
   render(
@@ -87,8 +87,21 @@ function renderOpenLobbyMenu(contextOverrides: Partial<RoomContextValue> = {}) {
       <LobbyMenu />
     </MemoryRouter>,
   );
+}
 
+function renderOpenLobbyMenu(contextOverrides: Partial<RoomContextValue> = {}) {
+  renderHomeLobbyMenu(contextOverrides);
   fireEvent.click(screen.getByRole('button', { name: 'Open lobby' }));
+}
+
+function renderOpenProfileMenu(contextOverrides: Partial<RoomContextValue> = {}) {
+  renderHomeLobbyMenu(contextOverrides);
+  fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
+}
+
+function renderOpenLevelMenu(contextOverrides: Partial<RoomContextValue> = {}) {
+  renderHomeLobbyMenu(contextOverrides);
+  fireEvent.click(screen.getByRole('button', { name: 'Level progress' }));
 }
 
 describe('LobbyMenu host leave button', () => {
@@ -193,6 +206,14 @@ describe('LobbyMenu favorite bots', () => {
     vi.unstubAllGlobals();
   });
 
+  it('lists My Bots after Players in the lobby panel', () => {
+    renderOpenLobbyMenu();
+
+    const playersHeading = screen.getByText(/Players \(\d+\)/);
+    const botsHeading = screen.getByText('My Bots');
+    expect(playersHeading.compareDocumentPosition(botsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('adds a bot and persists it to localStorage', () => {
     renderOpenLobbyMenu();
 
@@ -222,21 +243,28 @@ describe('LobbyMenu favorite bots', () => {
   });
 });
 
+describe('LobbyMenu homepage split triggers', () => {
+  it('shows Profile, Level, and lobby triggers on the homepage', () => {
+    renderHomeLobbyMenu();
+
+    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Level progress' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open lobby' })).toBeInTheDocument();
+  });
+
+  it('keeps lobby content out of the profile panel', () => {
+    renderOpenProfileMenu();
+
+    expect(screen.getByText('Profile')).toBeInTheDocument();
+    expect(screen.queryByText('Lobby Code')).not.toBeInTheDocument();
+  });
+});
+
 describe('LobbyMenu hats', () => {
   it('shows the equipped hat on the Change hat button', () => {
-    mockUseRoomContext.mockReturnValue(
-      createRoomContext({
-        myPlayer: createPlayer({ selectedHat: 'party' }),
-      }),
-    );
-
-    render(
-      <MemoryRouter>
-        <LobbyMenu />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open lobby' }));
+    renderOpenProfileMenu({
+      myPlayer: createPlayer({ selectedHat: 'party', xp: 500 }),
+    });
 
     expect(
       screen.getByRole('button', { name: 'Change Hat, currently Party hat' }),
@@ -244,7 +272,7 @@ describe('LobbyMenu hats', () => {
   });
 
   it('opens hat shop dialog from Change hat on the homepage', () => {
-    renderOpenLobbyMenu();
+    renderOpenProfileMenu();
 
     fireEvent.click(screen.getByRole('button', { name: /Change Hat/i }));
 
@@ -269,22 +297,11 @@ describe('LobbyMenu hats', () => {
 
 describe('LobbyMenu level progress', () => {
   it('shows level progress on the homepage menu', () => {
-    mockUseRoomContext.mockReturnValue(
-      createRoomContext({
-        myPlayer: createPlayer({ xp: 250 }),
-      }),
-    );
-
-    render(
-      <MemoryRouter>
-        <LobbyMenu />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open lobby' }));
+    renderOpenLevelMenu({
+      myPlayer: createPlayer({ xp: 250 }),
+    });
 
     expect(screen.getByText('Level')).toBeInTheDocument();
-    expect(screen.getByText('Lv 3')).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Level 3 progress' })).toBeInTheDocument();
     expect(screen.getByText('50 / 100 XP')).toBeInTheDocument();
   });
