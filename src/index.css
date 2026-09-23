@@ -536,6 +536,14 @@
   --radial-slot-gap: 6px;
 }
 
+@media (max-width: 639px) {
+  .hearts-board .radial-center {
+    --radial-slot-w: 56px;
+    --radial-slot-h: 81px;
+    --radial-slot-gap: 4px;
+  }
+}
+
 .hearts-board .radial-hand {
   overflow: visible;
   flex-shrink: 0;
