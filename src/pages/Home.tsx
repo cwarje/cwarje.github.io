@@ -11,6 +11,7 @@ import { useRoomContext } from '../networking/roomStore';
 import type { GameStartOptions, GameType, Player, PlayerColor } from '../networking/types';
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 import { GAME_REGISTRY, ALL_GAME_TYPES, PRODUCTION_GAME_TYPES } from '../games/registry';
+import { lobbyWaitingGifUrl } from '../lobby/waitingGif';
 const gameTypesToShow = import.meta.env.DEV ? ALL_GAME_TYPES : PRODUCTION_GAME_TYPES;
 
 function playerTextColor(color: PlayerColor): string {
@@ -165,6 +166,8 @@ export default function Home() {
 
   const showNonHostLobbyMessage = room && !isHost;
   const showHostLobbyMessage = room && isHost && waitingPlayers.length > 0;
+  const showNonHostWaitingGif = showNonHostLobbyMessage && room.phase === 'lobby';
+  const lobbyWaitingGifSrc = showNonHostWaitingGif ? lobbyWaitingGifUrl(room.roomCode) : null;
   const infoDisplayType = infoGameType ?? displayedInfoGameType;
   const infoGameDef = infoDisplayType ? GAME_REGISTRY[infoDisplayType] : null;
 
@@ -175,7 +178,9 @@ export default function Home() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
-        className="flex flex-col sm:flex-row items-center justify-center gap-3 h-[8.25rem] sm:h-[6rem]"
+        className={`flex flex-col sm:flex-row items-center justify-center gap-3 ${
+          showNonHostLobbyMessage ? 'min-h-[4rem]' : 'h-[8.25rem] sm:h-[6rem]'
+        }`}
       >
         {showNonHostLobbyMessage ? (
           <h1 className="text-center text-xl sm:text-2xl font-extrabold tracking-tight px-4 max-w-2xl text-white">
@@ -214,8 +219,21 @@ export default function Home() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.2 }}
-        className="space-y-4"
+        className="relative space-y-4"
       >
+        {lobbyWaitingGifSrc && (
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2 sm:pt-4"
+            aria-hidden
+          >
+            <img
+              data-testid="lobby-waiting-gif"
+              src={lobbyWaitingGifSrc}
+              alt=""
+              className="max-h-40 sm:max-h-48 w-auto max-w-[min(100%,16rem)] object-contain"
+            />
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {gameTypesToShow.map((game, i) => {
             const gameDef = GAME_REGISTRY[game];
