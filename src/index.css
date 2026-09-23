@@ -2951,6 +2951,12 @@
   }
 }
 
+@media (max-width: 639px) {
+  .radial-opponentHandAnchor {
+    display: none;
+  }
+}
+
 .twelve-pileRow {
   display: flex;
   gap: 5px;
