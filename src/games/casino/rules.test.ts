@@ -3,6 +3,8 @@ import type { Card, TableSlot } from './types';
 import {
   achievableSumsForCards,
   findPossibleCaptures,
+  findPossibleCapturesRespectingBuildObligation,
+  handCanResolveOwnedBuildValues,
   isValidBuild,
   isValidCapture,
   isValidTableGroup,
@@ -406,6 +408,31 @@ describe('resolveTableGroupWithBuildsDeclaredValue', () => {
     ];
     const hand: Card[] = [{ suit: 'hearts', rank: 8 }];
     expect(resolveTableGroupWithBuildsDeclaredValue(table, [0, 1, 2], hand)).toBe(0);
+  });
+});
+
+describe('owned-build reserve helpers', () => {
+  it('2♠ can resolve a single build value 15 but not 15 and 2 together', () => {
+    expect(handCanResolveOwnedBuildValues([S2], [15])).toBe(true);
+    expect(handCanResolveOwnedBuildValues([S2], [15, 2])).toBe(false);
+  });
+
+  it('filters captures that would strand an owned build 15', () => {
+    const S2: Card = { suit: 'spades', rank: 2 };
+    const looseTwo: Card = { suit: 'hearts', rank: 2 };
+    const table: TableSlot[] = [
+      {
+        kind: 'build',
+        build: { cards: [C5, { suit: 'clubs', rank: 10 }], value: 15, ownerId: 'bot', groupCount: 1 },
+      },
+      { kind: 'card', card: looseTwo },
+    ];
+    const hand = [S2, { suit: 'clubs', rank: 7 }];
+    const raw = findPossibleCaptures(S2, table);
+    expect(raw.some(indices => indices.includes(1) && !indices.includes(0))).toBe(true);
+    const safe = findPossibleCapturesRespectingBuildObligation(S2, table, hand, 'bot');
+    expect(safe.some(indices => indices.includes(1) && !indices.includes(0))).toBe(false);
+    expect(safe.some(indices => indices.includes(0))).toBe(true);
   });
 });
 

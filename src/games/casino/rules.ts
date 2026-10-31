@@ -427,3 +427,104 @@ export function findPossibleCaptures(playedCard: Card, tableSlots: TableSlot[]):
     return true;
   });
 }
+
+/** Distinct declared values among builds owned by `ownerId` (bot/heuristic helpers). */
+export function distinctOwnedBuildValues(tableSlots: TableSlot[], ownerId: string): number[] {
+  const values = new Set<number>();
+  for (const item of tableSlots) {
+    if (item?.kind === 'build' && item.build.ownerId === ownerId) values.add(item.build.value);
+  }
+  return [...values].sort((a, b) => a - b);
+}
+
+/** Each build value needs a distinct hand card that can capture it. */
+export function handCanResolveOwnedBuildValues(hand: Card[], values: number[]): boolean {
+  if (values.length === 0) return true;
+  if (hand.length < values.length) return false;
+
+  function assign(valueIndex: number, used: boolean[]): boolean {
+    if (valueIndex === values.length) return true;
+    const target = values[valueIndex];
+    for (let i = 0; i < hand.length; i++) {
+      if (used[i]) continue;
+      if (!playedCardMatchesBuildValue(hand[i], target)) continue;
+      used[i] = true;
+      if (assign(valueIndex + 1, used)) return true;
+      used[i] = false;
+    }
+    return false;
+  }
+
+  return assign(0, new Array(hand.length).fill(false));
+}
+
+export function tableSlotsAfterCapture(tableSlots: TableSlot[], capturedSlotIndices: number[]): TableSlot[] {
+  const next = [...tableSlots];
+  for (const i of capturedSlotIndices) next[i] = null;
+  return next;
+}
+
+function handAfterRemovingCards(hand: Card[], removed: Card[]): Card[] {
+  const next = [...hand];
+  for (const card of removed) {
+    const idx = next.findIndex(c => cardEquals(c, card));
+    if (idx === -1) return hand;
+    next.splice(idx, 1);
+  }
+  return next;
+}
+
+/** After a play, can remaining hand still capture every owned build left on the table? */
+export function handCanClearOwnedBuildsAfterPlay(
+  handAfter: Card[],
+  tableSlotsAfter: TableSlot[],
+  ownerId: string
+): boolean {
+  return handCanResolveOwnedBuildValues(handAfter, distinctOwnedBuildValues(tableSlotsAfter, ownerId));
+}
+
+export function findPossibleCapturesRespectingBuildObligation(
+  playedCard: Card,
+  tableSlots: TableSlot[],
+  hand: Card[],
+  ownerId: string
+): number[][] {
+  return findPossibleCaptures(playedCard, tableSlots).filter(indices => {
+    const handAfter = handAfterRemovingCards(hand, [playedCard]);
+    const tableAfter = tableSlotsAfterCapture(tableSlots, indices);
+    return handCanClearOwnedBuildsAfterPlay(handAfter, tableAfter, ownerId);
+  });
+}
+
+/** Post-build table for bot obligation checks (single loose-card build path). */
+export function tableSlotsAfterSimpleBuild(
+  tableSlots: TableSlot[],
+  looseCardIndex: number,
+  declaredValue: number,
+  ownerId: string,
+  playedCard: Card
+): TableSlot[] | null {
+  const item = tableSlots[looseCardIndex];
+  if (!item || item.kind !== 'card') return null;
+  const buildCards = [playedCard, item.card];
+  const next = [...tableSlots];
+  next[looseCardIndex] = {
+    kind: 'build',
+    build: { cards: buildCards, value: declaredValue, ownerId, groupCount: 1 },
+  };
+  return next;
+}
+
+export function botSimpleBuildAcceptable(
+  hand: Card[],
+  tableSlots: TableSlot[],
+  ownerId: string,
+  playedCard: Card,
+  looseCardIndex: number,
+  declaredValue: number
+): boolean {
+  const tableAfter = tableSlotsAfterSimpleBuild(tableSlots, looseCardIndex, declaredValue, ownerId, playedCard);
+  if (!tableAfter) return false;
+  const handAfter = handAfterRemovingCards(hand, [playedCard]);
+  return handCanClearOwnedBuildsAfterPlay(handAfter, tableAfter, ownerId);
+}

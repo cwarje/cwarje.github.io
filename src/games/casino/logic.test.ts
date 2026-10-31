@@ -20,6 +20,139 @@ function makePlayer(id: string, name: string): Player {
   };
 }
 
+describe('casino bot owned-build reserve', () => {
+  const S2: Card = { suit: 'spades', rank: 2 };
+
+  it('bot captures owned build 15 instead of loose 2 with 2♠', () => {
+    const s: CasinoState = {
+      players: [
+        {
+          id: 'bot',
+          name: 'Bot',
+          color: 'red',
+          isBot: true,
+          hand: [S2, { suit: 'clubs', rank: 7 }],
+          capturedCards: [],
+          sweepCount: 0,
+        },
+        {
+          id: 'p1',
+          name: 'Human',
+          color: 'blue',
+          isBot: false,
+          hand: [{ suit: 'diamonds', rank: 4 }],
+          capturedCards: [],
+          sweepCount: 0,
+        },
+      ],
+      deck: [],
+      tableRows: 1,
+      tableSlots: [
+        {
+          kind: 'build',
+          build: {
+            cards: [
+              { suit: 'clubs', rank: 5 },
+              { suit: 'diamonds', rank: 10 },
+            ],
+            value: 15,
+            ownerId: 'bot',
+            groupCount: 1,
+          },
+        },
+        { kind: 'card', card: { suit: 'hearts', rank: 2 } },
+        null,
+        null,
+      ],
+      currentPlayerIndex: 0,
+      dealerIndex: 0,
+      phase: 'playing',
+      roundNumber: 1,
+      dealNumberInRound: 1,
+      lastCapturerIndex: -1,
+      scores: { bot: 0, p1: 0 },
+      lastRoundScores: {},
+      matchLength: 'to21',
+      targetScore: 21,
+      gameOver: false,
+      winners: [],
+      actionAnnouncement: null,
+      pendingCapturePreview: null,
+    };
+
+    const next = runCasinoBotTurn(s) as CasinoState;
+    expect(next.pendingCapturePreview).not.toBeNull();
+    expect(next.pendingCapturePreview?.playedCard).toEqual(S2);
+    expect(next.pendingCapturePreview?.capturedSlotIndices).toEqual([0]);
+  });
+
+  it('human may still capture loose 2 with 2♠ while owning build 15', () => {
+    const s: CasinoState = {
+      players: [
+        {
+          id: 'p0',
+          name: 'A',
+          color: 'red',
+          isBot: false,
+          hand: [S2, { suit: 'clubs', rank: 7 }],
+          capturedCards: [],
+          sweepCount: 0,
+        },
+        {
+          id: 'p1',
+          name: 'B',
+          color: 'blue',
+          isBot: false,
+          hand: [],
+          capturedCards: [],
+          sweepCount: 0,
+        },
+      ],
+      deck: [],
+      tableRows: 1,
+      tableSlots: [
+        {
+          kind: 'build',
+          build: {
+            cards: [
+              { suit: 'clubs', rank: 5 },
+              { suit: 'diamonds', rank: 10 },
+            ],
+            value: 15,
+            ownerId: 'p0',
+            groupCount: 1,
+          },
+        },
+        { kind: 'card', card: { suit: 'hearts', rank: 2 } },
+        null,
+        null,
+      ],
+      currentPlayerIndex: 0,
+      dealerIndex: 0,
+      phase: 'playing',
+      roundNumber: 1,
+      dealNumberInRound: 1,
+      lastCapturerIndex: -1,
+      scores: { p0: 0, p1: 0 },
+      lastRoundScores: {},
+      matchLength: 'to21',
+      targetScore: 21,
+      gameOver: false,
+      winners: [],
+      actionAnnouncement: null,
+      pendingCapturePreview: null,
+    };
+
+    const preview = processCasinoAction(
+      s,
+      { type: 'capture-preview', playedCard: S2, capturedSlotIndices: [1] },
+      'p0'
+    ) as CasinoState;
+    expect(preview).not.toBe(s);
+    expect(preview.pendingCapturePreview?.capturedSlotIndices).toEqual([1]);
+  });
+});
+
 describe('casino trail', () => {
   it('playedCard removes card from hand and adds it to the table', () => {
     const s = createCasinoState([makePlayer('p0', 'A'), makePlayer('p1', 'B')]) as CasinoState;
@@ -54,7 +187,7 @@ describe('casino trail', () => {
     expect(afterHud.actionAnnouncement).toBeNull();
   });
 
-  it('rejects trail when current player owns a build on the table', () => {
+  it('allows trail when current player owns a build on the table', () => {
     const s: CasinoState = {
       players: [
         {
@@ -112,8 +245,11 @@ describe('casino trail', () => {
       s,
       { type: 'trail', playedCard: { suit: 'hearts', rank: 9 }, targetSlotIndex: 1 },
       'p0'
-    );
-    expect(next).toBe(s);
+    ) as CasinoState;
+    expect(next).not.toBe(s);
+    expect(next.tableSlots[1]).toEqual({ kind: 'card', card: { suit: 'hearts', rank: 9 } });
+    expect(next.tableSlots[0]?.kind).toBe('build');
+    expect(next.players[0].hand).toHaveLength(0);
   });
 });
 

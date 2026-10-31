@@ -18,7 +18,6 @@ import {
   canParticipateInBuildOrSum,
   cardEquals,
   isFiveOfSpadesSweepCard,
-  minCardValueForSum,
   occupiedTableSlotIndices,
 } from './types';
 import {
@@ -29,7 +28,8 @@ import {
   canAssignSumToCards,
   playerCanCaptureBuildValue,
   scoreRound,
-  findPossibleCaptures,
+  findPossibleCapturesRespectingBuildObligation,
+  botSimpleBuildAcceptable,
   achievableSumsForCards,
   resolveTableGroupDeclaredValue,
   resolveHandAssistedGroupDeclaredValue,
@@ -771,10 +771,6 @@ export function processCasinoAction(
       const fiveSweepTrail = tryApplyFiveOfSpadesTableSweep(s, playerIndex, playedCard);
       if (fiveSweepTrail) return fiveSweepTrail;
 
-      const hasOwnBuild = s.tableSlots.some(
-        it => it?.kind === 'build' && it.build.ownerId === playerId
-      );
-      if (hasOwnBuild) return state;
       if (targetSlotIndex < 0) return state;
       const expanded = ensureSlotCapacity(s.tableSlots, s.tableRows, targetSlotIndex);
       const newTableSlots = [...expanded.tableSlots];
@@ -845,6 +841,31 @@ function tryLegalGroupTable(
   return null;
 }
 
+function pickBotCaptureMove(
+  hand: Card[],
+  tableSlots: TableSlot[],
+  playerId: string
+): { playedCard: Card; capturedSlotIndices: number[] } | null {
+  let best: { playedCard: Card; capturedSlotIndices: number[]; score: number } | null = null;
+
+  for (const card of hand) {
+    const captures = findPossibleCapturesRespectingBuildObligation(card, tableSlots, hand, playerId);
+    for (const capturedSlotIndices of captures) {
+      const includesOwnBuild = capturedSlotIndices.some(i => {
+        const item = tableSlots[i];
+        return item?.kind === 'build' && item.build.ownerId === playerId;
+      });
+      const score = (includesOwnBuild ? 10_000 : 0) + capturedSlotIndices.length;
+      if (!best || score > best.score) {
+        best = { playedCard: card, capturedSlotIndices, score };
+      }
+    }
+  }
+
+  if (!best) return null;
+  return { playedCard: best.playedCard, capturedSlotIndices: best.capturedSlotIndices };
+}
+
 export function runCasinoBotTurn(state: unknown): unknown {
   const s = state as CasinoState;
   if (s.phase === 'round-end') return state;
@@ -856,17 +877,18 @@ export function runCasinoBotTurn(state: unknown): unknown {
   const player = s.players[s.currentPlayerIndex];
   if (!player.isBot) return state;
 
-  for (const card of player.hand) {
-    const captures = findPossibleCaptures(card, s.tableSlots);
-    if (captures.length > 0) {
-      const bestCapture = captures.reduce((best, curr) => (curr.length > best.length ? curr : best), captures[0]);
-      const result = processCasinoAction(
-        s,
-        { type: 'capture-preview', playedCard: card, capturedSlotIndices: bestCapture },
-        player.id
-      );
-      if (result !== state) return result;
-    }
+  const botCapture = pickBotCaptureMove(player.hand, s.tableSlots, player.id);
+  if (botCapture) {
+    const result = processCasinoAction(
+      s,
+      {
+        type: 'capture-preview',
+        playedCard: botCapture.playedCard,
+        capturedSlotIndices: botCapture.capturedSlotIndices,
+      },
+      player.id
+    );
+    if (result !== state) return result;
   }
 
   const groupMove = tryLegalGroupTable(s, player.hand);
@@ -888,32 +910,13 @@ export function runCasinoBotTurn(state: unknown): unknown {
         if (declaredValue < 1) continue;
         if (!playerCanCaptureBuildValue(player.hand, declaredValue, card)) continue;
         if (!isValidBuild(card, [i], s.tableSlots, declaredValue)) continue;
+        if (!botSimpleBuildAcceptable(player.hand, s.tableSlots, player.id, card, i, declaredValue)) continue;
         const result = processCasinoAction(
           s,
           { type: 'build', playedCard: card, tableCardIndices: [i], declaredValue },
           player.id
         );
         if (result !== state) return result;
-      }
-    }
-  }
-
-  const hasOwnBuild = s.tableSlots.some(
-    it => it?.kind === 'build' && it.build.ownerId === player.id
-  );
-  if (hasOwnBuild) {
-    const lowestCard = [...player.hand].sort((a, b) => minCardValueForSum(a) - minCardValueForSum(b))[0];
-    if (lowestCard) {
-      for (const card of player.hand) {
-        const captures = findPossibleCaptures(card, s.tableSlots);
-        if (captures.length > 0) {
-          const result = processCasinoAction(
-            s,
-            { type: 'capture-preview', playedCard: card, capturedSlotIndices: captures[0] },
-            player.id
-          );
-          if (result !== state) return result;
-        }
       }
     }
   }

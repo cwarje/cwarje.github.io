@@ -385,16 +385,7 @@ export default function CasinoBoard({
     return newVal > 0;
   }, [selectedHandCard, selectedTableIndices, s.tableSlots, myPlayer]);
 
-  const canTrail = useMemo(() => {
-    if (!selectedHandCard) return false;
-    const hasOwnBuild = s.tableSlots.some(
-      it => it?.kind === 'build' && it.build.ownerId === myId
-    );
-    if (hasOwnBuild) {
-      return isFiveOfSpadesSweepCard(selectedHandCard) && countOccupiedTableSlots(s.tableSlots) > 0;
-    }
-    return true;
-  }, [selectedHandCard, s.tableSlots, myId]);
+  const canTrail = useMemo(() => !!selectedHandCard, [selectedHandCard]);
 
   const handleCapture = useCallback(() => {
     if (!selectedHandCard) return;
