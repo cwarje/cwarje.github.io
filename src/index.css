@@ -633,6 +633,10 @@
   background: #c8c8c8;
 }
 
+.card-face--selected {
+  box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.45);
+}
+
 .card-face--received {
   animation: heartsCardReceivedBorderFade 10s linear forwards;
 }
@@ -1172,42 +1176,8 @@
   padding: 6px 8px 6px 3px;
 }
 
-.card-face {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  width: 1.45em;
-  line-height: 1;
-  gap: 2px;
-}
-
 .card-face--compact {
   width: 1.2em;
-}
-
-.card-faceRank {
-  display: block;
-  width: 100%;
-  text-align: center;
-  font-size: 1.45rem;
-  font-weight: 700;
-}
-
-.card-faceSuit {
-  display: block;
-  width: 100%;
-  text-align: center;
-  font-size: 1.38rem;
-  font-weight: 700;
-}
-
-.card-face--disabled {
-  background: #c8c8c8;
-}
-
-.card-face--selected {
-  box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.45);
 }
 
 .casino-tableCard {
@@ -1240,8 +1210,7 @@
   box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.55);
 }
 
-.casino-tableCard--disabled {
-  opacity: 0.58;
+.casino-tableCard[aria-disabled='true'] {
   cursor: default;
 }
 
@@ -1262,8 +1231,7 @@
   box-shadow: 0 0 0 3px rgba(253, 230, 138, 0.45);
 }
 
-.casino-buildPile--disabled {
-  opacity: 0.58;
+.casino-buildPile[aria-disabled='true'] {
   cursor: default;
 }
 
@@ -1281,12 +1249,6 @@
 .casino-buildPileLayer .card-face {
   width: 100%;
   height: 100%;
-}
-
-.casino-tableCard > .card-face,
-.casino-buildPileLayer .card-face,
-.casino-capturePreviewCard .card-face {
-  padding: 9px 10px 9px 7px;
 }
 
 .casino-buildPileValueBadge {
@@ -1355,6 +1317,24 @@
   }
 }
 
+.casino-playAnimLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 34;
+}
+
+.casino-playAnimCard {
+  position: absolute;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .casino-playAnimLayer {
+    display: none;
+  }
+}
+
 .casino-hand {
   width: 100%;
   display: flex;
@@ -1388,6 +1368,30 @@
   left: 0;
   top: 14px;
   transition: transform 0.16s ease;
+}
+
+.casino-board .casino-handCardWrap .card-face,
+.casino-board .casino-tableCard > .card-face,
+.casino-board .casino-buildPileLayer .card-face,
+.casino-board .casino-capturePreviewCard .card-face,
+.casino-board .casino-playAnimCard .card-face {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 6px 8px 6px 3px;
+  gap: 3px;
+}
+
+.casino-board .card-faceCorner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 1.45em;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1469,33 +1473,16 @@
     height: 81px;
   }
 
-  .card-face {
-    padding: 4px 0 0 0;
-  }
-
-  .casino-hand .card-face {
+  .casino-board .casino-handCardWrap .card-face,
+  .casino-board .casino-tableCard > .card-face,
+  .casino-board .casino-buildPileLayer .card-face,
+  .casino-board .casino-capturePreviewCard .card-face,
+  .casino-board .casino-playAnimCard .card-face {
     padding: 6px 8px 6px 0;
   }
 
-  .casino-tableCard > .card-face,
-  .casino-buildPileLayer .card-face,
-  .casino-capturePreviewCard .card-face {
-    padding: 6px 7px 6px 4px;
-  }
-
-  .card-faceRank {
-    font-size: 1.2rem;
-  }
-
-  .card-faceSuit {
-    font-size: 1.2rem;
-  }
-
-  .casino-hand .card-faceRank {
-    font-size: 1.1rem;
-  }
-
-  .casino-hand .card-faceSuit {
+  .casino-board .card-faceRank,
+  .casino-board .card-faceSuit {
     font-size: 1.1rem;
   }
 
@@ -1517,8 +1504,8 @@
     line-height: 1;
   }
 
-  .casino-hand.casino-hand--zoom .card-face,
-  .casino-center.casino-center--zoom .card-face {
+  .casino-hand.casino-hand--zoom .card-faceCorner,
+  .casino-center.casino-center--zoom .card-faceCorner {
     width: 1.8em;
   }
 }
@@ -1536,8 +1523,8 @@
     line-height: 1;
   }
 
-  .casino-hand.casino-hand--zoom .card-face,
-  .casino-center.casino-center--zoom .card-face {
+  .casino-hand.casino-hand--zoom .card-faceCorner,
+  .casino-center.casino-center--zoom .card-faceCorner {
     width: 1.75em;
   }
 }

@@ -35,6 +35,8 @@ import {
   mergeSeatPillHatStyle,
 } from '../../hats/hats';
 import { useLastDealFlash } from './useLastDealFlash';
+import { CasinoPlayAnimationLayer } from './CasinoPlayAnimationLayer';
+import { computeCasinoHandLayout, useCasinoPlayAnimation } from './useCasinoPlayAnimation';
 import { useDealerDealAnimation, type DealSeat, type DealExtraTarget } from '../shared/useDealerDealAnimation';
 import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 import { CardTossLayers } from '../shared/CardTossLayers';
@@ -129,24 +131,27 @@ function TableCard({
   card,
   selected,
   onClick,
-  disabled,
+  actionsEnabled,
   previewCard,
+  slotRef,
 }: {
   card: Card;
   selected: boolean;
   onClick: () => void;
-  disabled: boolean;
+  actionsEnabled: boolean;
   previewCard: Card | null;
+  slotRef?: (el: HTMLButtonElement | null) => void;
 }) {
   return (
     <motion.button
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      ref={slotRef}
+      type="button"
+      initial={false}
       exit={{ opacity: 0 }}
-      whileHover={!disabled ? { y: -4 } : undefined}
-      onClick={onClick}
-      disabled={disabled}
-      className={`casino-tableCard ${selected ? 'casino-tableCard--selected' : ''} ${disabled ? 'casino-tableCard--disabled' : ''}`}
+      whileHover={actionsEnabled ? { y: -4 } : undefined}
+      onClick={actionsEnabled ? onClick : undefined}
+      aria-disabled={!actionsEnabled}
+      className={`casino-tableCard ${selected ? 'casino-tableCard--selected' : ''}`}
     >
       <CasinoCardFace card={card} />
       {previewCard && (
@@ -162,25 +167,28 @@ function BuildPile({
   build,
   selected,
   onClick,
-  disabled,
+  actionsEnabled,
   previewCard,
+  slotRef,
 }: {
   build: TableItem & { kind: 'build' };
   selected: boolean;
   onClick: () => void;
-  disabled: boolean;
+  actionsEnabled: boolean;
   previewCard: Card | null;
+  slotRef?: (el: HTMLButtonElement | null) => void;
 }) {
   const topCards = build.build.cards.slice(-3);
   return (
     <motion.button
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      ref={slotRef}
+      type="button"
+      initial={false}
       exit={{ opacity: 0 }}
-      whileHover={!disabled ? { y: -4 } : undefined}
-      onClick={onClick}
-      disabled={disabled}
-      className={`casino-buildPile ${selected ? 'casino-buildPile--selected' : ''} ${disabled ? 'casino-buildPile--disabled' : ''}`}
+      whileHover={actionsEnabled ? { y: -4 } : undefined}
+      onClick={actionsEnabled ? onClick : undefined}
+      aria-disabled={!actionsEnabled}
+      className={`casino-buildPile ${selected ? 'casino-buildPile--selected' : ''}`}
     >
       <div className="casino-buildPileStack">
         {topCards.map((card, i) => (
@@ -221,6 +229,8 @@ export default function CasinoBoard({
   const boardRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const handContainerRef = useRef<HTMLDivElement>(null);
+  const tableSlotRefs = useRef<Map<number, HTMLElement>>(new Map());
+  const seatRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const [tableSize, setTableSize] = useState<ElementSize>({ width: 0, height: 0 });
   const [seatPillElement, setSeatPillElement] = useState<HTMLButtonElement | null>(null);
   const [seatPillSize, setSeatPillSize] = useState<ElementSize>({ width: 0, height: 0 });
@@ -563,35 +573,51 @@ export default function CasinoBoard({
     }));
   }, [s.dealNumberInRound]);
 
+  const dealKey = `${s.roundNumber}-${s.dealNumberInRound}`;
+  const [latchedDealKey, setLatchedDealKey] = useState(dealKey);
+
+  const registerTableSlotRef = useCallback((slotIndex: number, el: HTMLElement | null) => {
+    const map = tableSlotRefs.current;
+    if (el) map.set(slotIndex, el);
+    else map.delete(slotIndex);
+  }, []);
+
+  const handLayout = useMemo(
+    () => computeCasinoHandLayout(handWidth, myPlayer?.hand.length ?? 0),
+    [handWidth, myPlayer?.hand.length],
+  );
+  const selectedLift = 14;
+
   const deal = useDealerDealAnimation({
     boardRef,
     tableRef,
-    dealKey: `${s.roundNumber}-${s.dealNumberInRound}`,
+    dealKey: latchedDealKey,
     seats: dealSeats,
     extraTargets: dealExtras,
   });
 
-  const myRevealCount = deal.revealedFor(myId, myPlayer?.hand.length ?? 0);
-  const visibleHand = myPlayer ? myPlayer.hand.slice(0, myRevealCount) : [];
+  const playAnim = useCasinoPlayAnimation({
+    boardRef,
+    tableRef,
+    handContainerRef,
+    tableSlotRefs,
+    seatRefs,
+    handWidth,
+    myId,
+    state: s,
+    dealIsDealing: deal.isDealing,
+  });
 
-  const handLayout = useMemo(() => {
-    const cardCount = visibleHand.length;
-    const available = Math.max(handWidth - 8, 220);
-    const maxCardWidth = 84;
-    const cardWidth = Math.max(58, Math.min(available * 0.2, maxCardWidth));
-    const cardHeight = Math.round(cardWidth * 1.45);
-    const defaultStep = Math.round(cardWidth * 0.58);
-    const fitStep = cardCount > 1 ? (available - cardWidth) / (cardCount - 1) : defaultStep;
-    const step = cardCount > 1 ? Math.max(8, Math.min(defaultStep, fitStep)) : defaultStep;
-    const spreadWidth = cardCount > 1 ? cardWidth + step * (cardCount - 1) : cardWidth;
-    return {
-      cardWidth,
-      cardHeight,
-      step,
-      spreadWidth,
-      selectedLift: 14,
-    };
-  }, [handWidth, visibleHand.length]);
+  useEffect(() => {
+    if (playAnim.animation) return;
+    setLatchedDealKey(dealKey);
+  }, [dealKey, playAnim.animation]);
+
+  const myHandForDisplay = myPlayer ? playAnim.displayMyHand(myPlayer.hand) : [];
+  const myRevealCount = deal.revealedFor(myId, myHandForDisplay.length);
+  const visibleHand = myHandForDisplay
+    .slice(0, myRevealCount)
+    .filter(card => !playAnim.hideHandCard(myId, card));
 
   const currentPlayer = s.players[s.currentPlayerIndex];
   const hasEmptyTableSlot = s.tableSlots.some(slot => slot == null);
@@ -724,7 +750,12 @@ export default function CasinoBoard({
     return (
       <button
         type="button"
-        ref={shouldMeasure ? setSeatPillElement : undefined}
+        ref={el => {
+          if (shouldMeasure) setSeatPillElement(el);
+          const map = seatRefs.current;
+          if (el) map.set(player.id, el);
+          else map.delete(player.id);
+        }}
         onClick={tossProps.onClick}
         disabled={tossProps.disabled}
         className={mergeSeatPillHatClassName(
@@ -876,6 +907,11 @@ export default function CasinoBoard({
         seatCardSplats={seatCardSplats}
         cardSplats={cardSplats}
       />
+      <CasinoPlayAnimationLayer
+        animation={playAnim.animation}
+        renderCardFace={card => <CasinoCardFace card={card} />}
+        onAnimationComplete={playAnim.handleAnimationComplete}
+      />
       <div ref={tableRef} className={`casino-table casino-table--players-${s.players.length}`}>
         {seatLayouts.map((layout) => (
           <div
@@ -911,7 +947,22 @@ export default function CasinoBoard({
                 const isSelected = selectedTableIndices.includes(slotIndex);
                 const isPreviewTarget =
                   !!s.pendingCapturePreview && s.pendingCapturePreview.capturedSlotIndices.includes(slotIndex);
-                const previewCard = isPreviewTarget ? (s.pendingCapturePreview?.playedCard ?? null) : null;
+                const previewCard =
+                  isPreviewTarget && !playAnim.suppressCapturePreview
+                    ? (s.pendingCapturePreview?.playedCard ?? null)
+                    : null;
+                const tableActionsEnabled = isMyTurn && !s.pendingCapturePreview;
+                const slotRef = (el: HTMLButtonElement | null) => registerTableSlotRef(slotIndex, el);
+                if (playAnim.hideTableSlot(slotIndex)) {
+                  return (
+                    <div
+                      key={slotKey}
+                      ref={el => registerTableSlotRef(slotIndex, el)}
+                      className="casino-tableSlot"
+                      aria-hidden="true"
+                    />
+                  );
+                }
                 if (item?.kind === 'card') {
                   return (
                     <TableCard
@@ -919,8 +970,9 @@ export default function CasinoBoard({
                       card={item.card}
                       selected={isSelected}
                       onClick={() => handleTableItemClick(slotIndex)}
-                      disabled={!isMyTurn || !!s.pendingCapturePreview}
+                      actionsEnabled={tableActionsEnabled}
                       previewCard={previewCard}
+                      slotRef={slotRef}
                     />
                   );
                 }
@@ -931,8 +983,9 @@ export default function CasinoBoard({
                       build={item}
                       selected={isSelected}
                       onClick={() => handleTableItemClick(slotIndex)}
-                      disabled={!isMyTurn || !!s.pendingCapturePreview}
+                      actionsEnabled={tableActionsEnabled}
                       previewCard={previewCard}
+                      slotRef={slotRef}
                     />
                   );
                 }
@@ -940,6 +993,7 @@ export default function CasinoBoard({
                 return (
                   <motion.button
                     key={slotKey}
+                    ref={slotRef}
                     type="button"
                     onClick={() => {
                       if (!canTrailHere) return;
@@ -968,7 +1022,7 @@ export default function CasinoBoard({
               className={`casino-handSpread ${isThrowingCards ? 'card-toss-handSpread--hidden' : ''}`}
               style={{
                 width: `${handLayout.spreadWidth}px`,
-                height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
+                height: `${handLayout.cardHeight + selectedLift}px`,
                 transition: 'width 0.16s ease',
               }}
             >
@@ -988,7 +1042,7 @@ export default function CasinoBoard({
                     style={{
                       left: `${i * handLayout.step}px`,
                       width: `${hitboxWidth}px`,
-                      height: `${handLayout.cardHeight + handLayout.selectedLift}px`,
+                      height: `${handLayout.cardHeight + selectedLift}px`,
                       zIndex: i + 1,
                     }}
                   >
@@ -997,7 +1051,7 @@ export default function CasinoBoard({
                       style={{
                         width: `${handLayout.cardWidth}px`,
                         height: `${handLayout.cardHeight}px`,
-                        transform: isSelected ? `translateY(-${handLayout.selectedLift}px)` : 'translateY(0px)',
+                        transform: isSelected ? `translateY(-${selectedLift}px)` : 'translateY(0px)',
                       }}
                     >
                       <CasinoCardFace card={card} disabled={!isMyTurn} selected={isSelected} />

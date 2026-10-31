@@ -82,3 +82,9 @@ export function notifyDealAnimationStarted(plannedCount: number, speed: DealerSp
   if (!dealHoldExtender || plannedCount <= 0) return;
   dealHoldExtender(Date.now() + dealHoldDurationMs(plannedCount, speed));
 }
+
+/** Extend the host turn/deal scheduler hold (e.g. while a play animation runs). */
+export function extendDealHoldUntil(untilMs: number): void {
+  if (!dealHoldExtender) return;
+  dealHoldExtender(untilMs);
+}
