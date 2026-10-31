@@ -178,4 +178,43 @@ describe('detectCasinoPlayAnimIntent', () => {
       });
     }
   });
+
+  it('detects capture finalize to seat when hands empty skips announcement and deals', () => {
+    const tableTwo: Card = { suit: 'clubs', rank: 2 };
+    const handTwo: Card = { suit: 'hearts', rank: 2 };
+    const prev = baseState({
+      tableSlots: [{ kind: 'card', card: tableTwo }, null, null, null],
+      pendingCapturePreview: {
+        playerId: 'p0',
+        playedCard: handTwo,
+        capturedSlotIndices: [0],
+      },
+      players: [{ ...baseState().players[0]!, hand: [] }],
+      dealNumberInRound: 1,
+    });
+    const next = baseState({
+      tableSlots: [null, null, null, null],
+      dealNumberInRound: 2,
+      actionAnnouncement: null,
+      phase: 'playing',
+      players: [
+        {
+          ...prev.players[0]!,
+          hand: [
+            { suit: 'diamonds', rank: 4 },
+            { suit: 'clubs', rank: 3 },
+            { suit: 'spades', rank: 7 },
+            { suit: 'hearts', rank: 9 },
+          ],
+          capturedCards: [handTwo, tableTwo],
+        },
+      ],
+    });
+    const intent = detectCasinoPlayAnimIntent(prev, next);
+    expect(intent?.kind).toBe('capture-to-seat');
+    if (intent?.kind === 'capture-to-seat') {
+      expect(intent.capturedCards).toEqual([handTwo, tableTwo]);
+      expect(intent.playedFromPreview?.card).toEqual(handTwo);
+    }
+  });
 });

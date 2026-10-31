@@ -153,6 +153,8 @@ export function useCasinoPlayAnimation(options: {
   const lastStartedIdRef = useRef<string | null>(null);
   const landingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const landingInProgressRef = useRef(false);
+  /** Sync flag so deal animation latch can wait until layoutEffect starts play anim. */
+  const blockDealLatchRef = useRef(false);
 
   useEffect(() => {
     animationRef.current = animation;
@@ -161,6 +163,7 @@ export function useCasinoPlayAnimation(options: {
   const clearAnimation = useCallback(() => {
     landingInProgressRef.current = false;
     lastStartedIdRef.current = null;
+    blockDealLatchRef.current = false;
     setAnimation(null);
   }, []);
 
@@ -447,6 +450,7 @@ export function useCasinoPlayAnimation(options: {
 
     lastStartedIdRef.current = animId;
     landingInProgressRef.current = false;
+    blockDealLatchRef.current = true;
     extendDealHoldUntil(playAnimationHoldUntilMs(built.flights));
     setAnimation(built);
   }, [state, dealIsDealing, reduceMotion, buildAnimationFromIntent]);
@@ -493,6 +497,7 @@ export function useCasinoPlayAnimation(options: {
 
   return {
     animation,
+    blockDealLatchRef,
     hideTableSlot,
     hideHandCard,
     displayMyHand,

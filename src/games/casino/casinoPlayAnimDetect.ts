@@ -1,3 +1,4 @@
+import { getCaptureOutcomeFromPreview } from './logic';
 import type {
   Card,
   CasinoActionAnnouncement,
@@ -240,23 +241,23 @@ export function detectCasinoPlayAnimIntent(
   const newAnnouncement =
     next.actionAnnouncement != null && prevAnnKey !== nextAnnKey;
 
-  if (
-    prev.pendingCapturePreview &&
-    !next.pendingCapturePreview &&
-    next.actionAnnouncement?.kind === 'capture'
-  ) {
-    const ann = next.actionAnnouncement;
+  if (prev.pendingCapturePreview && !next.pendingCapturePreview) {
     const preview = prev.pendingCapturePreview;
+    const captureAnnouncement =
+      next.actionAnnouncement?.kind === 'capture' ? next.actionAnnouncement : null;
+    const outcome = getCaptureOutcomeFromPreview(prev, preview);
+    if (!outcome && !captureAnnouncement) return null;
+    const capturedCards = captureAnnouncement?.capturedCards ?? outcome!.capturedCards;
     const { slotFlights } = buildCaptureSlotFlights(
       prev.tableSlots,
       preview.capturedSlotIndices,
       preview.playedCard,
-      ann.capturedCards,
+      capturedCards,
     );
     return {
       kind: 'capture-to-seat',
-      playerId: ann.playerId,
-      capturedCards: ann.capturedCards,
+      playerId: preview.playerId,
+      capturedCards,
       slotFlights,
       playedFromHand: null,
       playedFromPreview: {

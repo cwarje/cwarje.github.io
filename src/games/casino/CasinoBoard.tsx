@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   CASINO_TABLE_COLUMNS,
@@ -608,13 +608,17 @@ export default function CasinoBoard({
     dealIsDealing: deal.isDealing,
   });
 
-  useEffect(() => {
-    if (playAnim.animation) return;
+  useLayoutEffect(() => {
+    if (playAnim.blockDealLatchRef.current || playAnim.animation) return;
     setLatchedDealKey(dealKey);
-  }, [dealKey, playAnim.animation]);
+  }, [dealKey, playAnim.animation, playAnim.blockDealLatchRef]);
 
   const myHandForDisplay = myPlayer ? playAnim.displayMyHand(myPlayer.hand) : [];
-  const myRevealCount = deal.revealedFor(myId, myHandForDisplay.length);
+  /** State may include the next deal before the latched deal animation starts (e.g. after last-card capture). */
+  const dealHandRevealPending = dealKey !== latchedDealKey;
+  const myRevealCount = dealHandRevealPending
+    ? 0
+    : deal.revealedFor(myId, myHandForDisplay.length);
   const visibleHand = myHandForDisplay
     .slice(0, myRevealCount)
     .filter(card => !playAnim.hideHandCard(myId, card));
@@ -925,7 +929,11 @@ export default function CasinoBoard({
                   playerId={layout.player.id}
                   playerName={layout.player.name}
                   fullCount={layout.player.hand.length}
-                  revealedCount={deal.revealedFor(layout.player.id, layout.player.hand.length)}
+                  revealedCount={
+                    dealHandRevealPending
+                      ? 0
+                      : deal.revealedFor(layout.player.id, layout.player.hand.length)
+                  }
                 />
               )}
               {renderSeatPill(layout, layout.relativeIndex === 0)}
