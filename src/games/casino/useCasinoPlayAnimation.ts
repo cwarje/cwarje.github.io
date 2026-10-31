@@ -330,8 +330,6 @@ export function useCasinoPlayAnimation(options: {
         const seatEl = seatRefs.current?.get(intent.playerId);
         const seatMetrics = getElementMetrics(boardRef, seatEl ?? null);
         const dest = seatMetrics?.center ?? fallbackCenter;
-        const destW = seatMetrics?.width || cardSize.width;
-        const destH = seatMetrics?.height || cardSize.height;
 
         let delay = 0;
         if (intent.playedFromPreview) {

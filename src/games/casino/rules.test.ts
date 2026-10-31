@@ -427,7 +427,8 @@ describe('owned-build reserve helpers', () => {
       },
       { kind: 'card', card: looseTwo },
     ];
-    const hand = [S2, { suit: 'clubs', rank: 7 }];
+    const C7: Card = { suit: 'clubs', rank: 7 };
+    const hand: Card[] = [S2, C7];
     const raw = findPossibleCaptures(S2, table);
     expect(raw.some(indices => indices.includes(1) && !indices.includes(0))).toBe(true);
     const safe = findPossibleCapturesRespectingBuildObligation(S2, table, hand, 'bot');
