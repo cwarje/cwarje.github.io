@@ -143,6 +143,117 @@
   filter: drop-shadow(0 1px 1px rgb(255 255 255 / 0.35));
 }
 
+/* Holiday Christmas lights (SITE_XMAS_THEME_ENABLED) */
+@keyframes christmas-light-flicker-die {
+  0% {
+    opacity: 1;
+    filter: brightness(1.35);
+  }
+  18% {
+    opacity: 0.55;
+    filter: brightness(0.75);
+  }
+  36% {
+    opacity: 1;
+    filter: brightness(1.2);
+  }
+  54% {
+    opacity: 0.5;
+    filter: brightness(0.7);
+  }
+  72% {
+    opacity: 0.92;
+    filter: brightness(1);
+  }
+  90%,
+  100% {
+    opacity: 0.72;
+    filter: brightness(0.82);
+  }
+}
+
+.christmas-lights__bulb {
+  position: absolute;
+  width: 8px;
+  height: 11px;
+  margin-left: -4px;
+  margin-top: -5px;
+}
+
+.christmas-lights__bulb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50% 50% 45% 45%;
+  background: var(--light-color, #ef4444);
+  box-shadow:
+    0 0 6px 1px color-mix(in srgb, var(--light-color, #ef4444) 55%, transparent),
+    inset 0 -2px 0 rgb(0 0 0 / 0.25);
+}
+
+.christmas-lights__bulb::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  z-index: 1;
+  width: 5px;
+  height: 3px;
+  margin-left: -2.5px;
+  border-radius: 1px;
+  background: rgb(55 65 81);
+}
+
+.header-christmas-lights {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  height: 14px;
+  padding: 0 10px;
+  transform: translateY(calc(100% - 2px));
+}
+
+.header-christmas-lights__wire {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 2px;
+  height: 0;
+  border-top: 1px solid rgb(55 65 81 / 0.9);
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.35);
+}
+
+.header-christmas-lights .christmas-lights__bulb {
+  position: relative;
+  margin-left: 0;
+  margin-top: 0;
+  top: var(--light-sag, 0);
+  flex-shrink: 0;
+}
+
+.header-christmas-lights .christmas-lights__bulb::before {
+  opacity: 1;
+  filter: brightness(1.35);
+}
+
+.header-christmas-lights .christmas-lights__bulb--flicker::before {
+  animation: christmas-light-flicker-die 0.52s linear forwards;
+}
+
+.header-christmas-lights .christmas-lights__bulb--out::before {
+  opacity: 0.72;
+  filter: brightness(0.82);
+  box-shadow:
+    0 0 3px 0 color-mix(in srgb, var(--light-color, #ef4444) 22%, transparent),
+    inset 0 -2px 0 rgb(0 0 0 / 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-christmas-lights .christmas-lights__bulb--flicker::before {
+    animation: none;
+  }
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

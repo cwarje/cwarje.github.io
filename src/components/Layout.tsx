@@ -1,5 +1,6 @@
 import { Gamepad2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import HeaderChristmasLights from './HeaderChristmasLights';
 import LobbyMenu from './LobbyMenu';
 import { isDoubleXpWeekend } from '../xp/progress';
 import { SITE_HEADER_TITLE, SITE_XMAS_THEME_ENABLED } from '../siteTheme';
@@ -16,7 +17,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-black">
       {showHeader && (
-        <header className="border-b border-white/5 bg-black sticky top-0 z-50">
+        <header className="relative border-b border-white/5 bg-black sticky top-0 z-50">
           <div className="relative mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
             <Link to="/" className="flex min-w-0 items-center gap-3 group">
               <div className="flex h-8 w-8 items-center justify-center shrink-0">
@@ -39,6 +40,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </Link>
             <LobbyMenu />
           </div>
+          {SITE_XMAS_THEME_ENABLED && <HeaderChristmasLights />}
         </header>
       )}
       <main className={mainClassName}>
