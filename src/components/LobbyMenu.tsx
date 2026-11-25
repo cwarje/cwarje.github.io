@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Copy, X, LogOut, Loader2, Settings, StopCircle, RotateCcw, Pencil, Trash2, Check, Plus, User } from 'lucide-react';
+import { Users, Copy, X, LogOut, Loader2, Settings, StopCircle, RotateCcw, Pencil, Trash2, Check, Plus } from 'lucide-react';
 import PlayerList from './PlayerList';
 import ColorSwatchGrid from './ColorSwatchGrid';
 import ColoredBotIcon from './ColoredBotIcon';
@@ -215,11 +215,6 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
   const playerLevel = getPlayerLevelForPlayer({ xp: playerXp });
   const equippedHatId = sanitizeSelectedHat(myPlayer?.selectedHat ?? readSelectedHat(), playerLevel);
   const equippedHat = HAT_CATALOG.find((h) => h.id === equippedHatId) ?? HAT_CATALOG[0];
-  const profileDisplayName = myPlayer?.name ?? localStorage.getItem('playerName') ?? '';
-  const profileDisplayColor = myPlayer?.color ?? normalizePlayerColor(localStorage.getItem('playerColor'));
-  const profileTriggerName = profileDisplayName.trim() || 'Player';
-  const myInitial = profileTriggerName[0].toUpperCase();
-  const myColorHex = PLAYER_COLOR_HEX[profileDisplayColor] ?? PLAYER_COLOR_HEX[DEFAULT_PLAYER_COLOR];
 
   const pillTriggerClassName =
     'flex h-9 items-center gap-1.5 px-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-sm font-medium leading-none text-gray-300 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer';
@@ -561,23 +556,11 @@ export default function LobbyMenu({ variant = 'default' }: LobbyMenuProps) {
             onClick={() => togglePanel('profile')}
             disabled={connecting && !room}
             className={pillTriggerClassName}
-            title={profileTriggerName}
+            title="Profile"
             aria-label="Profile"
             aria-expanded={activePanel === 'profile'}
           >
-            <span
-              className="flex-shrink-0 text-sm font-semibold leading-none sm:hidden"
-              style={{ color: myColorHex }}
-            >
-              {myInitial}
-            </span>
-            <span
-              className="hidden max-w-[9rem] truncate text-sm font-semibold leading-none sm:inline"
-              style={{ color: myColorHex }}
-            >
-              {profileTriggerName}
-            </span>
-            <User className="w-4 h-4 flex-shrink-0" />
+            <span className="font-semibold">Profile</span>
           </button>
           <button
             type="button"

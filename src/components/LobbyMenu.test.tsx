@@ -247,7 +247,10 @@ describe('LobbyMenu homepage split triggers', () => {
   it('shows Profile, Level, and lobby triggers on the homepage', () => {
     renderHomeLobbyMenu();
 
-    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
+    const profileButton = screen.getByRole('button', { name: 'Profile' });
+    expect(profileButton).toBeInTheDocument();
+    expect(profileButton).toHaveTextContent('Profile');
+    expect(screen.queryByText('Cam')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Level progress' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open lobby' })).toBeInTheDocument();
   });
@@ -255,7 +258,7 @@ describe('LobbyMenu homepage split triggers', () => {
   it('keeps lobby content out of the profile panel', () => {
     renderOpenProfileMenu();
 
-    expect(screen.getByText('Profile')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Your name')).toBeInTheDocument();
     expect(screen.queryByText('Lobby Code')).not.toBeInTheDocument();
   });
 });
