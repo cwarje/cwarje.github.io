@@ -397,7 +397,7 @@ For the holiday season, enable gentle snowfall on the homepage background:
 1. Set `SITE_XMAS_THEME_ENABLED = true` in `src/siteTheme.ts`.
 2. Deploy as usual; set the flag back to `false` after the season.
 
-Snow appears only on `/` (not game routes). Users with **Reduce motion** enabled see no snow (`HomeSnowfall` and `src/index.css`).
+Snow appears only on `/` (not game routes). Each homepage game card also gets a small snow cap along its top edge (`GameCardSnowCap`). Users with **Reduce motion** enabled see no falling snow (`HomeSnowfall` and `src/index.css`); card snow caps remain visible.
 
 ### New game badge
 

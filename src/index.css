@@ -133,6 +133,16 @@
   }
 }
 
+/* Homepage game card snow caps (SITE_XMAS_THEME_ENABLED) */
+.game-card-snow-cap {
+  top: -6px;
+  height: 20px;
+}
+
+.game-card-snow-cap__shape {
+  filter: drop-shadow(0 1px 1px rgb(255 255 255 / 0.35));
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

@@ -2,6 +2,8 @@ import { motion } from 'framer-motion';
 import { Info } from 'lucide-react';
 import type { GameType } from '../networking/types';
 import { GAME_REGISTRY } from '../games/registry';
+import GameCardSnowCap from './GameCardSnowCap';
+import { SITE_XMAS_THEME_ENABLED } from '../siteTheme';
 interface GameCardProps {
   gameType: GameType;
   onSelect: (gameType: GameType) => void;
@@ -31,6 +33,7 @@ export default function GameCard({ gameType, onSelect, onInfo, disabled, isExpan
       aria-expanded={isExpanded}
       className={`relative w-full flex flex-col p-6 min-h-[140px] rounded-2xl bg-gradient-to-br ${theme.gradient} backdrop-blur-md border ${theme.cardBorder} ${isExpanded ? 'rounded-b-none border-b-0' : ''} ${disabled ? 'opacity-40 cursor-not-allowed' : `${theme.hoverBorder} cursor-pointer`} transition-colors duration-300 group`}
     >
+      {SITE_XMAS_THEME_ENABLED && <GameCardSnowCap />}
       {gameDef.showNewBadge && (
         <div className="absolute top-3 left-3 flex items-center gap-1.5">
           <span className="inline-grid grid-cols-1 grid-rows-1 place-items-center px-2 py-0.5 rounded-md bg-amber-400/95 shadow-sm">

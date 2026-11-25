@@ -64,6 +64,7 @@ function createRoomContext(overrides: Partial<RoomContextValue> = {}): RoomConte
   };
 }
 
+import { PRODUCTION_GAME_TYPES } from '../games/registry';
 import Home from './Home';
 
 describe('Home christmas theme', () => {
@@ -77,5 +78,17 @@ describe('Home christmas theme', () => {
     );
 
     expect(screen.getByTestId('home-snowfall')).toBeInTheDocument();
+  });
+
+  it('renders a snow cap on each game card when SITE_XMAS_THEME_ENABLED is true', () => {
+    mockUseRoomContext.mockReturnValue(createRoomContext());
+
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByTestId('game-card-snow-cap')).toHaveLength(PRODUCTION_GAME_TYPES.length);
   });
 });
