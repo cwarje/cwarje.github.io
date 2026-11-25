@@ -66,7 +66,7 @@ describe('hats', () => {
       { id: 'bot', isBot: true, xp: 5000, selectedHat: 'cowboy' as const },
     ];
     expect(getLobbyPlayerSanitizedHatId('human', lobby)).toBe('chef');
-    expect(getLobbyPlayerSanitizedHatId('bot', lobby)).toBe('elf');
+    expect(getLobbyPlayerSanitizedHatId('bot', lobby)).toBe('none');
     expect(getLobbyPlayerSanitizedHatId('missing', lobby)).toBe('none');
   });
 
