@@ -45,6 +45,8 @@ export type BackgammonMatchFormat = 'single' | 'best-of-3';
 export type HatId =
   | 'none'
   | 'party'
+  | 'santa'
+  | 'elf'
   | 'chef'
   | 'captain'
   | 'beanie'

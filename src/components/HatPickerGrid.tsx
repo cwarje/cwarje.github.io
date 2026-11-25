@@ -2,7 +2,7 @@ import { Lock } from 'lucide-react';
 import type { HatId } from '../networking/types';
 import { useRoomContext } from '../networking/roomStore';
 import {
-  HAT_CATALOG,
+  HATS_FOR_PLAYER_PICKER,
   getPlayerLevelForPlayer,
   isHatUnlocked,
   sanitizeSelectedHat,
@@ -27,7 +27,7 @@ export default function HatPickerGrid() {
       role="listbox"
       aria-label="Choose a hat"
     >
-      {HAT_CATALOG.map((hat) => {
+      {HATS_FOR_PLAYER_PICKER.map((hat) => {
         const unlocked = isHatUnlocked(hat.id, level);
         const selected = equipped === hat.id;
         const unlockLabel = hat.requiredLevel > 0 ? `Lv ${hat.requiredLevel}` : null;

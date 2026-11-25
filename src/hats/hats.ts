@@ -1,7 +1,10 @@
 import type { CSSProperties } from 'react';
 import type { HatId, Player } from '../networking/types';
+import { SITE_XMAS_THEME_ENABLED } from '../siteTheme';
 import { getLevel } from '../xp/progress';
 import partyHatUrl from '../assets/party-hat.png';
+import santaHatUrl from '../assets/santa-hat.png';
+import elfHatUrl from '../assets/elf-hat.png';
 import chefHatUrl from '../assets/chef-hat.png';
 import captainHatUrl from '../assets/captain-hat.png';
 import beanieHatUrl from '../assets/beanie-hat.png';
@@ -20,11 +23,15 @@ export interface HatDefinition {
   label: string;
   imageUrl?: string;
   requiredLevel: number;
+  /** When false, hat is render-only (e.g. bots) and excluded from the player picker. */
+  playerWearable?: boolean;
 }
 
 export const HAT_CATALOG: HatDefinition[] = [
   { id: 'none', label: 'No hat', requiredLevel: 0 },
   { id: 'party', label: 'Party hat', imageUrl: partyHatUrl, requiredLevel: 0 },
+  { id: 'santa', label: 'Santa hat', imageUrl: santaHatUrl, requiredLevel: 0 },
+  { id: 'elf', label: 'Elf hat', imageUrl: elfHatUrl, requiredLevel: 0, playerWearable: false },
   { id: 'cowboy', label: 'Cowboy hat', imageUrl: cowboyHatUrl, requiredLevel: 10 },
   { id: 'chef', label: 'Chef hat', imageUrl: chefHatUrl, requiredLevel: 20 },
   { id: 'fedora', label: 'Fedora', imageUrl: fedoraHatUrl, requiredLevel: 30 },
@@ -37,6 +44,8 @@ export const HAT_CATALOG: HatDefinition[] = [
   { id: 'crown', label: 'Crown hat', imageUrl: crownHatUrl, requiredLevel: 100 },
 ];
 
+export const HATS_FOR_PLAYER_PICKER = HAT_CATALOG.filter((h) => h.playerWearable !== false);
+
 const HAT_IDS = new Set<HatId>(HAT_CATALOG.map((h) => h.id));
 
 export function getPlayerLevelForPlayer(player: Pick<Player, 'xp'>): number {
@@ -45,12 +54,14 @@ export function getPlayerLevelForPlayer(player: Pick<Player, 'xp'>): number {
 
 export function isHatUnlocked(hatId: HatId, level: number): boolean {
   const def = HAT_CATALOG.find((h) => h.id === hatId);
-  if (!def) return false;
+  if (!def || def.playerWearable === false) return false;
   return level >= def.requiredLevel;
 }
 
 export function countUnlockedWearableHats(level: number): number {
-  return HAT_CATALOG.filter((h) => h.id !== 'none' && isHatUnlocked(h.id, level)).length;
+  return HAT_CATALOG.filter(
+    (h) => h.id !== 'none' && h.playerWearable !== false && isHatUnlocked(h.id, level),
+  ).length;
 }
 
 export function normalizeHatId(raw: unknown): HatId {
@@ -127,8 +138,11 @@ export function getLobbyPlayerSanitizedHatId(
   lobbyPlayers: LobbyPlayerHatLookup[] | undefined,
 ): HatId {
   const lobbyPlayer = lobbyPlayers?.find((p) => p.id === playerId);
-  if (!lobbyPlayer || lobbyPlayer.isBot) {
+  if (!lobbyPlayer) {
     return 'none';
+  }
+  if (lobbyPlayer.isBot) {
+    return SITE_XMAS_THEME_ENABLED ? 'elf' : 'none';
   }
   const level = getLevel(lobbyPlayer.xp ?? 0);
   return sanitizeSelectedHat(lobbyPlayer.selectedHat, level);

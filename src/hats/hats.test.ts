@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
+  HAT_CATALOG,
+  HATS_FOR_PLAYER_PICKER,
   SELECTED_HAT_STORAGE_KEY,
   countUnlockedWearableHats,
   getLobbyPlayerSanitizedHatId,
@@ -14,8 +16,10 @@ describe('hats', () => {
     localStorage.removeItem(SELECTED_HAT_STORAGE_KEY);
   });
 
-  it('unlocks party at any level and tier hats every 10 levels', () => {
+  it('unlocks party and santa at any level and tier hats every 10 levels', () => {
     expect(isHatUnlocked('party', 1)).toBe(true);
+    expect(isHatUnlocked('santa', 0)).toBe(true);
+    expect(isHatUnlocked('elf', 100)).toBe(false);
     expect(isHatUnlocked('cowboy', 9)).toBe(false);
     expect(isHatUnlocked('cowboy', 10)).toBe(true);
     expect(isHatUnlocked('chef', 19)).toBe(false);
@@ -32,15 +36,21 @@ describe('hats', () => {
   });
 
   it('counts wearable hats at level 49', () => {
-    expect(countUnlockedWearableHats(49)).toBe(5);
-    expect(countUnlockedWearableHats(9)).toBe(1);
-    expect(countUnlockedWearableHats(90)).toBe(10);
-    expect(countUnlockedWearableHats(100)).toBe(11);
+    expect(countUnlockedWearableHats(49)).toBe(6);
+    expect(countUnlockedWearableHats(9)).toBe(2);
+    expect(countUnlockedWearableHats(90)).toBe(11);
+    expect(countUnlockedWearableHats(100)).toBe(12);
+  });
+
+  it('excludes non-player-wearable hats from the picker catalog', () => {
+    expect(HATS_FOR_PLAYER_PICKER).toHaveLength(HAT_CATALOG.length - 1);
+    expect(HATS_FOR_PLAYER_PICKER.some((h) => h.id === 'elf')).toBe(false);
   });
 
   it('sanitizes locked selections to none', () => {
     expect(sanitizeSelectedHat('chef', 10)).toBe('none');
     expect(sanitizeSelectedHat('chef', 20)).toBe('chef');
+    expect(sanitizeSelectedHat('elf', 100)).toBe('none');
     expect(sanitizeSelectedHat(undefined, 1)).toBe('none');
   });
 
@@ -56,7 +66,7 @@ describe('hats', () => {
       { id: 'bot', isBot: true, xp: 5000, selectedHat: 'cowboy' as const },
     ];
     expect(getLobbyPlayerSanitizedHatId('human', lobby)).toBe('chef');
-    expect(getLobbyPlayerSanitizedHatId('bot', lobby)).toBe('none');
+    expect(getLobbyPlayerSanitizedHatId('bot', lobby)).toBe('elf');
     expect(getLobbyPlayerSanitizedHatId('missing', lobby)).toBe('none');
   });
 
