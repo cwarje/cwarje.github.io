@@ -20,7 +20,7 @@ import { DealAnimationLayer } from '../shared/DealAnimationLayer';
 import { CardTossLayers } from '../shared/CardTossLayers';
 import { useCardToss } from '../shared/useCardToss';
 import { GameOverPlayerName, getGameOverXpAwards } from '../../xp/gameOverXp';
-import queenOfSpadesSound from '../../assets/queen-of-spades.mp3';
+import { QUEEN_OF_SPADES_SOUND } from '../../siteTheme';
 
 function placementLabel(position: number): string {
   if (position % 100 >= 11 && position % 100 <= 13) return `${position}th`;
@@ -183,7 +183,7 @@ export default function HeartsBoard({
   };
 
   useEffect(() => {
-    queenOfSpadesAudioRef.current = new Audio(queenOfSpadesSound);
+    queenOfSpadesAudioRef.current = new Audio(QUEEN_OF_SPADES_SOUND);
     return () => {
       queenOfSpadesAudioRef.current = null;
     };
