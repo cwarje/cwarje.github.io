@@ -12,8 +12,14 @@ function randomBetween(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
 
-/** Light string along the header bottom edge when the holiday theme is on. */
-export default function HeaderChristmasLights() {
+export type HeaderChristmasLightsPlacement = 'headerBottom' | 'viewportTop';
+
+/** Light string when the holiday theme is on (header bottom or viewport top). */
+export default function HeaderChristmasLights({
+  placement = 'headerBottom',
+}: {
+  placement?: HeaderChristmasLightsPlacement;
+}) {
   const [flickerIndex, setFlickerIndex] = useState<number | null>(null);
   const [deadIndex, setDeadIndex] = useState<number | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -56,10 +62,15 @@ export default function HeaderChristmasLights() {
     return () => clearTimers();
   }, []);
 
+  const anchorClass =
+    placement === 'viewportTop' ? 'top-0' : 'bottom-0';
+  const placementClass =
+    placement === 'viewportTop' ? 'header-christmas-lights--viewport-top' : '';
+
   return (
     <div
       data-testid="header-christmas-lights"
-      className="header-christmas-lights pointer-events-none absolute inset-x-0 bottom-0 z-10"
+      className={`header-christmas-lights pointer-events-none absolute inset-x-0 ${anchorClass} z-10 ${placementClass}`}
       aria-hidden
     >
       <div className="header-christmas-lights__wire" />

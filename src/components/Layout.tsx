@@ -43,6 +43,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {SITE_XMAS_THEME_ENABLED && <HeaderChristmasLights />}
         </header>
       )}
+      {isGamePage && SITE_XMAS_THEME_ENABLED && (
+        <div className="pointer-events-none fixed inset-x-0 top-0 z-[45]" aria-hidden>
+          <HeaderChristmasLights placement="viewportTop" />
+        </div>
+      )}
       <main className={mainClassName}>
         {children}
       </main>

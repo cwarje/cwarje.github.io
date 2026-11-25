@@ -24,4 +24,21 @@ describe('Layout christmas theme', () => {
 
     expect(screen.getByTestId('header-christmas-lights')).toBeInTheDocument();
   });
+
+  it('renders viewport-top Christmas lights on game routes without the homepage header', () => {
+    render(
+      <MemoryRouter initialEntries={['/game/TEST']}>
+        <Layout>
+          <div>Game</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId('header-christmas-lights')).toBeInTheDocument();
+    expect(screen.getByTestId('header-christmas-lights')).toHaveClass(
+      'header-christmas-lights--viewport-top',
+    );
+    expect(screen.queryByText("Santa's Fav Games")).not.toBeInTheDocument();
+    expect(screen.queryByTestId('lobby-menu-stub')).not.toBeInTheDocument();
+  });
 });

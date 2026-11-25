@@ -213,6 +213,17 @@
   transform: translateY(calc(100% - 2px));
 }
 
+.header-christmas-lights--viewport-top {
+  transform: translateY(5px);
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.header-christmas-lights--viewport-top .header-christmas-lights__wire {
+  left: 0;
+  right: 0;
+}
+
 .header-christmas-lights__wire {
   position: absolute;
   left: 8px;
