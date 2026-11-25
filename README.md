@@ -390,6 +390,15 @@ If your board uses `useDealAnimation`:
 - Add game-specific overrides under a `.my-game-*` prefix in `src/index.css`.
 - Seat pills often use a colored name row + white value row; see `.river-seatPillTop` and `.river-seatCell--*` for the Up River pattern.
 
+### Christmas homepage snow
+
+For the holiday season, enable gentle snowfall on the homepage background:
+
+1. Set `SITE_XMAS_THEME_ENABLED = true` in `src/siteTheme.ts`.
+2. Deploy as usual; set the flag back to `false` after the season.
+
+Snow appears only on `/` (not game routes). Users with **Reduce motion** enabled see no snow (`HomeSnowfall` and `src/index.css`).
+
 ### New game badge
 
 When you launch a new game, highlight it on the homepage with an amber **New** ribbon:

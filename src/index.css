@@ -109,6 +109,30 @@
   }
 }
 
+/* Homepage holiday snowfall (SITE_XMAS_THEME_ENABLED) */
+@keyframes home-snowfall {
+  0% {
+    transform: translate3d(0, -10vh, 0);
+  }
+  100% {
+    transform: translate3d(var(--snow-drift, 0px), 110vh, 0);
+  }
+}
+
+.home-snowflake {
+  top: -5vh;
+  animation-name: home-snowfall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-snowfall {
+    display: none;
+  }
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

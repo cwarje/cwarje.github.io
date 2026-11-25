@@ -12,6 +12,8 @@ import type { GameStartOptions, GameType, Player, PlayerColor } from '../network
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColor, PLAYER_COLOR_HEX, PLAYER_COLOR_OPTIONS } from '../networking/playerColors';
 import { GAME_REGISTRY, ALL_GAME_TYPES, PRODUCTION_GAME_TYPES } from '../games/registry';
 import { pickRandomLobbyWaitingGifUrl } from '../lobby/waitingGif';
+import HomeSnowfall from '../components/HomeSnowfall';
+import { SITE_XMAS_THEME_ENABLED } from '../siteTheme';
 const gameTypesToShow = import.meta.env.DEV ? ALL_GAME_TYPES : PRODUCTION_GAME_TYPES;
 
 function playerTextColor(color: PlayerColor): string {
@@ -179,7 +181,9 @@ export default function Home() {
   const infoGameDef = infoDisplayType ? GAME_REGISTRY[infoDisplayType] : null;
 
   return (
-    <div className="space-y-10">
+    <>
+      {SITE_XMAS_THEME_ENABLED && <HomeSnowfall />}
+      <div className="relative z-[2] space-y-10">
       {/* Join bar or waiting message — fixed height so game cards don't shift */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -383,6 +387,7 @@ export default function Home() {
         </motion.div>
       )}
 
-    </div>
+      </div>
+    </>
   );
 }
